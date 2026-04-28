@@ -1,13 +1,14 @@
 {
   "id": "content_fraction_001",
-  "title": "피자로 배우는 1/4",
+  "title": "분수 탐험: 빛나는 한 조각",
   "status": "teacher_review",
-  "generatedAt": "2026-04-28T11:01:08.974Z",
+  "generatedAt": "2026-04-28T11:08:13.334Z",
   "generation": {
     "requestedImageModel": "gpt-image-2",
     "usedImageModel": "gpt-image-2",
     "fallbackUsed": false,
-    "imagePrompt": "Create a simple, child-friendly educational illustration for a Korean middle school student learning fractions. Scene: one whole pizza divided into exactly four equal slices, with exactly one slice gently highlighted in warm yellow. The other three slices should remain visible and equal in size. Use a clean classroom-friendly style, soft colors, white or light neutral background, no clutter. Do not include any text, letters, numbers, labels, watermark, logo, or speech bubbles. The image should clearly communicate 'one out of four equal parts' without using written text."
+    "promptVersion": "creative-mission-card-v2",
+    "imagePrompt": "Create a premium Korean edtech mission-card illustration for a middle school student learning fractions. Visual concept: a round pizza becomes a small top-down adventure map on a clean study desk, like a friendly math quest board. The pizza must be divided by clear cross-shaped gaps into exactly four equal quarter regions. Exactly one quarter region is lifted slightly and glowing with warm golden light, while the other three equal regions stay visible and calm. Add subtle mission-scene details around the pizza: a tiny compass token, four small round counters near the plate with exactly one counter glowing, soft paper-cut or clay-like 3D texture, gentle shadows. Make it feel imaginative and useful for explaining 'one out of four equal parts', not like a plain food illustration. Use cheerful but not childish colors, clean composition, enough empty margin for UI overlay, no clutter. Do not include any text, letters, numbers, labels, watermark, logo, or speech bubbles anywhere in the image."
   },
   "student": {
     "id": "stu_sumin",
@@ -21,8 +22,8 @@
       "분모/분자 역할 혼동",
       "자신감 저하"
     ],
-    "strategy": "첫 문항은 정답 가능성이 높은 쉬운 성공 경험으로 시작하고, 피자 그림을 통해 전체 조각 수와 가진 조각 수를 분리해서 설명한다.",
-    "teacherNote": "이미지를 먼저 보여주고, '전체는 몇 조각?', '가진 건 몇 조각?' 순서로 질문하세요."
+    "strategy": "첫 문항은 정답 가능성이 높은 쉬운 성공 경험으로 시작하고, 탐험 지도처럼 보이는 피자 이미지를 통해 전체 조각 수와 선택한 조각 수를 분리해서 설명한다.",
+    "teacherNote": "이미지를 먼저 보여주고, '전체 구역은 몇 개?', '빛나는 구역은 몇 개?' 순서로 질문하세요."
   },
   "assets": [
     {
@@ -30,7 +31,7 @@
       "type": "image",
       "purpose": "concept_anchor",
       "path": "fraction-pizza.png",
-      "alt": "4조각으로 똑같이 나뉜 피자 중 1조각이 강조된 그림"
+      "alt": "4개의 같은 구역으로 나뉜 피자 지도에서 한 구역이 빛나는 그림"
     }
   ],
   "blocks": [
@@ -38,14 +39,14 @@
       "id": "block_intro",
       "type": "mission_intro",
       "order": 1,
-      "studentText": "오늘은 피자를 나누면서 1/4을 알아볼 거예요."
+      "studentText": "오늘은 빛나는 한 조각을 찾아보면서 1/4을 알아볼 거예요."
     },
     {
       "id": "block_image",
       "type": "image_anchor",
       "order": 2,
       "imageAssetId": "img_fraction_pizza_001",
-      "studentText": "피자 한 판이 똑같이 4조각으로 나뉘어 있어요. 노란 조각은 그중 1조각이에요."
+      "studentText": "피자 지도가 똑같이 4구역으로 나뉘어 있어요. 빛나는 구역은 그중 1구역이에요."
     },
     {
       "id": "block_explain",
@@ -57,7 +58,7 @@
       "id": "block_quiz",
       "type": "choice_question",
       "order": 4,
-      "question": "4조각 중 1조각은 몇 분의 몇일까요?",
+      "question": "4구역 중 빛나는 1구역은 몇 분의 몇일까요?",
       "choices": [
         {
           "id": "a",
@@ -79,8 +80,8 @@
       "type": "adaptive_feedback",
       "order": 5,
       "feedback": {
-        "correct": "좋아요. 전체 4조각 중 1조각이니까 1/4이에요.",
-        "wrong": "괜찮아요. 아래 숫자는 전체 조각 수, 위 숫자는 고른 조각 수예요. 다시 피자를 보면서 세어볼까요?"
+        "correct": "좋아요. 전체 4구역 중 1구역이니까 1/4이에요.",
+        "wrong": "괜찮아요. 아래 숫자는 전체 구역 수, 위 숫자는 빛나는 구역 수예요. 다시 그림을 보면서 세어볼까요?"
       }
     },
     {
