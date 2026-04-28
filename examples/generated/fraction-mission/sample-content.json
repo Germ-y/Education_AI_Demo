@@ -1,0 +1,120 @@
+{
+  "id": "content_fraction_001",
+  "title": "피자로 배우는 1/4",
+  "status": "teacher_review",
+  "generatedAt": "2026-04-28T11:01:08.974Z",
+  "generation": {
+    "requestedImageModel": "gpt-image-2",
+    "usedImageModel": "gpt-image-2",
+    "fallbackUsed": false,
+    "imagePrompt": "Create a simple, child-friendly educational illustration for a Korean middle school student learning fractions. Scene: one whole pizza divided into exactly four equal slices, with exactly one slice gently highlighted in warm yellow. The other three slices should remain visible and equal in size. Use a clean classroom-friendly style, soft colors, white or light neutral background, no clutter. Do not include any text, letters, numbers, labels, watermark, logo, or speech bubbles. The image should clearly communicate 'one out of four equal parts' without using written text."
+  },
+  "student": {
+    "id": "stu_sumin",
+    "displayName": "수민",
+    "grade": "중학교 2학년"
+  },
+  "orchestratorDecision": {
+    "sessionGoal": "전체와 부분의 관계를 그림으로 이해하고 1/4을 말할 수 있다.",
+    "diagnosis": [
+      "개념 미이해",
+      "분모/분자 역할 혼동",
+      "자신감 저하"
+    ],
+    "strategy": "첫 문항은 정답 가능성이 높은 쉬운 성공 경험으로 시작하고, 피자 그림을 통해 전체 조각 수와 가진 조각 수를 분리해서 설명한다.",
+    "teacherNote": "이미지를 먼저 보여주고, '전체는 몇 조각?', '가진 건 몇 조각?' 순서로 질문하세요."
+  },
+  "assets": [
+    {
+      "id": "img_fraction_pizza_001",
+      "type": "image",
+      "purpose": "concept_anchor",
+      "path": "fraction-pizza.png",
+      "alt": "4조각으로 똑같이 나뉜 피자 중 1조각이 강조된 그림"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "block_intro",
+      "type": "mission_intro",
+      "order": 1,
+      "studentText": "오늘은 피자를 나누면서 1/4을 알아볼 거예요."
+    },
+    {
+      "id": "block_image",
+      "type": "image_anchor",
+      "order": 2,
+      "imageAssetId": "img_fraction_pizza_001",
+      "studentText": "피자 한 판이 똑같이 4조각으로 나뉘어 있어요. 노란 조각은 그중 1조각이에요."
+    },
+    {
+      "id": "block_explain",
+      "type": "micro_explanation",
+      "order": 3,
+      "studentText": "아래 숫자 4는 전체 조각 수예요. 위 숫자 1은 내가 고른 조각 수예요."
+    },
+    {
+      "id": "block_quiz",
+      "type": "choice_question",
+      "order": 4,
+      "question": "4조각 중 1조각은 몇 분의 몇일까요?",
+      "choices": [
+        {
+          "id": "a",
+          "text": "1/4"
+        },
+        {
+          "id": "b",
+          "text": "4/1"
+        },
+        {
+          "id": "c",
+          "text": "1/2"
+        }
+      ],
+      "answer": "a"
+    },
+    {
+      "id": "block_feedback",
+      "type": "adaptive_feedback",
+      "order": 5,
+      "feedback": {
+        "correct": "좋아요. 전체 4조각 중 1조각이니까 1/4이에요.",
+        "wrong": "괜찮아요. 아래 숫자는 전체 조각 수, 위 숫자는 고른 조각 수예요. 다시 피자를 보면서 세어볼까요?"
+      }
+    },
+    {
+      "id": "block_repair",
+      "type": "repair_card",
+      "order": 6,
+      "studentText": "헷갈릴 땐 이렇게 생각해요. 전체가 몇 개인지 먼저 세고, 내가 가진 것이 몇 개인지 나중에 세요."
+    },
+    {
+      "id": "block_reflection",
+      "type": "reflection",
+      "order": 7,
+      "question": "오늘 내용은 어땠나요?",
+      "choices": [
+        "쉬웠어요",
+        "조금 헷갈렸어요",
+        "다시 보고 싶어요"
+      ]
+    },
+    {
+      "id": "block_next",
+      "type": "next_action",
+      "order": 8,
+      "studentText": "다음 미션에서는 2조각을 고르면 2/4가 되는지 알아볼 거예요."
+    }
+  ],
+  "teacherApproval": {
+    "required": true,
+    "status": "pending",
+    "checklist": [
+      "이미지 개념 일치",
+      "문항 정답 확인",
+      "문장 길이 적절",
+      "학생에게 민감 정보 미노출"
+    ]
+  }
+}
