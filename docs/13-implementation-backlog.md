@@ -10,10 +10,10 @@
 - [x] 교사 승인 구조: AI 생성 후 검수/승인/배포
 - [x] 공공데이터 방향: 교육과정/학사일정/통계/지역 맥락
 - [x] 문서 하네스: AGENTS/GOAL/navigation/spec docs
-- [ ] 실제 백엔드 프로젝트 구조 확인
-- [ ] DB schema 구현
-- [ ] seed 데이터 구현
-- [ ] API 구현
+- [x] 실제 백엔드 프로젝트 구조 확인
+- [x] DB schema 구현
+- [x] seed 데이터 구현
+- [x] 기본 API 구현
 - [ ] AI provider 연동
 - [ ] 학생 플레이 runtime 구현
 
@@ -40,6 +40,12 @@ npm run dev
 npm run lint/typecheck
 ```
 
+상태:
+
+```text
+완료. Fastify + TypeScript + Zod + Prisma 스키마 기반 첫 서버 구조를 추가했다.
+```
+
 ## Milestone 2. Domain Types And Schemas
 
 목표:
@@ -60,6 +66,12 @@ MissionContent, ContentStage, RealtimePracticeSpec, MemoryCard를 코드 타입�
 ```text
 1~3단계 템플릿과 4단계 realtime spec이 schema validation을 통과한다.
 step=5 또는 video asset role은 validation에서 실패한다.
+```
+
+상태:
+
+```text
+완료. tests/domain-schemas.test.ts에서 4단계/asset role/realtime stage 제약을 검증한다.
 ```
 
 ## Milestone 3. Database Migration
@@ -87,6 +99,12 @@ DB reset 후 schema 생성
 기본 relation query 통과
 ```
 
+상태:
+
+```text
+부분 완료. prisma/schema.prisma 계약과 prisma validate는 완료했다. 실제 PostgreSQL migration 적용은 다음 DB 연결 슬라이스에서 진행한다.
+```
+
 ## Milestone 4. Demo Seed
 
 참조:
@@ -110,6 +128,12 @@ teacher demo login 가능
 student access code login 가능
 ```
 
+상태:
+
+```text
+부분 완료. in-memory demo seed와 seed smoke 명령을 추가했다. DB upsert seed는 PostgreSQL 연결 뒤 진행한다.
+```
+
 ## Milestone 5. Teacher Dashboard API
 
 참조:
@@ -130,6 +154,12 @@ student access code login 가능
 교사 계정으로 학생 목록과 학생별 케이스 파일 조회 가능
 권한 없는 학생 접근 차단
 감사 로그 저장
+```
+
+상태:
+
+```text
+부분 완료. demo token 기반 학생 목록/상세/memory patch API를 추가했다. 감사 로그 영속화는 DB 연결 뒤 진행한다.
 ```
 
 ## Milestone 6. AI Content Generation

@@ -19,6 +19,44 @@
 - AI 생성물은 자동 검수 후 교사가 승인해야 학생에게 배포된다.
 - 공공데이터는 학생 개인 진단이 아니라 교육과정, 학사일정, 통계, 지역 맥락 연결 근거로 사용한다.
 
+## Backend Quick Start
+
+```bash
+npm install
+npm run dev
+```
+
+기본 서버는 `http://localhost:4000`에서 실행됩니다.
+
+검증 명령:
+
+```bash
+npm run typecheck
+npm run prisma:validate
+npm run test
+npm run db:seed:demo
+```
+
+현재 구현된 첫 슬라이스:
+
+- Fastify + TypeScript API 서버
+- Zod 기반 4단계 콘텐츠/RealtimePracticeSpec 검증
+- Prisma PostgreSQL 스키마 계약
+- in-memory demo seed store
+- 데모 로그인, 학생 목록/상세, 학생 미션 조회/시작/제출, 4단계 realtime session mock API
+
+데모 흐름:
+
+```bash
+curl -s -X POST http://localhost:4000/api/auth/demo-login \
+  -H 'content-type: application/json' \
+  -d '{"role":"teacher","email":"teacher.demo@eduyj.local"}'
+
+curl -s -X POST http://localhost:4000/api/auth/student-access \
+  -H 'content-type: application/json' \
+  -d '{"accessCode":"STAR-001"}'
+```
+
 ## Design Docs
 
 | 문서 | 목적 |
