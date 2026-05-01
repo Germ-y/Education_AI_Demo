@@ -147,7 +147,7 @@ AI 리뷰 요약
 개념 진입
 기본 문제 확인
 응용/심화 문제 수행
-오개념 판별
+가상 친구에게 설명하며 이해 확인
 이해도 회고
 ```
 
@@ -181,10 +181,10 @@ AI 리뷰 요약
 | 1 | 개념 열기 | 개념 설명 + 시나리오 이미지 | `concept_intro` |
 | 2 | 문제 1 | 시나리오 기반 기본 문제 | `scene_question`, `clue_question`, `blank_fill` |
 | 3 | 문제 2 | 문제 1 응용 및 심화 문제 | `applied_question`, `mini_simulation`, `card_match` |
-| 4 | 함정 찾기 | 일부러 틀린 풀이/그림/친구 답에서 오류 찾기 | `trap_finder`, `wrong_answer_compare`, `help_friend` |
+| 4 | 별이에게 설명하기 | 가상 시나리오 속 친구/마스코트에게 이유를 설명하기 | `help_friend`, `explanation_choice`, `wrong_explanation_fix` |
 | 5 | 회고 | 이해도/자신감/헷갈린 지점 확인 | `reflection_check` |
 
-4단계는 `생활에 적용`이나 `개념 정리`가 아니다. 학습집중형 4단계는 반복감을 줄이기 위해 **오개념을 판별하는 단계**로 둔다.
+4단계는 `생활에 적용`이나 `개념 정리`가 아니다. 학습집중형 4단계는 반복감을 줄이기 위해 **학생이 개념을 자기 말로 적용해보는 설명 단계**로 둔다. 단, 학생 플레이 중 AI가 새 분석을 하는 것이 아니라, AI가 사전에 생성한 설명 선택지/빈칸/오답 수정 템플릿을 학생이 수행한다.
 
 예시:
 
@@ -192,7 +192,7 @@ AI 리뷰 요약
 1. 피자 지도와 분수 개념을 봄
 2. 전체 4구역 중 빛나는 구역 수를 찾음
 3. 4구역 중 1구역을 1/4로 표현함
-4. 친구가 "4/1"이라고 말한 장면에서 틀린 이유를 찾음
+4. 별이가 "왜 4/1이 아니라 1/4이야?"라고 묻고, 학생이 맞는 설명을 고름
 5. 오늘 난이도와 헷갈린 부분을 회고함
 ```
 
@@ -286,7 +286,7 @@ TeacherReviewSummary
 
 ```text
 생활지원형 2단계: scene_observation, highlight_clue, card_match 중 선택
-학습집중형 4단계: trap_finder, wrong_answer_compare, help_friend 중 선택
+학습집중형 4단계: help_friend, explanation_choice, wrong_explanation_fix 중 선택
 ```
 
 ### 5.5 이미지 생성
@@ -660,4 +660,3 @@ ElevenLabs 음성 생성
 센터별 대시보드
 감사 로그/동의 관리 강화
 ```
-

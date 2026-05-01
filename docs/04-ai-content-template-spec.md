@@ -53,10 +53,10 @@ AI 생성 JSON
 | 1 | 개념 열기 | `concept_intro` | `concept_intro` |
 | 2 | 문제 1 | `basic_problem` | `scene_question`, `clue_question`, `blank_fill`, `partition_picker` |
 | 3 | 문제 2 | `applied_problem` | `applied_question`, `mini_simulation`, `card_match`, `sequence_ordering` |
-| 4 | 함정 찾기 | `misconception_check` | `trap_finder`, `wrong_answer_compare`, `help_friend`, `reverse_problem` |
+| 4 | 별이에게 설명하기 | `teach_back` | `help_friend`, `explanation_choice`, `wrong_explanation_fix`, `reverse_problem` |
 | 5 | 회고 | `reflection` | `reflection_check` |
 
-학습집중형 4단계는 개념 정리가 아니라 **오개념 판별 단계**다.
+학습집중형 4단계는 개념 정리가 아니라 **가상 친구에게 설명하며 이해를 확인하는 단계**다. 이 단계도 학생 플레이 중 새 AI 분석을 하지 않고, 사전에 생성된 설명 선택지/오답 수정/역문제 템플릿만 실행한다.
 
 ## 5. 템플릿 목록
 
@@ -343,7 +343,68 @@ AI 생성 JSON
 }
 ```
 
-### 5.14 `reflection_check`
+### 5.14 `explanation_choice`
+
+목적:
+
+```text
+가상 친구나 마스코트에게 들려줄 가장 좋은 설명을 고르게 한다.
+```
+
+필드:
+
+```json
+{
+  "templateType": "explanation_choice",
+  "friendName": "별이",
+  "friendLine": "왜 아래 숫자가 4인지 모르겠어.",
+  "question": "별이에게 어떤 설명을 해주면 좋을까요?",
+  "choices": [
+    {
+      "id": "whole_count",
+      "text": "아래 숫자는 전체가 몇 조각인지 알려줘. 전체가 4조각이라서 아래에 4를 써.",
+      "isCorrect": true
+    },
+    {
+      "id": "large_number",
+      "text": "큰 숫자는 항상 아래에 쓰면 돼.",
+      "isCorrect": false
+    }
+  ]
+}
+```
+
+### 5.15 `wrong_explanation_fix`
+
+목적:
+
+```text
+친구의 설명 중 틀린 부분을 고치게 한다.
+```
+
+필드:
+
+```json
+{
+  "templateType": "wrong_explanation_fix",
+  "wrongLine": "전체 4개 중 1개니까 4/1이라고 쓰면 돼.",
+  "fixOptions": [
+    {
+      "id": "swap",
+      "text": "고른 것은 위에, 전체는 아래에 써야 해.",
+      "isCorrect": true
+    },
+    {
+      "id": "same",
+      "text": "전체와 고른 것을 같은 숫자로 써야 해.",
+      "isCorrect": false
+    }
+  ],
+  "fixedLine": "전체 4개 중 고른 것이 1개라서 1/4이에요."
+}
+```
+
+### 5.16 `reflection_check`
 
 목적:
 
@@ -389,9 +450,9 @@ AI 생성 JSON
     },
     {
       "step": 4,
-      "studentLabel": "함정 찾기",
-      "stageRole": "misconception_check",
-      "templateType": "trap_finder"
+      "studentLabel": "별이에게 설명하기",
+      "stageRole": "teach_back",
+      "templateType": "help_friend"
     },
     {
       "step": 5,
@@ -416,4 +477,3 @@ templateType이 허용 목록에 있는가
 이미지 안에 넣을 텍스트를 과도하게 요구하지 않았는가
 교사 승인 전 published 상태가 아닌가
 ```
-
