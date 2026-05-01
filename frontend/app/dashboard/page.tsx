@@ -139,6 +139,8 @@ export default function DashboardPage() {
   const [reviewPreviewStep, setReviewPreviewStep] = useState(1);
   const [reviewPreviewScale, setReviewPreviewScale] = useState(1);
   const reviewPreviewFrameRef = useRef<HTMLDivElement>(null);
+  const [reportPreviewScale, setReportPreviewScale] = useState(1);
+  const reportPreviewFrameRef = useRef<HTMLDivElement>(null);
   const [reviewStageDrafts, setReviewStageDrafts] = useState<Record<string, ReviewStageDraft[]>>({});
   const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({});
   const [savedMemos, setSavedMemos] = useState<Record<string, string>>({});
@@ -188,6 +190,9 @@ export default function DashboardPage() {
   const feedbackTarget =
     feedbackQueue.find((record) => record.id === selectedFeedbackId) ?? feedbackQueue[0] ?? sessionLogs[0];
   const openReport = sessionLogs.find((record) => record.id === openReportId);
+  const openReportStageStep = openReport
+    ? Math.min(Math.max(sessionLogs.findIndex((record) => record.id === openReport.id) + 1, 1), reviewStagePreviews.length)
+    : 1;
   const openReview = selectedReviewItems.find((item) => item.id === openReviewId);
   const openReviewStages = openReview ? (reviewStageDrafts[openReview.id] ?? reviewStagePreviews) : reviewStagePreviews;
   const isReviewEditing = openReview ? editingReviewIds.includes(openReview.id) : false;
@@ -241,6 +246,22 @@ export default function DashboardPage() {
     observer.observe(frame);
     return () => observer.disconnect();
   }, [openReview]);
+
+  useEffect(() => {
+    if (!openReport) return;
+    const frame = reportPreviewFrameRef.current;
+    if (!frame) return;
+
+    const updateScale = () => {
+      const { width, height } = frame.getBoundingClientRect();
+      setReportPreviewScale(Math.min(width / 1024, height / 768) + 0.004);
+    };
+
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [openReport]);
 
   return (
     <main className="relative min-h-screen bg-[#f5f7fa] text-[#172033]">
@@ -743,8 +764,8 @@ export default function DashboardPage() {
       </div>
       {openReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/45 p-6">
-          <section className="w-full max-w-5xl rounded-xl bg-white p-6 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
-            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#e5e9f0] pb-4">
+          <section className="flex max-h-[88vh] w-full max-w-5xl flex-col rounded-xl bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#e5e9f0] px-6 py-4">
               <div>
                 <p className="text-sm font-bold text-[#64748b]">학습 리포트</p>
                 <h3 className="mt-1 text-2xl font-black">
@@ -759,18 +780,40 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
-              <InfoBlock label="걸린 시간" value={`${openReport.durationMinutes}분`} />
-              <InfoBlock label="평균 응답" value={`${openReport.averageResponseSeconds}초`} />
-              <InfoBlock label="문제당 시간" value={`${openReport.secondsPerQuestion}초`} />
-              <InfoBlock label="시도 횟수" value={`${openReport.attemptCount}회`} />
-              <InfoBlock label="오답 횟수" value={`${openReport.wrongCount}회`} />
-              <InfoBlock label="정답률" value={`${openReport.accuracyRate}%`} />
-            </div>
+            <div className="min-h-0 flex-1 px-6 py-4">
+              <section className="rounded-lg border border-[#d8dee8] bg-[#e7edf4] p-3">
+                <div className="mb-2">
+                  <div>
+                    <p className="text-xs font-black text-[#64748b]">차시 자료</p>
+                    <p className="mt-1 text-base font-black text-[#172033]">스테이지 {openReportStageStep} 학습 화면</p>
+                  </div>
+                </div>
+                <div
+                  ref={reportPreviewFrameRef}
+                  className="relative mx-auto aspect-[4/3] max-h-[40vh] max-w-[560px] overflow-hidden rounded-md bg-[#e7edf4]"
+                >
+                  <iframe
+                    title={`학습 리포트 자료 스테이지 ${openReportStageStep}`}
+                    src={`/student/stage?step=${openReportStageStep}&preview=1`}
+                    className="absolute left-0 top-0 h-[768px] w-[1024px] origin-top-left border-0"
+                    style={{ transform: `scale(${reportPreviewScale})` }}
+                  />
+                </div>
+              </section>
 
-            <div className="mt-5 rounded-lg bg-[#f8fafc] p-5">
-              <p className="text-sm font-bold text-[#64748b]">기록 요약</p>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">{openReport.note}</p>
+              <div className="mt-3 grid gap-2 md:grid-cols-6">
+                <InfoBlock label="걸린 시간" value={`${openReport.durationMinutes}분`} />
+                <InfoBlock label="평균 응답" value={`${openReport.averageResponseSeconds}초`} />
+                <InfoBlock label="문제당 시간" value={`${openReport.secondsPerQuestion}초`} />
+                <InfoBlock label="시도 횟수" value={`${openReport.attemptCount}회`} />
+                <InfoBlock label="오답 횟수" value={`${openReport.wrongCount}회`} />
+                <InfoBlock label="정답률" value={`${openReport.accuracyRate}%`} />
+              </div>
+
+              <div className="mt-3 rounded-lg bg-[#f8fafc] p-4">
+                <p className="text-sm font-bold text-[#64748b]">기록 요약</p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">{openReport.note}</p>
+              </div>
             </div>
           </section>
         </div>
