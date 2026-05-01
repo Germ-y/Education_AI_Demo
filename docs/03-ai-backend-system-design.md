@@ -345,20 +345,18 @@ AI 역할: 별이 또는 친구
 정답/선택지/설명은 UI 텍스트가 담당한다.
 ```
 
-### 5.7 음성/마이크로 영상
+### 5.7 음성
 
-MVP에서는 선택 기능이다.
+별도 영상 생성은 범위에서 제외한다.
 
-권장 구조:
+음성은 아래 두 경우에만 다룬다.
 
 ```text
-image-2 장면 이미지
-→ ElevenLabs 내레이션
-→ Remotion/ffmpeg 기반 20~40초 마이크로 영상
-→ 단계별 문제는 앱 UI에서 진행
+마지막 realtime practice의 음성 대화
+필요 시 짧은 안내 내레이션
 ```
 
-영상 안에 문제를 모두 박지 않는다. 영상은 몰입을 담당하고, 문제/피드백은 앱이 담당한다.
+문제/피드백/정답 판정은 앱 템플릿과 realtime practice가 담당한다.
 
 ### 5.8 자동 검수
 
@@ -435,10 +433,9 @@ ConsentModule
 PostgreSQL: 핵심 데이터
 Prisma: ORM
 Redis + BullMQ: AI 생성/이미지 생성 작업 큐
-S3 호환 스토리지: 생성 이미지/음성/영상
+S3 호환 스토리지: 생성 이미지/음성
 OpenAI: reasoning, content JSON, image-2
 ElevenLabs: 음성 생성
-Remotion/ffmpeg: 마이크로 영상 렌더링
 ```
 
 ## 7. 주요 데이터 모델
@@ -540,7 +537,7 @@ visual_spec_json
 id
 mission_content_id
 stage_id
-asset_type: image | audio | video
+asset_type: image | audio
 purpose
 prompt
 model
@@ -636,7 +633,7 @@ POST /internal/ai/update-memory
 5. 5단계 StagePlan 생성
 6. 1~4단계 템플릿 선택 및 5단계 RealtimePracticeSpec 생성
 7. StageQuestion/TemplateSpec 생성
-8. 이미지/음성/영상 Asset job 생성
+8. 이미지/음성 Asset job 생성
 9. 자동 검수
 10. teacher_review 상태 저장
 11. 교사가 승인
@@ -699,7 +696,6 @@ image-2 시나리오 이미지 생성
 아이등록
 교사 회원가입/초대 코드
 ElevenLabs 음성 생성
-마이크로 영상 렌더링
 공공 교육데이터/학교 일정 연계
 보호자 요약 카드
 주간/월간 리포트

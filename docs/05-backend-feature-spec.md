@@ -91,7 +91,7 @@ AI 프롬프트와 로그에는 불필요한 실명/연락처/주소를 넣지 �
 | `PublicEducationDataModule` | NEIS, 교육과정, 교육통계 등 공공데이터 수집/정규화 |
 | `OrchestratorModule` | 학생 맥락을 읽고 오늘 콘텐츠 방향 결정 |
 | `ContentModule` | 미션 콘텐츠, 스테이지, 템플릿 JSON 관리 |
-| `AssetModule` | 이미지, 음성, 영상 에셋 생성/저장/검수 |
+| `AssetModule` | 이미지, 음성 에셋 생성/저장/검수 |
 | `RealtimeModule` | 마지막 단계 실시간 대화 세션, 임시 토큰, 루브릭 이벤트 관리 |
 | `ApprovalModule` | 교사 검토, 승인, 반려, 수정 요청 |
 | `ActivityModule` | 학생 플레이 이벤트 수집 |
@@ -114,7 +114,6 @@ Object Storage: S3 호환 스토리지
 AI: OpenAI reasoning/content JSON + gpt-image-2 이미지 생성
 Realtime: OpenAI Realtime API + WebRTC
 Voice(Optional): ElevenLabs
-Video(Optional): Remotion + ffmpeg
 Validation: Zod 또는 JSON Schema
 Observability: structured log + job trace id
 ```
@@ -472,33 +471,32 @@ maxTurns, maxDurationSec를 반드시 둔다.
 교사 승인 전 realtime session을 만들 수 없다.
 ```
 
-### 6.8 Voice/Video Optional Workflow
+### 6.8 Voice Optional Workflow
 
-MVP에서는 영상 전체 생성보다 `이미지 + 짧은 내레이션 + 앱 인터랙션`이 현실적이다.
+영상 생성은 현재 범위에서 제외한다.
 
-권장 확장:
-
-```text
-gpt-image-2 장면 이미지
-→ ElevenLabs 20~40초 내레이션
-→ Remotion/ffmpeg로 마이크로 영상 생성
-→ 문제/선택/피드백은 앱 템플릿이 담당
-```
-
-영상의 역할:
+음성은 아래 범위로 제한한다.
 
 ```text
-상황 몰입
-오늘 미션 진입
-감정적 장벽 낮추기
+마지막 realtime practice의 음성 대화
+필요 시 짧은 안내 내레이션
 ```
 
-영상이 담당하지 않는 것:
+음성이 담당하는 것:
+
+```text
+상황 진입 부담 낮추기
+문장을 읽기 어려운 학생 보조
+마지막 실시간 연습의 말하기 경험
+```
+
+음성이 담당하지 않는 것:
 
 ```text
 정답 판정
 단계별 피드백
 학생별 활동 기록
+영상 렌더링
 ```
 
 ### 6.9 Auto Validation
@@ -1141,7 +1139,6 @@ PublicContextBundle 생성
 
 ```text
 ElevenLabs 음성
-Remotion 마이크로 영상
 월별 리포트
 센터 대시보드 통계
 프롬프트/템플릿 A/B 성능 비교
