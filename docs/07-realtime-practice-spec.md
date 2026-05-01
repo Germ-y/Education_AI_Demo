@@ -1,23 +1,23 @@
-# 마지막 실시간 연습 단계 설계
+# 4단계 실시간 연습 설계
 
 확인 기준일: 2026-05-02
 
 ## 1. 방향
 
-각 콘텐츠 유형의 마지막 단계는 정적 퀴즈가 아니라 `상황 이미지 + AI 실시간 대화 + 즉시 피드백`으로 간다.
+각 콘텐츠 유형의 4단계는 정적 퀴즈가 아니라 `상황 이미지 + AI 실시간 대화 + 즉시 피드백`으로 간다.
 
 핵심은 아래다.
 
 ```text
-1~4단계: 사전 생성 템플릿 콘텐츠
-5단계: 승인된 RealtimePracticeSpec 기반 실시간 연습
+1~3단계: 사전 생성 템플릿 콘텐츠
+4단계: 승인된 RealtimePracticeSpec 기반 실시간 연습
 종료 후: 짧은 회고와 리뷰 요약
 ```
 
 중요한 점:
 
 ```text
-마지막 단계에서만 realtime을 연다.
+4단계에서만 realtime을 연다.
 AI가 새 콘텐츠를 마음대로 생성하지 않는다.
 AI는 교사가 승인한 상황, 역할, 첫 질문, 루브릭, 금지 범위 안에서만 대화한다.
 실시간 피드백은 학생 경험용이고, 다음 회기 반영은 세션 종료 후 요약으로만 한다.
@@ -45,7 +45,7 @@ https://platform.openai.com/docs/api-reference/realtime-sessions
 WebRTC SDP 교환: /v1/realtime/calls
 ```
 
-## 3. 유형별 마지막 단계
+## 3. 유형별 4단계
 
 ### 3.1 생활지원형
 
@@ -120,7 +120,7 @@ AI 첫 질문: "왜 4/1이 아니라 1/4인지 알려줄래?"
 ```json
 {
   "id": "rt_spec_001",
-  "stageId": "stage_005",
+  "stageId": "stage_004",
   "templateType": "realtime_teach_back",
   "imageAssetId": "asset_fraction_001",
   "mode": "voice_or_text",
@@ -154,7 +154,7 @@ AI 첫 질문: "왜 4/1이 아니라 1/4인지 알려줄래?"
 
 ```mermaid
 flowchart TD
-  A["학생: 마지막 단계 진입"] --> B["GET mission stage"]
+  A["학생: 4단계 진입"] --> B["GET mission stage"]
   B --> C["상황 이미지 + 시작 버튼 표시"]
   C --> D["POST realtime-session"]
   D --> E["Backend: published/approved/spec 검증"]
@@ -181,7 +181,7 @@ POST /api/student/missions/:contentId/stages/:stageId/realtime-session
 
 ```text
 content.status가 published 또는 in_progress인가
-stage.step이 마지막 단계인가
+stage.step이 4인가
 stage.templateType이 realtime_roleplay 또는 realtime_teach_back인가
 교사가 승인한 realtime_spec_json이 존재하는가
 학생이 해당 콘텐츠에 접근 가능한가
@@ -272,7 +272,7 @@ POST /api/student/realtime-sessions/:sessionId/complete
 
 ## 8. 교사 검토 화면
 
-교사는 마지막 실시간 단계에 대해 아래를 승인한다.
+교사는 4단계 실시간 연습에 대해 아래를 승인한다.
 
 ```text
 상황 이미지

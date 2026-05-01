@@ -2,7 +2,7 @@
 
 ## 1. 목표
 
-이 백엔드는 교사/센터가 학생을 사례 단위로 관리하고, AI가 학생 맥락을 바탕으로 5단계 맞춤 콘텐츠 패키지를 생성하며, 교사가 승인한 콘텐츠만 학생에게 배포하는 시스템이다.
+이 백엔드는 교사/센터가 학생을 사례 단위로 관리하고, AI가 학생 맥락을 바탕으로 4단계 맞춤 콘텐츠 패키지를 생성하며, 교사가 승인한 콘텐츠만 학생에게 배포하는 시스템이다.
 
 핵심 흐름은 아래와 같다.
 
@@ -22,8 +22,8 @@
 절대 원칙:
 
 ```text
-1~4단계에서는 학생 플레이 중 새 AI 분석/생성/후처리를 하지 않는다.
-마지막 단계는 별도 RealtimePracticeSpec을 승인받은 뒤 실시간 AI 대화를 연다.
+1~3단계에서는 학생 플레이 중 새 AI 분석/생성/후처리를 하지 않는다.
+4단계는 별도 RealtimePracticeSpec을 승인받은 뒤 실시간 AI 대화를 연다.
 학생 화면은 승인된 JSON, 승인된 에셋, 승인된 realtime 스펙만 실행한다.
 AI 생성물은 반드시 스키마 검증과 교사 승인을 거친다.
 공공데이터는 학생 개인 진단값이 아니라 맥락/근거/교육과정 연결 정보로 사용한다.
@@ -92,7 +92,7 @@ AI 프롬프트와 로그에는 불필요한 실명/연락처/주소를 넣지 �
 | `OrchestratorModule` | 학생 맥락을 읽고 오늘 콘텐츠 방향 결정 |
 | `ContentModule` | 미션 콘텐츠, 스테이지, 템플릿 JSON 관리 |
 | `AssetModule` | 이미지, 음성 에셋 생성/저장/검수 |
-| `RealtimeModule` | 마지막 단계 실시간 대화 세션, 임시 토큰, 루브릭 이벤트 관리 |
+| `RealtimeModule` | 4단계 실시간 대화 세션, 임시 토큰, 루브릭 이벤트 관리 |
 | `ApprovalModule` | 교사 검토, 승인, 반려, 수정 요청 |
 | `ActivityModule` | 학생 플레이 이벤트 수집 |
 | `ReviewModule` | 수행 결과 요약, 다음 회기 근거 생성 |
@@ -275,8 +275,8 @@ difficultyLevel
 successFirst 여부
 stageTemplateSeed
 stage별 templateType
-마지막 realtimePracticeSpec
-image 필요 범위
+4단계 realtimePracticeSpec
+대표 이미지와 단계별 이미지 필요 범위
 teacherReviewFocus
 publicDataReferences
 ```
@@ -287,7 +287,7 @@ publicDataReferences
 {
   "contentType": "learning_focus",
   "title": "분수 탐험: 빛나는 한 조각",
-  "reasoningSummaryForTeacher": "최근 절차 누락이 반복되어 2단계는 단계 따라하기, 4단계는 별이에게 설명하기로 구성합니다.",
+  "reasoningSummaryForTeacher": "최근 절차 누락이 반복되어 2단계는 단계 따라하기, 4단계는 별이에게 직접 설명하기로 구성합니다.",
   "difficulty": "foundation",
   "successFirst": true,
   "templateSeed": "student_001:case_003:2026-W18",
@@ -295,8 +295,7 @@ publicDataReferences
     { "step": 1, "label": "개념 열기", "stageRole": "concept_intro", "templateType": "concept_intro" },
     { "step": 2, "label": "문제 1", "stageRole": "basic_problem", "templateType": "sequence_ordering" },
     { "step": 3, "label": "문제 2", "stageRole": "applied_problem", "templateType": "blank_fill" },
-    { "step": 4, "label": "별이에게 설명하기", "stageRole": "teach_back", "templateType": "help_friend" },
-    { "step": 5, "label": "AI에게 말해보기", "stageRole": "realtime_practice", "templateType": "realtime_teach_back" }
+    { "step": 4, "label": "AI에게 말해보기", "stageRole": "realtime_practice", "templateType": "realtime_teach_back" }
   ],
   "realtimePracticeSpec": {
     "aiRole": "별이",
@@ -339,8 +338,7 @@ seeded random 허용
 | 1 | 개념 열기 | `concept_intro` | `concept_intro` |
 | 2 | 문제 1 | `basic_problem` | `scene_question`, `sequence_ordering`, `blank_fill`, `partition_picker` |
 | 3 | 문제 2 | `applied_problem` | `applied_question`, `card_match`, `blank_fill`, `mini_simulation` |
-| 4 | 별이에게 설명하기 | `teach_back` | `help_friend`, `explanation_choice`, `wrong_explanation_fix` |
-| 5 | AI에게 말해보기 | `realtime_practice` | `realtime_teach_back` |
+| 4 | AI에게 말해보기 | `realtime_practice` | `realtime_teach_back` |
 
 생활지원형 기본 플로우:
 
@@ -349,10 +347,9 @@ seeded random 허용
 | 1 | 상황 만나기 | `scenario_intro` | `scenario_intro` |
 | 2 | 단서 찾기 | `clue_identification` | `scene_observation`, `highlight_clue`, `card_match` |
 | 3 | 행동 고르기 | `action_selection` | `action_choice`, `sequence_ordering`, `decision_card` |
-| 4 | 한 번 해보기 | `roleplay_practice` | `roleplay_simulation`, `dialogue_choice`, `mini_simulation` |
-| 5 | AI와 연습하기 | `realtime_practice` | `realtime_roleplay` |
+| 4 | AI와 연습하기 | `realtime_practice` | `realtime_roleplay` |
 
-회고는 마지막 실시간 연습 뒤 `post_practice_reflection` 이벤트로 수집한다.
+회고는 4단계 실시간 연습 뒤 `post_practice_reflection` 이벤트로 수집한다.
 
 ### 6.5 Content JSON Generator
 
@@ -373,7 +370,7 @@ MissionContent와 ContentStage JSON을 생성한다.
 교사용 진단 포인트
 마스코트 말풍선
 이미지 프롬프트 원재료
-마지막 실시간 연습 역할/첫 질문/루브릭
+4단계 실시간 연습 역할/첫 질문/루브릭
 ```
 
 금지:
@@ -391,7 +388,7 @@ MissionContent와 ContentStage JSON을 생성한다.
 역할:
 
 ```text
-각 미션의 몰입 장면과 개념 앵커 이미지를 생성한다.
+각 미션의 대표 이미지와 단계별 이미지를 생성한다.
 ```
 
 기본 정책:
@@ -401,6 +398,16 @@ MissionContent와 ContentStage JSON을 생성한다.
 이미지 비율: 학생 화면 카드/와이드 영역에 맞춰 16:9 또는 4:3
 텍스트는 UI에서 렌더링하고, 이미지는 장면/물체/관계 중심
 필수 숫자/라벨이 이미지 안에 들어가는 경우 OCR 검증 큐를 태운다.
+```
+
+이미지 패키지:
+
+```text
+hero: 미션 대표 이미지
+stage_1: 상황/개념 진입 이미지
+stage_2: 단서 찾기/기본 문제 이미지
+stage_3: 행동 선택/응용 문제 이미지
+stage_4: realtime 연습용 상황 이미지
 ```
 
 이미지 생성 단계:
@@ -428,12 +435,12 @@ OCR 검증이 필요 없는 경우:
 
 ### 6.7 Realtime Practice
 
-마지막 단계는 정적 템플릿이 아니라 `RealtimePracticeSpec`을 실행한다.
+4단계는 정적 템플릿이 아니라 `RealtimePracticeSpec`을 실행한다.
 
 실행 흐름:
 
 ```text
-학생이 마지막 단계 진입
+학생이 4단계 진입
 → 서버가 content/status/stage/spec 승인 여부 확인
 → RealtimePracticeSession 생성
 → 승인된 이미지와 첫 질문 반환
@@ -478,7 +485,7 @@ maxTurns, maxDurationSec를 반드시 둔다.
 음성은 아래 범위로 제한한다.
 
 ```text
-마지막 realtime practice의 음성 대화
+4단계 realtime practice의 음성 대화
 필요 시 짧은 안내 내레이션
 ```
 
@@ -487,7 +494,7 @@ maxTurns, maxDurationSec를 반드시 둔다.
 ```text
 상황 진입 부담 낮추기
 문장을 읽기 어려운 학생 보조
-마지막 실시간 연습의 말하기 경험
+4단계 실시간 연습의 말하기 경험
 ```
 
 음성이 담당하지 않는 것:
@@ -496,7 +503,7 @@ maxTurns, maxDurationSec를 반드시 둔다.
 정답 판정
 단계별 피드백
 학생별 활동 기록
-영상 렌더링
+영상 렌더링 또는 영상 믹싱
 ```
 
 ### 6.9 Auto Validation
@@ -895,7 +902,7 @@ POST   /api/student/missions/:contentId/complete
 학생 API는 콘텐츠 생성 endpoint를 호출하지 않는다.
 학생 API는 published/in_progress 상태의 콘텐츠만 반환한다.
 정답 판정은 승인된 ContentStage JSON 기준으로 서버에서 수행한다.
-마지막 realtime session은 승인된 RealtimePracticeSpec이 있는 경우에만 생성한다.
+4단계 realtime session은 승인된 RealtimePracticeSpec이 있는 경우에만 생성한다.
 OpenAI API 키는 클라이언트에 노출하지 않고, 서버가 짧게 유효한 client secret만 발급한다.
 ```
 
@@ -929,7 +936,7 @@ POST   /api/review-summaries/:reviewId/apply-to-planner
 ```text
 오늘 회기 목표
 학생 유형과 최근 메모리 근거
-AI가 선택한 5단계 흐름
+AI가 선택한 4단계 흐름
 단계별 템플릿과 정답
 이미지 미리보기
 힌트/피드백 문장
@@ -962,7 +969,7 @@ stage별 정답 여부
 시도 횟수
 힌트 사용 여부
 체류시간
-마지막 realtime 루브릭 결과
+4단계 realtime 루브릭 결과
 post-practice 회고 선택
 교사 사후 메모
 ```
@@ -994,7 +1001,7 @@ post-practice 회고 선택
 ```text
 이 요약은 다음 회기 생성의 근거가 된다.
 현재 플레이 중 다음 문제를 즉석 생성하지 않는다.
-마지막 실시간 대화도 종료 후 요약만 다음 회기에 반영한다.
+4단계 실시간 대화도 종료 후 요약만 다음 회기에 반영한다.
 ```
 
 ## 12. 공공데이터 사용 위치
@@ -1037,9 +1044,9 @@ AI 입력에는 원천 데이터 전체가 아니라 정규화된 `PublicContext
 한 단계에 한 가지 행동만 요구한다.
 학생 지시문은 짧고 직접적이어야 한다.
 생활지원형은 판단/행동/도움요청을 중심으로 한다.
-학습집중형은 개념 → 기본 → 응용 → 설명 → 실시간 설명 연습 흐름을 유지한다.
+학습집중형은 개념 → 기본 → 응용 → 실시간 설명 연습 흐름을 유지한다.
 4단계 설명 활동은 사전 생성 템플릿으로만 실행한다.
-5단계 realtime은 승인된 상황/역할/루브릭 안에서만 실행한다.
+4단계 realtime은 승인된 상황/역할/루브릭 안에서만 실행한다.
 오답 피드백은 낙인 없이 다음 행동을 알려준다.
 ```
 
@@ -1088,14 +1095,14 @@ seed 교사/학생 로그인
 학생/사례/메모리/콘텐츠/스테이지/에셋/승인/활동 이벤트 테이블
 교사용 학생 목록 API
 학생용 오늘 미션 API
-마지막 realtime session 생성 API
+4단계 realtime session 생성 API
 콘텐츠 상태 머신
 ```
 
 ### Phase 2. 템플릿 런타임
 
 ```text
-5단계 MissionContent JSON
+4단계 MissionContent JSON
 생활지원형/학습집중형 템플릿 허용 목록
 RealtimePracticeSpec 스키마
 스키마 검증
@@ -1120,7 +1127,7 @@ RealtimePracticeSpec 생성
 교사용 콘텐츠 미리보기
 승인/반려/수정 요청
 학생 배포
-마지막 realtime practice 실행
+4단계 realtime practice 실행
 ReviewAgent 요약
 메모리 업데이트 후보 반영
 ```

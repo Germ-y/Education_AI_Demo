@@ -13,9 +13,9 @@ AI 생성 JSON
 → 학생 화면 렌더링
 ```
 
-학생이 플레이하는 동안 1~4단계는 AI가 새로 분석하거나 후처리로 스테이지를 바꾸지 않는다.
+학생이 플레이하는 동안 1~3단계는 AI가 새로 분석하거나 후처리로 스테이지를 바꾸지 않는다.
 
-단, 각 유형의 마지막 단계는 `Realtime Practice`로 분리한다. 이 단계는 자유 생성 콘텐츠가 아니라 교사가 승인한 `RealtimePracticeSpec` 안에서만 AI가 대화와 짧은 피드백을 제공한다.
+단, 4단계는 `Realtime Practice`로 분리한다. 이 단계는 자유 생성 콘텐츠가 아니라 교사가 승인한 `RealtimePracticeSpec` 안에서만 AI가 대화와 짧은 피드백을 제공한다.
 
 ## 2. 공통 MissionContent 스키마
 
@@ -27,7 +27,7 @@ AI 생성 JSON
   "contentType": "learning_focus",
   "title": "분수 탐험: 빛나는 한 조각",
   "status": "teacher_review",
-  "totalSteps": 5,
+  "totalSteps": 4,
   "rewardLabel": "분수 탐험 토큰",
   "theme": {
     "accent": "#27ae60",
@@ -45,8 +45,7 @@ AI 생성 JSON
 | 1 | 상황 만나기 | `scenario_intro` | `scenario_intro` |
 | 2 | 단서 찾기 | `clue_identification` | `scene_observation`, `highlight_clue`, `card_match` |
 | 3 | 행동 고르기 | `action_selection` | `action_choice`, `sequence_ordering`, `decision_card` |
-| 4 | 한 번 해보기 | `roleplay_practice` | `roleplay_simulation`, `dialogue_choice`, `mini_simulation` |
-| 5 | AI와 연습하기 | `realtime_practice` | `realtime_roleplay` |
+| 4 | AI와 연습하기 | `realtime_practice` | `realtime_roleplay` |
 
 ## 4. 학습집중형 단계
 
@@ -55,12 +54,11 @@ AI 생성 JSON
 | 1 | 개념 열기 | `concept_intro` | `concept_intro` |
 | 2 | 문제 1 | `basic_problem` | `scene_question`, `clue_question`, `blank_fill`, `partition_picker` |
 | 3 | 문제 2 | `applied_problem` | `applied_question`, `mini_simulation`, `card_match`, `sequence_ordering` |
-| 4 | 별이에게 설명하기 | `teach_back` | `help_friend`, `explanation_choice`, `wrong_explanation_fix`, `reverse_problem` |
-| 5 | AI에게 말해보기 | `realtime_practice` | `realtime_teach_back` |
+| 4 | AI에게 말해보기 | `realtime_practice` | `realtime_teach_back` |
 
-학습집중형 4단계는 개념 정리가 아니라 **가상 친구에게 설명하며 이해를 확인하는 단계**다. 이 단계도 학생 플레이 중 새 AI 분석을 하지 않고, 사전에 생성된 설명 선택지/오답 수정/역문제 템플릿만 실행한다.
+학습집중형 4단계는 개념 정리가 아니라 **상황 이미지와 AI 대화로 설명을 직접 연습하는 realtime 단계**다. AI는 교사가 승인한 역할/루브릭 안에서만 피드백한다.
 
-회고는 마지막 실시간 연습 종료 후 `post_practice_reflection` 이벤트로 수집한다. 별도 스테이지로 카운트하지 않는다.
+회고는 4단계 실시간 연습 종료 후 `post_practice_reflection` 이벤트로 수집한다. 별도 스테이지로 카운트하지 않는다.
 
 ## 5. 템플릿 목록
 
@@ -524,12 +522,6 @@ AI 생성 JSON
     },
     {
       "step": 4,
-      "studentLabel": "별이에게 설명하기",
-      "stageRole": "teach_back",
-      "templateType": "help_friend"
-    },
-    {
-      "step": 5,
       "studentLabel": "AI에게 말해보기",
       "stageRole": "realtime_practice",
       "templateType": "realtime_teach_back"

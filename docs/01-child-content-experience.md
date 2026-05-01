@@ -13,7 +13,7 @@
 → 쉬운 상호작용
 → 즉시 피드백
 → 틀린 포인트 교정
-→ 마지막 실시간 연습
+→ 4단계 실시간 연습
 → 짧은 회고
 → 다음 미션 예고
 ```
@@ -72,18 +72,15 @@ UI 텍스트: 4조각 중 1조각은 몇 분의 몇일까요?
 
 ## 3. 한 회기 콘텐츠 기본 구조
 
-MVP 기준 한 회기는 5~9개 블록으로 구성한다.
+MVP 기준 학생에게 보이는 핵심 콘텐츠는 4단계로 구성한다. 회고와 다음 미션 예고는 플레이 종료 후 이벤트/요약으로 붙으며, 별도 스테이지로 카운트하지 않는다.
 
 ```text
-1. mission_intro
-2. image_anchor
-3. micro_explanation
-4. check_question
-5. adaptive_feedback
-6. repair_or_success_card
-7. realtime_practice
-8. post_practice_reflection
-9. next_action
+1. stage_1_intro
+2. stage_2_basic_interaction
+3. stage_3_applied_interaction
+4. stage_4_realtime_practice
+after. post_practice_reflection
+after. next_action
 ```
 
 ### 3.1 블록 타입
@@ -207,7 +204,7 @@ flowchart TD
     {
       "id": "block_005",
       "type": "realtime_practice",
-      "order": 5,
+      "order": 4,
       "templateType": "realtime_teach_back",
       "practiceTitle": "별이에게 분수 설명하기",
       "openingLine": "왜 4/1이 아니라 1/4인지 알려줄래?",
@@ -330,9 +327,9 @@ post_practice_reflection
 next_action
 ```
 
-드래그앤드롭은 2차 이후로 미룬다. 영상 생성은 현재 범위에서 제외한다. 마지막 실시간 연습은 MVP 차별점으로 별도 구현한다.
+드래그앤드롭은 2차 이후로 미룬다. 영상 생성은 현재 범위에서 제외한다. 4단계 실시간 연습은 MVP 차별점으로 별도 구현한다.
 
-MVP의 강점은 영상 생성이 아니라, **학생별 맥락에 맞춘 이미지 카드형 미션을 AI가 만들고 교사가 승인한 뒤, 마지막에 짧은 실시간 연습까지 이어진다는 구조**다.
+MVP의 강점은 영상 생성이 아니라, **학생별 맥락에 맞춘 이미지 카드형 미션을 AI가 만들고 교사가 승인한 뒤, 4단계에서 짧은 실시간 연습까지 이어진다는 구조**다.
 
 ## 11. 교사 검토 화면에서 보여줄 정보
 
