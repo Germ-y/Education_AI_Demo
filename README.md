@@ -8,3 +8,5 @@
 - [오케스트레이터 및 메모리 압축 설계](./docs/02-orchestrator-memory.md)
 - [AI 백엔드 전체 설계](./docs/03-ai-backend-system-design.md)
 - [AI 콘텐츠 템플릿 명세](./docs/04-ai-content-template-spec.md)
+- [백엔드 기능 명세 및 AI 워크플로우](./docs/05-backend-feature-spec.md)
+- [공공데이터 활용 전략](./docs/06-public-data-strategy.md)
