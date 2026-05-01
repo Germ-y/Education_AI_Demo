@@ -504,7 +504,7 @@ export default function DashboardPage() {
             {activeTab === "records" && (
               <section className="space-y-6 p-6">
                 <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-                  <div className="space-y-4">
+                  <div className="hidden">
                     <div>
                       <h3 className="text-xl font-black">피드백 대기</h3>
                       <p className="mt-1 text-sm font-semibold text-[#64748b]">
@@ -543,7 +543,7 @@ export default function DashboardPage() {
                     ))}
                   </div>
 
-                  <div className="rounded-lg border border-[#e5e9f0] p-5">
+                  <div className="rounded-lg border border-[#e5e9f0] bg-white p-5 xl:order-1">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <h3 className="text-xl font-black">교육 피드백 작성</h3>
@@ -554,6 +554,36 @@ export default function DashboardPage() {
                       <button className="rounded-md bg-[#1f3a5f] px-4 py-2 text-sm font-bold text-white">
                         저장
                       </button>
+                    </div>
+                    <div className="mt-5">
+                      <p className="text-sm font-bold text-[#64748b]">피드백 작성 대상</p>
+                      <div className="mt-2 grid gap-2 md:grid-cols-2">
+                        {feedbackQueue.map((record) => (
+                          <button
+                            key={record.id}
+                            onClick={() => setSelectedFeedbackId(record.id)}
+                            className={`rounded-md border p-3 text-left transition ${
+                              feedbackTarget?.id === record.id
+                                ? "border-[#1f3a5f] bg-[#eef4fb]"
+                                : "border-[#e5e9f0] bg-[#f8fafc] hover:bg-[#eef4fb]"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="font-black">
+                                  {record.session} · {record.date}
+                                </p>
+                                <p className="mt-1 text-xs font-bold text-[#64748b]">
+                                  이해도 {record.understanding} · 집중도 {record.focus}
+                                </p>
+                              </div>
+                              <span className="shrink-0 rounded-full bg-[#fff7ed] px-2 py-1 text-xs font-bold text-[#9a3412]">
+                                대기
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     {feedbackTarget && (
                       <p className="hidden">
@@ -586,7 +616,7 @@ export default function DashboardPage() {
                     />
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-4 rounded-lg border border-[#e5e9f0] bg-white p-5 xl:order-2">
                     <h3 className="text-xl font-black">최근 기록</h3>
                     {sessionLogs.map((record) => (
                       <button
