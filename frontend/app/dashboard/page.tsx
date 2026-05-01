@@ -104,6 +104,8 @@ const reviewStageReasons: Record<number, string> = {
   4: "학습한 분수 표현을 생활 장면에 적용해 개념 전이를 확인합니다.",
 };
 
+type ReviewStageDraft = (typeof reviewStagePreviews)[number];
+
 function StatusBadge({ supportCase }: { supportCase: SupportCase }) {
   return (
     <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusTone[supportCase.status]}`}>
@@ -137,6 +139,7 @@ export default function DashboardPage() {
   const [reviewPreviewStep, setReviewPreviewStep] = useState(1);
   const [reviewPreviewScale, setReviewPreviewScale] = useState(1);
   const reviewPreviewFrameRef = useRef<HTMLDivElement>(null);
+  const [reviewStageDrafts, setReviewStageDrafts] = useState<Record<string, ReviewStageDraft[]>>({});
   const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({});
   const [savedMemos, setSavedMemos] = useState<Record<string, string>>({});
 
@@ -179,10 +182,25 @@ export default function DashboardPage() {
     feedbackQueue.find((record) => record.id === selectedFeedbackId) ?? feedbackQueue[0] ?? sessionLogs[0];
   const openReport = sessionLogs.find((record) => record.id === openReportId);
   const openReview = selectedReviewItems.find((item) => item.id === openReviewId);
+  const openReviewStages = openReview ? (reviewStageDrafts[openReview.id] ?? reviewStagePreviews) : reviewStagePreviews;
   const isReviewEditing = openReview ? editingReviewIds.includes(openReview.id) : false;
   const savedMemo = savedMemos[selectedCase.id] ?? selectedCase.riskNote;
   const memoValue = memoDrafts[selectedCase.id] ?? savedMemo;
   const isMemoDirty = memoValue !== savedMemo;
+
+  const updateReviewStageDraft = (
+    reviewId: string,
+    step: number,
+    updater: (stage: ReviewStageDraft) => ReviewStageDraft,
+  ) => {
+    setReviewStageDrafts((current) => {
+      const stages = current[reviewId] ?? reviewStagePreviews;
+      return {
+        ...current,
+        [reviewId]: stages.map((stage) => (stage.step === step ? updater(stage) : stage)),
+      };
+    });
+  };
 
   useEffect(() => {
     if (!openReview) return;
@@ -750,7 +768,7 @@ export default function DashboardPage() {
                     <p className="mt-1 text-lg font-black text-[#172033]">스테이지 {reviewPreviewStep}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {reviewStagePreviews.map((stage) => (
+                    {openReviewStages.map((stage) => (
                       <button
                         key={stage.step}
                         onClick={() => setReviewPreviewStep(stage.step)}
@@ -776,7 +794,7 @@ export default function DashboardPage() {
                 </div>
               </section>
               <div className="min-h-0 space-y-4 overflow-y-auto pr-2">
-                {reviewStagePreviews.map((stage, index) => {
+                {openReviewStages.map((stage, index) => {
                   const imageKey = `${openReview.id}-${stage.step}`;
                   const isImageEditing = editingImageKey === imageKey;
 
@@ -819,7 +837,13 @@ export default function DashboardPage() {
                               <textarea
                                 id={`image-prompt-${stage.step}`}
                                 className="mt-2 h-20 w-full resize-none rounded-md border border-[#fdba74] bg-white p-3 text-xs font-semibold leading-5 outline-none focus:border-[#ea580c]"
-                                defaultValue={stage.imagePrompt}
+                                value={stage.imagePrompt}
+                                onChange={(event) =>
+                                  updateReviewStageDraft(openReview.id, stage.step, (currentStage) => ({
+                                    ...currentStage,
+                                    imagePrompt: event.target.value,
+                                  }))
+                                }
                               />
                               <button
                                 onClick={() => {
@@ -842,7 +866,13 @@ export default function DashboardPage() {
                             {isReviewEditing ? (
                               <textarea
                                 className="mt-2 h-20 w-full resize-none rounded-md border border-[#cbd5e1] bg-[#fbfcfe] p-3 text-sm font-semibold leading-6 outline-none focus:border-[#1f3a5f]"
-                                defaultValue={stage.description}
+                                value={stage.description}
+                                onChange={(event) =>
+                                  updateReviewStageDraft(openReview.id, stage.step, (currentStage) => ({
+                                    ...currentStage,
+                                    description: event.target.value,
+                                  }))
+                                }
                               />
                             ) : (
                               <>
@@ -862,7 +892,13 @@ export default function DashboardPage() {
                             {isReviewEditing ? (
                               <input
                                 className="mt-2 w-full rounded-md border border-[#cbd5e1] bg-[#fbfcfe] px-3 py-2 text-sm font-black outline-none focus:border-[#1f3a5f]"
-                                defaultValue={stage.question}
+                                value={stage.question}
+                                onChange={(event) =>
+                                  updateReviewStageDraft(openReview.id, stage.step, (currentStage) => ({
+                                    ...currentStage,
+                                    question: event.target.value,
+                                  }))
+                                }
                               />
                             ) : (
                               <p className="mt-2 text-base font-black leading-7 text-[#172033]">{stage.question}</p>
@@ -875,9 +911,17 @@ export default function DashboardPage() {
                               {stage.choices.map((choice, choiceIndex) =>
                                 isReviewEditing ? (
                                   <input
-                                    key={choice}
+                                    key={`${stage.step}-${choiceIndex}`}
                                     className="w-full rounded-md border border-[#cbd5e1] bg-[#fbfcfe] px-3 py-2 text-sm font-bold outline-none focus:border-[#1f3a5f]"
-                                    defaultValue={choice}
+                                    value={choice}
+                                    onChange={(event) =>
+                                      updateReviewStageDraft(openReview.id, stage.step, (currentStage) => ({
+                                        ...currentStage,
+                                        choices: currentStage.choices.map((currentChoice, currentChoiceIndex) =>
+                                          currentChoiceIndex === choiceIndex ? event.target.value : currentChoice,
+                                        ),
+                                      }))
+                                    }
                                   />
                                 ) : (
                                   <div
