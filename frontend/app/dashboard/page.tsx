@@ -782,8 +782,8 @@ export default function DashboardPage() {
                   <iframe
                     title={`학습 리포트 자료 스테이지 ${openReportStageStep}`}
                     src={`/student/stage?step=${openReportStageStep}&preview=1`}
-                    className="absolute left-0 top-0 h-[768px] w-[1024px] origin-top-left border-0"
-                    style={{ transform: `scale(${reportPreviewScale})` }}
+                    className="absolute left-1/2 top-1/2 h-[768px] w-[1024px] origin-center border-0"
+                    style={{ transform: `translate(-50%, -50%) scale(${reportPreviewScale})` }}
                   />
                 </div>
               </section>
@@ -851,14 +851,14 @@ export default function DashboardPage() {
                 </div>
                 <div
                   ref={reviewPreviewFrameRef}
-                  className="relative aspect-[4/3] min-h-0 flex-1 overflow-hidden rounded-md border border-[#cbd5e1] bg-[#e7edf4]"
+                  className="relative aspect-[4/3] w-full overflow-hidden rounded-md border border-[#cbd5e1] bg-[#e7edf4]"
                 >
                   <iframe
                     key={`${openReview.id}-${reviewPreviewStep}`}
                     title={`학생 화면 스테이지 ${reviewPreviewStep}`}
                     src={`/student/stage?step=${reviewPreviewStep}&preview=1`}
-                    className="absolute left-0 top-0 h-[768px] w-[1024px] origin-top-left border-0"
-                    style={{ transform: `scale(${reviewPreviewScale})` }}
+                    className="absolute left-1/2 top-1/2 h-[768px] w-[1024px] origin-center border-0"
+                    style={{ transform: `translate(-50%, -50%) scale(${reviewPreviewScale})` }}
                   />
                 </div>
               </section>
