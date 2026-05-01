@@ -142,6 +142,8 @@ export default function DashboardPage() {
   const [reviewStageDrafts, setReviewStageDrafts] = useState<Record<string, ReviewStageDraft[]>>({});
   const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({});
   const [savedMemos, setSavedMemos] = useState<Record<string, string>>({});
+  const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({});
+  const [savedFeedbackIds, setSavedFeedbackIds] = useState<string[]>([]);
 
   const filteredStudents = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -612,69 +614,73 @@ export default function DashboardPage() {
                           선택한 학습 기록에 대한 피드백을 남깁니다.
                         </p>
                       </div>
-                      <button className="rounded-md bg-[#1f3a5f] px-4 py-2 text-sm font-bold text-white">
-                        저장
-                      </button>
+                      <span className="rounded-full bg-[#eef4fb] px-3 py-1 text-xs font-black text-[#1f3a5f]">
+                        {feedbackQueue.length}개 작성 대상
+                      </span>
                     </div>
-                    <div className="mt-5">
-                      <p className="text-sm font-bold text-[#64748b]">피드백 작성 대상</p>
-                      <div className="mt-2 grid gap-2 md:grid-cols-2">
-                        {feedbackQueue.map((record) => (
-                          <button
-                            key={record.id}
-                            onClick={() => setSelectedFeedbackId(record.id)}
-                            className={`rounded-md border p-3 text-left transition ${
-                              feedbackTarget?.id === record.id
-                                ? "border-[#1f3a5f] bg-[#eef4fb]"
-                                : "border-[#e5e9f0] bg-[#f8fafc] hover:bg-[#eef4fb]"
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <p className="font-black">
-                                  {record.session} · {record.date}
-                                </p>
-                                <p className="mt-1 text-xs font-bold text-[#64748b]">
-                                  이해도 {record.understanding} · 집중도 {record.focus}
-                                </p>
-                              </div>
-                              <span className="shrink-0 rounded-full bg-[#fff7ed] px-2 py-1 text-xs font-bold text-[#9a3412]">
-                                대기
+                    <div className="mt-5 space-y-4">
+                      {feedbackQueue.map((record) => {
+                        const isFeedbackSaved = savedFeedbackIds.includes(record.id);
+
+                        return (
+                        <section key={record.id} className="rounded-lg border border-[#e5e9f0] bg-[#f8fafc] p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-bold text-[#64748b]">피드백 작성 대상</p>
+                              <p className="mt-1 text-base font-black text-[#172033]">
+                                {record.session} · {record.date}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Link
+                                href="/student/stage?preview=1"
+                                target="_blank"
+                                className="rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-xs font-black text-[#334155]"
+                              >
+                                학습 자료 보기
+                              </Link>
+                              <span
+                                className={`rounded-full px-3 py-1 text-xs font-bold ${
+                                  isFeedbackSaved ? "bg-[#f0fdf4] text-[#15803d]" : "bg-[#fff7ed] text-[#9a3412]"
+                                }`}
+                              >
+                                {isFeedbackSaved ? "저장 완료" : "작성 필요"}
                               </span>
                             </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    {feedbackTarget && (
-                      <p className="hidden">
-                        {feedbackTarget.session} · {feedbackTarget.date}
-                      </p>
-                    )}
-                    {feedbackTarget && (
-                      <div className="mt-4 rounded-lg bg-[#f8fafc] p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-bold text-[#64748b]">피드백 작성 대상</p>
-                            <p className="mt-1 text-base font-black text-[#172033]">
-                              {feedbackTarget.session} · {feedbackTarget.date}
-                            </p>
                           </div>
-                          <span className="rounded-full bg-[#fff7ed] px-3 py-1 text-xs font-bold text-[#9a3412]">
-                            작성 필요
-                          </span>
-                        </div>
-                        <div className="mt-4 grid gap-2 md:grid-cols-3">
-                          <InfoBlock label="걸린 시간" value={`${feedbackTarget.durationMinutes}분`} />
-                          <InfoBlock label="오답 횟수" value={`${feedbackTarget.wrongCount}회`} />
-                          <InfoBlock label="정답률" value={`${feedbackTarget.accuracyRate}%`} />
-                        </div>
-                      </div>
-                    )}
-                    <textarea
-                      className="mt-4 h-48 w-full resize-none rounded-md border border-[#cbd5e1] bg-white p-4 outline-none focus:border-[#1f3a5f]"
-                      placeholder="학생 반응, 이해도 변화, 다음 수업에서 반영할 피드백을 기록하세요."
-                    />
+                          <div className="mt-4 grid gap-2 md:grid-cols-3">
+                            <InfoBlock label="걸린 시간" value={`${record.durationMinutes}분`} />
+                            <InfoBlock label="오답 횟수" value={`${record.wrongCount}회`} />
+                            <InfoBlock label="정답률" value={`${record.accuracyRate}%`} />
+                          </div>
+                          <textarea
+                            value={feedbackDrafts[record.id] ?? ""}
+                            onChange={(event) => {
+                              setFeedbackDrafts((current) => ({
+                                ...current,
+                                [record.id]: event.target.value,
+                              }));
+                              setSavedFeedbackIds((current) => current.filter((id) => id !== record.id));
+                            }}
+                            className="mt-4 h-40 w-full resize-none rounded-md border border-[#cbd5e1] bg-white p-4 outline-none focus:border-[#1f3a5f]"
+                            placeholder="학생 반응, 이해도 변화, 다음 수업에서 반영할 피드백을 기록하세요."
+                          />
+                          <div className="mt-3 flex justify-end">
+                            <button
+                              onClick={() =>
+                                setSavedFeedbackIds((current) =>
+                                  current.includes(record.id) ? current : [...current, record.id],
+                                )
+                              }
+                              className="rounded-md bg-[#1f3a5f] px-4 py-2 text-sm font-bold text-white"
+                            >
+                              저장
+                            </button>
+                          </div>
+                        </section>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   <div className="space-y-4 rounded-lg border border-[#e5e9f0] bg-white p-5 xl:order-2">
