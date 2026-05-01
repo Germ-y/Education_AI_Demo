@@ -216,23 +216,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!openReview) return;
-
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type !== "student-preview-stage") return;
-
-      const nextStep = Number(event.data.step);
-      if (Number.isInteger(nextStep) && nextStep >= 1 && nextStep <= reviewStagePreviews.length) {
-        setReviewPreviewStep(nextStep);
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [openReview]);
-
-  useEffect(() => {
-    if (!openReview) return;
     const frame = reviewPreviewFrameRef.current;
     if (!frame) return;
 
@@ -560,7 +543,10 @@ export default function DashboardPage() {
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <button
-                            onClick={() => setOpenReviewId(item.id)}
+                            onClick={() => {
+                              setReviewPreviewStep(1);
+                              setOpenReviewId(item.id);
+                            }}
                             className="rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-bold text-[#334155]"
                           >
                             검토하기
@@ -774,9 +760,10 @@ export default function DashboardPage() {
               </div>
               <button
                 onClick={() => setOpenReportId(null)}
-                className="rounded-md border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-bold text-[#334155]"
+                aria-label="닫기"
+                className="flex h-11 w-11 items-center justify-center rounded-md border border-[#cbd5e1] bg-white text-2xl font-bold leading-none text-[#334155]"
               >
-                닫기
+                ×
               </button>
             </div>
 
@@ -867,6 +854,7 @@ export default function DashboardPage() {
                   className="relative aspect-[4/3] max-h-[min(58vh,560px)] overflow-hidden rounded-md border border-[#cbd5e1] bg-[#e7edf4]"
                 >
                   <iframe
+                    key={`${openReview.id}-${reviewPreviewStep}`}
                     title={`학생 화면 스테이지 ${reviewPreviewStep}`}
                     src={`/student/stage?step=${reviewPreviewStep}&preview=1`}
                     className="absolute left-0 top-0 h-[768px] w-[1024px] origin-top-left border-0"
