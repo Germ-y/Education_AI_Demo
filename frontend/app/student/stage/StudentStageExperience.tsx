@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { SceneTheme, SceneVisual, StudentContext } from "@/lib/demo-data";
 
 function MiniStar() {
@@ -211,11 +211,13 @@ export function StudentStageExperience({
   initialStep = context.scene.currentStep,
   initialMode = "stage",
   nextHref,
+  previewMode = false,
 }: {
   context: StudentContext;
   initialStep?: number;
   initialMode?: "stage" | "complete";
   nextHref: string;
+  previewMode?: boolean;
 }) {
   const { student, scene } = context;
   const theme = scene.theme;
@@ -258,6 +260,11 @@ export function StudentStageExperience({
   const isCorrect = isChoiceStage && answer === activeQuestion.correctAnswer;
   const isStageComplete = completedSteps.includes(activeStage.step);
   const isLastStage = activeStageIndex === scene.stages.length - 1;
+
+  useEffect(() => {
+    if (!previewMode) return;
+    window.parent.postMessage({ type: "student-preview-stage", step: activeStage.step }, window.location.origin);
+  }, [activeStage.step, previewMode]);
   const progressPercent = Math.round((completedSteps.length / scene.stages.length) * 100);
   const activeVisual = {
     ...scene.visual,
@@ -325,12 +332,14 @@ export function StudentStageExperience({
 
   return (
     <main className="relative flex h-screen overflow-hidden bg-[#e7edf4] p-4 text-[#1f211d]">
+      {!previewMode && (
       <Link
         href="/"
         className="fixed bottom-6 right-6 z-50 rounded-full border border-[#25466f] bg-[#1f3a5f] px-5 py-3 text-base font-black text-white shadow-[0_12px_30px_rgba(31,58,95,0.25)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(31,58,95,0.32)]"
       >
         데모 홈
       </Link>
+      )}
       <div className="m-auto">
         <div className="relative aspect-[4/3] h-[min(calc(100vh-32px),820px)] rounded-[44px] bg-[#202939] p-4 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
           <div className="absolute bottom-5 left-1/2 h-1.5 w-24 -translate-x-1/2 rounded-full bg-white/22" />
