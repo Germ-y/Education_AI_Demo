@@ -22,8 +22,9 @@
 절대 원칙:
 
 ```text
-학생 플레이 중 새 AI 분석/생성/후처리를 하지 않는다.
-학생 화면은 승인된 JSON과 승인된 에셋만 실행한다.
+1~4단계에서는 학생 플레이 중 새 AI 분석/생성/후처리를 하지 않는다.
+마지막 단계는 별도 RealtimePracticeSpec을 승인받은 뒤 실시간 AI 대화를 연다.
+학생 화면은 승인된 JSON, 승인된 에셋, 승인된 realtime 스펙만 실행한다.
 AI 생성물은 반드시 스키마 검증과 교사 승인을 거친다.
 공공데이터는 학생 개인 진단값이 아니라 맥락/근거/교육과정 연결 정보로 사용한다.
 ```
@@ -63,6 +64,7 @@ AI 프롬프트와 로그에는 불필요한 실명/연락처/주소를 넣지 �
 | `OrchestratorModule` | 학생 맥락을 읽고 오늘 콘텐츠 방향 결정 |
 | `ContentModule` | 미션 콘텐츠, 스테이지, 템플릿 JSON 관리 |
 | `AssetModule` | 이미지, 음성, 영상 에셋 생성/저장/검수 |
+| `RealtimeModule` | 마지막 단계 실시간 대화 세션, 임시 토큰, 루브릭 이벤트 관리 |
 | `ApprovalModule` | 교사 검토, 승인, 반려, 수정 요청 |
 | `ActivityModule` | 학생 플레이 이벤트 수집 |
 | `ReviewModule` | 수행 결과 요약, 다음 회기 근거 생성 |
@@ -82,6 +84,7 @@ DB: PostgreSQL
 Queue: Redis + BullMQ
 Object Storage: S3 호환 스토리지
 AI: OpenAI reasoning/content JSON + gpt-image-2 이미지 생성
+Realtime: OpenAI Realtime API + WebRTC
 Voice(Optional): ElevenLabs
 Video(Optional): Remotion + ffmpeg
 Validation: Zod 또는 JSON Schema
@@ -111,17 +114,20 @@ flowchart TD
   E --> F["Mission Blueprint 생성"]
   F --> G["Stage Template Resolver"]
   G --> H["Content JSON Generator"]
-  H --> I["Image Prompt Builder"]
+  H --> I["Image Prompt + Realtime Spec Builder"]
   I --> J["gpt-image-2 Asset Job"]
+  I --> U["RealtimePracticeSpec 생성"]
   H --> K["Schema Validator"]
   J --> L["Asset Validator"]
-  K --> M["Safety/Education Validator"]
+  U --> V["Realtime Spec Validator"]
+  K --> M["Safety/Education/Realtime Validator"]
   L --> M
+  V --> M
   M --> N["Teacher Review Package"]
   N --> O["교사 승인/수정요청"]
   O --> P["Publish"]
   P --> Q["학생 플레이"]
-  Q --> R["Activity Events"]
+  Q --> R["Activity + Realtime Events"]
   R --> S["Review Summary"]
   S --> T["Memory/Planner Update"]
 ```
@@ -242,6 +248,7 @@ difficultyLevel
 successFirst 여부
 stageTemplateSeed
 stage별 templateType
+마지막 realtimePracticeSpec
 image 필요 범위
 teacherReviewFocus
 publicDataReferences
@@ -262,7 +269,19 @@ publicDataReferences
     { "step": 2, "label": "문제 1", "stageRole": "basic_problem", "templateType": "sequence_ordering" },
     { "step": 3, "label": "문제 2", "stageRole": "applied_problem", "templateType": "blank_fill" },
     { "step": 4, "label": "별이에게 설명하기", "stageRole": "teach_back", "templateType": "help_friend" },
-    { "step": 5, "label": "회고", "stageRole": "reflection", "templateType": "reflection_check" }
+    { "step": 5, "label": "AI에게 말해보기", "stageRole": "realtime_practice", "templateType": "realtime_teach_back" }
+  ],
+  "realtimePracticeSpec": {
+    "aiRole": "별이",
+    "openingLine": "왜 4/1이 아니라 1/4인지 알려줄래?",
+    "maxTurns": 6,
+    "maxDurationSec": 120,
+    "rubricIds": ["mention_whole", "mention_part", "connect_fraction"]
+  },
+  "postPracticeReflection": [
+    "쉬웠어요",
+    "조금 헷갈렸어요",
+    "다시 연습하고 싶어요"
   ]
 }
 ```
@@ -294,7 +313,7 @@ seeded random 허용
 | 2 | 문제 1 | `basic_problem` | `scene_question`, `sequence_ordering`, `blank_fill`, `partition_picker` |
 | 3 | 문제 2 | `applied_problem` | `applied_question`, `card_match`, `blank_fill`, `mini_simulation` |
 | 4 | 별이에게 설명하기 | `teach_back` | `help_friend`, `explanation_choice`, `wrong_explanation_fix` |
-| 5 | 회고 | `reflection` | `reflection_check` |
+| 5 | AI에게 말해보기 | `realtime_practice` | `realtime_teach_back` |
 
 생활지원형 기본 플로우:
 
@@ -304,7 +323,9 @@ seeded random 허용
 | 2 | 단서 찾기 | `clue_identification` | `scene_observation`, `highlight_clue`, `card_match` |
 | 3 | 행동 고르기 | `action_selection` | `action_choice`, `sequence_ordering`, `decision_card` |
 | 4 | 한 번 해보기 | `roleplay_practice` | `roleplay_simulation`, `dialogue_choice`, `mini_simulation` |
-| 5 | 회고 | `reflection` | `reflection_check` |
+| 5 | AI와 연습하기 | `realtime_practice` | `realtime_roleplay` |
+
+회고는 마지막 실시간 연습 뒤 `post_practice_reflection` 이벤트로 수집한다.
 
 ### 6.5 Content JSON Generator
 
@@ -325,6 +346,7 @@ MissionContent와 ContentStage JSON을 생성한다.
 교사용 진단 포인트
 마스코트 말풍선
 이미지 프롬프트 원재료
+마지막 실시간 연습 역할/첫 질문/루브릭
 ```
 
 금지:
@@ -377,7 +399,52 @@ OCR 검증이 필요 없는 경우:
 정답/문제/긴 설명이 전부 UI 텍스트로 분리된 경우
 ```
 
-### 6.7 Voice/Video Optional Workflow
+### 6.7 Realtime Practice
+
+마지막 단계는 정적 템플릿이 아니라 `RealtimePracticeSpec`을 실행한다.
+
+실행 흐름:
+
+```text
+학생이 마지막 단계 진입
+→ 서버가 content/status/stage/spec 승인 여부 확인
+→ RealtimePracticeSession 생성
+→ 승인된 이미지와 첫 질문 반환
+→ 서버가 OpenAI Realtime 세션용 임시 client secret 생성
+→ 브라우저가 WebRTC로 실시간 대화 연결
+→ 대화 이벤트/루브릭 신호 저장
+→ 종료 후 transcript summary와 post_practice_reflection 저장
+```
+
+생활지원형:
+
+```text
+templateType: realtime_roleplay
+AI 역할: 안내 직원, 센터 선생님, 또래 친구, 도서관 사서
+목표: 도움 요청, 순서 말하기, 감정 표현, 다음 행동 확인
+피드백: 짧고 즉시적인 행동 피드백
+```
+
+학습집중형:
+
+```text
+templateType: realtime_teach_back
+AI 역할: 별이 또는 친구
+목표: 개념을 말로 설명, 이유 말하기, 헷갈린 표현 바로잡기
+피드백: 핵심 요소 누락 확인, 오개념 짧은 교정, 성공 표현 강화
+```
+
+제한:
+
+```text
+maxTurns, maxDurationSec를 반드시 둔다.
+새 단원/새 문제를 임의 생성하지 않는다.
+학생 진단 라벨을 학생에게 말하지 않는다.
+개인정보나 상담 원문을 대화 instructions에 넣지 않는다.
+교사 승인 전 realtime session을 만들 수 없다.
+```
+
+### 6.8 Voice/Video Optional Workflow
 
 MVP에서는 영상 전체 생성보다 `이미지 + 짧은 내레이션 + 앱 인터랙션`이 현실적이다.
 
@@ -406,7 +473,7 @@ gpt-image-2 장면 이미지
 학생별 활동 기록
 ```
 
-### 6.8 Auto Validation
+### 6.9 Auto Validation
 
 교사 검토 전 자동 검수를 통과해야 한다.
 
@@ -421,6 +488,7 @@ gpt-image-2 장면 이미지
 | `SafetyValidator` | 민감정보, 낙인 표현, 부적절 콘텐츠 |
 | `CurriculumValidator` | 성취기준/단원 연결 |
 | `AssetValidator` | 이미지 에셋 존재, OCR 필요 시 통과 여부 |
+| `RealtimeSpecValidator` | 역할, 첫 질문, 루브릭, turn/time limit, 금지 범위 |
 | `TeacherReviewValidator` | 교사용 요약/주의점 포함 여부 |
 
 검수 실패 시:
@@ -627,6 +695,7 @@ correct_feedback
 wrong_feedback
 teacher_diagnosis_point
 visual_spec_json
+realtime_spec_json
 asset_ids
 created_at
 ```
@@ -656,11 +725,36 @@ order_submitted
 hint_opened
 feedback_seen
 stage_completed
-reflection_submitted
+post_practice_reflection_submitted
+realtime_session_started
+realtime_turn_completed
+realtime_feedback_given
+realtime_session_completed
 mission_completed
 ```
 
-### 8.9 ReviewSummary
+### 8.9 RealtimePracticeSession
+
+```text
+id
+student_id
+mission_content_id
+stage_id
+status: created | active | completed | failed | expired
+provider
+model
+client_secret_expires_at
+started_at
+ended_at
+turn_count
+duration_sec
+rubric_result_json
+transcript_summary
+post_practice_reflection_json
+created_at
+```
+
+### 8.10 ReviewSummary
 
 ```text
 id
@@ -679,7 +773,7 @@ agent_run_id
 created_at
 ```
 
-### 8.10 Public Data Tables
+### 8.11 Public Data Tables
 
 ```text
 public_data_sources
@@ -762,16 +856,21 @@ GET    /api/student/missions/today
 GET    /api/student/missions/:contentId
 POST   /api/student/missions/:contentId/events
 POST   /api/student/missions/:contentId/stages/:stageId/submit
-POST   /api/student/missions/:contentId/reflection
+POST   /api/student/missions/:contentId/stages/:stageId/realtime-session
+POST   /api/student/realtime-sessions/:sessionId/events
+POST   /api/student/realtime-sessions/:sessionId/complete
+POST   /api/student/missions/:contentId/post-practice-reflection
 POST   /api/student/missions/:contentId/complete
 ```
 
 주의:
 
 ```text
-학생 API는 AI 생성 endpoint를 호출하지 않는다.
+학생 API는 콘텐츠 생성 endpoint를 호출하지 않는다.
 학생 API는 published/in_progress 상태의 콘텐츠만 반환한다.
 정답 판정은 승인된 ContentStage JSON 기준으로 서버에서 수행한다.
+마지막 realtime session은 승인된 RealtimePracticeSpec이 있는 경우에만 생성한다.
+OpenAI API 키는 클라이언트에 노출하지 않고, 서버가 짧게 유효한 client secret만 발급한다.
 ```
 
 ### 9.4 Public Data APIs
@@ -837,7 +936,8 @@ stage별 정답 여부
 시도 횟수
 힌트 사용 여부
 체류시간
-회고 선택
+마지막 realtime 루브릭 결과
+post-practice 회고 선택
 교사 사후 메모
 ```
 
@@ -847,6 +947,11 @@ stage별 정답 여부
 {
   "completionRate": 1,
   "accuracyRate": 0.75,
+  "realtimePracticeResult": {
+    "completed": true,
+    "rubricPassed": ["mention_whole", "mention_part"],
+    "rubricNeedsSupport": ["connect_fraction"]
+  },
   "blockingTypeGuess": "procedure_skip",
   "shortSummary": "분수 자체는 이해했지만 분모/분자 위치를 한 번 헷갈렸습니다.",
   "memoryUpdateCandidate": {
@@ -863,6 +968,7 @@ stage별 정답 여부
 ```text
 이 요약은 다음 회기 생성의 근거가 된다.
 현재 플레이 중 다음 문제를 즉석 생성하지 않는다.
+마지막 실시간 대화도 종료 후 요약만 다음 회기에 반영한다.
 ```
 
 ## 12. 공공데이터 사용 위치
@@ -905,8 +1011,9 @@ AI 입력에는 원천 데이터 전체가 아니라 정규화된 `PublicContext
 한 단계에 한 가지 행동만 요구한다.
 학생 지시문은 짧고 직접적이어야 한다.
 생활지원형은 판단/행동/도움요청을 중심으로 한다.
-학습집중형은 개념 → 기본 → 응용 → 설명 → 회고 흐름을 유지한다.
+학습집중형은 개념 → 기본 → 응용 → 설명 → 실시간 설명 연습 흐름을 유지한다.
 4단계 설명 활동은 사전 생성 템플릿으로만 실행한다.
+5단계 realtime은 승인된 상황/역할/루브릭 안에서만 실행한다.
 오답 피드백은 낙인 없이 다음 행동을 알려준다.
 ```
 
@@ -916,6 +1023,7 @@ AI 입력에는 원천 데이터 전체가 아니라 정규화된 `PublicContext
 AI 생성 실패 시 재시도 가능해야 한다.
 교사 승인 기록이 남아야 한다.
 학생 활동 이벤트는 유실되지 않아야 한다.
+realtime session은 turn/time limit와 만료 시간을 가진다.
 AI 입력/출력은 prompt_version/schema_version과 함께 추적해야 한다.
 공공데이터는 source_url, last_fetched_at, license를 저장해야 한다.
 ```
@@ -952,6 +1060,7 @@ AI 입력 스냅샷은 마스킹된 형태로 저장한다.
 학생/사례/메모리/콘텐츠/스테이지/에셋/승인/활동 이벤트 테이블
 교사용 학생 목록 API
 학생용 오늘 미션 API
+마지막 realtime session 생성 API
 콘텐츠 상태 머신
 ```
 
@@ -960,6 +1069,7 @@ AI 입력 스냅샷은 마스킹된 형태로 저장한다.
 ```text
 5단계 MissionContent JSON
 생활지원형/학습집중형 템플릿 허용 목록
+RealtimePracticeSpec 스키마
 스키마 검증
 학생 이벤트 저장
 ```
@@ -972,6 +1082,7 @@ Memory Compression
 Orchestrator Reasoning
 Content JSON Generator
 gpt-image-2 이미지 생성
+RealtimePracticeSpec 생성
 자동 검수
 ```
 
@@ -981,6 +1092,7 @@ gpt-image-2 이미지 생성
 교사용 콘텐츠 미리보기
 승인/반려/수정 요청
 학생 배포
+마지막 realtime practice 실행
 ReviewAgent 요약
 메모리 업데이트 후보 반영
 ```
@@ -1012,9 +1124,10 @@ Remotion 마이크로 영상
 1. `MissionContent`/`ContentStage` 스키마 확정
 2. 교사 승인 상태 머신 구현
 3. 학생 플레이 이벤트 저장
-4. AI 생성 job queue 구현
-5. gpt-image-2 이미지 에셋 파이프라인 구현
-6. ReviewSummary와 MemoryCard 업데이트 후보 구현
-7. NEIS/NCIC/KESS 기반 PublicContextBundle 구현
+4. `RealtimePracticeSpec`과 realtime session API 구현
+5. AI 생성 job queue 구현
+6. gpt-image-2 이미지 에셋 파이프라인 구현
+7. ReviewSummary와 MemoryCard 업데이트 후보 구현
+8. NEIS/NCIC/KESS 기반 PublicContextBundle 구현
 
 이 구조로 가면 프론트는 승인된 콘텐츠 JSON만 렌더링하고, 백엔드는 AI 생성·검수·승인·기록·메모리 업데이트를 책임지는 분명한 역할 분리가 된다.
