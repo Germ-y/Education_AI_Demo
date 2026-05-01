@@ -13,7 +13,8 @@
 → 쉬운 상호작용
 → 즉시 피드백
 → 틀린 포인트 교정
-→ 한 줄 회고
+→ 마지막 실시간 연습
+→ 짧은 회고
 → 다음 미션 예고
 ```
 
@@ -32,7 +33,8 @@
 - 이미지와 짧은 문장을 함께 쓴다.
 - 선택지는 2~3개 정도로 제한한다.
 - 오답을 틀림으로 끝내지 않고 바로 다시 이해할 수 있게 만든다.
-- 마지막에는 아이가 자기 상태를 짧게 표현하게 한다.
+- 마지막에는 상황 이미지 위에서 AI와 직접 말해보거나 입력하며 연습하게 한다.
+- 실시간 연습이 끝나면 아이가 자기 상태를 짧게 표현하게 한다.
 
 피해야 할 방향:
 
@@ -70,7 +72,7 @@ UI 텍스트: 4조각 중 1조각은 몇 분의 몇일까요?
 
 ## 3. 한 회기 콘텐츠 기본 구조
 
-MVP 기준 한 회기는 5~8개 블록으로 구성한다.
+MVP 기준 한 회기는 5~9개 블록으로 구성한다.
 
 ```text
 1. mission_intro
@@ -79,8 +81,9 @@ MVP 기준 한 회기는 5~8개 블록으로 구성한다.
 4. check_question
 5. adaptive_feedback
 6. repair_or_success_card
-7. reflection
-8. next_action
+7. realtime_practice
+8. post_practice_reflection
+9. next_action
 ```
 
 ### 3.1 블록 타입
@@ -95,7 +98,8 @@ MVP 기준 한 회기는 5~8개 블록으로 구성한다.
 | `adaptive_feedback` | 정답/오답별 반응 | 맞춤 피드백 카드 |
 | `repair_card` | 틀린 포인트 교정 | 다시 보는 설명 카드 |
 | `success_card` | 성공 경험 강화 | 칭찬 + 다음 작은 도전 |
-| `reflection` | 자기평가 수집 | 버튼 또는 한 줄 입력 |
+| `realtime_practice` | 실제 말하기/설명 연습 | 상황 이미지 + AI 대화 |
+| `post_practice_reflection` | 자기평가 수집 | 버튼 또는 한 줄 입력 |
 | `next_action` | 다음 회기 연결 | 다음 미션 예고 |
 
 ## 4. 콘텐츠 생성 플로우
@@ -202,10 +206,19 @@ flowchart TD
     },
     {
       "id": "block_005",
-      "type": "reflection",
+      "type": "realtime_practice",
       "order": 5,
-      "question": "오늘 내용은 어땠나요?",
-      "choices": ["쉬웠어요", "조금 헷갈렸어요", "다시 보고 싶어요"]
+      "templateType": "realtime_teach_back",
+      "practiceTitle": "별이에게 분수 설명하기",
+      "openingLine": "왜 4/1이 아니라 1/4인지 알려줄래?",
+      "rubric": ["mention_whole", "mention_part", "connect_fraction"]
+    },
+    {
+      "id": "block_006",
+      "type": "post_practice_reflection",
+      "order": 6,
+      "question": "AI와 연습해보니 어땠나요?",
+      "choices": ["말할 수 있었어요", "조금 헷갈렸어요", "다시 연습하고 싶어요"]
     }
   ]
 }
@@ -279,8 +292,11 @@ answer_submitted
 feedback_viewed
 hint_used
 block_replayed
+realtime_session_started
+realtime_feedback_received
+realtime_session_completed
 content_completed
-reflection_submitted
+post_practice_reflection_submitted
 content_abandoned
 ```
 
@@ -309,13 +325,14 @@ image_anchor
 micro_explanation
 choice_question
 adaptive_feedback
-reflection
+realtime_practice
+post_practice_reflection
 next_action
 ```
 
-드래그앤드롭, 음성, 영상은 2차 이후로 미룬다.
+드래그앤드롭과 영상은 2차 이후로 미룬다. 다만 마지막 실시간 연습은 MVP 차별점으로 별도 구현한다.
 
-MVP의 강점은 영상 생성이 아니라, **학생별 맥락에 맞춘 이미지 카드형 미션을 AI가 만들고 교사가 승인한다는 구조**다.
+MVP의 강점은 영상 생성이 아니라, **학생별 맥락에 맞춘 이미지 카드형 미션을 AI가 만들고 교사가 승인한 뒤, 마지막에 짧은 실시간 연습까지 이어진다는 구조**다.
 
 ## 11. 교사 검토 화면에서 보여줄 정보
 
@@ -360,4 +377,3 @@ AI 판단 요약
 ```
 
 이 구조를 잡아야 AI 이미지 생성의 장점이 실제 학습 개입으로 이어진다.
-
