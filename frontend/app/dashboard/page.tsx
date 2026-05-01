@@ -503,7 +503,7 @@ export default function DashboardPage() {
 
             {activeTab === "records" && (
               <section className="space-y-6 p-6">
-                <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+                <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
                   <div className="hidden">
                     <div>
                       <h3 className="text-xl font-black">피드백 대기</h3>
