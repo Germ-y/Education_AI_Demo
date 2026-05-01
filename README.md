@@ -2,7 +2,7 @@
 
 영주 공공데이터 공모전용 AI 맞춤형 교육 지원 서비스의 백엔드 설계 문서입니다.
 
-현재 핵심 설계 축은 다음 네 가지입니다.
+현재 핵심 설계 문서는 다음과 같습니다.
 
 - [아이 맞춤 콘텐츠 경험 설계](./docs/01-child-content-experience.md)
 - [오케스트레이터 및 메모리 압축 설계](./docs/02-orchestrator-memory.md)
@@ -11,3 +11,4 @@
 - [백엔드 기능 명세 및 AI 워크플로우](./docs/05-backend-feature-spec.md)
 - [공공데이터 활용 전략](./docs/06-public-data-strategy.md)
 - [마지막 실시간 연습 단계 설계](./docs/07-realtime-practice-spec.md)
+- [데모 Seed 데이터 및 회원가입/아이등록 확장 계획](./docs/08-demo-seed-auth-registration-plan.md)
