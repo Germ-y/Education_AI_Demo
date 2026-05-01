@@ -143,7 +143,9 @@ export default function DashboardPage() {
   const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({});
   const [savedMemos, setSavedMemos] = useState<Record<string, string>>({});
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({});
-  const [savedFeedbackIds, setSavedFeedbackIds] = useState<string[]>([]);
+  const [savedFeedbackRecords, setSavedFeedbackRecords] = useState<
+    Array<{ id: string; recordId: string; feedback: string; savedAt: string }>
+  >([]);
 
   const filteredStudents = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -180,6 +182,9 @@ export default function DashboardPage() {
     };
   });
   const feedbackQueue = sessionLogs.slice(0, 2);
+  const pendingFeedbackQueue = feedbackQueue.filter(
+    (record) => !savedFeedbackRecords.some((feedback) => feedback.recordId === record.id),
+  );
   const feedbackTarget =
     feedbackQueue.find((record) => record.id === selectedFeedbackId) ?? feedbackQueue[0] ?? sessionLogs[0];
   const openReport = sessionLogs.find((record) => record.id === openReportId);
@@ -615,14 +620,16 @@ export default function DashboardPage() {
                         </p>
                       </div>
                       <span className="rounded-full bg-[#eef4fb] px-3 py-1 text-xs font-black text-[#1f3a5f]">
-                        {feedbackQueue.length}개 작성 대상
+                        {pendingFeedbackQueue.length}개 작성 대상
                       </span>
                     </div>
                     <div className="mt-5 space-y-4">
-                      {feedbackQueue.map((record) => {
-                        const isFeedbackSaved = savedFeedbackIds.includes(record.id);
-
-                        return (
+                      {pendingFeedbackQueue.length === 0 && (
+                        <div className="rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] p-4 text-sm font-bold text-[#15803d]">
+                          모든 차시 피드백이 최근 기록에 저장되었습니다.
+                        </div>
+                      )}
+                      {pendingFeedbackQueue.map((record) => (
                         <section key={record.id} className="rounded-lg border border-[#e5e9f0] bg-[#f8fafc] p-4">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
@@ -639,12 +646,8 @@ export default function DashboardPage() {
                               >
                                 학습 자료 보기
                               </Link>
-                              <span
-                                className={`rounded-full px-3 py-1 text-xs font-bold ${
-                                  isFeedbackSaved ? "bg-[#f0fdf4] text-[#15803d]" : "bg-[#fff7ed] text-[#9a3412]"
-                                }`}
-                              >
-                                {isFeedbackSaved ? "저장 완료" : "작성 필요"}
+                              <span className="rounded-full bg-[#fff7ed] px-3 py-1 text-xs font-bold text-[#9a3412]">
+                                작성 필요
                               </span>
                             </div>
                           </div>
@@ -660,31 +663,60 @@ export default function DashboardPage() {
                                 ...current,
                                 [record.id]: event.target.value,
                               }));
-                              setSavedFeedbackIds((current) => current.filter((id) => id !== record.id));
                             }}
                             className="mt-4 h-40 w-full resize-none rounded-md border border-[#cbd5e1] bg-white p-4 outline-none focus:border-[#1f3a5f]"
                             placeholder="학생 반응, 이해도 변화, 다음 수업에서 반영할 피드백을 기록하세요."
                           />
                           <div className="mt-3 flex justify-end">
                             <button
-                              onClick={() =>
-                                setSavedFeedbackIds((current) =>
-                                  current.includes(record.id) ? current : [...current, record.id],
-                                )
-                              }
-                              className="rounded-md bg-[#1f3a5f] px-4 py-2 text-sm font-bold text-white"
+                              onClick={() => {
+                                const feedback = feedbackDrafts[record.id]?.trim();
+                                if (!feedback) return;
+
+                                setSavedFeedbackRecords((current) => [
+                                  {
+                                    id: `feedback-${record.id}-${Date.now()}`,
+                                    recordId: record.id,
+                                    feedback,
+                                    savedAt: "방금 저장",
+                                  },
+                                  ...current.filter((item) => item.recordId !== record.id),
+                                ]);
+                              }}
+                              disabled={!feedbackDrafts[record.id]?.trim()}
+                              className="rounded-md bg-[#1f3a5f] px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
                             >
                               저장
                             </button>
                           </div>
                         </section>
-                        );
-                      })}
+                      ))}
                     </div>
                   </div>
 
                   <div className="space-y-4 rounded-lg border border-[#e5e9f0] bg-white p-5 xl:order-2">
                     <h3 className="text-xl font-black">최근 기록</h3>
+                    {savedFeedbackRecords.map((feedbackRecord) => {
+                      const sourceRecord = sessionLogs.find((record) => record.id === feedbackRecord.recordId);
+                      if (!sourceRecord) return null;
+
+                      return (
+                        <button
+                          key={feedbackRecord.id}
+                          onClick={() => setOpenReportId(sourceRecord.id)}
+                          className="w-full rounded-md bg-[#f8fafc] p-4 text-left transition hover:bg-[#eef4fb]"
+                        >
+                          <p className="font-black">
+                            {sourceRecord.session} · {sourceRecord.date}
+                          </p>
+                          <p className="mt-1 text-sm font-bold text-[#64748b]">
+                            교육 피드백 · {feedbackRecord.savedAt}
+                          </p>
+                          <p className="mt-2 text-sm leading-6">{feedbackRecord.feedback}</p>
+                          <p className="mt-3 text-sm font-black text-[#1f3a5f]">리포트 보기</p>
+                        </button>
+                      );
+                    })}
                     {sessionLogs.map((record) => (
                       <button
                         key={record.id}
