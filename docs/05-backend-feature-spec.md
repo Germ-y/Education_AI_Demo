@@ -31,6 +31,8 @@ AI 생성물은 반드시 스키마 검증과 교사 승인을 거친다.
 
 ## 2. 사용자 역할
 
+MVP/공모전 데모에서는 학생과 선생님 데이터를 미리 넣어둔다. 즉, 초기 범위는 `회원가입 서비스`가 아니라 `seed 데이터 기반 로그인/조회/콘텐츠 실행`이다.
+
 | 역할 | 설명 | 주요 권한 |
 | --- | --- | --- |
 | `center_admin` | 센터 관리자 | 조직/사용자/학생 전체 관리, 데이터 동기화, 감사 로그 조회 |
@@ -46,7 +48,32 @@ AI 생성물은 반드시 스키마 검증과 교사 승인을 거친다.
 AI 프롬프트와 로그에는 불필요한 실명/연락처/주소를 넣지 않는다.
 학생 계정은 콘텐츠 조회와 이벤트 제출만 가능하다.
 교사 승인 전 콘텐츠는 학생 API에서 절대 반환하지 않는다.
+데모 seed 계정은 운영 환경에서 자동 생성하지 않는다.
 ```
+
+### 2.1 계정/등록 범위
+
+초기 MVP:
+
+```text
+센터/교사/학생 계정 seed 데이터 사전 적재
+로그인 또는 데모 계정 선택
+교사 대시보드에서 기존 학생 목록 조회
+학생별 메모리 카드/콘텐츠/기록 조회
+```
+
+시간이 남으면 추가:
+
+```text
+교사 회원가입
+관리자 승인 또는 초대 코드 기반 가입
+교사의 아이 등록
+학생 기본 정보/지원 유형/학교 정보 입력
+초기 상담 메모/보호자 동의 상태 입력
+등록 직후 MemoryCard 초안 생성
+```
+
+학생은 원칙적으로 스스로 회원가입하지 않는다. 교사/센터가 학생을 등록하고, 학생에게는 `student_access_code` 또는 간단 로그인 계정을 발급한다.
 
 ## 3. 도메인 경계
 
@@ -57,6 +84,7 @@ AI 프롬프트와 로그에는 불필요한 실명/연락처/주소를 넣지 �
 | `AuthModule` | 로그인, 세션, 역할 권한 |
 | `OrganizationModule` | 센터/학교/운영 조직 관리 |
 | `StudentModule` | 학생 프로필, 학년, 학교, 관심사, 지원 유형 |
+| `DemoSeedModule` | 공모전/개발용 seed 데이터 적재, 샘플 계정 관리 |
 | `CaseModule` | 상담 신청서, 사례 목표, 회기 기록, 코칭 메모 |
 | `MemoryModule` | 학생별 장기 메모리 카드, 메모리 스냅샷, 압축 이력 |
 | `PlannerModule` | 주차별/월별 목표와 다음 회기 추천 |
@@ -1057,6 +1085,8 @@ AI 입력 스냅샷은 마스킹된 형태로 저장한다.
 ### Phase 1. DB/API 골격
 
 ```text
+DemoSeedModule과 seed 데이터 적재
+seed 교사/학생 로그인
 학생/사례/메모리/콘텐츠/스테이지/에셋/승인/활동 이벤트 테이블
 교사용 학생 목록 API
 학생용 오늘 미션 API
@@ -1121,13 +1151,14 @@ Remotion 마이크로 영상
 
 바로 개발해야 하는 순서:
 
-1. `MissionContent`/`ContentStage` 스키마 확정
-2. 교사 승인 상태 머신 구현
-3. 학생 플레이 이벤트 저장
-4. `RealtimePracticeSpec`과 realtime session API 구현
-5. AI 생성 job queue 구현
-6. gpt-image-2 이미지 에셋 파이프라인 구현
-7. ReviewSummary와 MemoryCard 업데이트 후보 구현
-8. NEIS/NCIC/KESS 기반 PublicContextBundle 구현
+1. 데모 seed 데이터와 seed 로그인 구현
+2. `MissionContent`/`ContentStage` 스키마 확정
+3. 교사 승인 상태 머신 구현
+4. 학생 플레이 이벤트 저장
+5. `RealtimePracticeSpec`과 realtime session API 구현
+6. AI 생성 job queue 구현
+7. gpt-image-2 이미지 에셋 파이프라인 구현
+8. ReviewSummary와 MemoryCard 업데이트 후보 구현
+9. NEIS/NCIC/KESS 기반 PublicContextBundle 구현
 
 이 구조로 가면 프론트는 승인된 콘텐츠 JSON만 렌더링하고, 백엔드는 AI 생성·검수·승인·기록·메모리 업데이트를 책임지는 분명한 역할 분리가 된다.
