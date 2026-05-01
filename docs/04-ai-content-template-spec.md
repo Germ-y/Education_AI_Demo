@@ -13,7 +13,9 @@ AI 생성 JSON
 → 학생 화면 렌더링
 ```
 
-학생이 플레이하는 동안 AI가 새로 분석하거나 후처리로 스테이지를 바꾸지 않는다.
+학생이 플레이하는 동안 1~4단계는 AI가 새로 분석하거나 후처리로 스테이지를 바꾸지 않는다.
+
+단, 각 유형의 마지막 단계는 `Realtime Practice`로 분리한다. 이 단계는 자유 생성 콘텐츠가 아니라 교사가 승인한 `RealtimePracticeSpec` 안에서만 AI가 대화와 짧은 피드백을 제공한다.
 
 ## 2. 공통 MissionContent 스키마
 
@@ -44,7 +46,7 @@ AI 생성 JSON
 | 2 | 단서 찾기 | `clue_identification` | `scene_observation`, `highlight_clue`, `card_match` |
 | 3 | 행동 고르기 | `action_selection` | `action_choice`, `sequence_ordering`, `decision_card` |
 | 4 | 한 번 해보기 | `roleplay_practice` | `roleplay_simulation`, `dialogue_choice`, `mini_simulation` |
-| 5 | 회고 | `reflection` | `reflection_check` |
+| 5 | AI와 연습하기 | `realtime_practice` | `realtime_roleplay` |
 
 ## 4. 학습집중형 단계
 
@@ -54,9 +56,11 @@ AI 생성 JSON
 | 2 | 문제 1 | `basic_problem` | `scene_question`, `clue_question`, `blank_fill`, `partition_picker` |
 | 3 | 문제 2 | `applied_problem` | `applied_question`, `mini_simulation`, `card_match`, `sequence_ordering` |
 | 4 | 별이에게 설명하기 | `teach_back` | `help_friend`, `explanation_choice`, `wrong_explanation_fix`, `reverse_problem` |
-| 5 | 회고 | `reflection` | `reflection_check` |
+| 5 | AI에게 말해보기 | `realtime_practice` | `realtime_teach_back` |
 
 학습집중형 4단계는 개념 정리가 아니라 **가상 친구에게 설명하며 이해를 확인하는 단계**다. 이 단계도 학생 플레이 중 새 AI 분석을 하지 않고, 사전에 생성된 설명 선택지/오답 수정/역문제 템플릿만 실행한다.
+
+회고는 마지막 실시간 연습 종료 후 `post_practice_reflection` 이벤트로 수집한다. 별도 스테이지로 카운트하지 않는다.
 
 ## 5. 템플릿 목록
 
@@ -404,7 +408,75 @@ AI 생성 JSON
 }
 ```
 
-### 5.16 `reflection_check`
+### 5.16 `realtime_roleplay`
+
+목적:
+
+```text
+생활지원형 학생이 상황 이미지 속 역할극을 AI와 실시간으로 연습하게 한다.
+```
+
+필드:
+
+```json
+{
+  "templateType": "realtime_roleplay",
+  "imageAssetId": "asset_bus_stop_001",
+  "practiceTitle": "정류장에서 도움 요청하기",
+  "situationText": "버스가 아직 오지 않았고, 어떤 버스를 타야 할지 헷갈려요.",
+  "aiRole": "정류장 안내 직원",
+  "openingLine": "어디로 가려고 하나요? 제가 도와줄게요.",
+  "studentGoal": "3번 버스를 타고 센터에 가야 한다고 말하기",
+  "rubric": [
+    { "id": "state_destination", "label": "목적지를 말한다", "required": true },
+    { "id": "ask_help", "label": "도움을 요청한다", "required": true },
+    { "id": "confirm_next_action", "label": "다음 행동을 확인한다", "required": false }
+  ],
+  "allowedFeedback": [
+    "좋아요. 어디로 가는지 말했어요.",
+    "도움을 요청하는 말을 한 번 더 해볼까요?",
+    "이제 어떤 버스를 타면 되는지 확인해봐요."
+  ],
+  "maxTurns": 6,
+  "maxDurationSec": 120
+}
+```
+
+### 5.17 `realtime_teach_back`
+
+목적:
+
+```text
+학습집중형 학생이 상황 이미지와 별이의 질문을 보고 AI에게 말로 설명하며 실시간 피드백을 받는다.
+```
+
+필드:
+
+```json
+{
+  "templateType": "realtime_teach_back",
+  "imageAssetId": "asset_fraction_001",
+  "practiceTitle": "별이에게 분수 설명하기",
+  "situationText": "별이가 빛나는 피자 조각을 보고 왜 1/4인지 궁금해해요.",
+  "aiRole": "별이",
+  "openingLine": "왜 4/1이 아니라 1/4인지 알려줄래?",
+  "studentGoal": "전체 4개 중 고른 것이 1개라서 1/4이라고 설명하기",
+  "rubric": [
+    { "id": "mention_whole", "label": "전체가 4개임을 말한다", "required": true },
+    { "id": "mention_part", "label": "고른 것이 1개임을 말한다", "required": true },
+    { "id": "connect_fraction", "label": "1/4로 연결한다", "required": true }
+  ],
+  "allowedFeedback": [
+    "좋아요. 전체가 4개라는 말을 넣었어요.",
+    "고른 조각이 몇 개인지도 말해볼까요?",
+    "이제 1/4이라는 표현까지 이어서 말해봐요."
+  ],
+  "maxTurns": 6,
+  "maxDurationSec": 120
+}
+```
+
+### 5.18 `reflection_check`
 
 목적:
 
@@ -422,6 +494,8 @@ AI 생성 JSON
   "freeTextEnabled": false
 }
 ```
+
+`reflection_check`는 이제 마지막 정규 스테이지가 아니라 실시간 연습 종료 후 짧게 붙는 후속 수집용 템플릿이다.
 
 ## 6. AI 생성 출력 예시
 
@@ -456,9 +530,9 @@ AI 생성 JSON
     },
     {
       "step": 5,
-      "studentLabel": "회고",
-      "stageRole": "reflection",
-      "templateType": "reflection_check"
+      "studentLabel": "AI에게 말해보기",
+      "stageRole": "realtime_practice",
+      "templateType": "realtime_teach_back"
     }
   ]
 }
@@ -475,5 +549,6 @@ templateType이 허용 목록에 있는가
 학생 유형에 맞는 문장 길이인가
 민감 개인정보가 텍스트/프롬프트에 포함되지 않았는가
 이미지 안에 넣을 텍스트를 과도하게 요구하지 않았는가
+realtime 템플릿의 역할/첫 질문/루브릭/시간 제한이 승인 가능한가
 교사 승인 전 published 상태가 아닌가
 ```

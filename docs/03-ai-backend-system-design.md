@@ -19,12 +19,12 @@
 중요한 원칙:
 
 ```text
-학생 플레이 중 AI가 새로 분석하거나 새 콘텐츠를 즉석 생성하지 않는다.
-AI는 수업 전 콘텐츠 패키지 전체를 생성한다.
-학생 화면은 승인된 콘텐츠 JSON만 실행한다.
+1~4단계에서는 AI가 새로 분석하거나 새 콘텐츠를 즉석 생성하지 않는다.
+AI는 수업 전 콘텐츠 패키지와 마지막 실시간 연습 스펙을 생성한다.
+학생 화면은 승인된 콘텐츠 JSON과 승인된 RealtimePracticeSpec만 실행한다.
 ```
 
-즉, 학생 화면에서의 인터랙션은 실시간 AI가 아니라 **사전에 생성되고 승인된 미션 콘텐츠**를 플레이하는 구조다.
+즉, 기본 인터랙션은 **사전에 생성되고 승인된 미션 콘텐츠**를 플레이하는 구조다. 다만 각 유형의 마지막 단계는 예외적으로 `Realtime Practice`를 붙여 학생이 상황 이미지 안에서 AI와 짧게 대화하고 실시간 피드백을 받는다. 이때도 AI가 새 문제를 즉석 생성하는 것이 아니라, 교사가 승인한 상황/역할/루브릭 안에서만 대화한다.
 
 ## 2. 현재 프론트 기준 계약
 
@@ -127,7 +127,7 @@ AI 리뷰 요약
 중요 단서 찾기
 적절한 행동 선택
 실제 상황 리허설
-자기 상태 회고
+AI와 실시간 상황 연습
 ```
 
 ### 3.2 학습집중형
@@ -148,7 +148,7 @@ AI 리뷰 요약
 기본 문제 확인
 응용/심화 문제 수행
 가상 친구에게 설명하며 이해 확인
-이해도 회고
+AI와 실시간 설명 연습
 ```
 
 ## 4. 콘텐츠 단계
@@ -161,7 +161,9 @@ AI 리뷰 요약
 | 2 | 단서 찾기 | 상황 속 중요한 정보 고르기 | `scene_observation`, `highlight_clue`, `card_match` |
 | 3 | 행동 고르기 | 지금 해야 할 행동 선택 | `action_choice`, `sequence_ordering`, `decision_card` |
 | 4 | 한 번 해보기 | 실제 상황 재현, 롤플레잉 | `roleplay_simulation`, `dialogue_choice`, `mini_simulation` |
-| 5 | 회고 | 감정/도움 필요도/자신감 확인 | `reflection_check` |
+| 5 | AI와 연습하기 | 상황 이미지 기반 실시간 대화/피드백 | `realtime_roleplay` |
+
+회고는 마지막 실시간 연습 종료 후 1~2개 버튼으로 수집한다. 콘텐츠 단계로는 카운트하지 않고 `post_practice_reflection` 이벤트로 저장한다.
 
 예시:
 
@@ -170,8 +172,8 @@ AI 리뷰 요약
 1. 정류장 장면을 보여줌
 2. 버스 번호/도착 시간/목적지를 찾음
 3. 지금 해야 할 행동을 고름
-4. "버스가 5분 뒤에 와요" 상황을 다시 연습
-5. 쉬웠는지, 도움이 더 필요한지 선택
+4. 선택형 롤플레잉으로 말/행동을 한번 연습
+5. AI가 정류장 직원 역할을 하고 학생이 직접 말로 도움을 요청함
 ```
 
 ### 4.2 학습집중형 5단계
@@ -182,9 +184,11 @@ AI 리뷰 요약
 | 2 | 문제 1 | 시나리오 기반 기본 문제 | `scene_question`, `clue_question`, `blank_fill` |
 | 3 | 문제 2 | 문제 1 응용 및 심화 문제 | `applied_question`, `mini_simulation`, `card_match` |
 | 4 | 별이에게 설명하기 | 가상 시나리오 속 친구/마스코트에게 이유를 설명하기 | `help_friend`, `explanation_choice`, `wrong_explanation_fix` |
-| 5 | 회고 | 이해도/자신감/헷갈린 지점 확인 | `reflection_check` |
+| 5 | AI에게 말해보기 | 상황 이미지 기반 실시간 설명/피드백 | `realtime_teach_back` |
 
 4단계는 `생활에 적용`이나 `개념 정리`가 아니다. 학습집중형 4단계는 반복감을 줄이기 위해 **학생이 개념을 자기 말로 적용해보는 설명 단계**로 둔다. 단, 학생 플레이 중 AI가 새 분석을 하는 것이 아니라, AI가 사전에 생성한 설명 선택지/빈칸/오답 수정 템플릿을 학생이 수행한다.
+
+5단계는 별도 예외다. 학생이 상황 이미지와 별이의 질문을 보고, AI에게 직접 말하거나 짧게 입력하며 설명을 연습한다. AI는 실시간으로 "좋아요", "전체가 몇 조각인지도 말해볼까요?"처럼 피드백하지만, 교사가 승인한 루브릭 밖의 새 문제를 만들지 않는다.
 
 예시:
 
@@ -193,7 +197,7 @@ AI 리뷰 요약
 2. 전체 4구역 중 빛나는 구역 수를 찾음
 3. 4구역 중 1구역을 1/4로 표현함
 4. 별이가 "왜 4/1이 아니라 1/4이야?"라고 묻고, 학생이 맞는 설명을 고름
-5. 오늘 난이도와 헷갈린 부분을 회고함
+5. 별이가 다시 묻고, 학생이 마이크/텍스트로 "전체 4개 중 1개라서 1/4이야"라고 설명함
 ```
 
 ## 5. AI 기능 범위
@@ -225,6 +229,7 @@ AI 리뷰 요약
 오늘 콘텐츠 유형
 5단계 시나리오
 단계별 템플릿 선택
+마지막 실시간 연습 스펙
 난이도
 교사 검토 포인트
 이미지/음성 생성 필요 여부
@@ -255,6 +260,7 @@ AI 리뷰 요약
 
 ```text
 생활지원형 또는 학습집중형 5단계 콘텐츠 골격을 만든다.
+1~4단계는 정적 템플릿, 5단계는 승인형 RealtimePracticeSpec으로 만든다.
 ```
 
 출력:
@@ -287,9 +293,43 @@ TeacherReviewSummary
 ```text
 생활지원형 2단계: scene_observation, highlight_clue, card_match 중 선택
 학습집중형 4단계: help_friend, explanation_choice, wrong_explanation_fix 중 선택
+각 유형 5단계: realtime_roleplay 또는 realtime_teach_back 고정
 ```
 
-### 5.5 이미지 생성
+### 5.5 실시간 연습 세션
+
+역할:
+
+```text
+마지막 단계에서 학생이 상황 이미지와 AI 대화로 실제 말하기/설명하기를 연습한다.
+```
+
+원칙:
+
+```text
+실시간 AI는 마지막 단계에서만 열린다.
+교사가 승인한 RealtimePracticeSpec이 있어야 세션을 만들 수 있다.
+AI는 승인된 역할, 첫 질문, 허용 피드백, 루브릭 안에서만 응답한다.
+대화 결과는 즉시 다음 문제 생성에 쓰지 않고, 종료 후 리뷰 요약과 메모리 업데이트 후보로만 저장한다.
+```
+
+생활지원형:
+
+```text
+AI 역할: 정류장 직원, 센터 선생님, 또래 친구, 도서관 사서 등
+학생 행동: 도움 요청하기, 순서 말하기, 감정 표현하기, 안전한 선택 말하기
+피드백: 말문 열기, 핵심 단서 확인, 다음 행동 안내
+```
+
+학습집중형:
+
+```text
+AI 역할: 별이 또는 친구
+학생 행동: 개념을 자기 말로 설명하기, 이유 말하기, 헷갈린 부분 다시 말하기
+피드백: 핵심 단어 누락 확인, 오개념 짧게 바로잡기, 성공 표현 강화
+```
+
+### 5.6 이미지 생성
 
 역할:
 
@@ -305,7 +345,7 @@ TeacherReviewSummary
 정답/선택지/설명은 UI 텍스트가 담당한다.
 ```
 
-### 5.6 음성/마이크로 영상
+### 5.7 음성/마이크로 영상
 
 MVP에서는 선택 기능이다.
 
@@ -320,7 +360,7 @@ image-2 장면 이미지
 
 영상 안에 문제를 모두 박지 않는다. 영상은 몰입을 담당하고, 문제/피드백은 앱이 담당한다.
 
-### 5.7 자동 검수
+### 5.8 자동 검수
 
 교사 검토 전 시스템이 확인한다.
 
@@ -331,13 +371,14 @@ image-2 장면 이미지
 템플릿 스키마 유효성
 이미지 프롬프트 안전성
 교육과정 연결 여부
+RealtimePracticeSpec의 역할/루브릭/시간 제한 유효성
 ```
 
-### 5.8 리뷰 요약
+### 5.9 리뷰 요약
 
 학생 플레이 후 AI가 수행 결과를 요약한다.
 
-단, 새 콘텐츠를 즉시 생성하지 않는다.
+단, 새 콘텐츠를 즉시 생성하지 않는다. 마지막 실시간 연습의 대화 기록은 루브릭 결과와 짧은 요약으로 압축해 다음 회기 근거로만 사용한다.
 
 출력:
 
@@ -547,8 +588,11 @@ GET  /api/student/contents/:contentId
 POST /api/student/contents/:contentId/start
 POST /api/student/contents/:contentId/events
 POST /api/student/contents/:contentId/stages/:stageId/answer
+POST /api/student/contents/:contentId/stages/:stageId/realtime-session
+POST /api/student/realtime-sessions/:sessionId/events
+POST /api/student/realtime-sessions/:sessionId/complete
+POST /api/student/contents/:contentId/post-practice-reflection
 POST /api/student/contents/:contentId/complete
-POST /api/student/contents/:contentId/reflection
 ```
 
 ### 8.2 교사 화면
@@ -590,7 +634,7 @@ POST /internal/ai/update-memory
 3. Working Context 생성
 4. 콘텐츠 유형 결정
 5. 5단계 StagePlan 생성
-6. 단계별 템플릿 선택
+6. 1~4단계 템플릿 선택 및 5단계 RealtimePracticeSpec 생성
 7. StageQuestion/TemplateSpec 생성
 8. 이미지/음성/영상 Asset job 생성
 9. 자동 검수
@@ -606,11 +650,13 @@ POST /internal/ai/update-memory
 2. published 콘텐츠 조회
 3. 각 스테이지 플레이
 4. 선택/클릭/힌트/체류시간 이벤트 저장
-5. 완료 시 content_attempt 종료
-6. 회고 저장
-7. 리뷰 요약 job 실행
-8. 메모리 업데이트 후보 생성
-9. 교사 화면 기록/분석에 노출
+5. 마지막 단계에서 승인된 realtime session 생성
+6. 상황 이미지 기반 AI 대화/실시간 피드백 수행
+7. post-practice 회고 저장
+8. 완료 시 content_attempt 종료
+9. 리뷰 요약 job 실행
+10. 메모리 업데이트 후보 생성
+11. 교사 화면 기록/분석에 노출
 ```
 
 ## 11. 안전 원칙
@@ -619,6 +665,7 @@ POST /internal/ai/update-memory
 AI 생성물은 교사 승인 전 학생에게 노출하지 않는다.
 학생 플레이 중 임의 JS 코드를 실행하지 않는다.
 인터랙션은 허용된 템플릿 스키마만 렌더링한다.
+마지막 realtime은 승인된 역할/루브릭/시간 제한 안에서만 실행한다.
 민감 정보는 콘텐츠 텍스트와 이미지 프롬프트에 넣지 않는다.
 AgentRun과 콘텐츠 버전은 모두 저장한다.
 승인된 콘텐츠는 학생 수행 후 수정하지 않고 새 버전을 만든다.
