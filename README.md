@@ -10,3 +10,4 @@
 - [AI 콘텐츠 템플릿 명세](./docs/04-ai-content-template-spec.md)
 - [백엔드 기능 명세 및 AI 워크플로우](./docs/05-backend-feature-spec.md)
 - [공공데이터 활용 전략](./docs/06-public-data-strategy.md)
+- [마지막 실시간 연습 단계 설계](./docs/07-realtime-practice-spec.md)
