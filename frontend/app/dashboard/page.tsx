@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   reviewItems,
   sessionRecords,
@@ -97,6 +97,13 @@ const reviewStagePreviews = [
   },
 ];
 
+const reviewStageReasons: Record<number, string> = {
+  1: "분수를 표현하기 전에 전체가 몇 등분인지 확인해 전체-부분 관계의 기준을 세웁니다.",
+  2: "전체 중에서 특정 부분만 구분하게 하여 분자의 의미를 시각적으로 연결합니다.",
+  3: "앞 단계에서 센 전체와 부분을 실제 분수 기호 1/4로 바꾸는 단계입니다.",
+  4: "학습한 분수 표현을 생활 장면에 적용해 개념 전이를 확인합니다.",
+};
+
 function StatusBadge({ supportCase }: { supportCase: SupportCase }) {
   return (
     <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusTone[supportCase.status]}`}>
@@ -127,6 +134,9 @@ export default function DashboardPage() {
   const [rejectedMaterialIds, setRejectedMaterialIds] = useState<string[]>([]);
   const [editingReviewIds, setEditingReviewIds] = useState<string[]>([]);
   const [editingImageKey, setEditingImageKey] = useState<string | null>(null);
+  const [reviewPreviewStep, setReviewPreviewStep] = useState(1);
+  const [reviewPreviewScale, setReviewPreviewScale] = useState(1);
+  const reviewPreviewFrameRef = useRef<HTMLDivElement>(null);
   const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({});
   const [savedMemos, setSavedMemos] = useState<Record<string, string>>({});
 
@@ -173,6 +183,39 @@ export default function DashboardPage() {
   const savedMemo = savedMemos[selectedCase.id] ?? selectedCase.riskNote;
   const memoValue = memoDrafts[selectedCase.id] ?? savedMemo;
   const isMemoDirty = memoValue !== savedMemo;
+
+  useEffect(() => {
+    if (!openReview) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== "student-preview-stage") return;
+
+      const nextStep = Number(event.data.step);
+      if (Number.isInteger(nextStep) && nextStep >= 1 && nextStep <= reviewStagePreviews.length) {
+        setReviewPreviewStep(nextStep);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [openReview]);
+
+  useEffect(() => {
+    if (!openReview) return;
+    const frame = reviewPreviewFrameRef.current;
+    if (!frame) return;
+
+    const updateScale = () => {
+      const { width, height } = frame.getBoundingClientRect();
+      setReviewPreviewScale(Math.min(width / 1024, height / 768) + 0.004);
+    };
+
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [openReview]);
 
   return (
     <main className="relative min-h-screen bg-[#f5f7fa] text-[#172033]">
@@ -678,7 +721,7 @@ export default function DashboardPage() {
       )}
       {openReview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/45 p-5">
-          <section className="flex max-h-[86vh] w-full max-w-4xl flex-col rounded-xl bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+          <section className="flex max-h-[90vh] w-full max-w-[1240px] flex-col rounded-xl bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
             <div className="flex items-start justify-between gap-4 border-b border-[#e5e9f0] px-6 py-5">
               <div>
                 <p className="text-sm font-bold text-[#64748b]">자료 검토</p>
@@ -692,20 +735,53 @@ export default function DashboardPage() {
                   setOpenReviewId(null);
                   setEditingImageKey(null);
                 }}
-                className="rounded-md border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-bold text-[#334155]"
+                aria-label="닫기"
+                className="flex h-11 w-11 items-center justify-center rounded-md border border-[#cbd5e1] bg-white text-2xl font-bold leading-none text-[#334155]"
               >
-                닫기
+                ×
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-              <div className="space-y-3">
+            <div className="grid min-h-0 flex-1 gap-5 px-7 py-5 lg:grid-cols-[minmax(560px,620px)_minmax(460px,1fr)]">
+              <section className="min-h-0 rounded-lg border border-[#d8dee8] bg-[#e7edf4] p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black text-[#64748b]">학생 화면 미리보기</p>
+                    <p className="mt-1 text-lg font-black text-[#172033]">스테이지 {reviewPreviewStep}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {reviewStagePreviews.map((stage) => (
+                      <button
+                        key={stage.step}
+                        onClick={() => setReviewPreviewStep(stage.step)}
+                        className={`rounded-full px-3 py-1 text-xs font-black ${
+                          reviewPreviewStep === stage.step ? "bg-[#1f3a5f] text-white" : "bg-white text-[#475569]"
+                        }`}
+                      >
+                        {stage.step}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div
+                  ref={reviewPreviewFrameRef}
+                  className="relative aspect-[4/3] max-h-[min(58vh,560px)] overflow-hidden rounded-md border border-[#cbd5e1] bg-[#e7edf4]"
+                >
+                  <iframe
+                    title={`학생 화면 스테이지 ${reviewPreviewStep}`}
+                    src={`/student/stage?step=${reviewPreviewStep}&preview=1`}
+                    className="absolute left-0 top-0 h-[768px] w-[1024px] origin-top-left border-0"
+                    style={{ transform: `scale(${reviewPreviewScale})` }}
+                  />
+                </div>
+              </section>
+              <div className="min-h-0 space-y-4 overflow-y-auto pr-2">
                 {reviewStagePreviews.map((stage, index) => {
                   const imageKey = `${openReview.id}-${stage.step}`;
                   const isImageEditing = editingImageKey === imageKey;
 
                   return (
-                    <section key={stage.step} className="rounded-lg border border-[#e5e9f0] bg-[#fbfcfe] p-4">
+                    <section key={stage.step} className="rounded-lg border border-[#e5e9f0] bg-[#fbfcfe] p-5">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
                           <span className="rounded-full bg-[#1f3a5f] px-3 py-1 text-xs font-black text-white">
@@ -720,26 +796,25 @@ export default function DashboardPage() {
                         )}
                       </div>
 
-                      <div className="grid gap-4 lg:grid-cols-[210px_minmax(0,1fr)]">
-                        <div className="relative">
-                          <div className="relative aspect-[4/3] overflow-hidden rounded-lg border border-[#ecd27a] bg-[#f6df7d] p-3">
+                      <div className="grid gap-4">
+                        <div className="hidden">
+                          <div className="relative aspect-[4/3] overflow-hidden rounded-lg border border-[#d8dee8] bg-[#e7edf4]">
                             <button
                               onClick={() => setEditingImageKey(isImageEditing ? null : imageKey)}
                               className="absolute right-2 top-2 z-10 rounded-full border border-[#cbd5e1] bg-white/95 px-3 py-1 text-xs font-black text-[#334155] shadow-sm"
                             >
-                              이미지 수정
+                              화면 수정
                             </button>
-                            <div className="grid h-full grid-cols-2 gap-1 rounded-md border-4 border-[#e4bd4e] bg-[#f8e48f]">
-                              <div className="border-r border-b border-[#e4bd4e]" />
-                              <div className="border-b border-[#e4bd4e]" />
-                              <div className="border-r border-[#e4bd4e]" />
-                              <div className={index === 1 ? "ring-4 ring-[#fff176]" : "bg-[#f9eca8]"} />
-                            </div>
+                            <iframe
+                              title={`학생 화면 스테이지 ${stage.step}`}
+                              src={`/student/stage?step=${stage.step}&preview=1`}
+                              className="absolute left-0 top-0 h-[768px] w-[1024px] origin-top-left scale-[0.205] border-0"
+                            />
                           </div>
                           {isImageEditing && (
                             <div className="absolute left-[calc(100%+12px)] top-1 z-30 w-72 rounded-lg border border-[#fed7aa] bg-[#fff7ed] p-3 shadow-[0_18px_45px_rgba(154,52,18,0.18)] before:absolute before:left-[-7px] before:top-8 before:h-3 before:w-3 before:rotate-45 before:border-b before:border-l before:border-[#fed7aa] before:bg-[#fff7ed] max-lg:left-0 max-lg:top-[calc(100%+10px)] max-lg:w-full max-lg:before:left-8 max-lg:before:top-[-7px] max-lg:before:border-b-0 max-lg:before:border-l-0 max-lg:before:border-r max-lg:before:border-t">
                               <label className="text-xs font-black text-[#9a3412]" htmlFor={`image-prompt-${stage.step}`}>
-                                이미지 재생성 프롬프트
+                                화면 수정 프롬프트
                               </label>
                               <textarea
                                 id={`image-prompt-${stage.step}`}
@@ -755,13 +830,13 @@ export default function DashboardPage() {
                                 }}
                                 className="mt-2 w-full rounded-md bg-[#9a3412] px-3 py-2 text-xs font-black text-white"
                               >
-                                이미지 재생성
+                                화면 재생성
                               </button>
                             </div>
                           )}
                         </div>
 
-                        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_260px]">
+                        <div className="grid gap-3">
                           <div className="rounded-md bg-white p-4">
                             <p className="text-xs font-black text-[#64748b]">내용</p>
                             {isReviewEditing ? (
@@ -770,7 +845,17 @@ export default function DashboardPage() {
                                 defaultValue={stage.description}
                               />
                             ) : (
-                              <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">{stage.description}</p>
+                              <>
+                                <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">{stage.description}</p>
+                                <div className="mt-4 border-l-4 border-[#1f3a5f] bg-[#f2f6fb] px-4 py-3">
+                                  <p className="text-xs font-black uppercase tracking-[0.08em] text-[#1f3a5f]">
+                                    설계 의도
+                                  </p>
+                                  <p className="mt-2 text-sm font-bold leading-6 text-[#26364d]">
+                                    {reviewStageReasons[stage.step]}
+                                  </p>
+                                </div>
+                              </>
                             )}
 
                             <p className="mt-4 text-xs font-black text-[#64748b]">문제</p>
