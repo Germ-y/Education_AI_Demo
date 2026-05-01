@@ -750,7 +750,7 @@ export default function DashboardPage() {
       </div>
       {openReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/45 p-6">
-          <section className="flex max-h-[88vh] w-full max-w-5xl flex-col rounded-xl bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+          <section className="flex h-[min(88vh,820px)] w-[min(92vw,1280px)] flex-col rounded-xl bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#e5e9f0] px-6 py-4">
               <div>
                 <p className="text-sm font-bold text-[#64748b]">학습 리포트</p>
@@ -777,7 +777,7 @@ export default function DashboardPage() {
                 </div>
                 <div
                   ref={reportPreviewFrameRef}
-                  className="relative mx-auto aspect-[4/3] max-h-[40vh] max-w-[560px] overflow-hidden rounded-md bg-[#e7edf4]"
+                  className="relative mx-auto aspect-[4/3] h-[min(40vh,420px)] overflow-hidden rounded-md bg-[#e7edf4]"
                 >
                   <iframe
                     title={`학습 리포트 자료 스테이지 ${openReportStageStep}`}
@@ -807,7 +807,7 @@ export default function DashboardPage() {
       )}
       {openReview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/45 p-5">
-          <section className="flex max-h-[90vh] w-full max-w-[1240px] flex-col rounded-xl bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+          <section className="flex h-[min(90vh,920px)] w-[min(94vw,1560px)] flex-col rounded-xl bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
             <div className="flex items-start justify-between gap-4 border-b border-[#e5e9f0] px-6 py-5">
               <div>
                 <p className="text-sm font-bold text-[#64748b]">자료 검토</p>
@@ -828,8 +828,8 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            <div className="grid min-h-0 flex-1 gap-5 px-7 py-5 lg:grid-cols-[minmax(560px,620px)_minmax(460px,1fr)]">
-              <section className="min-h-0 rounded-lg border border-[#d8dee8] bg-[#e7edf4] p-4">
+            <div className="grid min-h-0 flex-1 gap-[clamp(16px,1.2vw,24px)] px-[clamp(24px,2vw,36px)] py-[clamp(18px,1.5vw,28px)] lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,0.85fr)]">
+              <section className="flex min-h-0 flex-col rounded-lg border border-[#d8dee8] bg-[#e7edf4] p-4">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-black text-[#64748b]">학생 화면 미리보기</p>
@@ -851,7 +851,7 @@ export default function DashboardPage() {
                 </div>
                 <div
                   ref={reviewPreviewFrameRef}
-                  className="relative aspect-[4/3] max-h-[min(58vh,560px)] overflow-hidden rounded-md border border-[#cbd5e1] bg-[#e7edf4]"
+                  className="relative aspect-[4/3] min-h-0 flex-1 overflow-hidden rounded-md border border-[#cbd5e1] bg-[#e7edf4]"
                 >
                   <iframe
                     key={`${openReview.id}-${reviewPreviewStep}`}
