@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 from functools import lru_cache
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -30,7 +30,34 @@ def get_session_maker() -> sessionmaker[Session]:
 
 
 def create_schema(engine: Engine | None = None) -> None:
-    Base.metadata.create_all(bind=engine or get_engine())
+    active_engine = engine or get_engine()
+    Base.metadata.create_all(bind=active_engine)
+    add_missing_demo_columns(active_engine)
+
+
+def add_missing_demo_columns(engine: Engine) -> None:
+    if engine.dialect.name != "sqlite":
+        return
+
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
+    if "students" not in existing_tables or "support_cases" not in existing_tables:
+        return
+
+    support_case_columns = {column["name"] for column in inspector.get_columns("support_cases")}
+    statements = []
+
+    if "dashboard_stage" not in support_case_columns:
+        statements.append("ALTER TABLE support_cases ADD COLUMN dashboard_stage VARCHAR DEFAULT 'initial_review'")
+    if "support_strategy" not in support_case_columns:
+        statements.append("ALTER TABLE support_cases ADD COLUMN support_strategy TEXT")
+
+    if not statements:
+        return
+
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
 
 
 def drop_schema(engine: Engine | None = None) -> None:

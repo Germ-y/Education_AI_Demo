@@ -19,6 +19,7 @@ def use_sqlite_demo_db(tmp_path) -> None:
     os.environ["DEMO_SEED_RESET"] = "true"
     os.environ["OPENAI_API_KEY"] = ""
     os.environ["ELEVENLABS_API_KEY"] = ""
+    os.environ["NEIS_API_KEY"] = ""
     get_settings.cache_clear()
     get_engine.cache_clear()
     get_session_maker.cache_clear()
@@ -83,6 +84,10 @@ def test_teacher_and_student_demo_flows() -> None:
     history = client.get("/api/teacher/students/student_learning_fraction/history", headers={"authorization": f"Bearer {teacher_token}"})
     assert history.status_code == 200
     assert history.json()["data"]["missionContents"][0]["studentId"] == "student_learning_fraction"
+    report = client.get("/api/teacher/students/student_learning_fraction/report", headers={"authorization": f"Bearer {teacher_token}"})
+    assert report.status_code == 200
+    assert report.json()["data"]["reports"][0]["studentId"] == "student_learning_fraction"
+    assert "Completed" not in report.json()["data"]["reports"][0]["shortSummary"]
 
     teacher_content = client.get("/api/contents/content_fraction_001", headers={"authorization": f"Bearer {teacher_token}"})
     assert teacher_content.status_code == 200
@@ -271,7 +276,11 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     os.environ["GENERATED_ASSETS_DIR"] = str(tmp_path / "generated")
     get_settings.cache_clear()
 
-    generated_content = create_demo_database().mission_contents[0].model_dump(by_alias=True)
+    seed = create_demo_database()
+    base_content = next(content for content in seed.mission_contents if content.student_id == "student_learning_fraction")
+    generated_content = base_content.model_dump(by_alias=True)
+    student_id = base_content.student_id
+    case_id = base_content.case_id
     generated_content["id"] = "content_generated_contract_001"
     generated_content["status"] = "teacher_review"
     generated_content["approvedByUserId"] = None
@@ -329,25 +338,25 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     client = TestClient(create_app())
 
     orchestrator = client.post(
-        "/api/ai/orchestrator-runs",
-        json={
-            "studentId": "student_learning_fraction",
-            "caseId": "case_learning_fraction",
-            "requestedGoal": "[난이도: 기초] 전체 4개 중 1개를 1/4로 표현한다.",
-            "contentType": "learning_focus",
-        },
+            "/api/ai/orchestrator-runs",
+            json={
+                "studentId": student_id,
+                "caseId": case_id,
+                "requestedGoal": "[난이도: 기초] 전체 4개 중 1개를 1/4로 표현한다.",
+                "contentType": "learning_focus",
+            },
     )
     assert orchestrator.status_code == 200
     orchestrator_run = orchestrator.json()["data"]["agentRun"]
     assert orchestrator_run["status"] == "succeeded"
 
     content_generation = client.post(
-        "/api/ai/content-generations",
-        json={
-            "orchestratorRunId": orchestrator_run["id"],
-            "studentId": "student_learning_fraction",
-            "caseId": "case_learning_fraction",
-        },
+            "/api/ai/content-generations",
+            json={
+                "orchestratorRunId": orchestrator_run["id"],
+                "studentId": student_id,
+                "caseId": case_id,
+            },
     )
     assert content_generation.status_code == 200
     content = content_generation.json()["data"]["content"]

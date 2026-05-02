@@ -103,6 +103,11 @@ class SupportCase(BaseModel):
     owner_teacher_id: str = Field(alias="ownerTeacherId")
     case_status: Literal["open", "paused", "closed"] = Field(default="open", alias="caseStatus")
     current_goal: str = Field(alias="currentGoal")
+    dashboard_stage: Literal["initial_review", "material_generation", "material_review", "learning", "feedback"] = Field(
+        default="initial_review",
+        alias="dashboardStage",
+    )
+    support_strategy: str | None = Field(default=None, alias="supportStrategy")
     opened_at: str = Field(alias="openedAt")
 
     model_config = ConfigDict(populate_by_name=True)

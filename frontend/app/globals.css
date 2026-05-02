@@ -121,3 +121,25 @@ a {
     transform-origin: 78% 49%;
   }
 }
+
+@keyframes hintStarBlink {
+  0%,
+  40%,
+  47%,
+  100% {
+    transform: scaleY(1);
+  }
+  44% {
+    transform: scaleY(0.08);
+  }
+}
+
+@keyframes hintStarLightFloat {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(2deg);
+  }
+}

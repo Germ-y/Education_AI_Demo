@@ -201,6 +201,8 @@ def _insert_all(session: Session, db: DemoDatabase) -> None:
             owner_teacher_id=item.owner_teacher_id,
             case_status=item.case_status,
             current_goal=item.current_goal,
+            dashboard_stage=item.dashboard_stage,
+            support_strategy=item.support_strategy,
             opened_at=item.opened_at,
         )
         for item in db.support_cases
@@ -476,6 +478,8 @@ def _support_case(row: rows.SupportCaseRow) -> dict:
         "ownerTeacherId": row.owner_teacher_id,
         "caseStatus": row.case_status,
         "currentGoal": row.current_goal,
+        "dashboardStage": row.dashboard_stage,
+        "supportStrategy": row.support_strategy,
         "openedAt": row.opened_at,
     }
 

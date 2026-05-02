@@ -10,3 +10,4 @@ export * from "./features/seeded-domain-read";
 export * from "./features/student-mission";
 export * from "./features/student-mission-runtime";
 export * from "./features/teacher-case-read";
+export * from "../mission-content";

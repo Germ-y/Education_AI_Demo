@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { getBackendStudentScenario } from "@/lib/scenario-data";
+import { getStudentContextForRoute } from "@/lib/student-context-source";
 
 function StarterStar() {
   return (
@@ -45,28 +45,15 @@ export default async function StudentStartPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const params = await searchParams;
-  const studentIdParam = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
-  const result = await getBackendStudentScenario(studentIdParam);
-
-  if (result.kind === "empty") {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#e7edf4] px-6 text-[#1f211d]">
-        <section className="max-w-xl rounded-[28px] border border-[#d8dee8] bg-white p-8 shadow-[0_24px_70px_rgba(57,78,97,0.14)]">
-          <p className="text-sm font-black text-[#1f3a5f]">{result.student.displayName} · {result.student.grade}</p>
-          <h1 className="mt-3 text-3xl font-black">오늘 배포된 미션이 없어요</h1>
-          <p className="mt-4 text-base font-bold leading-7 text-[#596157]">{result.message}</p>
-          <Link href="/dashboard" className="mt-6 inline-flex rounded-[18px] bg-[#1f3a5f] px-5 py-3 text-sm font-black text-white">
-            교사용 자료 만들기로 이동
-          </Link>
-        </section>
-      </main>
-    );
-  }
-
-  const { student, scene } = result.context;
+  const caseIdParam = Array.isArray(params.caseId) ? params.caseId[0] : params.caseId;
+  const contentIdParam = Array.isArray(params.contentId) ? params.contentId[0] : params.contentId;
+  const { student, scene } = await getStudentContextForRoute({ caseId: caseIdParam, contentId: contentIdParam });
   const theme = scene.theme;
   const nextStage = scene.stages[scene.currentStep - 1] ?? scene.stages[0];
-  const pathHref = `/student/path?studentId=${encodeURIComponent(result.studentId)}`;
+  const caseQuery = `caseId=${encodeURIComponent(scene.caseId)}${scene.contentId ? `&contentId=${encodeURIComponent(scene.contentId)}` : ""}`;
+  const pathHref = `/student/path?${caseQuery}`;
+  const heroImage = scene.assets?.find((asset) => asset.assetRole === "hero" && asset.assetType === "image" && asset.url);
+  const heroAudio = scene.assets?.find((asset) => asset.assetRole === "hero" && asset.assetType === "audio" && asset.url);
 
   return (
     <main className="relative flex h-screen overflow-hidden bg-[#e7edf4] p-4 text-[#1f211d]">
@@ -145,9 +132,31 @@ export default async function StudentStartPage({
 
               <aside className="flex min-h-0 items-center justify-center">
                 <div className="relative w-full max-w-[430px]">
-                  <div className="mx-auto flex justify-center">
-                    <StarterStar />
-                  </div>
+                  {heroImage?.url ? (
+                    <div
+                      className="overflow-hidden rounded-[28px] border bg-white p-3 shadow-[0_20px_54px_rgba(57,78,97,0.10)]"
+                      style={{ borderColor: theme.border }}
+                    >
+                      <Image
+                        src={heroImage.url}
+                        alt={heroImage.alt}
+                        width={720}
+                        height={480}
+                        className="h-[240px] w-full rounded-[20px] object-cover"
+                        unoptimized
+                        priority
+                      />
+                      {heroAudio?.url && (
+                        <div className="mt-3">
+                          <audio className="w-full" src={heroAudio.url} controls preload="auto" />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mx-auto flex justify-center">
+                      <StarterStar />
+                    </div>
+                  )}
                   <div
                     className="mt-3 rounded-[26px] border px-7 py-6 shadow-[0_20px_54px_rgba(57,78,97,0.10)]"
                     style={{ borderColor: theme.border, backgroundColor: `${theme.accentPale}f4` }}

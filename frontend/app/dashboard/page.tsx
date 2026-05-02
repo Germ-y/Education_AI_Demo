@@ -2,37 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { backendAdapter } from "@/lib/api/backend-adapter";
-import type { ContentType, MissionContent, StudentCaseFile, StudentListItem } from "@/lib/api/contracts";
 import {
   reviewItems,
   sessionRecords,
-  students as mockStudents,
+  students,
   supportCases,
   type CaseStatus,
-  type StudentProfile,
   type SupportCase,
 } from "@/lib/demo-data";
+import { demoLogin, getTeacherStudent, getTeacherStudents, type StudentCaseFile, type StudentListItem } from "@/lib/api";
 
 type DashboardTab = "info" | "materials" | "records";
-
-type MaterialReviewItem = {
-  id: string;
-  caseId: string;
-  title: string;
-  type: string;
-  state: string;
-  contentId?: string;
-  content?: MissionContent;
-};
-
-type MaterialGenerationState = {
-  status: "idle" | "running" | "succeeded" | "failed";
-  phase: string;
-  message: string;
-  contentId?: string;
-  errorCode?: string;
-};
 
 const tabs: Array<{ id: DashboardTab; label: string; description: string }> = [
   { id: "info", label: "학생 정보", description: "기본 정보와 현재 학습 상태" },
@@ -139,6 +119,84 @@ const reviewStageReasons: Record<number, string> = {
 
 type ReviewStageDraft = (typeof reviewStagePreviews)[number];
 
+type DashboardStudentView = {
+  id: string;
+  name: string;
+  school: string;
+  grade: string;
+  attendanceRate: number | null;
+  strengths: string[];
+  weaknesses: string[];
+};
+
+function toDashboardStatus(item?: StudentListItem): CaseStatus {
+  if (item?.dashboardStage === "initial_review") return "intake";
+  if (item?.dashboardStage === "material_generation") return "structured";
+  if (item?.dashboardStage === "material_review") return "scene_review";
+  if (item?.dashboardStage === "learning") return "goal_set";
+  if (item?.dashboardStage === "feedback") return "follow_up";
+  if (item?.latestContentStatus === "completed") return "follow_up";
+  if (item?.latestContentStatus && item.latestContentStatus !== "none") return "scene_review";
+  return "intake";
+}
+
+function toSupportCaseFromListItem(item: StudentListItem): SupportCase {
+  const status = toDashboardStatus(item);
+
+  return {
+    id: `${item.studentId}-case-summary`,
+    studentId: item.studentId,
+    status,
+    statusLabel: learningStatus[status].label,
+    caseType: item.studentType === "learning_focus" ? "학습 집중" : "생활 연습",
+    primaryNeed: item.primaryNeed,
+    sessionGoal: item.primaryNeed,
+    supportStrategy: item.supportStrategy ?? (item.studentType === "learning_focus" ? "초기 학습 반응 확인" : "상황 장면 기반"),
+    nextAction: item.nextSessionSuggestion,
+    riskNote: "학생 화면에는 진단 표현을 노출하지 않음",
+    challengeTags: item.weaknesses && item.weaknesses.length > 0 ? item.weaknesses : [item.primaryNeed],
+    planTags: [item.nextSessionSuggestion],
+  };
+}
+
+function toSupportCaseFromCaseFile(caseFile: StudentCaseFile, listItem?: StudentListItem): SupportCase {
+  const status = toDashboardStatus(listItem);
+
+  return {
+    id: caseFile.openCase.id,
+    studentId: caseFile.profile.id,
+    status,
+    statusLabel: learningStatus[status].label,
+    caseType: caseFile.profile.studentType === "learning_focus" ? "학습 집중" : "생활 연습",
+    primaryNeed: caseFile.profile.primaryNeed,
+    sessionGoal: caseFile.openCase.currentGoal,
+    supportStrategy:
+      caseFile.openCase.supportStrategy ??
+      toDisplayLabels(caseFile.memoryCard?.effectiveExplanationStyles, ["정적 콘텐츠", "실시간 연습"]).join(", "),
+    nextAction: listItem?.nextSessionSuggestion ?? "다음 미션 확인",
+    riskNote: caseFile.memoryCard?.nextSessionCautions.join(", ") || "학생 화면에는 진단 표현을 노출하지 않음",
+    challengeTags:
+      caseFile.profile.weaknesses && caseFile.profile.weaknesses.length > 0
+        ? caseFile.profile.weaknesses
+        : toDisplayLabels(caseFile.memoryCard?.learningProblemTypes),
+    planTags: caseFile.plannerItems.map((item) => item.goalText),
+  };
+}
+
+const memoryLabelMap: Record<string, string> = {
+  visual_example: "그림 예시",
+  short_steps: "짧은 단계 설명",
+  concept_misunderstanding: "개념 이해 보완",
+  sequence_planning: "순서 계획 연습",
+  fractions: "분수",
+  daily_route: "일상 이동",
+};
+
+function toDisplayLabels(values: string[] | undefined, fallback: string[] = []) {
+  const source = values && values.length > 0 ? values : fallback;
+  return source.map((value) => memoryLabelMap[value] ?? value);
+}
+
 function StatusBadge({ supportCase }: { supportCase: SupportCase }) {
   return (
     <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusTone[supportCase.status]}`}>
@@ -156,176 +214,13 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
-function mapDashboardStudent(caseFile: StudentCaseFile): StudentProfile {
-  const interests = Array.isArray(caseFile.profile.profileJson.interests)
-    ? caseFile.profile.profileJson.interests.filter((item): item is string => typeof item === "string")
-    : [];
-
-  return {
-    id: caseFile.profile.id,
-    name: caseFile.profile.displayName,
-    displayName: caseFile.profile.displayName,
-    grade: formatGrade(caseFile.profile.grade),
-    school: caseFile.schoolContext?.school.name ?? schoolNameFromCode(caseFile.profile.schoolCode),
-    guardianName: "보호자",
-    phone: "-",
-    level: caseFile.profile.studentType === "life_support" ? 2 : 3,
-    rewardTokens: caseFile.profile.studentType === "life_support" ? 96 : 120,
-    nextRewardTokens: 30,
-    attendanceRate: 92,
-    understandingRate: caseFile.profile.studentType === "life_support" ? 68 : 76,
-    interests,
-    strengths: caseFile.memoryCard?.effectiveExplanationStyles ?? ["시각 자료", "짧은 단계"],
-  };
-}
-
-function mapDashboardCase(caseFile: StudentCaseFile, summary?: StudentListItem): SupportCase {
-  const hasContent = caseFile.recentContents.some((content) => content.status === "published");
-
-  return {
-    id: caseFile.openCase.id,
-    studentId: caseFile.profile.id,
-    status: hasContent ? "scene_review" : "structured",
-    statusLabel: hasContent ? "자료 검토" : "자료 생성 필요",
-    caseType: caseFile.profile.studentType === "life_support" ? "일상생활 지원형" : "학습집중형",
-    primaryNeed: caseFile.profile.primaryNeed,
-    sessionGoal: caseFile.recentContents[0]?.sessionGoal ?? caseFile.openCase.currentGoal,
-    supportStrategy: caseFile.memoryCard?.effectiveExplanationStyles.join(", ") ?? "학생 반응을 보고 짧은 단계로 진행",
-    nextAction: summary?.nextSessionSuggestion ?? caseFile.plannerItems[0]?.goalText ?? "다음 회기 목표 확인",
-    riskNote: caseFile.memoryCard?.emotionalStateNote ?? "초기 데이터 수집 중입니다.",
-    challengeTags: caseFile.memoryCard?.learningProblemTypes ?? [caseFile.profile.primaryNeed],
-    planTags: caseFile.plannerItems.map((item) => item.goalText).slice(0, 3),
-  };
-}
-
-function formatGrade(grade: string): string {
-  const match = /^(elementary|middle|high)_(\d+)$/.exec(grade);
-  if (!match) return grade;
-  const label = match[1] === "elementary" ? "초" : match[1] === "middle" ? "중" : "고";
-  return `${label}${match[2]}`;
-}
-
-function schoolNameFromCode(schoolCode: string | null | undefined): string {
-  if (schoolCode === "8811046") return "영주중앙초등학교";
-  if (schoolCode === "8811058") return "영주중학교";
-  if (schoolCode === "8811067") return "영주가흥초등학교";
-  return "학교 정보 확인 중";
-}
-
-function contentTypeFromCaseFile(caseFile: StudentCaseFile | undefined, supportCase: SupportCase): ContentType {
-  if (caseFile) return caseFile.profile.studentType;
-  return supportCase.caseType.includes("일상생활") ? "life_support" : "learning_focus";
-}
-
-function describeContentType(contentType: ContentType): string {
-  return contentType === "life_support" ? "일상생활 지원형" : "학습집중형";
-}
-
-function mapContentToReviewItem(content: MissionContent): MaterialReviewItem {
-  return {
-    id: content.id,
-    caseId: content.caseId,
-    title: content.title,
-    type: `백엔드 생성 미션 · ${describeContentType(content.contentType)}`,
-    state: content.status === "teacher_review" ? "검토 대기" : content.status === "published" ? "배포됨" : content.status,
-    contentId: content.id,
-    content,
-  };
-}
-
-function choicesFromTemplate(templateJson: Record<string, unknown>): string[] {
-  const choices = templateJson.choices;
-  if (Array.isArray(choices)) {
-    return choices
-      .map((choice) => {
-        if (typeof choice === "string") return choice;
-        if (choice && typeof choice === "object" && "text" in choice && typeof choice.text === "string") return choice.text;
-        if (choice && typeof choice === "object" && "label" in choice && typeof choice.label === "string") return choice.label;
-        return null;
-      })
-      .filter((choice): choice is string => Boolean(choice));
-  }
-
-  const cards = templateJson.cards;
-  if (Array.isArray(cards)) {
-    return cards
-      .map((card) => {
-        if (typeof card === "string") return card;
-        if (card && typeof card === "object" && "text" in card && typeof card.text === "string") return card.text;
-        if (card && typeof card === "object" && "label" in card && typeof card.label === "string") return card.label;
-        return null;
-      })
-      .filter((choice): choice is string => Boolean(choice));
-  }
-
-  const leftCards = templateJson.leftCards;
-  const rightCards = templateJson.rightCards;
-  if (Array.isArray(leftCards) && Array.isArray(rightCards)) {
-    return ["왼쪽 카드와 오른쪽 카드를 연결", `${leftCards.length}개 카드`, `${rightCards.length}개 카드`];
-  }
-
-  const acceptedAnswers = templateJson.acceptedAnswers;
-  if (Array.isArray(acceptedAnswers) && acceptedAnswers.length > 0) return ["정답 칸 채우기", "다시 생각하기", "힌트 보기"];
-
-  return ["확인했어요"];
-}
-
-function mapContentToReviewStages(content: MissionContent): ReviewStageDraft[] {
-  return [...content.stages]
-    .sort((a, b) => a.step - b.step)
-    .map((stage) => {
-      const imageAssetId = typeof stage.templateJson.imageAssetId === "string" ? stage.templateJson.imageAssetId : undefined;
-      const imageAsset = content.assets.find((asset) => asset.id === imageAssetId || asset.assetRole === (stage.step === 4 ? "stage_4_realtime" : `stage_${stage.step}`));
-      const imagePrompt =
-        imageAsset?.promptJson && typeof imageAsset.promptJson.prompt === "string"
-          ? imageAsset.promptJson.prompt
-          : "이미지 promptJson.prompt가 아직 없습니다.";
-      const question =
-        typeof stage.templateJson.question === "string"
-          ? stage.templateJson.question
-          : typeof stage.templateJson.missionText === "string"
-            ? stage.templateJson.missionText
-            : stage.studentInstruction;
-
-      return {
-        step: stage.step,
-        stageRole: stage.stageRole,
-        templateType: stage.templateType,
-        assetRole: stage.step === 4 ? "stage_4_realtime" : `stage_${stage.step}`,
-        title: stage.studentTitle,
-        description: stage.studentInstruction,
-        question,
-        choices: choicesFromTemplate(stage.templateJson),
-        imagePrompt,
-      };
-    });
-}
-
-function errorMessageOf(error: unknown): { message: string; code?: string } {
-  if (error instanceof Error) {
-    const maybeCode = "code" in error && typeof error.code === "string" ? error.code : undefined;
-    return { message: error.message, code: maybeCode };
-  }
-  return { message: "AI 자료 생성 중 알 수 없는 오류가 발생했습니다." };
-}
-
 export default function DashboardPage() {
-  const [dashboardStudents, setDashboardStudents] = useState<StudentProfile[]>(mockStudents);
-  const [dashboardCases, setDashboardCases] = useState<SupportCase[]>(supportCases);
-  const [caseFilesByStudent, setCaseFilesByStudent] = useState<Record<string, StudentCaseFile>>({});
-  const [apiState, setApiState] = useState<"loading" | "ready" | "error">("loading");
-  const [apiMessage, setApiMessage] = useState("백엔드 학생 데이터를 불러오는 중입니다.");
-  const [selectedStudentId, setSelectedStudentId] = useState(mockStudents[0].id);
+  const [selectedStudentId, setSelectedStudentId] = useState(students[0].id);
+  const [teacherStudentItems, setTeacherStudentItems] = useState<StudentListItem[]>([]);
+  const [selectedCaseFile, setSelectedCaseFile] = useState<StudentCaseFile | null>(null);
+  const [teacherToken, setTeacherToken] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<DashboardTab>("info");
-  const [lessonDrafts, setLessonDrafts] = useState<Record<string, string>>({});
-  const [difficultyDrafts, setDifficultyDrafts] = useState<Record<string, string>>({});
-  const [generatedReviewItems, setGeneratedReviewItems] = useState<MaterialReviewItem[]>([]);
-  const [materialGeneration, setMaterialGeneration] = useState<MaterialGenerationState>({
-    status: "idle",
-    phase: "idle",
-    message: "",
-  });
   const [openReportId, setOpenReportId] = useState<string | null>(null);
   const [openReviewId, setOpenReviewId] = useState<string | null>(null);
   const [selectedFeedbackId, setSelectedFeedbackId] = useState<string | null>(null);
@@ -348,47 +243,111 @@ export default function DashboardPage() {
     Array<{ id: string; recordId: string; feedback: string; savedAt: string }>
   >([]);
 
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadStudents() {
+      try {
+        const login = await demoLogin({ role: "teacher", email: "teacher.demo@eduyj.local" });
+        if (ignore) return;
+
+        const token = login.session.accessToken;
+        const items = await getTeacherStudents({ token });
+        if (ignore) return;
+
+        setTeacherToken(token);
+        setTeacherStudentItems(items);
+        if (items.length > 0) setSelectedStudentId(items[0].studentId);
+      } catch {
+        if (ignore) return;
+        setTeacherToken(null);
+        setTeacherStudentItems([]);
+      }
+    }
+
+    loadStudents();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (teacherStudentItems.length === 0) return;
+
+    let ignore = false;
+
+    getTeacherStudent(selectedStudentId, teacherToken ? { token: teacherToken } : undefined)
+      .then((caseFile) => {
+        if (!ignore) setSelectedCaseFile(caseFile);
+      })
+      .catch(() => {
+        if (!ignore) setSelectedCaseFile(null);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedStudentId, teacherStudentItems.length, teacherToken]);
+
+  const dashboardStudents = useMemo<DashboardStudentView[]>(() => {
+    if (teacherStudentItems.length === 0) {
+      return students.map((student) => ({
+        id: student.id,
+        name: student.name,
+        school: student.school,
+        grade: student.grade,
+        attendanceRate: student.attendanceRate,
+        strengths: student.strengths,
+        weaknesses: [],
+      }));
+    }
+
+    return teacherStudentItems.map((item) => ({
+      id: item.studentId,
+      name: item.displayName,
+      school: item.schoolName ?? "학교 정보 확인 중",
+      grade: item.grade,
+      attendanceRate: item.attendanceRate ?? null,
+      strengths: item.strengths ?? [],
+      weaknesses: item.weaknesses ?? [],
+    }));
+  }, [teacherStudentItems]);
+
   const filteredStudents = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return dashboardStudents;
 
     return dashboardStudents.filter((student) => {
-      const supportCase = dashboardCases.find((item) => item.studentId === student.id);
-      return [student.name, student.school, student.grade, supportCase?.primaryNeed, supportCase?.caseType]
+      const apiStudent = teacherStudentItems.find((item) => item.studentId === student.id);
+      const supportCase = supportCases.find((item) => item.studentId === student.id);
+      return [student.name, student.school, student.grade, apiStudent?.primaryNeed, supportCase?.primaryNeed, supportCase?.caseType]
         .filter(Boolean)
         .some((value) => value?.toLowerCase().includes(normalized));
     });
-  }, [dashboardCases, dashboardStudents, query]);
+  }, [dashboardStudents, query, teacherStudentItems]);
 
-  const selectedStudent = dashboardStudents.find((student) => student.id === selectedStudentId) ?? dashboardStudents[0] ?? mockStudents[0];
-  const selectedCase =
-    dashboardCases.find((supportCase) => supportCase.studentId === selectedStudent.id) ?? dashboardCases[0] ?? supportCases[0];
-  const selectedCaseFile = caseFilesByStudent[selectedStudent.id];
-  const selectedContentType = contentTypeFromCaseFile(selectedCaseFile, selectedCase);
-  const lessonDraft = lessonDrafts[selectedCase.id] ?? selectedCase.sessionGoal;
-  const difficultyDraft = difficultyDrafts[selectedCase.id] ?? "기초";
-  const backendCaseReviewItems = (selectedCaseFile?.recentContents ?? []).map(mapContentToReviewItem);
-  const caseReviewItems = reviewItems.filter((item) => item.caseId === selectedCase.id) as MaterialReviewItem[];
-  const generatedCaseReviewItems = generatedReviewItems.filter((item) => item.caseId === selectedCase.id);
-  const uniqueReviewItems = [...generatedCaseReviewItems, ...backendCaseReviewItems, ...caseReviewItems].filter(
-    (item, index, items) => items.findIndex((candidate) => candidate.id === item.id) === index,
-  );
-  const selectedReviewItems =
-    uniqueReviewItems.length > 0
-      ? uniqueReviewItems
-      : selectedCase.status === "scene_review"
-        ? [
-            {
-              id: `review-${selectedCase.id}`,
-              caseId: selectedCase.id,
-              title: selectedCase.sessionGoal,
-              type: "백엔드 배포 미션",
-              state: "검토 대기",
-            },
-          ]
-        : [];
+  const selectedStudent = dashboardStudents.find((student) => student.id === selectedStudentId) ?? dashboardStudents[0] ?? students[0];
+  const selectedApiStudent = teacherStudentItems.find((student) => student.studentId === selectedStudent.id);
+  const activeCaseFile = selectedCaseFile?.profile.id === selectedStudent.id ? selectedCaseFile : null;
+  const fallbackCase = supportCases.find((supportCase) => supportCase.studentId === selectedStudent.id) ?? supportCases[0];
+  const selectedCase: SupportCase = activeCaseFile
+    ? toSupportCaseFromCaseFile(activeCaseFile, selectedApiStudent)
+    : selectedApiStudent
+      ? toSupportCaseFromListItem(selectedApiStudent)
+      : fallbackCase;
+  const selectedReviewItems = reviewItems.filter((item) => item.caseId === selectedCase.id);
   const selectedRecords = sessionRecords.filter((record) => record.caseId === selectedCase.id);
-  const currentWorkflowStep = selectedCase.status === "follow_up" ? 4 : selectedCase.status === "scene_review" ? 2 : 3;
+  const currentWorkflowStep =
+    selectedCase.status === "intake"
+      ? 0
+      : selectedCase.status === "structured"
+        ? 1
+        : selectedCase.status === "scene_review"
+          ? 2
+          : selectedCase.status === "follow_up"
+            ? 4
+            : 3;
   const sessionLogs = selectedRecords.map((record, index) => {
     const attemptCount = index === 0 ? 9 : 7;
     const wrongCount = index === 0 ? 4 : 2;
@@ -416,131 +375,11 @@ export default function DashboardPage() {
     ? Math.min(Math.max(sessionLogs.findIndex((record) => record.id === openReport.id) + 1, 1), reviewStagePreviews.length)
     : 1;
   const openReview = selectedReviewItems.find((item) => item.id === openReviewId);
-  const openReviewStages = openReview
-    ? (reviewStageDrafts[openReview.id] ?? (openReview.content ? mapContentToReviewStages(openReview.content) : reviewStagePreviews))
-    : reviewStagePreviews;
+  const openReviewStages = openReview ? (reviewStageDrafts[openReview.id] ?? reviewStagePreviews) : reviewStagePreviews;
   const isReviewEditing = openReview ? editingReviewIds.includes(openReview.id) : false;
   const savedMemo = savedMemos[selectedCase.id] ?? selectedCase.riskNote;
   const memoValue = memoDrafts[selectedCase.id] ?? savedMemo;
   const isMemoDirty = memoValue !== savedMemo;
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadTeacherData() {
-      try {
-        const list = await backendAdapter.getTeacherStudents();
-        const caseFiles = await Promise.all(
-          list.map((student) => backendAdapter.getTeacherStudent(student.studentId)),
-        );
-
-        if (cancelled) return;
-
-        const nextStudents = caseFiles.map((caseFile) => mapDashboardStudent(caseFile));
-        const nextCases = caseFiles.map((caseFile) =>
-          mapDashboardCase(caseFile, list.find((item) => item.studentId === caseFile.profile.id)),
-        );
-        const nextCaseFilesByStudent = Object.fromEntries(caseFiles.map((caseFile) => [caseFile.profile.id, caseFile]));
-
-        setDashboardStudents(nextStudents);
-        setDashboardCases(nextCases);
-        setCaseFilesByStudent(nextCaseFilesByStudent);
-        setSelectedStudentId((current) => (nextStudents.some((student) => student.id === current) ? current : nextStudents[0]?.id ?? current));
-        setApiState("ready");
-        setApiMessage(`백엔드에서 학생 ${nextStudents.length}명과 케이스 파일을 불러왔습니다.`);
-      } catch (error) {
-        if (cancelled) return;
-        setApiState("error");
-        setApiMessage(error instanceof Error ? error.message : "백엔드 학생 데이터를 불러오지 못했습니다.");
-      }
-    }
-
-    loadTeacherData();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleGenerateMaterial = async () => {
-    const requestedGoal = lessonDraft.trim();
-    if (!requestedGoal || materialGeneration.status === "running") return;
-
-    try {
-      setMaterialGeneration({
-        status: "running",
-        phase: "orchestrator",
-        message: "오케스트레이터가 학생 맥락과 수업 내용을 분석하는 중입니다.",
-      });
-
-      const orchestrator = await backendAdapter.createAgentRun({
-        studentId: selectedStudent.id,
-        caseId: selectedCase.id,
-        contentType: selectedContentType,
-        requestedGoal: `[난이도: ${difficultyDraft}] ${requestedGoal}`,
-      });
-      const orchestratorRun = orchestrator.agentRun;
-      if (!orchestratorRun || orchestratorRun.status !== "succeeded") {
-        throw new Error(orchestratorRun?.errorMessage ?? "오케스트레이터 실행이 성공하지 못했습니다.");
-      }
-
-      setMaterialGeneration({
-        status: "running",
-        phase: "content",
-        message: "콘텐츠 에이전트가 4단계 MissionContent와 5개 이미지/5개 음성 asset 계약을 만드는 중입니다.",
-      });
-
-      const generated = await backendAdapter.createContentGeneration({
-        orchestratorRunId: orchestratorRun.id,
-        studentId: selectedStudent.id,
-        caseId: selectedCase.id,
-      });
-      const contentRun = generated.agentRun;
-      if (!contentRun || contentRun.status !== "succeeded" || !generated.content) {
-        throw new Error(contentRun?.errorMessage ?? "MissionContent 생성 결과가 비어 있습니다.");
-      }
-
-      setMaterialGeneration({
-        status: "running",
-        phase: "assets",
-        message: "gpt-image-2 이미지 5장과 ElevenLabs 안내 음성 5개를 실제 provider로 생성하는 중입니다.",
-        contentId: generated.content.id,
-      });
-
-      await backendAdapter.generateContentAssetPackage(generated.content.id);
-      const refreshedContent = await backendAdapter.getReviewableContent(generated.content.id);
-      const reviewItem: MaterialReviewItem = {
-        id: refreshedContent.id,
-        caseId: refreshedContent.caseId,
-        title: refreshedContent.title,
-        type: `AI 생성 미션 · ${describeContentType(refreshedContent.contentType)}`,
-        state: "검토 대기",
-        contentId: refreshedContent.id,
-        content: refreshedContent,
-      };
-
-      setGeneratedReviewItems((current) => [reviewItem, ...current.filter((item) => item.id !== reviewItem.id)]);
-      setReviewStageDrafts((current) => ({
-        ...current,
-        [reviewItem.id]: mapContentToReviewStages(refreshedContent),
-      }));
-      setOpenReviewId(reviewItem.id);
-      setReviewPreviewStep(1);
-      setMaterialGeneration({
-        status: "succeeded",
-        phase: "done",
-        message: "AI 자료 생성과 asset 패키지 생성이 완료되었습니다. 오른쪽 목록에서 검토할 수 있습니다.",
-        contentId: refreshedContent.id,
-      });
-    } catch (error) {
-      const { message, code } = errorMessageOf(error);
-      setMaterialGeneration({
-        status: "failed",
-        phase: "review_required",
-        message,
-        errorCode: code,
-      });
-    }
-  };
 
   const updateReviewStageDraft = (
     reviewId: string,
@@ -604,17 +443,6 @@ export default function DashboardPage() {
             <p className="mt-2 text-sm font-semibold leading-6 text-[#64748b]">
               학생을 검색하고, 오늘 수업에 필요한 상태와 자료를 확인합니다.
             </p>
-            <div
-              className={`mt-4 rounded-md border px-3 py-2 text-xs font-bold leading-5 ${
-                apiState === "ready"
-                  ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
-                  : apiState === "error"
-                    ? "border-[#fecaca] bg-[#fef2f2] text-[#991b1b]"
-                    : "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
-              }`}
-            >
-              {apiMessage}
-            </div>
           </div>
 
           <div className="space-y-3 border-b border-[#e5e9f0] p-4">
@@ -634,7 +462,10 @@ export default function DashboardPage() {
 
           <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-[#e5e9f0]">
             {filteredStudents.map((student) => {
-              const supportCase = dashboardCases.find((item) => item.studentId === student.id) ?? dashboardCases[0] ?? supportCases[0];
+              const apiStudent = teacherStudentItems.find((item) => item.studentId === student.id);
+              const supportCase = apiStudent
+                ? toSupportCaseFromListItem(apiStudent)
+                : supportCases.find((item) => item.studentId === student.id) ?? supportCases[0];
 
               return (
                 <button
@@ -693,11 +524,15 @@ export default function DashboardPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm font-bold text-[#64748b]">현재 단계</p>
-                      <p className="mt-1 text-lg font-black text-[#172033]">{workflowSteps[currentWorkflowStep - 1]}</p>
+                      <p className="mt-1 text-lg font-black text-[#172033]">
+                        {currentWorkflowStep === 0 ? "초기 확인" : workflowSteps[currentWorkflowStep - 1]}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm font-bold text-[#64748b]">출석</p>
-                      <p className="mt-1 text-lg font-black text-[#172033]">{selectedStudent.attendanceRate}%</p>
+                      <p className="mt-1 text-lg font-black text-[#172033]">
+                        {selectedStudent.attendanceRate === null ? "기록 전" : `${selectedStudent.attendanceRate}%`}
+                      </p>
                     </div>
                   </div>
                   <div className="mt-4 grid grid-cols-4 gap-3">
@@ -747,7 +582,7 @@ export default function DashboardPage() {
                   <div className="rounded-lg border border-[#e5e9f0] bg-white p-5">
                     <h3 className="text-xl font-black">강점</h3>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {selectedStudent.strengths.map((strength) => (
+                      {(selectedStudent.strengths.length > 0 ? selectedStudent.strengths : ["기록 전"]).map((strength) => (
                         <span
                           key={strength}
                           className="rounded-full bg-[#eef4fb] px-3 py-1 text-sm font-bold text-[#1f3a5f]"
@@ -818,7 +653,7 @@ export default function DashboardPage() {
                       <div>
                         <h3 className="text-xl font-black">자료 만들기</h3>
                         <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                          수업 내용과 난이도를 정하면 오케스트레이터가 학생 맥락을 함께 분석합니다.
+                          수업 내용과 난이도를 정하면 학생 정보는 자동으로 반영됩니다.
                         </p>
                       </div>
                     </div>
@@ -827,68 +662,30 @@ export default function DashboardPage() {
                       <label className="block">
                         <span className="text-sm font-bold text-[#64748b]">수업 내용</span>
                         <textarea
-                          key={`lesson-${selectedCase.id}`}
                           className="mt-2 h-36 w-full resize-none rounded-md border border-[#cbd5e1] bg-[#fbfcfe] p-4 text-sm font-semibold outline-none focus:border-[#1f3a5f]"
-                          value={lessonDraft}
-                          onChange={(event) =>
-                            setLessonDrafts((current) => ({
-                              ...current,
-                              [selectedCase.id]: event.target.value,
-                            }))
-                          }
+                          defaultValue="분수의 전체-부분 관계를 시각 자료로 설명하고 1/4을 표현한다."
                         />
                       </label>
 
                       <label className="block">
                         <span className="text-sm font-bold text-[#64748b]">난이도</span>
-                        <select
-                          className="mt-2 w-full rounded-md border border-[#cbd5e1] bg-white px-3 py-3 text-sm font-bold outline-none focus:border-[#1f3a5f]"
-                          value={difficultyDraft}
-                          onChange={(event) =>
-                            setDifficultyDrafts((current) => ({
-                              ...current,
-                              [selectedCase.id]: event.target.value,
-                            }))
-                          }
-                        >
-                          <option value="기초">기초 · 설명을 더 짧고 쉽게</option>
-                          <option value="보통">보통 · 문제와 피드백 균형</option>
-                          <option value="도전">도전 · 3단계 응용 강화</option>
+                        <select className="mt-2 w-full rounded-md border border-[#cbd5e1] bg-white px-3 py-3 text-sm font-bold outline-none focus:border-[#1f3a5f]">
+                          <option>기초</option>
+                          <option>보통</option>
+                          <option>도전</option>
                         </select>
                       </label>
 
                       <div className="rounded-md bg-[#f8fafc] p-3">
-                        <p className="text-sm font-bold text-[#64748b]">AI에 함께 전달되는 학생 컨텍스트</p>
+                        <p className="text-sm font-bold text-[#64748b]">자동 반영 정보</p>
                         <p className="mt-1 text-sm font-semibold leading-6 text-[#334155]">
-                          {selectedStudent.name} · {selectedStudent.school} · {describeContentType(selectedContentType)} · {selectedCase.primaryNeed}
-                        </p>
-                        <p className="mt-1 text-xs font-bold leading-5 text-[#64748b]">
-                          난이도 {difficultyDraft} / 케이스 {selectedCase.id}
+                          핵심 어려움, 강점, 약점, 최근 학습 기록
                         </p>
                       </div>
 
-                      <button
-                        onClick={handleGenerateMaterial}
-                        disabled={materialGeneration.status === "running" || !lessonDraft.trim()}
-                        className="w-full rounded-md bg-[#1f3a5f] px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
-                      >
-                        {materialGeneration.status === "running" ? "AI 자료 생성 중..." : "AI 자료 생성하기"}
+                      <button className="w-full rounded-md bg-[#1f3a5f] px-4 py-3 text-sm font-bold text-white">
+                        AI 자료 생성하기
                       </button>
-                      {materialGeneration.message && (
-                        <div
-                          className={`rounded-md border px-4 py-3 text-sm font-bold leading-6 ${
-                            materialGeneration.status === "failed"
-                              ? "border-[#fecaca] bg-[#fef2f2] text-[#991b1b]"
-                              : materialGeneration.status === "succeeded"
-                                ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
-                                : "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
-                          }`}
-                        >
-                          <p>{materialGeneration.message}</p>
-                          {materialGeneration.errorCode && <p className="mt-1 text-xs">오류 코드: {materialGeneration.errorCode}</p>}
-                          {materialGeneration.contentId && <p className="mt-1 text-xs">콘텐츠 ID: {materialGeneration.contentId}</p>}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </section>
@@ -1038,7 +835,7 @@ export default function DashboardPage() {
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                               <Link
-                                href={`/student/stage?studentId=${encodeURIComponent(selectedStudent.id)}&preview=1`}
+                                href="/student/stage?preview=1"
                                 target="_blank"
                                 className="rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-xs font-black text-[#334155]"
                               >
@@ -1172,7 +969,7 @@ export default function DashboardPage() {
                 >
                   <iframe
                     title={`학습 리포트 자료 스테이지 ${openReportStageStep}`}
-                    src={`/student/stage?studentId=${encodeURIComponent(selectedStudent.id)}&step=${openReportStageStep}&preview=1`}
+                    src={`/student/stage?step=${openReportStageStep}&preview=1`}
                     className="absolute left-1/2 top-1/2 h-[768px] w-[1024px] origin-center border-0"
                     style={{ transform: `translate(-50%, -50%) scale(${reportPreviewScale})` }}
                   />
@@ -1247,9 +1044,7 @@ export default function DashboardPage() {
                   <iframe
                     key={`${openReview.id}-${reviewPreviewStep}`}
                     title={`학생 화면 스테이지 ${reviewPreviewStep}`}
-                    src={`/student/stage?studentId=${encodeURIComponent(selectedStudent.id)}${
-                      openReview.contentId ? `&contentId=${encodeURIComponent(openReview.contentId)}` : ""
-                    }&step=${reviewPreviewStep}&preview=1`}
+                    src={`/student/stage?step=${reviewPreviewStep}&preview=1`}
                     className="absolute left-1/2 top-1/2 h-[768px] w-[1024px] origin-center border-0"
                     style={{ transform: `translate(-50%, -50%) scale(${reviewPreviewScale})` }}
                   />
@@ -1287,9 +1082,7 @@ export default function DashboardPage() {
                             </button>
                             <iframe
                               title={`학생 화면 스테이지 ${stage.step}`}
-                              src={`/student/stage?studentId=${encodeURIComponent(selectedStudent.id)}${
-                                openReview.contentId ? `&contentId=${encodeURIComponent(openReview.contentId)}` : ""
-                              }&step=${stage.step}&preview=1`}
+                              src={`/student/stage?step=${stage.step}&preview=1`}
                               className="absolute left-0 top-0 h-[768px] w-[1024px] origin-top-left scale-[0.205] border-0"
                             />
                           </div>

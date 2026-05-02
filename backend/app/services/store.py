@@ -99,6 +99,8 @@ class DemoStore:
                     "studentId": support_case.student_id,
                     "caseId": support_case.id,
                     "caseStatus": support_case.case_status,
+                    "dashboardStage": support_case.dashboard_stage,
+                    "supportStrategy": support_case.support_strategy,
                 }
                 for support_case in self.db.support_cases
                 if support_case.owner_teacher_id == teacher.id
@@ -185,7 +187,12 @@ class DemoStore:
                     "schoolName": school.school_name if school else None,
                     "studentType": student.student_type,
                     "primaryNeed": student.primary_need,
+                    "attendanceRate": _student_dashboard_value(student.profile_json, "attendanceRate"),
+                    "strengths": _student_dashboard_list(student.profile_json, "strengths"),
+                    "weaknesses": _student_dashboard_list(student.profile_json, "weaknesses"),
                     "latestContentStatus": latest_content.status if latest_content else "none",
+                    "dashboardStage": open_case_by_student_id[student.id].dashboard_stage,
+                    "supportStrategy": open_case_by_student_id[student.id].support_strategy,
                     "nextSessionSuggestion": planner.goal_text if planner else "다음 회기 목표를 설정해 주세요.",
                 }
             )
@@ -202,8 +209,16 @@ class DemoStore:
             return None
         memory_card = next((card for card in self.db.memory_cards if card.student_id == student_id and card.status == "active"), None)
         school = self.get_school(student.school_code)
+        profile = student.model_dump(by_alias=True)
+        profile.update(
+            {
+                "attendanceRate": _student_dashboard_value(student.profile_json, "attendanceRate"),
+                "strengths": _student_dashboard_list(student.profile_json, "strengths"),
+                "weaknesses": _student_dashboard_list(student.profile_json, "weaknesses"),
+            }
+        )
         return {
-            "profile": student.model_dump(by_alias=True),
+            "profile": profile,
             "school": school.model_dump(by_alias=True) if school else None,
             "openCase": open_case.model_dump(by_alias=True),
             "memoryCard": memory_card.model_dump(by_alias=True) if memory_card else None,
@@ -264,6 +279,71 @@ class DemoStore:
             "reviewSummaries": [
                 summary.model_dump(by_alias=True) for summary in self.db.review_summaries if summary.student_id == student_id
             ],
+        }
+
+    def get_student_report(self, student_id: str, teacher_id: str | None = None) -> dict | None:
+        self.refresh()
+        student = next((candidate for candidate in self.db.students if candidate.id == student_id), None)
+        open_case = next(
+            (
+                support_case
+                for support_case in self.db.support_cases
+                if support_case.student_id == student_id
+                and support_case.case_status == "open"
+                and (teacher_id is None or support_case.owner_teacher_id == teacher_id)
+            ),
+            None,
+        )
+        if student is None or open_case is None:
+            return None
+
+        contents_by_id = {content.id: content for content in self.db.mission_contents if content.student_id == student_id}
+        attempts = [attempt for attempt in self.db.attempts if attempt.student_id == student_id]
+        attempts_by_id = {attempt.id: attempt for attempt in attempts}
+        reports = []
+
+        for summary in self.db.review_summaries:
+            if summary.student_id != student_id:
+                continue
+            attempt = attempts_by_id.get(summary.attempt_id)
+            if attempt is None:
+                continue
+            content = contents_by_id.get(attempt.mission_content_id)
+            realtime_session = next((session for session in self.db.realtime_sessions if session.attempt_id == attempt.id), None)
+            activity_events = [event for event in self.db.activity_events if event.attempt_id == attempt.id]
+            answer_events = [event for event in activity_events if event.event_type == "answer_submitted"]
+            reflection = next((event for event in reversed(activity_events) if event.event_type == "post_practice_reflection"), None)
+            wrong_count = sum(1 for event in answer_events if event.payload_json.get("isCorrect") is False)
+            hint_count = sum(1 for event in answer_events if event.payload_json.get("hintUsed") is True)
+
+            reports.append(
+                {
+                    "id": summary.id,
+                    "studentId": summary.student_id,
+                    "caseId": open_case.id,
+                    "contentId": content.id if content else attempt.mission_content_id,
+                    "contentTitle": content.title if content else None,
+                    "attemptId": attempt.id,
+                    "startedAt": attempt.started_at,
+                    "completedAt": attempt.completed_at,
+                    "completionRate": summary.completion_rate,
+                    "accuracyRate": summary.accuracy_rate,
+                    "durationSec": _duration_seconds(attempt.started_at, attempt.completed_at),
+                    "answerCount": len(answer_events),
+                    "wrongCount": wrong_count,
+                    "hintCount": hint_count,
+                    "shortSummary": summary.short_summary,
+                    "wrongPatternJson": summary.wrong_pattern_json,
+                    "realtimeResultJson": summary.realtime_result_json,
+                    "realtimeTranscriptSummary": realtime_session.transcript_summary if realtime_session else None,
+                    "reflection": reflection.payload_json if reflection else None,
+                }
+            )
+
+        return {
+            "student": student.model_dump(by_alias=True),
+            "openCase": open_case.model_dump(by_alias=True),
+            "reports": sorted(reports, key=lambda item: item["completedAt"] or item["startedAt"], reverse=True),
         }
 
     def get_mission_for_teacher(self, content_id: str, teacher_id: str | None = None) -> MissionContent | None:
@@ -345,7 +425,7 @@ class DemoStore:
         completion_rate = 1.0 if attempt.status == "completed" else min(max(attempt.current_step / 4, 0), 1)
         reflection = next((event.payload_json for event in reversed(events) if event.event_type == "post_practice_reflection"), None)
         realtime_session = next((session for session in self.db.realtime_sessions if session.attempt_id == attempt.id), None)
-        short_summary = _build_review_summary_text(completion_rate, accuracy_rate, wrong_count, reflection, realtime_session)
+        short_summary = _build_korean_review_summary_text(completion_rate, accuracy_rate, wrong_count, reflection, realtime_session)
         summary = ReviewSummary(
             id=f"review_{uuid4()}",
             attemptId=attempt.id,
@@ -370,9 +450,16 @@ class DemoStore:
         mission = self.get_mission_for_teacher(content_id, teacher_id)
         if mission is None:
             return None
-        attempt_ids = {attempt.id for attempt in self.db.attempts if attempt.mission_content_id == content_id}
-        summaries = [summary for summary in self.db.review_summaries if summary.attempt_id in attempt_ids]
-        return summaries[-1] if summaries else None
+        attempts = sorted(
+            [attempt for attempt in self.db.attempts if attempt.mission_content_id == content_id],
+            key=lambda item: item.started_at,
+            reverse=True,
+        )
+        for attempt in attempts:
+            summaries = [summary for summary in self.db.review_summaries if summary.attempt_id == attempt.id]
+            if summaries:
+                return summaries[-1]
+        return None
 
     def apply_review_summary_to_memory(self, review_id: str, teacher_id: str | None = None) -> MemoryCard | None:
         self.refresh()
@@ -727,6 +814,31 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _duration_seconds(started_at: str, completed_at: str | None) -> int | None:
+    if completed_at is None:
+        return None
+    try:
+        started = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+        completed = datetime.fromisoformat(completed_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return max(int((completed - started).total_seconds()), 0)
+
+
+def _student_dashboard_value(profile_json: dict[str, Any], key: str) -> Any:
+    dashboard = profile_json.get("dashboard")
+    if not isinstance(dashboard, dict):
+        return None
+    return dashboard.get(key)
+
+
+def _student_dashboard_list(profile_json: dict[str, Any], key: str) -> list[str]:
+    value = _student_dashboard_value(profile_json, key)
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
+
+
 def _evaluate_answer(template_json: dict[str, Any], answer: dict[str, Any]) -> dict:
     correct_feedback = str(template_json.get("correctFeedback", "좋아요."))
     wrong_feedback = str(template_json.get("wrongFeedback", "다시 확인해볼까요?"))
@@ -749,6 +861,23 @@ def _evaluate_answer(template_json: dict[str, Any], answer: dict[str, Any]) -> d
         "isCorrect": is_correct,
         "feedback": correct_feedback if is_correct else wrong_feedback,
     }
+
+
+def _build_korean_review_summary_text(
+    completion_rate: float,
+    accuracy_rate: float,
+    wrong_count: int,
+    reflection: dict[str, Any] | None,
+    realtime_session: RealtimePracticeSession | None,
+) -> str:
+    parts = [f"완료율 {completion_rate:.0%}", f"정답률 {accuracy_rate:.0%}"]
+    if wrong_count:
+        parts.append(f"오답 {wrong_count}개")
+    if reflection and reflection.get("reflectionChoice"):
+        parts.append(f"회고: {reflection['reflectionChoice']}")
+    if realtime_session and realtime_session.transcript_summary:
+        parts.append(f"실시간 연습: {realtime_session.transcript_summary}")
+    return " / ".join(parts)
 
 
 def _build_review_summary_text(

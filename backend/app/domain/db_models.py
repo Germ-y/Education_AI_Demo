@@ -106,6 +106,8 @@ class SupportCaseRow(Base):
     owner_teacher_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     case_status: Mapped[str] = mapped_column(String, default="open")
     current_goal: Mapped[str] = mapped_column(Text)
+    dashboard_stage: Mapped[str] = mapped_column(String, default="initial_review")
+    support_strategy: Mapped[str | None] = mapped_column(Text)
     opened_at: Mapped[str] = mapped_column(String)
 
 

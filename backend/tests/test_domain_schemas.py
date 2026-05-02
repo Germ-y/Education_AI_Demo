@@ -106,7 +106,8 @@ def test_requires_problem_text_in_template_json_not_image() -> None:
 
 
 def test_content_generation_output_accepts_direct_mission_content_schema() -> None:
-    content = create_demo_database().mission_contents[0].model_dump(by_alias=True)
+    base_content = next(content for content in create_demo_database().mission_contents if content.student_id == "student_learning_fraction")
+    content = base_content.model_dump(by_alias=True)
     content["id"] = "content_generated_schema_check"
     content["status"] = "teacher_review"
     content["approvedByUserId"] = None
@@ -121,7 +122,7 @@ def test_content_generation_output_accepts_direct_mission_content_schema() -> No
         asset["qaStatus"] = "pending"
         asset["approvalStatus"] = "pending"
 
-    mission = _mission_from_generation(content, student_id="student_learning_fraction", case_id="case_learning_fraction")
+    mission = _mission_from_generation(content, student_id=base_content.student_id, case_id=base_content.case_id)
 
     assert mission.id == "content_generated_schema_check"
     assert mission.status == "teacher_review"

@@ -49,6 +49,7 @@ backend/.pytest_cache/
 backend/.ruff_cache/
 __pycache__/
 *.py[cod]
-backend/*.db
-backend/data/*.db
+*.db
+*.sqlite
+*.sqlite3
 backend/generated/assets/

@@ -205,6 +205,42 @@ publicContextSummary
 }
 ```
 
+### GET /api/teacher/students/:studentId/report
+
+교사용 학습 리포트 조회. `review_summaries`를 리포트 원천으로 사용하고, 시도/이벤트/realtime 결과를 합쳐 화면용 요약을 반환한다.
+
+```json
+{
+  "data": {
+    "student": "Student",
+    "openCase": "SupportCase",
+    "reports": [
+      {
+        "id": "review_fraction_20260502",
+        "studentId": "student_learning_fraction",
+        "caseId": "case_learning_fraction",
+        "contentId": "content_fraction_001",
+        "contentTitle": "분수 탐험: 빛나는 한 조각",
+        "attemptId": "attempt_fraction_20260502",
+        "startedAt": "2026-05-02T09:10:00.000Z",
+        "completedAt": "2026-05-02T09:24:00.000Z",
+        "completionRate": 1,
+        "accuracyRate": 0.5,
+        "durationSec": 840,
+        "answerCount": 2,
+        "wrongCount": 1,
+        "hintCount": 1,
+        "shortSummary": "4단계를 모두 완료했습니다. 그림 자료에는 안정적으로 반응했습니다.",
+        "wrongPatternJson": {},
+        "realtimeResultJson": {},
+        "realtimeTranscriptSummary": "시각 자료를 보며 1/4 설명을 마쳤습니다.",
+        "reflection": {}
+      }
+    ]
+  }
+}
+```
+
 ### POST /api/teacher/students/:studentId/notes
 
 학생의 열린 case에 교사 메모를 추가한다.
@@ -896,3 +932,20 @@ sync job 상태 조회.
 - 4단계 realtime client secret은 서버가 발급하고 TTL을 짧게 둔다.
 - AI prompt 원문은 관리자/디버그 권한에서만 조회한다.
 - 모든 승인/반려/메모리 반영은 `audit_logs`에 기록한다.
+
+## Dashboard student read-model fields
+
+`GET /api/teacher/students` and `GET /api/teacher/students/:studentId` expose dashboard-facing fields from the database.
+Student observation values are stored under `students.profile_json.dashboard` and surfaced in the read model:
+
+```json
+{
+  "attendanceRate": 95,
+  "strengths": ["그림 자료 반응"],
+  "weaknesses": ["분모/분자 위치 혼동"],
+  "dashboardStage": "learning",
+  "supportStrategy": "그림 자료와 짧은 단계 설명으로 반복 확인"
+}
+```
+
+For students whose `dashboardStage` is `initial_review`, the frontend should not display them as actively learning yet.
