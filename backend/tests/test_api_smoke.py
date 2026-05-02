@@ -80,6 +80,8 @@ def test_teacher_and_student_demo_flows() -> None:
     assert "시간 읽기 기초" in clock_student["primaryNeed"]
     assert "좋겠어요" in clock_student["primaryNeed"]
     assert "시간 읽기 기초" in clock_student["summaryLine"]
+    assert clock_student["strengths"][0] == "그림에서 중요한 단서를 먼저 찾으면 바로 반응해요."
+    assert clock_student["weaknesses"][0] == "문장이 길어지면 무엇부터 해야 할지 멈칫할 수 있어요."
     assert_no_teacher_raw_terms(
         [
             [
@@ -154,11 +156,15 @@ def test_teacher_and_student_demo_flows() -> None:
     assert "수업이 좋겠어요" in fraction_case.json()["data"]["dashboardProfile"]["primaryNeedDetail"]
     assert "말로 정리하기" in fraction_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
     assert "좋겠어요" in fraction_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
+    assert fraction_case.json()["data"]["dashboardProfile"]["strengths"][0] == "그림이나 조각 모델을 보면 전체와 부분을 더 쉽게 이해해요."
+    assert fraction_case.json()["data"]["dashboardProfile"]["weaknesses"][0] == "분모와 분자가 각각 무엇을 뜻하는지 자주 바꿔 생각해요."
     assert_no_teacher_raw_terms(fraction_case.json()["data"]["dashboardProfile"])
     life_case = client.get("/api/teacher/students/student_life_bus", headers={"authorization": f"Bearer {teacher_token}"})
     assert life_case.status_code == 200
     assert life_case.json()["data"]["dashboardProfile"]["primaryNeedTitle"] == "일상생활 의사소통 수업"
     assert "실시간 역할 발화 연습" in life_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
+    assert life_case.json()["data"]["dashboardProfile"]["strengths"][0] == "상황 그림을 보면 지금 어디서 무엇을 해야 하는지 잘 파악해요."
+    assert life_case.json()["data"]["dashboardProfile"]["weaknesses"][0] == "여러 이동 단계를 한 번에 정리하면 순서가 헷갈릴 수 있어요."
     assert_no_teacher_raw_terms(life_case.json()["data"]["dashboardProfile"])
     context_bundle = client.get(
         "/api/teacher/students/student_learning_fraction/context-bundle",

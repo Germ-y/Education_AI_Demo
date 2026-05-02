@@ -714,8 +714,8 @@ StudentProfile.profileJson stores:
 {
   "dashboard": {
     "attendanceRate": 95,
-    "strengths": ["그림 자료 반응", "짧은 단계 설명"],
-    "weaknesses": ["분모/분자 위치 혼동"]
+    "strengths": ["그림이나 조각 모델을 보면 전체와 부분을 더 쉽게 이해해요."],
+    "weaknesses": ["문제 설명이 길면 중요한 조건을 놓칠 수 있어요."]
   }
 }
 ```
@@ -725,8 +725,8 @@ StudentProfile and StudentListItem may expose:
 ```json
 {
   "attendanceRate": 95,
-  "strengths": ["그림 자료 반응", "짧은 단계 설명"],
-  "weaknesses": ["분모/분자 위치 혼동"]
+  "strengths": ["그림이나 조각 모델을 보면 전체와 부분을 더 쉽게 이해해요."],
+  "weaknesses": ["문제 설명이 길면 중요한 조건을 놓칠 수 있어요."]
 }
 ```
 
