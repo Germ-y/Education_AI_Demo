@@ -4,6 +4,9 @@
 
 ## 1. 공통 규칙
 
+프론트/백엔드가 공유하는 canonical field, enum, MissionContent 구조는 [12-schema-contract.md](12-schema-contract.md)를 우선 기준으로 한다.
+이 문서는 endpoint별 request/response 흐름을 설명한다.
+
 Base path:
 
 ```text

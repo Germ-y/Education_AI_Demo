@@ -56,6 +56,7 @@ docs-agent-harness
 | [ ] | [00-agent-navigation.md](00-agent-navigation.md) | 작업 주제별로 볼 문서가 맞는가 |
 | [ ] | [01-collaboration-contract.md](01-collaboration-contract.md) | 수정 영역과 계약 변경 순서가 맞는가 |
 | [ ] | [02-branch-handoff-contract.md](02-branch-handoff-contract.md) | 상대 파트 승인 필요 여부가 정해졌는가 |
+| [ ] | [12-schema-contract.md](12-schema-contract.md) | 프론트/백엔드 공통 field와 enum이 맞는가 |
 | [ ] | [08-rest-api-spec.md](08-rest-api-spec.md) | API path/request/response가 있는가 |
 | [ ] | [10-pr-feature-review-contract.md](10-pr-feature-review-contract.md) | PR 기능 단위와 템플릿이 정해졌는가 |
 

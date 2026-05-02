@@ -27,7 +27,8 @@ git status --short --branch
 5. [docs/common/02-branch-handoff-contract.md](docs/common/02-branch-handoff-contract.md) - 브랜치 간 handoff 기준
 6. [docs/common/10-pr-feature-review-contract.md](docs/common/10-pr-feature-review-contract.md) - 기능 단위 PR 기준
 7. [docs/common/11-feature-start-checklist.md](docs/common/11-feature-start-checklist.md) - 기능 시작 체크리스트
-8. [docs/common/03-implementation-backlog.md](docs/common/03-implementation-backlog.md) - 현재 백로그
+8. [docs/common/12-schema-contract.md](docs/common/12-schema-contract.md) - 프론트/백엔드 스키마 계약
+9. [docs/common/03-implementation-backlog.md](docs/common/03-implementation-backlog.md) - 현재 백로그
 
 ## 3. 작업 유형별 시작 문서
 
@@ -39,6 +40,7 @@ git status --short --branch
 | 프론트/백엔드 동시 변경 | [docs/common/02-branch-handoff-contract.md](docs/common/02-branch-handoff-contract.md) | [eduyj-monorepo-collaboration](.agents/skills/eduyj-monorepo-collaboration/SKILL.md) |
 | PR 작성/리뷰 | [docs/common/10-pr-feature-review-contract.md](docs/common/10-pr-feature-review-contract.md) | [eduyj-monorepo-collaboration](.agents/skills/eduyj-monorepo-collaboration/SKILL.md) |
 | 기능 시작 회의 | [docs/common/11-feature-start-checklist.md](docs/common/11-feature-start-checklist.md) | [eduyj-monorepo-collaboration](.agents/skills/eduyj-monorepo-collaboration/SKILL.md) |
+| 스키마/API 계약 | [docs/common/12-schema-contract.md](docs/common/12-schema-contract.md) | [eduyj-backend-contracts](.agents/skills/eduyj-backend-contracts/SKILL.md) |
 | 장기 목표 이어가기 | [docs/common/03-implementation-backlog.md](docs/common/03-implementation-backlog.md) | [eduyj-agent-loop](.agents/skills/eduyj-agent-loop/SKILL.md) |
 
 문서 링크를 따라갈 때의 기준:

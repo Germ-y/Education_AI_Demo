@@ -12,8 +12,9 @@ description: EduYJ 레포에서 프론트엔드와 백엔드가 함께 바뀌는
 3. `docs/common/02-branch-handoff-contract.md`
 4. `docs/common/10-pr-feature-review-contract.md`
 5. `docs/common/11-feature-start-checklist.md`
-6. `docs/common/00-agent-navigation.md`
-7. 지금 작업과 관련된 상세 문서
+6. `docs/common/12-schema-contract.md`
+7. `docs/common/00-agent-navigation.md`
+8. 지금 작업과 관련된 상세 문서
 
 ## 1. 작업 영역 먼저 정하기
 
@@ -22,6 +23,7 @@ description: EduYJ 레포에서 프론트엔드와 백엔드가 함께 바뀌는
 - 프론트 작업: `frontend/`
 - 백엔드 작업: `backend/`
 - API 계약 작업: `docs/common/08-rest-api-spec.md`, `backend/app/domain/schemas.py`, `frontend/lib/demo-data.ts`
+- 스키마 계약 작업: `docs/common/12-schema-contract.md`, `backend/app/domain/schemas.py`, `backend/app/domain/enums.py`
 - AI 콘텐츠 작업: `docs/common/05-*`, `docs/common/06-*`, `docs/common/07-*`, `backend/scripts/`
 - 작업 규칙/문서 작업: `AGENTS.md`, `GOAL.md`, `.agents/skills/`, `docs/common/00-*`, `docs/common/03-*`
 - PR 기준 작업: `docs/common/10-pr-feature-review-contract.md`
@@ -57,6 +59,7 @@ handoff 문서 확인
 - 상대 파트 확인이 필요한 변경은 `docs/common/02-branch-handoff-contract.md`에 자체 검수와 승인 상태를 남긴다.
 - PR을 작성하거나 리뷰할 때는 `docs/common/10-pr-feature-review-contract.md`의 기능 단위와 템플릿을 따른다.
 - 새 기능을 시작할 때는 `docs/common/11-feature-start-checklist.md`에서 기능 단위, 담당 브랜치, handoff 필요 여부를 먼저 정한다.
+- API field, enum, MissionContent 구조는 `docs/common/12-schema-contract.md`를 기준으로 맞춘다.
 - provider key는 `frontend/`에 노출하지 않는다.
 - 학생 미션은 4단계다. 회고는 5단계가 아니다.
 - 4단계가 realtime이다. 1~3단계는 승인된 정적 템플릿이다.

@@ -11,6 +11,7 @@ description: EduYJ 백엔드 API, DB 스키마, seed 데이터, 공공데이터 
 - `docs/backend/05-data-api-requirements.md`
 - `docs/backend/06-database-schema-spec.md`
 - `docs/common/08-rest-api-spec.md`
+- `docs/common/12-schema-contract.md`
 - `docs/common/03-implementation-backlog.md`
 - `docs/common/02-branch-handoff-contract.md`
 
@@ -31,6 +32,7 @@ description: EduYJ 백엔드 API, DB 스키마, seed 데이터, 공공데이터 
 ## 계약 규칙
 
 - `mission_contents.total_steps`는 항상 4다.
+- API JSON field는 `camelCase`를 기준으로 하며 [docs/common/12-schema-contract.md](../../../docs/common/12-schema-contract.md)를 먼저 갱신한다.
 - `content_stages.step`은 1~4만 허용한다.
 - realtime session 생성은 `stage.step == 4`이고 승인된 `realtime_spec_json`이 있을 때만 가능하다.
 - 학생 API는 승인/배포된 콘텐츠만 반환한다.

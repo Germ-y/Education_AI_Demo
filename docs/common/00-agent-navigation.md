@@ -28,6 +28,7 @@
 | 브랜치 handoff | [02-branch-handoff-contract.md](02-branch-handoff-contract.md) | [08-rest-api-spec.md](08-rest-api-spec.md) |
 | PR 작성/리뷰 | [10-pr-feature-review-contract.md](10-pr-feature-review-contract.md) | [01-collaboration-contract.md](01-collaboration-contract.md), [02-branch-handoff-contract.md](02-branch-handoff-contract.md) |
 | 기능 시작 회의 | [11-feature-start-checklist.md](11-feature-start-checklist.md) | [10-pr-feature-review-contract.md](10-pr-feature-review-contract.md), [02-branch-handoff-contract.md](02-branch-handoff-contract.md) |
+| 스키마 계약 점검 | [12-schema-contract.md](12-schema-contract.md) | [08-rest-api-spec.md](08-rest-api-spec.md), [../backend/06-database-schema-spec.md](../backend/06-database-schema-spec.md) |
 | 학생 콘텐츠 경험 | [04-child-content-experience.md](04-child-content-experience.md) | [05-ai-content-template-spec.md](05-ai-content-template-spec.md), [07-image-content-package-spec.md](07-image-content-package-spec.md) |
 | 템플릿/콘텐츠 JSON | [05-ai-content-template-spec.md](05-ai-content-template-spec.md) | [07-image-content-package-spec.md](07-image-content-package-spec.md) |
 | 4단계 realtime | [06-realtime-practice-spec.md](06-realtime-practice-spec.md) | [08-rest-api-spec.md](08-rest-api-spec.md) |
@@ -78,6 +79,7 @@ flowchart TD
 - 프론트/백엔드 계약이 바뀌면 [02-branch-handoff-contract.md](02-branch-handoff-contract.md)에 handoff 기준과 상대 파트 승인 상태도 같이 반영한다.
 - PR 기준이 바뀌면 [10-pr-feature-review-contract.md](10-pr-feature-review-contract.md)에 기능 단위와 리뷰 순서를 같이 반영한다.
 - 기능 시작 순서가 바뀌면 [11-feature-start-checklist.md](11-feature-start-checklist.md)에 회의 체크 항목을 같이 반영한다.
+- API field나 enum이 바뀌면 [12-schema-contract.md](12-schema-contract.md)를 먼저 갱신한다.
 
 ## 빠른 확인 명령
 

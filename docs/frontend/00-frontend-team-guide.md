@@ -30,11 +30,12 @@
 
 1. [../common/04-child-content-experience.md](../common/04-child-content-experience.md)
 2. [../common/05-ai-content-template-spec.md](../common/05-ai-content-template-spec.md)
-3. [../common/08-rest-api-spec.md](../common/08-rest-api-spec.md)
-4. [../common/02-branch-handoff-contract.md](../common/02-branch-handoff-contract.md)
-5. [../../AGENTS.md](../../AGENTS.md)
+3. [../common/12-schema-contract.md](../common/12-schema-contract.md)
+4. [../common/08-rest-api-spec.md](../common/08-rest-api-spec.md)
+5. [../common/02-branch-handoff-contract.md](../common/02-branch-handoff-contract.md)
+6. [../../AGENTS.md](../../AGENTS.md)
 
-API나 데이터가 헷갈리면 [../common/08-rest-api-spec.md](../common/08-rest-api-spec.md)를 기준으로 본다.
+API field나 enum이 헷갈리면 [../common/12-schema-contract.md](../common/12-schema-contract.md)를 먼저 보고, endpoint 흐름은 [../common/08-rest-api-spec.md](../common/08-rest-api-spec.md)를 기준으로 본다.
 다른 브랜치 변경을 받아야 하면 [../common/02-branch-handoff-contract.md](../common/02-branch-handoff-contract.md)의 검수/승인 절차를 먼저 따른다.
 
 ## 3. 프론트 폴더 구조
