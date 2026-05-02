@@ -68,6 +68,9 @@ class DemoRepository:
                     "realtimeSessions": [
                         _realtime_session(row) for row in session.scalars(select(rows.RealtimePracticeSessionRow).order_by(rows.RealtimePracticeSessionRow.id))
                     ],
+                    "reviewSummaries": [
+                        _review_summary(row) for row in session.scalars(select(rows.ReviewSummaryRow).order_by(rows.ReviewSummaryRow.id))
+                    ],
                     "publicDataSources": [
                         _public_data_source(row) for row in session.scalars(select(rows.PublicDataSourceRow).order_by(rows.PublicDataSourceRow.id))
                     ],
@@ -339,6 +342,19 @@ def _insert_all(session: Session, db: DemoDatabase) -> None:
         for item in db.realtime_sessions
     )
     session.add_all(
+        rows.ReviewSummaryRow(
+            id=item.id,
+            attempt_id=item.attempt_id,
+            student_id=item.student_id,
+            completion_rate=item.completion_rate,
+            accuracy_rate=item.accuracy_rate,
+            short_summary=item.short_summary,
+            wrong_pattern_json=item.wrong_pattern_json,
+            realtime_result_json=item.realtime_result_json,
+        )
+        for item in db.review_summaries
+    )
+    session.add_all(
         rows.PublicDataSourceRow(
             id=item.id,
             source_code=item.source_code,
@@ -599,4 +615,17 @@ def _public_data_source(row: rows.PublicDataSourceRow) -> dict:
         "baseUrl": row.base_url,
         "authType": row.auth_type,
         "enabled": row.enabled,
+    }
+
+
+def _review_summary(row: rows.ReviewSummaryRow) -> dict:
+    return {
+        "id": row.id,
+        "attemptId": row.attempt_id,
+        "studentId": row.student_id,
+        "completionRate": float(row.completion_rate),
+        "accuracyRate": float(row.accuracy_rate),
+        "shortSummary": row.short_summary,
+        "wrongPatternJson": row.wrong_pattern_json,
+        "realtimeResultJson": row.realtime_result_json,
     }

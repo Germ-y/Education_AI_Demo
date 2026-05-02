@@ -668,6 +668,26 @@ attempt 완료.
 
 ReviewAgent 실행 요청.
 
+현재 MVP 구현은 저장된 `ContentAttempt`, `ActivityEvent`, `RealtimePracticeSession`을 기준으로 deterministic summary를 만든다.
+실제 ReviewAgent provider 호출은 이후 `agent_runs` 기반으로 확장한다.
+
+응답:
+
+```json
+{
+  "data": {
+    "id": "review_001",
+    "attemptId": "attempt_001",
+    "studentId": "student_learning_fraction",
+    "completionRate": 1,
+    "accuracyRate": 0.5,
+    "shortSummary": "완료율 100%, 정답률 50%, 오답 1개",
+    "wrongPatternJson": {},
+    "realtimeResultJson": {}
+  }
+}
+```
+
 ### GET /api/contents/:contentId/review-summary
 
 리뷰 요약 조회.
@@ -675,6 +695,8 @@ ReviewAgent 실행 요청.
 ### POST /api/review-summaries/:reviewId/apply-to-memory
 
 교사가 리뷰 요약을 메모리 카드에 반영한다.
+
+반영 시 active memory card의 `recent4wResponseJson`과 `nextSessionCautions`가 업데이트된다.
 
 ## 10. Public Data APIs
 

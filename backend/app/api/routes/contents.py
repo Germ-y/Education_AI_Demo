@@ -104,6 +104,33 @@ def generate_content_asset_package(
     return ok({"contentId": content.id, "generatedCount": len(generated), "assets": generated})
 
 
+@router.post("/{content_id}/review-summary")
+def create_review_summary(
+    content_id: str,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    summary = demo_store.create_review_summary_for_content(content_id, teacher_id=principal.id if principal.role == "teacher" else None)
+    if summary is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "REVIEW_SUMMARY_NOT_AVAILABLE", "message": "요약할 학생 시도 또는 콘텐츠를 찾을 수 없습니다."},
+        )
+    return ok(summary.model_dump(by_alias=True))
+
+
+@router.get("/{content_id}/review-summary")
+def get_review_summary(
+    content_id: str,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    summary = demo_store.get_latest_review_summary_for_content(content_id, teacher_id=principal.id if principal.role == "teacher" else None)
+    if summary is None:
+        raise HTTPException(status_code=404, detail={"code": "REVIEW_SUMMARY_NOT_FOUND", "message": "리뷰 요약을 찾을 수 없습니다."})
+    return ok(summary.model_dump(by_alias=True))
+
+
 @router.post("/{content_id}/publish")
 def publish_content(
     content_id: str,

@@ -225,6 +225,19 @@ class AgentRun(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class ReviewSummary(BaseModel):
+    id: str
+    attempt_id: str = Field(alias="attemptId")
+    student_id: str = Field(alias="studentId")
+    completion_rate: float = Field(alias="completionRate")
+    accuracy_rate: float = Field(alias="accuracyRate")
+    short_summary: str = Field(alias="shortSummary")
+    wrong_pattern_json: dict[str, Any] = Field(default_factory=dict, alias="wrongPatternJson")
+    realtime_result_json: dict[str, Any] = Field(default_factory=dict, alias="realtimeResultJson")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class DemoDatabase(BaseModel):
     organizations: list[Organization]
     users: list[User]
@@ -242,5 +255,6 @@ class DemoDatabase(BaseModel):
     activity_events: list[ActivityEvent] = Field(default_factory=list, alias="activityEvents")
     realtime_sessions: list[RealtimePracticeSession] = Field(default_factory=list, alias="realtimeSessions")
     public_data_sources: list[PublicDataSource] = Field(alias="publicDataSources")
+    review_summaries: list[ReviewSummary] = Field(default_factory=list, alias="reviewSummaries")
 
     model_config = ConfigDict(populate_by_name=True)

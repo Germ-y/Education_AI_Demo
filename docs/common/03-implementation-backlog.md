@@ -351,6 +351,14 @@ OPENAI_API_KEY가 없으면 가짜 secret을 반환하지 않고 424 + 검수 �
 교사가 승인하면 memory_cards 새 버전 또는 업데이트 후보가 저장된다.
 ```
 
+상태:
+
+```text
+부분 완료. 저장된 attempt/activity/realtime 데이터를 기준으로 deterministic review summary 생성/조회 API를 추가했다.
+POST /api/review-summaries/:id/apply-to-memory로 active memory card에 요약을 반영한다.
+AI ReviewAgent provider 실행과 메모리 새 버전 생성은 다음 고도화 단계에서 진행한다.
+```
+
 ## 마일스톤 12. 공공데이터 동기화
 
 참조:

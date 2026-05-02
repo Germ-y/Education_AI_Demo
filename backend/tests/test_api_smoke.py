@@ -161,6 +161,33 @@ def test_teacher_and_student_demo_flows() -> None:
     assert realtime.json()["error"]["code"] == "OPENAI_API_KEY_MISSING"
     assert realtime.json()["error"]["details"] == {"reviewRequired": True, "fallbackPolicy": "disabled"}
 
+    reflection = client.post(
+        "/api/student/missions/content_fraction_001/post-practice-reflection",
+        headers={"authorization": f"Bearer {student_token}"},
+        json={"attemptId": attempt_id, "reflectionChoice": "조금 헷갈렸어요", "shortText": "아래 숫자가 전체인 게 헷갈렸어요."},
+    )
+    assert reflection.status_code == 200
+    complete = client.post(
+        "/api/student/missions/content_fraction_001/complete",
+        headers={"authorization": f"Bearer {student_token}"},
+        json={"attemptId": attempt_id},
+    )
+    assert complete.status_code == 200
+
+    review_summary = client.post("/api/contents/content_fraction_001/review-summary", headers={"authorization": f"Bearer {teacher_token}"})
+    assert review_summary.status_code == 200
+    assert review_summary.json()["data"]["studentId"] == "student_learning_fraction"
+    assert review_summary.json()["data"]["accuracyRate"] == 1
+    latest_review_summary = client.get("/api/contents/content_fraction_001/review-summary", headers={"authorization": f"Bearer {teacher_token}"})
+    assert latest_review_summary.status_code == 200
+    assert latest_review_summary.json()["data"]["id"] == review_summary.json()["data"]["id"]
+    applied_memory = client.post(
+        f"/api/review-summaries/{review_summary.json()['data']['id']}/apply-to-memory",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert applied_memory.status_code == 200
+    assert applied_memory.json()["data"]["recent4wResponseJson"]["latestReviewSummaryId"] == review_summary.json()["data"]["id"]
+
     orchestrator = client.post(
         "/api/ai/orchestrator-runs",
         headers={"authorization": f"Bearer {teacher_token}"},

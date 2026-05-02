@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.core.config import get_settings
 from app.data.demo_data import create_demo_database
 from app.domain.enums import MissionStatus
-from app.domain.models import ActivityEvent, CaseNote, ContentAttempt, DemoDatabase, MemoryCard, RealtimePracticeSession
+from app.domain.models import ActivityEvent, CaseNote, ContentAttempt, DemoDatabase, MemoryCard, RealtimePracticeSession, ReviewSummary
 from app.domain.schemas import MissionContent
 from app.repositories.demo_repository import DemoRepository
 
@@ -216,6 +216,9 @@ class DemoStore:
             "realtimeSessions": [
                 session.model_dump(by_alias=True) for session in self.db.realtime_sessions if session.mission_content_id in content_ids
             ],
+            "reviewSummaries": [
+                summary.model_dump(by_alias=True) for summary in self.db.review_summaries if summary.student_id == student_id
+            ],
         }
 
     def get_mission_for_teacher(self, content_id: str, teacher_id: str | None = None) -> MissionContent | None:
@@ -275,6 +278,88 @@ class DemoStore:
         mission.published_at = _now()
         self.persist()
         return mission
+
+    def create_review_summary_for_content(self, content_id: str, teacher_id: str | None = None) -> ReviewSummary | None:
+        self.refresh()
+        mission = self.get_mission_for_teacher(content_id, teacher_id)
+        if mission is None:
+            return None
+        attempts = sorted(
+            [attempt for attempt in self.db.attempts if attempt.mission_content_id == content_id],
+            key=lambda item: item.started_at,
+            reverse=True,
+        )
+        if not attempts:
+            return None
+        attempt = attempts[0]
+        events = [event for event in self.db.activity_events if event.attempt_id == attempt.id]
+        answer_events = [event for event in events if event.event_type == "answer_submitted"]
+        correct_count = sum(1 for event in answer_events if event.payload_json.get("isCorrect") is True)
+        wrong_count = sum(1 for event in answer_events if event.payload_json.get("isCorrect") is False)
+        accuracy_rate = correct_count / len(answer_events) if answer_events else 0
+        completion_rate = 1.0 if attempt.status == "completed" else min(max(attempt.current_step / 4, 0), 1)
+        reflection = next((event.payload_json for event in reversed(events) if event.event_type == "post_practice_reflection"), None)
+        realtime_session = next((session for session in self.db.realtime_sessions if session.attempt_id == attempt.id), None)
+        short_summary = _build_review_summary_text(completion_rate, accuracy_rate, wrong_count, reflection, realtime_session)
+        summary = ReviewSummary(
+            id=f"review_{uuid4()}",
+            attemptId=attempt.id,
+            studentId=attempt.student_id,
+            completionRate=completion_rate,
+            accuracyRate=accuracy_rate,
+            shortSummary=short_summary,
+            wrongPatternJson={
+                "answerCount": len(answer_events),
+                "correctCount": correct_count,
+                "wrongCount": wrong_count,
+                "reflection": reflection,
+            },
+            realtimeResultJson=realtime_session.model_dump(by_alias=True) if realtime_session else {},
+        )
+        self.db.review_summaries.append(summary)
+        self.persist()
+        return summary
+
+    def get_latest_review_summary_for_content(self, content_id: str, teacher_id: str | None = None) -> ReviewSummary | None:
+        self.refresh()
+        mission = self.get_mission_for_teacher(content_id, teacher_id)
+        if mission is None:
+            return None
+        attempt_ids = {attempt.id for attempt in self.db.attempts if attempt.mission_content_id == content_id}
+        summaries = [summary for summary in self.db.review_summaries if summary.attempt_id in attempt_ids]
+        return summaries[-1] if summaries else None
+
+    def apply_review_summary_to_memory(self, review_id: str, teacher_id: str | None = None) -> MemoryCard | None:
+        self.refresh()
+        summary = next((candidate for candidate in self.db.review_summaries if candidate.id == review_id), None)
+        if summary is None:
+            return None
+        open_case = next((case for case in self.db.support_cases if case.student_id == summary.student_id and case.case_status == "open"), None)
+        if open_case is None or (teacher_id is not None and open_case.owner_teacher_id != teacher_id):
+            return None
+        for index, card in enumerate(self.db.memory_cards):
+            if card.student_id != summary.student_id or card.status != "active":
+                continue
+            cautions = list(card.next_session_cautions)
+            if summary.short_summary not in cautions:
+                cautions.append(summary.short_summary)
+            updated = card.model_copy(
+                update={
+                    "recent_4w_response_json": {
+                        **card.recent_4w_response_json,
+                        "latestReviewSummaryId": summary.id,
+                        "latestReviewSummary": summary.short_summary,
+                        "latestAccuracyRate": summary.accuracy_rate,
+                        "latestCompletionRate": summary.completion_rate,
+                    },
+                    "next_session_cautions": cautions[-5:],
+                    "teacher_verified_at": _now(),
+                }
+            )
+            self.db.memory_cards[index] = updated
+            self.persist()
+            return updated
+        return None
 
     def add_student_note(self, student_id: str, author_id: str, payload: dict[str, Any]) -> CaseNote | None:
         open_case = next(
@@ -597,3 +682,20 @@ def _evaluate_answer(template_json: dict[str, Any], answer: dict[str, Any]) -> d
         "isCorrect": is_correct,
         "feedback": correct_feedback if is_correct else wrong_feedback,
     }
+
+
+def _build_review_summary_text(
+    completion_rate: float,
+    accuracy_rate: float,
+    wrong_count: int,
+    reflection: dict[str, Any] | None,
+    realtime_session: RealtimePracticeSession | None,
+) -> str:
+    parts = [f"완료율 {completion_rate:.0%}, 정답률 {accuracy_rate:.0%}"]
+    if wrong_count:
+        parts.append(f"오답 {wrong_count}개")
+    if reflection and reflection.get("reflectionChoice"):
+        parts.append(f"회고: {reflection['reflectionChoice']}")
+    if realtime_session and realtime_session.transcript_summary:
+        parts.append(f"실시간 연습: {realtime_session.transcript_summary}")
+    return " / ".join(parts)
