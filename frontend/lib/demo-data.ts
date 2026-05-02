@@ -72,6 +72,8 @@ export type StageQuestion = {
     | "partition_picker"
     | "applied_question"
     | "mini_simulation"
+    | "explanation_choice"
+    | "wrong_explanation_fix"
     | "card_match"
     | "realtime_roleplay"
     | "realtime_teach_back";

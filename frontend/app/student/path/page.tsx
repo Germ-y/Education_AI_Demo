@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import { getStudentContext, type SceneTheme } from "@/lib/demo-data";
+import type { SceneTheme } from "@/lib/demo-data";
+import { getStudentContextForRoute } from "@/lib/student-context-source";
 
 function StarMascot() {
   return (
@@ -82,11 +83,12 @@ export default async function StudentHomePage({
 }) {
   const params = await searchParams;
   const caseIdParam = Array.isArray(params.caseId) ? params.caseId[0] : params.caseId;
-  const { student, scene } = getStudentContext(caseIdParam);
+  const contentIdParam = Array.isArray(params.contentId) ? params.contentId[0] : params.contentId;
+  const { student, scene } = await getStudentContextForRoute({ caseId: caseIdParam, contentId: contentIdParam });
   const completeParam = Array.isArray(params.complete) ? params.complete[0] : params.complete;
   const isComplete = completeParam === "1";
   const theme = scene.theme;
-  const caseQuery = `caseId=${encodeURIComponent(scene.caseId)}`;
+  const caseQuery = `caseId=${encodeURIComponent(scene.caseId)}${scene.contentId ? `&contentId=${encodeURIComponent(scene.contentId)}` : ""}`;
 
   return (
     <main className="relative flex h-screen overflow-hidden bg-[#e7edf4] p-4 text-[#1f211d]">

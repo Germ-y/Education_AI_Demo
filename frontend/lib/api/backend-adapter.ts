@@ -8,6 +8,7 @@ import type {
   PublicContextBundle,
   RealtimeSessionResponse,
   ReviewableContent,
+  SeedContext,
   StudentAccessResponse,
   StudentCaseFile,
   StudentListItem,
@@ -19,6 +20,8 @@ export const backendAdapter: ApiAdapter = {
 
   studentAccess: (payload) =>
     apiFetch<StudentAccessResponse>("/api/auth/student-access", { method: "POST", body: payload }),
+
+  getContextSeed: (options) => apiFetch<SeedContext>("/api/context/seed", { token: options?.token }),
 
   getContextMe: (options) => apiFetch<ContextMe>("/api/context/me", { token: options?.token }),
 

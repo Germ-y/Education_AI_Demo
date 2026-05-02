@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { getStudentContext } from "@/lib/demo-data";
+import { getStudentContextForRoute } from "@/lib/student-context-source";
 
 function StarterStar() {
   return (
@@ -46,10 +46,12 @@ export default async function StudentStartPage({
 }) {
   const params = await searchParams;
   const caseIdParam = Array.isArray(params.caseId) ? params.caseId[0] : params.caseId;
-  const { student, scene } = getStudentContext(caseIdParam);
+  const contentIdParam = Array.isArray(params.contentId) ? params.contentId[0] : params.contentId;
+  const { student, scene } = await getStudentContextForRoute({ caseId: caseIdParam, contentId: contentIdParam });
   const theme = scene.theme;
   const nextStage = scene.stages[scene.currentStep - 1] ?? scene.stages[0];
-  const pathHref = `/student/path?caseId=${encodeURIComponent(scene.caseId)}`;
+  const caseQuery = `caseId=${encodeURIComponent(scene.caseId)}${scene.contentId ? `&contentId=${encodeURIComponent(scene.contentId)}` : ""}`;
+  const pathHref = `/student/path?${caseQuery}`;
 
   return (
     <main className="relative flex h-screen overflow-hidden bg-[#e7edf4] p-4 text-[#1f211d]">

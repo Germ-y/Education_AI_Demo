@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getStudentCaseSummaries } from "@/lib/demo-data";
+import { getContextSeed } from "@/lib/api";
 
 const teacherRole = {
   href: "/dashboard",
@@ -9,8 +9,22 @@ const teacherRole = {
   accent: "bg-[#1f3a5f]",
 };
 
-export default function Home() {
-  const studentCases = getStudentCaseSummaries();
+export default async function Home() {
+  const seed = await getContextSeed();
+  const studentCases = seed.students.map((student) => {
+    const supportCase = seed.cases.find((item) => item.studentId === student.id);
+    const mapping = seed.mappings.find((item) => item.studentId === student.id);
+
+    return {
+      studentId: student.id,
+      caseId: supportCase?.id,
+      contentId: mapping?.contentId,
+      studentName: student.displayName,
+      grade: student.grade,
+      label: student.studentType === "learning_focus" ? "학습 집중" : "생활 연습",
+      description: student.primaryNeed,
+    };
+  });
 
   return (
     <main className="min-h-screen bg-[#f6f3ea] text-[#1f211d]">
@@ -57,8 +71,14 @@ export default function Home() {
               <div className="mt-5 grid gap-3">
                 {studentCases.map((studentCase) => (
                   <Link
-                    key={studentCase.caseId}
-                    href={`/student?caseId=${encodeURIComponent(studentCase.caseId)}`}
+                    key={studentCase.studentId}
+                    href={
+                      studentCase.caseId
+                        ? `/student?caseId=${encodeURIComponent(studentCase.caseId)}${
+                            studentCase.contentId ? `&contentId=${encodeURIComponent(studentCase.contentId)}` : ""
+                          }`
+                        : `/student?studentId=${encodeURIComponent(studentCase.studentId)}`
+                    }
                     className="group rounded-[18px] border border-[#dfe7d8] bg-[#f7fbf2] px-4 py-4 transition hover:-translate-y-0.5 hover:border-[#9ec391] hover:bg-white"
                   >
                     <div className="flex items-center justify-between gap-4">
@@ -67,6 +87,7 @@ export default function Home() {
                         <p className="mt-1 text-sm font-bold text-[#66705f]">
                           {studentCase.grade} · {studentCase.label}
                         </p>
+                        <p className="mt-1 truncate text-xs font-bold text-[#7b8575]">{studentCase.description}</p>
                       </div>
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-xl transition group-hover:bg-[#27ae60] group-hover:text-white">
                         →

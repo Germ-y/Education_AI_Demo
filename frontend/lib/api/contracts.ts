@@ -274,7 +274,7 @@ export type ContentAsset = {
   missionContentId: string;
   stageId?: string | null;
   assetRole: AssetRole;
-  assetType: "image";
+  assetType: "image" | "audio";
   provider: string;
   model: string;
   promptJson?: Record<string, unknown> | null;
@@ -300,6 +300,20 @@ export type MissionContent = {
   approvedByUserId?: string | null;
   approvedAt?: string | null;
   publishedAt?: string | null;
+};
+
+export type SeedContext = {
+  organization: Organization;
+  teacher: UserProfile;
+  students: StudentProfile[];
+  schools: SchoolProfile[];
+  cases: SupportCaseSummary[];
+  contents: MissionContent[];
+  mappings: Array<{
+    studentId: string;
+    caseId: string;
+    contentId: string;
+  }>;
 };
 
 export type StudentMissionSummary = {

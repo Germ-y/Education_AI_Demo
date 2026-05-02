@@ -9,6 +9,8 @@ import type {
   PublicContextBundle,
   RealtimeSessionResponse,
   SchoolProfile,
+  SeedContext,
+  SupportCaseSummary,
   StudentAccessResponse,
   StudentCaseFile,
   StudentListItem,
@@ -63,8 +65,8 @@ const students: StudentProfile[] = [
     id: "student_learning_fraction",
     organizationId: organization.id,
     externalKey: "demo_student_learning_fraction",
-    displayName: "민지",
-    grade: "middle_2",
+    displayName: "수민",
+    grade: "초4",
     schoolCode: "demo_middle_school",
     studentType: "learning_focus",
     primaryNeed: "분수의 전체-부분 관계 이해",
@@ -75,13 +77,52 @@ const students: StudentProfile[] = [
     id: "student_life_bus",
     organizationId: organization.id,
     externalKey: "demo_student_life_bus",
-    displayName: "하늘",
-    grade: "elementary_6",
+    displayName: "하윤",
+    grade: "초2",
     schoolCode: "demo_elementary_school",
     studentType: "life_support",
     primaryNeed: "센터 이동 순서와 도움 요청 연습",
     profileJson: { interests: ["동네 지도", "역할극"], readingLoad: "very_low", choiceCountLimit: 2 },
     status: "active",
+  },
+  {
+    id: "student_life_planning",
+    organizationId: organization.id,
+    externalKey: "demo_student_life_planning",
+    displayName: "도윤",
+    grade: "중2",
+    schoolCode: "demo_middle_school",
+    studentType: "life_support",
+    primaryNeed: "긴 과제를 작은 첫 행동으로 나누기",
+    profileJson: { interests: ["축구", "영상 만들기"], readingLoad: "medium", choiceCountLimit: 3 },
+    status: "active",
+  },
+];
+
+const supportCaseSummaries: SupportCaseSummary[] = [
+  {
+    id: "case-foundation-001",
+    studentId: "student_learning_fraction",
+    ownerTeacherId: teacher.id,
+    caseStatus: "open",
+    currentGoal: "분수의 전체-부분 관계 이해",
+    openedAt: now,
+  },
+  {
+    id: "case-emotion-001",
+    studentId: "student_life_bus",
+    ownerTeacherId: teacher.id,
+    caseStatus: "open",
+    currentGoal: "센터 이동 순서와 도움 요청 연습",
+    openedAt: now,
+  },
+  {
+    id: "case-older-001",
+    studentId: "student_life_planning",
+    ownerTeacherId: teacher.id,
+    caseStatus: "open",
+    currentGoal: "긴 과제를 작은 첫 행동으로 나누기",
+    openedAt: now,
   },
 ];
 
@@ -114,6 +155,24 @@ function imageAsset(contentId: string, assetRole: ContentAsset["assetRole"], sta
     assetType: "image",
     provider: "openai",
     model: "gpt-image-2",
+    promptJson: {},
+    storageUrl: url,
+    previewUrl: url,
+    qaStatus: "passed",
+    approvalStatus: "approved",
+  };
+}
+
+function audioAsset(contentId: string, assetRole: ContentAsset["assetRole"], stageId: string | null): ContentAsset {
+  const url = `/assets/audio/${contentId}-${assetRole}.mp3`;
+  return {
+    id: `asset_${contentId}_${assetRole}_audio`,
+    missionContentId: contentId,
+    stageId,
+    assetRole,
+    assetType: "audio",
+    provider: "seed",
+    model: "seed-audio",
     promptJson: {},
     storageUrl: url,
     previewUrl: url,
@@ -218,7 +277,7 @@ const fractionStages: ContentStage[] = [
 const missions: MissionContent[] = [
   {
     id: "content_fraction_001",
-    caseId: "case_learning_fraction",
+    caseId: "case-foundation-001",
     studentId: "student_learning_fraction",
     contentType: "learning_focus",
     title: "분수 탐험: 빛나는 한 조각",
@@ -232,6 +291,11 @@ const missions: MissionContent[] = [
       imageAsset("content_fraction_001", "stage_2", "stage_fraction_2"),
       imageAsset("content_fraction_001", "stage_3", "stage_fraction_3"),
       imageAsset("content_fraction_001", "stage_4_realtime", "stage_fraction_4"),
+      audioAsset("content_fraction_001", "hero", null),
+      audioAsset("content_fraction_001", "stage_1", "stage_fraction_1"),
+      audioAsset("content_fraction_001", "stage_2", "stage_fraction_2"),
+      audioAsset("content_fraction_001", "stage_3", "stage_fraction_3"),
+      audioAsset("content_fraction_001", "stage_4_realtime", "stage_fraction_4"),
     ],
     briefJson: { strategy: "정적 1~3단계와 4단계 realtime teach-back" },
     teacherReviewSummary: "분모/분자 위치 혼동을 줄이기 위해 전체 수를 먼저 세는 흐름입니다.",
@@ -253,6 +317,12 @@ function getMission(contentId: string): MissionContent {
   return mission;
 }
 
+function getSupportCase(studentId: string): SupportCaseSummary {
+  const supportCase = supportCaseSummaries.find((item) => item.studentId === studentId);
+  if (!supportCase) throw new Error(`Unknown dev case for student: ${studentId}`);
+  return supportCase;
+}
+
 export const devAdapter: ApiAdapter = {
   async demoLogin(payload) {
     return {
@@ -269,7 +339,12 @@ export const devAdapter: ApiAdapter = {
   },
 
   async studentAccess(payload) {
-    const student = payload.accessCode === "LIFE-BUS" ? getStudent("student_life_bus") : getStudent("student_learning_fraction");
+    const student =
+      payload.accessCode === "LIFE-BUS"
+        ? getStudent("student_life_bus")
+        : payload.accessCode === "LIFE-PLAN"
+          ? getStudent("student_life_planning")
+          : getStudent("student_learning_fraction");
     return {
       student,
       session: {
@@ -277,6 +352,22 @@ export const devAdapter: ApiAdapter = {
         expiresAt: "2026-05-02T12:00:00.000Z",
       },
     } satisfies StudentAccessResponse;
+  },
+
+  async getContextSeed() {
+    return {
+      organization,
+      teacher,
+      students,
+      schools: Object.values(schools),
+      cases: supportCaseSummaries,
+      contents: missions,
+      mappings: missions.map((mission) => ({
+        studentId: mission.studentId,
+        caseId: mission.caseId,
+        contentId: mission.id,
+      })),
+    } satisfies SeedContext;
   },
 
   async getContextMe() {
@@ -307,22 +398,16 @@ export const devAdapter: ApiAdapter = {
     const student = getStudent(studentId);
     const schoolContext = student.schoolCode ? publicContexts[student.schoolCode] : undefined;
     const recentContents = missions.filter((mission) => mission.studentId === studentId);
+    const supportCase = getSupportCase(student.id);
 
     return {
       profile: student,
       schoolContext,
-      openCase: {
-        id: student.studentType === "learning_focus" ? "case_learning_fraction" : "case_life_bus",
-        studentId: student.id,
-        ownerTeacherId: teacher.id,
-        caseStatus: "open",
-        currentGoal: student.primaryNeed,
-        openedAt: now,
-      },
+      openCase: supportCase,
       memoryCard: {
         id: `memory_${student.id}`,
         studentId: student.id,
-        caseId: student.studentType === "learning_focus" ? "case_learning_fraction" : "case_life_bus",
+        caseId: supportCase.id,
         version: 1,
         learningProblemTypes: student.studentType === "learning_focus" ? ["concept_misunderstanding"] : ["sequence_planning"],
         recent4wResponseJson: { summary: "seed read model" },
@@ -337,7 +422,7 @@ export const devAdapter: ApiAdapter = {
       weeklyRecords: [
         {
           id: `note_${student.id}_001`,
-          caseId: student.studentType === "learning_focus" ? "case_learning_fraction" : "case_life_bus",
+          caseId: supportCase.id,
           authorId: teacher.id,
           noteType: "session",
           body: "시각 자료에 반응이 좋고 짧은 단계 안내가 필요합니다.",
@@ -351,7 +436,7 @@ export const devAdapter: ApiAdapter = {
         {
           id: `planner_${student.id}_next`,
           studentId: student.id,
-          caseId: student.studentType === "learning_focus" ? "case_learning_fraction" : "case_life_bus",
+          caseId: supportCase.id,
           periodType: "next_session",
           goalText: student.primaryNeed,
           checklistJson: { checks: ["정적 콘텐츠 확인", "4단계 realtime 진입"] },

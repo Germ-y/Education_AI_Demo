@@ -9,6 +9,7 @@ import type {
   RealtimeSessionRequest,
   RealtimeSessionResponse,
   ReviewableContent,
+  SeedContext,
   StudentAccessRequest,
   StudentAccessResponse,
   StudentCaseFile,
@@ -23,6 +24,7 @@ export type ApiAdapterOptions = {
 export type ApiAdapter = {
   demoLogin(payload: DemoLoginRequest): Promise<DemoLoginResponse>;
   studentAccess(payload: StudentAccessRequest): Promise<StudentAccessResponse>;
+  getContextSeed(options?: ApiAdapterOptions): Promise<SeedContext>;
   getContextMe(options?: ApiAdapterOptions): Promise<ContextMe>;
   getTeacherStudents(options?: ApiAdapterOptions): Promise<StudentListItem[]>;
   getTeacherStudent(studentId: string, options?: ApiAdapterOptions): Promise<StudentCaseFile>;

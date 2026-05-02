@@ -10,6 +10,7 @@ import {
   type CaseStatus,
   type SupportCase,
 } from "@/lib/demo-data";
+import { getTeacherStudent, getTeacherStudents, type StudentCaseFile, type StudentListItem } from "@/lib/api";
 
 type DashboardTab = "info" | "materials" | "records";
 
@@ -118,6 +119,29 @@ const reviewStageReasons: Record<number, string> = {
 
 type ReviewStageDraft = (typeof reviewStagePreviews)[number];
 
+type DashboardStudentView = {
+  id: string;
+  name: string;
+  school: string;
+  grade: string;
+  attendanceRate: number;
+  strengths: string[];
+};
+
+const memoryLabelMap: Record<string, string> = {
+  visual_example: "그림 예시",
+  short_steps: "짧은 단계 설명",
+  concept_misunderstanding: "개념 이해 보완",
+  sequence_planning: "순서 계획 연습",
+  fractions: "분수",
+  daily_route: "일상 이동",
+};
+
+function toDisplayLabels(values: string[] | undefined, fallback: string[] = []) {
+  const source = values && values.length > 0 ? values : fallback;
+  return source.map((value) => memoryLabelMap[value] ?? value);
+}
+
 function StatusBadge({ supportCase }: { supportCase: SupportCase }) {
   return (
     <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusTone[supportCase.status]}`}>
@@ -137,6 +161,8 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
 
 export default function DashboardPage() {
   const [selectedStudentId, setSelectedStudentId] = useState(students[0].id);
+  const [teacherStudentItems, setTeacherStudentItems] = useState<StudentListItem[]>([]);
+  const [selectedCaseFile, setSelectedCaseFile] = useState<StudentCaseFile | null>(null);
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<DashboardTab>("info");
   const [openReportId, setOpenReportId] = useState<string | null>(null);
@@ -161,21 +187,87 @@ export default function DashboardPage() {
     Array<{ id: string; recordId: string; feedback: string; savedAt: string }>
   >([]);
 
+  useEffect(() => {
+    let ignore = false;
+
+    getTeacherStudents()
+      .then((items) => {
+        if (ignore) return;
+        setTeacherStudentItems(items);
+        if (items.length > 0) setSelectedStudentId(items[0].studentId);
+      })
+      .catch(() => {
+        if (ignore) return;
+        setTeacherStudentItems([]);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (teacherStudentItems.length === 0) return;
+
+    let ignore = false;
+    getTeacherStudent(selectedStudentId)
+      .then((caseFile) => {
+        if (!ignore) setSelectedCaseFile(caseFile);
+      })
+      .catch(() => {
+        if (!ignore) setSelectedCaseFile(null);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedStudentId, teacherStudentItems.length]);
+
+  const dashboardStudents = useMemo<DashboardStudentView[]>(() => {
+    if (teacherStudentItems.length === 0) return students;
+
+    return teacherStudentItems.map((item) => ({
+      id: item.studentId,
+      name: item.displayName,
+      school: item.schoolName ?? "학교 정보 확인 중",
+      grade: item.grade,
+      attendanceRate: 90,
+      strengths: item.studentType === "learning_focus" ? ["시각 자료 반응", "짧은 단계 학습"] : ["상황 이해", "역할 연습"],
+    }));
+  }, [teacherStudentItems]);
+
   const filteredStudents = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return students;
+    if (!normalized) return dashboardStudents;
 
-    return students.filter((student) => {
+    return dashboardStudents.filter((student) => {
+      const apiStudent = teacherStudentItems.find((item) => item.studentId === student.id);
       const supportCase = supportCases.find((item) => item.studentId === student.id);
-      return [student.name, student.school, student.grade, supportCase?.primaryNeed, supportCase?.caseType]
+      return [student.name, student.school, student.grade, apiStudent?.primaryNeed, supportCase?.primaryNeed, supportCase?.caseType]
         .filter(Boolean)
         .some((value) => value?.toLowerCase().includes(normalized));
     });
-  }, [query]);
+  }, [dashboardStudents, query, teacherStudentItems]);
 
-  const selectedStudent = students.find((student) => student.id === selectedStudentId) ?? students[0];
-  const selectedCase =
-    supportCases.find((supportCase) => supportCase.studentId === selectedStudent.id) ?? supportCases[0];
+  const selectedStudent = dashboardStudents.find((student) => student.id === selectedStudentId) ?? dashboardStudents[0] ?? students[0];
+  const selectedApiStudent = teacherStudentItems.find((student) => student.studentId === selectedStudent.id);
+  const fallbackCase = supportCases.find((supportCase) => supportCase.studentId === selectedStudent.id) ?? supportCases[0];
+  const selectedCase: SupportCase = selectedCaseFile
+    ? {
+        id: selectedCaseFile.openCase.id,
+        studentId: selectedCaseFile.profile.id,
+        status: "scene_review",
+        statusLabel: "API 조회",
+        caseType: selectedCaseFile.profile.studentType === "learning_focus" ? "학습 집중" : "생활 연습",
+        primaryNeed: selectedCaseFile.profile.primaryNeed,
+        sessionGoal: selectedCaseFile.openCase.currentGoal,
+        supportStrategy: toDisplayLabels(selectedCaseFile.memoryCard?.effectiveExplanationStyles, ["정적 콘텐츠", "실시간 연습"]).join(", "),
+        nextAction: selectedApiStudent?.nextSessionSuggestion ?? "다음 미션 확인",
+        riskNote: selectedCaseFile.memoryCard?.nextSessionCautions.join(", ") || "학생 화면에는 진단 표현을 노출하지 않음",
+        challengeTags: toDisplayLabels(selectedCaseFile.memoryCard?.learningProblemTypes),
+        planTags: selectedCaseFile.plannerItems.map((item) => item.goalText),
+      }
+    : fallbackCase;
   const selectedReviewItems = reviewItems.filter((item) => item.caseId === selectedCase.id);
   const selectedRecords = sessionRecords.filter((record) => record.caseId === selectedCase.id);
   const currentWorkflowStep = selectedCase.status === "follow_up" ? 4 : selectedCase.status === "scene_review" ? 2 : 3;
