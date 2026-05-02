@@ -409,6 +409,33 @@ AI 실행 상태/결과 조회.
 }
 ```
 
+### POST /api/contents/:contentId/assets/:assetId/generate
+
+단일 이미지 또는 오디오 asset을 실제 provider로 생성한다.
+
+```text
+image asset: promptJson.prompt/imagePrompt/visualPrompt 필요
+audio asset: sourceText 필요
+```
+
+성공하면 `/generated/assets/:contentId/:assetId.(png|mp3)` 경로를 `storageUrl`, `previewUrl`에 반영한다.
+생성 직후에는 교사가 다시 확인해야 하므로 `qaStatus=pending`, `approvalStatus=pending`으로 둔다.
+
+provider key 없음, HTTP 오류, 빈 파일, b64 parse 실패는 대체 파일을 만들지 않고 `424` 오류로 반환한다.
+
+```json
+{
+  "error": {
+    "code": "ELEVENLABS_API_KEY_MISSING",
+    "message": "ELEVENLABS_API_KEY가 없어 TTS 생성을 실행할 수 없습니다.",
+    "details": {
+      "reviewRequired": true,
+      "fallbackPolicy": "disabled"
+    }
+  }
+}
+```
+
 ### POST /api/contents/:contentId/approve
 
 교사 승인.

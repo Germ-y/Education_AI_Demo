@@ -1,4 +1,6 @@
+import base64
 import json
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -65,6 +67,39 @@ class OpenAiProvider:
         if not value or not expires_at:
             raise ProviderOutputError("OPENAI_REALTIME_SECRET_INVALID", "OpenAI realtime client secret 응답 형식이 올바르지 않습니다.")
         return {"value": value, "expiresAt": expires_at, "raw": data}
+
+    def create_image_file(
+        self,
+        *,
+        prompt: str,
+        output_path: Path,
+        model: str,
+        size: str = "1536x1024",
+        timeout_sec: float = 180,
+    ) -> Path:
+        if not self.settings.openai_api_key:
+            raise ProviderConfigurationError("OPENAI_API_KEY_MISSING", "OPENAI_API_KEY가 없어 이미지 생성을 실행할 수 없습니다.")
+
+        data = self._post(
+            "/v1/images/generations",
+            {"model": model, "prompt": prompt, "n": 1, "size": size, "quality": "high", "output_format": "png"},
+            timeout_sec=timeout_sec,
+        )
+        images = data.get("data")
+        if not isinstance(images, list) or not images or not isinstance(images[0], dict):
+            raise ProviderOutputError("OPENAI_IMAGE_DATA_MISSING", "OpenAI 이미지 응답에 data[0]가 없습니다.")
+        b64_json = images[0].get("b64_json")
+        if not isinstance(b64_json, str) or not b64_json:
+            raise ProviderOutputError("OPENAI_IMAGE_B64_MISSING", "OpenAI 이미지 응답에 b64_json이 없습니다.")
+        try:
+            image_bytes = base64.b64decode(b64_json)
+        except ValueError as exc:
+            raise ProviderOutputError("OPENAI_IMAGE_B64_INVALID", "OpenAI 이미지 b64_json을 디코딩할 수 없습니다.") from exc
+        if not image_bytes:
+            raise ProviderOutputError("OPENAI_IMAGE_EMPTY", "OpenAI 이미지 파일이 비어 있습니다.")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(image_bytes)
+        return output_path
 
     def _post(self, path: str, payload: dict[str, Any], *, timeout_sec: float) -> dict[str, Any]:
         try:

@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.response import ok
 from app.api.routes import ai, auth, contents, context, public_data, student, teacher
@@ -27,6 +28,7 @@ def create_app() -> FastAPI:
     app.include_router(teacher.router)
     app.include_router(student.router)
     app.include_router(public_data.router)
+    app.mount("/generated", StaticFiles(directory=settings.generated_assets_dir, check_dir=False), name="generated")
 
     @app.get("/health")
     def health() -> dict:

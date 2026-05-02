@@ -72,6 +72,12 @@ def test_teacher_and_student_demo_flows() -> None:
     teacher_content = client.get("/api/contents/content_fraction_001", headers={"authorization": f"Bearer {teacher_token}"})
     assert teacher_content.status_code == 200
     content_payload = teacher_content.json()["data"]
+    asset_generation = client.post(
+        "/api/contents/content_fraction_001/assets/asset_content_fraction_001_stage_2_audio/generate",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert asset_generation.status_code == 424
+    assert asset_generation.json()["error"]["code"] == "ELEVENLABS_API_KEY_MISSING"
     approve = client.post(
         "/api/contents/content_fraction_001/approve",
         headers={"authorization": f"Bearer {teacher_token}"},
