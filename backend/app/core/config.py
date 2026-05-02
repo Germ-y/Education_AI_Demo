@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://eduyj:eduyj@localhost:5432/eduyj"
     cors_origins: str = "http://localhost:3000"
     openai_api_key: str | None = None
+    openai_reasoning_model: str = "gpt-5.1"
     openai_image_model: str = "gpt-image-2"
     openai_realtime_model: str = "gpt-realtime"
     elevenlabs_api_key: str | None = None
@@ -26,6 +27,7 @@ class Settings(BaseSettings):
     )
     schoolinfo_api_key: str | None = None
     public_data_sync_enabled: bool = False
+    generated_assets_dir: str = str(BACKEND_DIR / "generated")
     demo_seed_mode: bool = True
     demo_seed_reset: bool = False
 

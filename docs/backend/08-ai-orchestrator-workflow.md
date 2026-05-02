@@ -115,5 +115,45 @@ TTS: ElevenLabs
 2. Responses API adapter 추가
 3. `POST /api/ai/orchestrator-runs` 구현
 4. `POST /api/ai/content-generations` 구현
-5. mock provider로 schema validation 먼저 통과
-6. 실제 OpenAI/ElevenLabs adapter 연결
+5. image/TTS job record 구현
+6. teacher_review MissionContent 저장 연결
+
+## 9. Fallback 금지 구현 원칙
+
+AI provider 호출에서 오류가 나면 대체 seed content, 대체 이미지, 대체 음성을 만들지 않는다.
+
+```text
+provider key 없음
+provider HTTP 오류
+provider timeout
+provider output JSON parse 실패
+image QA 실패
+TTS audio empty
+```
+
+위 경우는 모두 실행 기록에 실패로 남긴다.
+
+```text
+status = failed
+reviewRequired = true
+fallbackPolicy = disabled
+errorCode
+errorMessage
+```
+
+학생에게 노출되는 것은 이미 `published` 상태인 콘텐츠뿐이다.
+생성 실패한 결과는 교사/운영자가 검수한 뒤 재시도하거나 prompt/schema를 수정해야 한다.
+
+현재 구현된 provider 연결:
+
+```text
+POST /api/ai/orchestrator-runs
+POST /api/ai/content-generations
+GET /api/ai/agent-runs/:agentRunId
+OpenAI Responses API adapter
+OpenAI Realtime client secret adapter
+ElevenLabs TTS adapter
+```
+
+`content-generations`는 성공한 orchestrator run만 입력으로 받는다.
+생성된 `MissionContent`는 schema validation을 통과하고 `teacher_review` 상태일 때만 저장한다.

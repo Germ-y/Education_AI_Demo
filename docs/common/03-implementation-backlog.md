@@ -21,8 +21,9 @@
 - [x] 기능 시작 체크리스트 추가
 - [x] 프론트/백엔드 공통 스키마 계약 추가
 - [x] MVP를 회원가입보다 seed 도메인 조회 우선으로 정리
-- [ ] AI provider 연동
-- [ ] 학생 플레이 런타임 구현
+- [x] AI provider 연동 기반: AgentRun 저장, OpenAI/ElevenLabs adapter, fallback 금지 실패 기록
+- [x] AI provider 실제 생성 workflow MVP 완성
+- [x] 학생 플레이 런타임 MVP 구현
 
 ## 협업 기준
 
@@ -190,7 +191,8 @@ seed 여러 번 실행해도 중복 생성 없음
 상태:
 
 ```text
-부분 완료. demo token 기반 학생 목록/상세/memory patch API를 추가했다. 감사 로그 영속화는 DB 연결 뒤 진행한다.
+부분 완료. demo token 기반 학생 목록/상세/memory patch API를 추가했다.
+학생 상세/히스토리 조회 감사 로그를 저장한다.
 ```
 
 ## 마일스톤 6. AI 콘텐츠 생성
@@ -225,7 +227,10 @@ hero + stage_1~stage_4_realtime에는 TTS audio asset record를 붙인다.
 
 ```text
 부분 완료. prompt registry와 v1 prompt 파일을 추가했고, MVP 프레임워크는 자체 workflow + OpenAI Responses API adapter로 정했다.
-다음 단계는 AgentRun repository와 실제 provider adapter 구현이다.
+AgentRun repository, OpenAI Responses/Realtime adapter, ElevenLabs TTS adapter 골격을 추가했다.
+`POST /api/ai/orchestrator-runs`, `POST /api/ai/content-generations`, `GET /api/ai/agent-runs/:id`를 추가했다.
+OPENAI_API_KEY/ELEVENLABS_*가 없거나 provider 요청이 실패하면 대체 seed asset을 만들지 않고 failed + reviewRequired 상태로 남긴다.
+생성된 MissionContent는 `teacher_review` 상태와 schema validation을 통과해야 저장된다.
 ```
 
 ElevenLabs TTS는 4단계 realtime이 아니라 정적 콘텐츠 안내 음성 사전 생성에만 사용한다.
@@ -247,6 +252,15 @@ ElevenLabs TTS는 4단계 realtime이 아니라 정적 콘텐츠 안내 음성 �
 OPENAI_API_KEY가 있으면 실제 이미지 생성 가능
 OPENAI_API_KEY가 없거나 생성 실패 시 job failed 상태와 error reason 저장
 QA 실패 시 재생성 요청 가능
+fallback seed asset 대체 없음
+```
+
+상태:
+
+```text
+완료(MVP). OpenAI 이미지 생성 adapter, 단일 asset 생성 API, 5개 이미지 + 5개 오디오 package 생성 API를 추가했다.
+생성 성공 시 /generated asset URL로 연결하고, 실패 시 424 + reviewRequired 오류를 반환한다.
+별도 background job queue/table은 운영 고도화 단계에서 진행한다.
 ```
 
 ## 마일스톤 8. 승인과 배포
@@ -266,6 +280,17 @@ published 콘텐츠만 학생 API에서 조회된다.
 승인/반려/배포가 audit log에 남는다.
 ```
 
+상태:
+
+```text
+부분 완료. GET /api/contents/:id, approve, reject, publish API를 추가했다.
+POST /api/contents/:id/assets/:assetId/generate로 단일 이미지/TTS asset 실제 생성을 연결했다.
+POST /api/contents/:id/assets/generate-package로 5개 이미지 + 5개 오디오 batch 생성을 연결했다.
+학생 API는 published 콘텐츠만 반환한다.
+승인/반려/배포/asset 생성 audit log를 저장한다.
+재생성 API는 단일 asset generate API를 재사용하며, 교사용 별도 요청 문구 저장은 다음 슬라이스에서 진행한다.
+```
+
 ## 마일스톤 9. 학생 플레이 런타임
 
 작업:
@@ -282,6 +307,12 @@ published 콘텐츠만 학생 API에서 조회된다.
 ```text
 학생 access code로 로그인해 published 콘텐츠를 1~3단계까지 완료한다.
 정답 판정은 서버에서 승인된 JSON 기준으로 수행한다.
+```
+
+상태:
+
+```text
+완료(MVP). 오늘의 미션 조회, 콘텐츠 시작, 1~3단계 submit, 학생 활동 이벤트 저장, 회고, 완료 API를 추가했다.
 ```
 
 ## 마일스톤 10. 4단계 realtime
@@ -307,6 +338,13 @@ stage.step != 4이면 session 생성 실패.
 세션 종료 후 review input으로 사용할 summary가 저장된다.
 ```
 
+상태:
+
+```text
+완료(MVP). OpenAI realtime client secret 발급 adapter, realtime session 생성 계약, realtime 이벤트 저장, realtime 완료 저장 API를 추가했다.
+OPENAI_API_KEY가 없으면 가짜 secret을 반환하지 않고 424 + 검수 필요 오류를 반환한다.
+```
+
 ## 마일스톤 11. 리뷰와 메모리 업데이트
 
 작업:
@@ -321,6 +359,14 @@ stage.step != 4이면 session 생성 실패.
 ```text
 학생 플레이 완료 후 리뷰 요약 생성.
 교사가 승인하면 memory_cards 새 버전 또는 업데이트 후보가 저장된다.
+```
+
+상태:
+
+```text
+부분 완료. 저장된 attempt/activity/realtime 데이터를 기준으로 deterministic review summary 생성/조회 API를 추가했다.
+POST /api/review-summaries/:id/apply-to-memory로 active memory card에 요약을 반영한다.
+AI ReviewAgent provider 실행과 메모리 새 버전 생성은 다음 고도화 단계에서 진행한다.
 ```
 
 ## 마일스톤 12. 공공데이터 동기화
@@ -342,6 +388,15 @@ stage.step != 4이면 session 생성 실패.
 ```text
 API key 없이도 snapshot으로 데모 가능.
 API key가 있으면 수동 sync job 실행 가능.
+```
+
+상태:
+
+```text
+부분 완료. seed snapshot 조회 API와 NEIS 수동 sync endpoint를 추가했다.
+NEIS_API_KEY가 없으면 snapshot fallback sync를 하지 않고 424 오류를 반환한다.
+키가 있으면 schoolInfo, SchoolSchedule, timetable endpoint를 호출해 정규화 snapshot을 upsert한다.
+sync job 이력 테이블은 이후 운영 고도화 단계에서 진행한다.
 ```
 
 ## 마일스톤 13. 선택 기능: 회원가입과 아이 등록

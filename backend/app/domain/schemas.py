@@ -292,3 +292,73 @@ class ReflectionRequest(BaseModel):
     short_text: str | None = Field(default=None, alias="shortText")
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class OrchestratorRunRequest(BaseModel):
+    student_id: str = Field(alias="studentId")
+    case_id: str = Field(alias="caseId")
+    requested_goal: str | None = Field(default=None, alias="requestedGoal")
+    content_type: Literal[StudentType.LIFE_SUPPORT, StudentType.LEARNING_FOCUS] | None = Field(default=None, alias="contentType")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ContentGenerationRequest(BaseModel):
+    orchestrator_run_id: str = Field(alias="orchestratorRunId")
+    student_id: str = Field(alias="studentId")
+    case_id: str = Field(alias="caseId")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ContentApprovalRequest(BaseModel):
+    approved_stage_ids: list[str] = Field(alias="approvedStageIds")
+    approved_asset_ids: list[str] = Field(alias="approvedAssetIds")
+    review_note: str | None = Field(default=None, alias="reviewNote")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ContentRejectRequest(BaseModel):
+    reason: str
+    requested_changes: list[str] = Field(default_factory=list, alias="requestedChanges")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class StudentActivityEventRequest(BaseModel):
+    attempt_id: str | None = Field(default=None, alias="attemptId")
+    stage_id: str | None = Field(default=None, alias="stageId")
+    event_type: str = Field(alias="eventType")
+    payload_json: dict[str, Any] = Field(default_factory=dict, alias="payloadJson")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class RealtimeSessionEventRequest(BaseModel):
+    event_type: str = Field(alias="eventType")
+    payload_json: dict[str, Any] = Field(default_factory=dict, alias="payloadJson")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class RealtimeSessionCompleteRequest(BaseModel):
+    turn_count: int = Field(alias="turnCount", ge=0)
+    duration_sec: int = Field(alias="durationSec", ge=0)
+    rubric_result: dict[str, Any] = Field(default_factory=dict, alias="rubricResult")
+    transcript_summary: str | None = Field(default=None, alias="transcriptSummary")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class PublicDataSyncRequest(BaseModel):
+    region_code: str | None = Field(default=None, alias="regionCode")
+    office_code: str = Field(default="R10", alias="officeCode")
+    school_code: str | None = Field(default=None, alias="schoolCode")
+    from_date: str | None = Field(default=None, alias="fromDate")
+    to_date: str | None = Field(default=None, alias="toDate")
+    timetable_date: str | None = Field(default=None, alias="timetableDate")
+    grade: str | None = None
+    class_name: str | None = Field(default=None, alias="className")
+
+    model_config = ConfigDict(populate_by_name=True)

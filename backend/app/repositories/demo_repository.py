@@ -68,6 +68,10 @@ class DemoRepository:
                     "realtimeSessions": [
                         _realtime_session(row) for row in session.scalars(select(rows.RealtimePracticeSessionRow).order_by(rows.RealtimePracticeSessionRow.id))
                     ],
+                    "reviewSummaries": [
+                        _review_summary(row) for row in session.scalars(select(rows.ReviewSummaryRow).order_by(rows.ReviewSummaryRow.id))
+                    ],
+                    "auditLogs": [_audit_log(row) for row in session.scalars(select(rows.AuditLogRow).order_by(rows.AuditLogRow.created_at))],
                     "publicDataSources": [
                         _public_data_source(row) for row in session.scalars(select(rows.PublicDataSourceRow).order_by(rows.PublicDataSourceRow.id))
                     ],
@@ -77,6 +81,8 @@ class DemoRepository:
 
 def _delete_all(session: Session) -> None:
     for model in [
+        rows.AgentRunRow,
+        rows.AuditLogRow,
         rows.ReviewSummaryRow,
         rows.RealtimePracticeSessionRow,
         rows.ActivityEventRow,
@@ -338,6 +344,19 @@ def _insert_all(session: Session, db: DemoDatabase) -> None:
         for item in db.realtime_sessions
     )
     session.add_all(
+        rows.ReviewSummaryRow(
+            id=item.id,
+            attempt_id=item.attempt_id,
+            student_id=item.student_id,
+            completion_rate=item.completion_rate,
+            accuracy_rate=item.accuracy_rate,
+            short_summary=item.short_summary,
+            wrong_pattern_json=item.wrong_pattern_json,
+            realtime_result_json=item.realtime_result_json,
+        )
+        for item in db.review_summaries
+    )
+    session.add_all(
         rows.PublicDataSourceRow(
             id=item.id,
             source_code=item.source_code,
@@ -347,6 +366,19 @@ def _insert_all(session: Session, db: DemoDatabase) -> None:
             enabled=item.enabled,
         )
         for item in db.public_data_sources
+    )
+    session.add_all(
+        rows.AuditLogRow(
+            id=item.id,
+            actor_user_id=item.actor_user_id,
+            student_id=item.student_id,
+            action=item.action,
+            resource_type=item.resource_type,
+            resource_id=item.resource_id,
+            payload_json=item.payload_json,
+            created_at=item.created_at,
+        )
+        for item in db.audit_logs
     )
 
 
@@ -598,4 +630,30 @@ def _public_data_source(row: rows.PublicDataSourceRow) -> dict:
         "baseUrl": row.base_url,
         "authType": row.auth_type,
         "enabled": row.enabled,
+    }
+
+
+def _review_summary(row: rows.ReviewSummaryRow) -> dict:
+    return {
+        "id": row.id,
+        "attemptId": row.attempt_id,
+        "studentId": row.student_id,
+        "completionRate": float(row.completion_rate),
+        "accuracyRate": float(row.accuracy_rate),
+        "shortSummary": row.short_summary,
+        "wrongPatternJson": row.wrong_pattern_json,
+        "realtimeResultJson": row.realtime_result_json,
+    }
+
+
+def _audit_log(row: rows.AuditLogRow) -> dict:
+    return {
+        "id": row.id,
+        "actorUserId": row.actor_user_id,
+        "studentId": row.student_id,
+        "action": row.action,
+        "resourceType": row.resource_type,
+        "resourceId": row.resource_id,
+        "payloadJson": row.payload_json,
+        "createdAt": row.created_at,
     }

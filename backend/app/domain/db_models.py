@@ -269,3 +269,35 @@ class ReviewSummaryRow(Base):
     short_summary: Mapped[str] = mapped_column(Text)
     wrong_pattern_json: Mapped[dict] = mapped_column(JSON, default=dict)
     realtime_result_json: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class AgentRunRow(Base):
+    __tablename__ = "agent_runs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    agent_type: Mapped[str] = mapped_column(String, index=True)
+    prompt_version: Mapped[str] = mapped_column(String, index=True)
+    output_schema_name: Mapped[str] = mapped_column(String)
+    input_snapshot_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    output_json: Mapped[dict | None] = mapped_column(JSON)
+    model: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String, index=True)
+    token_usage_json: Mapped[dict | None] = mapped_column(JSON)
+    error_code: Mapped[str | None] = mapped_column(String, index=True)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    review_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[str] = mapped_column(String)
+    completed_at: Mapped[str | None] = mapped_column(String)
+
+
+class AuditLogRow(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    actor_user_id: Mapped[str | None] = mapped_column(String, index=True)
+    student_id: Mapped[str | None] = mapped_column(String, index=True)
+    action: Mapped[str] = mapped_column(String, index=True)
+    resource_type: Mapped[str] = mapped_column(String, index=True)
+    resource_id: Mapped[str | None] = mapped_column(String, index=True)
+    payload_json: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[str] = mapped_column(String)

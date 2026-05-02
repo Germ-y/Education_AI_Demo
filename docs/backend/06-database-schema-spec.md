@@ -388,15 +388,21 @@ local_learning_resources
 | --- | --- | --- |
 | `id` | uuid pk | 실행 ID |
 | `agent_type` | text | `orchestrator`, `content`, `image_prompt`, `review`, `memory` |
-| `student_id` | uuid fk nullable | 학생 |
-| `mission_content_id` | uuid fk nullable | 콘텐츠 |
+| `prompt_version` | text | 사용 prompt version |
+| `output_schema_name` | text | 기대 출력 schema 이름 |
 | `input_snapshot_json` | jsonb | 입력 스냅샷 |
 | `output_json` | jsonb nullable | 출력 |
-| `model_name` | text | 모델 |
+| `model` | text | 모델 |
 | `status` | text | `running`, `succeeded`, `failed` |
+| `token_usage_json` | jsonb nullable | provider token usage |
+| `error_code` | text nullable | 실패 코드 |
 | `error_message` | text nullable | 오류 |
+| `review_required` | boolean | 교사/운영자 검수 필요 여부 |
 | `created_at` | timestamptz | 생성 |
 | `completed_at` | timestamptz nullable | 완료 |
+
+provider 오류가 나도 대체 콘텐츠를 생성하지 않는다.
+`status=failed`, `review_required=true`, `error_code`, `error_message`를 저장하고 검수 후 재시도한다.
 
 ### audit_logs
 

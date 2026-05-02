@@ -206,6 +206,51 @@ class PublicDataSource(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class AgentRun(BaseModel):
+    id: str
+    agent_type: str = Field(alias="agentType")
+    prompt_version: str = Field(alias="promptVersion")
+    output_schema_name: str = Field(alias="outputSchemaName")
+    input_snapshot_json: dict[str, Any] = Field(default_factory=dict, alias="inputSnapshotJson")
+    output_json: dict[str, Any] | None = Field(default=None, alias="outputJson")
+    model: str
+    status: Literal["running", "succeeded", "failed"] = "running"
+    token_usage_json: dict[str, Any] | None = Field(default=None, alias="tokenUsageJson")
+    error_code: str | None = Field(default=None, alias="errorCode")
+    error_message: str | None = Field(default=None, alias="errorMessage")
+    review_required: bool = Field(default=False, alias="reviewRequired")
+    created_at: str = Field(alias="createdAt")
+    completed_at: str | None = Field(default=None, alias="completedAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ReviewSummary(BaseModel):
+    id: str
+    attempt_id: str = Field(alias="attemptId")
+    student_id: str = Field(alias="studentId")
+    completion_rate: float = Field(alias="completionRate")
+    accuracy_rate: float = Field(alias="accuracyRate")
+    short_summary: str = Field(alias="shortSummary")
+    wrong_pattern_json: dict[str, Any] = Field(default_factory=dict, alias="wrongPatternJson")
+    realtime_result_json: dict[str, Any] = Field(default_factory=dict, alias="realtimeResultJson")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class AuditLog(BaseModel):
+    id: str
+    actor_user_id: str | None = Field(default=None, alias="actorUserId")
+    student_id: str | None = Field(default=None, alias="studentId")
+    action: str
+    resource_type: str = Field(alias="resourceType")
+    resource_id: str | None = Field(default=None, alias="resourceId")
+    payload_json: dict[str, Any] | None = Field(default=None, alias="payloadJson")
+    created_at: str = Field(alias="createdAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class DemoDatabase(BaseModel):
     organizations: list[Organization]
     users: list[User]
@@ -223,5 +268,7 @@ class DemoDatabase(BaseModel):
     activity_events: list[ActivityEvent] = Field(default_factory=list, alias="activityEvents")
     realtime_sessions: list[RealtimePracticeSession] = Field(default_factory=list, alias="realtimeSessions")
     public_data_sources: list[PublicDataSource] = Field(alias="publicDataSources")
+    review_summaries: list[ReviewSummary] = Field(default_factory=list, alias="reviewSummaries")
+    audit_logs: list[AuditLog] = Field(default_factory=list, alias="auditLogs")
 
     model_config = ConfigDict(populate_by_name=True)

@@ -6,7 +6,20 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.config import get_settings
 from app.data.demo_data import create_demo_database
-from app.domain.models import ActivityEvent, CaseNote, ContentAttempt, DemoDatabase, MemoryCard, RealtimePracticeSession
+from app.domain.enums import MissionStatus
+from app.domain.models import (
+    ActivityEvent,
+    AuditLog,
+    CaseNote,
+    ContentAttempt,
+    DemoDatabase,
+    MemoryCard,
+    RealtimePracticeSession,
+    ReviewSummary,
+    SchoolCalendarEvent,
+    SchoolProfile,
+    SchoolTimetableSlot,
+)
 from app.domain.schemas import MissionContent
 from app.repositories.demo_repository import DemoRepository
 
@@ -102,6 +115,39 @@ class DemoStore:
                 for content in self.db.mission_contents
             ],
         }
+
+    def record_audit(
+        self,
+        *,
+        actor_user_id: str | None,
+        action: str,
+        resource_type: str,
+        resource_id: str | None = None,
+        student_id: str | None = None,
+        payload_json: dict[str, Any] | None = None,
+    ) -> AuditLog:
+        log = AuditLog(
+            id=f"audit_{uuid4()}",
+            actorUserId=actor_user_id,
+            studentId=student_id,
+            action=action,
+            resourceType=resource_type,
+            resourceId=resource_id,
+            payloadJson=payload_json or {},
+            createdAt=_now(),
+        )
+        self.db.audit_logs.append(log)
+        self.persist()
+        return log
+
+    def list_audit_logs(self, *, student_id: str | None = None, action: str | None = None, limit: int = 50) -> list[dict]:
+        self.refresh()
+        logs = self.db.audit_logs
+        if student_id:
+            logs = [log for log in logs if log.student_id == student_id]
+        if action:
+            logs = [log for log in logs if log.action == action]
+        return [log.model_dump(by_alias=True) for log in logs[-limit:]]
 
     def list_teacher_students(self, student_type: str | None = None, q: str | None = None, teacher_id: str | None = None) -> list[dict]:
         self.refresh()
@@ -215,7 +261,150 @@ class DemoStore:
             "realtimeSessions": [
                 session.model_dump(by_alias=True) for session in self.db.realtime_sessions if session.mission_content_id in content_ids
             ],
+            "reviewSummaries": [
+                summary.model_dump(by_alias=True) for summary in self.db.review_summaries if summary.student_id == student_id
+            ],
         }
+
+    def get_mission_for_teacher(self, content_id: str, teacher_id: str | None = None) -> MissionContent | None:
+        self.refresh()
+        mission = next((content for content in self.db.mission_contents if content.id == content_id), None)
+        if mission is None:
+            return None
+        support_case = next((case for case in self.db.support_cases if case.id == mission.case_id), None)
+        if support_case is None or (teacher_id is not None and support_case.owner_teacher_id != teacher_id):
+            return None
+        return mission
+
+    def approve_mission_content(
+        self,
+        content_id: str,
+        teacher_id: str,
+        approved_stage_ids: list[str],
+        approved_asset_ids: list[str],
+        review_note: str | None,
+    ) -> MissionContent | None:
+        self.refresh()
+        mission = self.get_mission_for_teacher(content_id, teacher_id)
+        if mission is None:
+            return None
+        stage_ids = {stage.id for stage in mission.stages}
+        asset_ids = {asset.id for asset in mission.assets}
+        if not stage_ids.issubset(set(approved_stage_ids)) or not asset_ids.issubset(set(approved_asset_ids)):
+            return None
+        for asset in mission.assets:
+            asset.approval_status = "approved"
+        mission.status = MissionStatus.APPROVED
+        mission.teacher_review_summary = review_note
+        mission.approved_by_user_id = teacher_id
+        mission.approved_at = _now()
+        self.persist()
+        return mission
+
+    def reject_mission_content(self, content_id: str, teacher_id: str, reason: str, requested_changes: list[str]) -> MissionContent | None:
+        self.refresh()
+        mission = self.get_mission_for_teacher(content_id, teacher_id)
+        if mission is None:
+            return None
+        mission.status = MissionStatus.REVISION_REQUESTED
+        mission.teacher_review_summary = reason
+        mission.brief_json = {**mission.brief_json, "requestedChanges": requested_changes}
+        self.persist()
+        return mission
+
+    def publish_mission_content(self, content_id: str, teacher_id: str) -> MissionContent | None:
+        self.refresh()
+        mission = self.get_mission_for_teacher(content_id, teacher_id)
+        if mission is None or mission.status != MissionStatus.APPROVED:
+            return None
+        if any(asset.approval_status != "approved" for asset in mission.assets):
+            return None
+        mission.status = MissionStatus.PUBLISHED
+        mission.published_at = _now()
+        self.persist()
+        return mission
+
+    def create_review_summary_for_content(self, content_id: str, teacher_id: str | None = None) -> ReviewSummary | None:
+        self.refresh()
+        mission = self.get_mission_for_teacher(content_id, teacher_id)
+        if mission is None:
+            return None
+        attempts = sorted(
+            [attempt for attempt in self.db.attempts if attempt.mission_content_id == content_id],
+            key=lambda item: item.started_at,
+            reverse=True,
+        )
+        if not attempts:
+            return None
+        attempt = attempts[0]
+        events = [event for event in self.db.activity_events if event.attempt_id == attempt.id]
+        answer_events = [event for event in events if event.event_type == "answer_submitted"]
+        correct_count = sum(1 for event in answer_events if event.payload_json.get("isCorrect") is True)
+        wrong_count = sum(1 for event in answer_events if event.payload_json.get("isCorrect") is False)
+        accuracy_rate = correct_count / len(answer_events) if answer_events else 0
+        completion_rate = 1.0 if attempt.status == "completed" else min(max(attempt.current_step / 4, 0), 1)
+        reflection = next((event.payload_json for event in reversed(events) if event.event_type == "post_practice_reflection"), None)
+        realtime_session = next((session for session in self.db.realtime_sessions if session.attempt_id == attempt.id), None)
+        short_summary = _build_review_summary_text(completion_rate, accuracy_rate, wrong_count, reflection, realtime_session)
+        summary = ReviewSummary(
+            id=f"review_{uuid4()}",
+            attemptId=attempt.id,
+            studentId=attempt.student_id,
+            completionRate=completion_rate,
+            accuracyRate=accuracy_rate,
+            shortSummary=short_summary,
+            wrongPatternJson={
+                "answerCount": len(answer_events),
+                "correctCount": correct_count,
+                "wrongCount": wrong_count,
+                "reflection": reflection,
+            },
+            realtimeResultJson=realtime_session.model_dump(by_alias=True) if realtime_session else {},
+        )
+        self.db.review_summaries.append(summary)
+        self.persist()
+        return summary
+
+    def get_latest_review_summary_for_content(self, content_id: str, teacher_id: str | None = None) -> ReviewSummary | None:
+        self.refresh()
+        mission = self.get_mission_for_teacher(content_id, teacher_id)
+        if mission is None:
+            return None
+        attempt_ids = {attempt.id for attempt in self.db.attempts if attempt.mission_content_id == content_id}
+        summaries = [summary for summary in self.db.review_summaries if summary.attempt_id in attempt_ids]
+        return summaries[-1] if summaries else None
+
+    def apply_review_summary_to_memory(self, review_id: str, teacher_id: str | None = None) -> MemoryCard | None:
+        self.refresh()
+        summary = next((candidate for candidate in self.db.review_summaries if candidate.id == review_id), None)
+        if summary is None:
+            return None
+        open_case = next((case for case in self.db.support_cases if case.student_id == summary.student_id and case.case_status == "open"), None)
+        if open_case is None or (teacher_id is not None and open_case.owner_teacher_id != teacher_id):
+            return None
+        for index, card in enumerate(self.db.memory_cards):
+            if card.student_id != summary.student_id or card.status != "active":
+                continue
+            cautions = list(card.next_session_cautions)
+            if summary.short_summary not in cautions:
+                cautions.append(summary.short_summary)
+            updated = card.model_copy(
+                update={
+                    "recent_4w_response_json": {
+                        **card.recent_4w_response_json,
+                        "latestReviewSummaryId": summary.id,
+                        "latestReviewSummary": summary.short_summary,
+                        "latestAccuracyRate": summary.accuracy_rate,
+                        "latestCompletionRate": summary.completion_rate,
+                    },
+                    "next_session_cautions": cautions[-5:],
+                    "teacher_verified_at": _now(),
+                }
+            )
+            self.db.memory_cards[index] = updated
+            self.persist()
+            return updated
+        return None
 
     def add_student_note(self, student_id: str, author_id: str, payload: dict[str, Any]) -> CaseNote | None:
         open_case = next(
@@ -281,6 +470,28 @@ class DemoStore:
             slots.append(slot.model_dump(by_alias=True))
         return sorted(slots, key=lambda item: (item["timetableDate"], item["grade"], item["className"], item["period"]))
 
+    def upsert_public_school_context(
+        self,
+        *,
+        schools: list[dict[str, Any]],
+        calendar: list[dict[str, Any]],
+        timetable: list[dict[str, Any]],
+    ) -> dict[str, int]:
+        self.refresh()
+        school_models = [SchoolProfile.model_validate(item) for item in schools]
+        calendar_models = [SchoolCalendarEvent.model_validate(item) for item in calendar]
+        timetable_models = [SchoolTimetableSlot.model_validate(item) for item in timetable]
+
+        school_codes = {item.school_code for item in school_models}
+        event_ids = {item.id for item in calendar_models}
+        timetable_ids = {item.id for item in timetable_models}
+
+        self.db.schools = [item for item in self.db.schools if item.school_code not in school_codes] + school_models
+        self.db.school_calendar_events = [item for item in self.db.school_calendar_events if item.id not in event_ids] + calendar_models
+        self.db.school_timetable_slots = [item for item in self.db.school_timetable_slots if item.id not in timetable_ids] + timetable_models
+        self.persist()
+        return {"schools": len(school_models), "calendar": len(calendar_models), "timetable": len(timetable_models)}
+
     def patch_memory_card(self, student_id: str, patch: dict[str, Any]) -> MemoryCard | None:
         for index, card in enumerate(self.db.memory_cards):
             if card.student_id == student_id and card.status == "active":
@@ -293,6 +504,13 @@ class DemoStore:
     def list_published_missions_for_student(self, student_id: str) -> list[MissionContent]:
         self.refresh()
         return [content for content in self.db.mission_contents if content.student_id == student_id and content.status == "published"]
+
+    def save_generated_mission_content(self, mission: MissionContent) -> MissionContent:
+        self.refresh()
+        self.db.mission_contents = [content for content in self.db.mission_contents if content.id != mission.id]
+        self.db.mission_contents.append(mission)
+        self.persist()
+        return mission
 
     def get_published_mission_for_student(self, student_id: str, content_id: str) -> MissionContent | None:
         self.refresh()
@@ -389,6 +607,95 @@ class DemoStore:
         self.persist()
         return {"saved": True}
 
+    def save_student_activity_event(
+        self,
+        student_id: str,
+        content_id: str,
+        attempt_id: str | None,
+        stage_id: str | None,
+        event_type: str,
+        payload_json: dict[str, Any],
+    ) -> ActivityEvent | None:
+        self.refresh()
+        mission = self.get_published_mission_for_student(student_id, content_id)
+        if mission is None:
+            return None
+        if attempt_id is not None:
+            attempt = self.get_attempt(attempt_id)
+            if attempt is None or attempt.student_id != student_id or attempt.mission_content_id != content_id:
+                return None
+        if stage_id is not None and not any(stage.id == stage_id for stage in mission.stages):
+            return None
+        event = ActivityEvent(
+            id=f"event_{uuid4()}",
+            attemptId=attempt_id,
+            studentId=student_id,
+            stageId=stage_id,
+            eventType=event_type,
+            payloadJson=payload_json,
+            occurredAt=_now(),
+        )
+        self.db.activity_events.append(event)
+        self.persist()
+        return event
+
+    def save_realtime_event(self, student_id: str, session_id: str, event_type: str, payload_json: dict[str, Any]) -> ActivityEvent | None:
+        self.refresh()
+        session = next((candidate for candidate in self.db.realtime_sessions if candidate.id == session_id and candidate.student_id == student_id), None)
+        if session is None:
+            return None
+        event = ActivityEvent(
+            id=f"event_{uuid4()}",
+            attemptId=session.attempt_id,
+            studentId=student_id,
+            stageId=session.stage_id,
+            eventType=event_type,
+            payloadJson={"realtimeSessionId": session.id, **payload_json},
+            occurredAt=_now(),
+        )
+        self.db.activity_events.append(event)
+        self.persist()
+        return event
+
+    def complete_realtime_session(
+        self,
+        student_id: str,
+        session_id: str,
+        turn_count: int,
+        duration_sec: int,
+        rubric_result: dict[str, Any],
+        transcript_summary: str | None,
+    ) -> RealtimePracticeSession | None:
+        self.refresh()
+        for index, session in enumerate(self.db.realtime_sessions):
+            if session.id != session_id or session.student_id != student_id:
+                continue
+            updated = session.model_copy(
+                update={
+                    "status": "completed",
+                    "ended_at": _now(),
+                    "turn_count": turn_count,
+                    "duration_sec": duration_sec,
+                    "rubric_result_json": rubric_result,
+                    "transcript_summary": transcript_summary,
+                }
+            )
+            self.db.realtime_sessions[index] = updated
+            self.db.activity_events.append(
+                ActivityEvent(
+                    id=f"event_{uuid4()}",
+                    attemptId=updated.attempt_id,
+                    studentId=student_id,
+                    stageId=updated.stage_id,
+                    eventType="realtime_session_completed",
+                    payloadJson={"realtimeSessionId": updated.id, "turnCount": turn_count, "durationSec": duration_sec},
+                    occurredAt=_now(),
+                )
+            )
+            self.persist()
+            return updated
+        return None
+
     def complete_attempt(self, student_id: str, content_id: str, attempt_id: str) -> ContentAttempt | None:
         self.refresh()
         attempt = self.get_attempt(attempt_id)
@@ -442,3 +749,20 @@ def _evaluate_answer(template_json: dict[str, Any], answer: dict[str, Any]) -> d
         "isCorrect": is_correct,
         "feedback": correct_feedback if is_correct else wrong_feedback,
     }
+
+
+def _build_review_summary_text(
+    completion_rate: float,
+    accuracy_rate: float,
+    wrong_count: int,
+    reflection: dict[str, Any] | None,
+    realtime_session: RealtimePracticeSession | None,
+) -> str:
+    parts = [f"완료율 {completion_rate:.0%}, 정답률 {accuracy_rate:.0%}"]
+    if wrong_count:
+        parts.append(f"오답 {wrong_count}개")
+    if reflection and reflection.get("reflectionChoice"):
+        parts.append(f"회고: {reflection['reflectionChoice']}")
+    if realtime_session and realtime_session.transcript_summary:
+        parts.append(f"실시간 연습: {realtime_session.transcript_summary}")
+    return " / ".join(parts)
