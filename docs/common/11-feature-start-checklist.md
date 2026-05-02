@@ -30,22 +30,28 @@ content-generation
 orchestrator-memory
 public-data
 seed-auth
+seeded-domain-read
+school-public-context
+teacher-case-read
 docs-agent-harness
 ```
 
 첫 구현은 가능하면 아래 순서를 추천한다.
 
 ```text
-1. seed-auth
-2. teacher-dashboard
-3. student-mission
-4. content-generation
-5. realtime-practice
-6. orchestrator-memory
-7. public-data
+1. seeded-domain-read
+2. school-public-context
+3. teacher-case-read
+4. student-mission
+5. content-generation
+6. realtime-practice
+7. orchestrator-memory
+8. public-data
 ```
 
-이 순서는 데모를 빨리 보이게 하기 위한 추천일 뿐이다. 회의에서 화면 우선으로 가기로 하면 `teacher-dashboard`나 `student-mission`부터 시작해도 된다.
+이 순서는 데모를 빨리 보이게 하기 위한 추천이다.
+회원가입/일반 로그인은 먼저 만들지 않고, seed된 사용자/학생/학교 데이터를 조회하는 것부터 맞춘다.
+회의에서 화면 우선으로 가기로 하면 `teacher-dashboard`부터 시작해도 되지만, 그래도 [12-schema-contract.md](12-schema-contract.md)의 도메인 read model을 먼저 확인한다.
 
 ## 3. 작업 전 문서 체크
 
@@ -56,7 +62,7 @@ docs-agent-harness
 | [ ] | [00-agent-navigation.md](00-agent-navigation.md) | 작업 주제별로 볼 문서가 맞는가 |
 | [ ] | [01-collaboration-contract.md](01-collaboration-contract.md) | 수정 영역과 계약 변경 순서가 맞는가 |
 | [ ] | [02-branch-handoff-contract.md](02-branch-handoff-contract.md) | 상대 파트 승인 필요 여부가 정해졌는가 |
-| [ ] | [12-schema-contract.md](12-schema-contract.md) | 프론트/백엔드 공통 field와 enum이 맞는가 |
+| [ ] | [12-schema-contract.md](12-schema-contract.md) | 도메인 read model, 단계 기능, field, enum이 맞는가 |
 | [ ] | [08-rest-api-spec.md](08-rest-api-spec.md) | API path/request/response가 있는가 |
 | [ ] | [10-pr-feature-review-contract.md](10-pr-feature-review-contract.md) | PR 기능 단위와 템플릿이 정해졌는가 |
 
@@ -71,6 +77,8 @@ docs-agent-harness
 API path
 request/response field
 enum/status
+Organization/User/Student/School read model
+PublicContextBundle
 MissionContent JSON
 ContentStage template type
 image asset role

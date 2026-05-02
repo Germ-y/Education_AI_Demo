@@ -8,11 +8,12 @@
 
 ```text
 1. 선생님/학생/센터 데이터 seed 적재
-2. seed 계정 로그인
-3. 교사 대시보드에서 학생 케이스 확인
-4. AI 콘텐츠 생성/검토/승인
-5. 학생 플레이와 4단계 realtime 연습
-6. 시간이 남으면 회원가입/아이등록 확장
+2. 학생별 학교 코드와 공공데이터 snapshot 연결
+3. seed 사용자/학생/학교 조회 API
+4. 교사 대시보드에서 학생 케이스 확인
+5. 학생 미션 조회와 1~4단계 플레이
+6. AI 콘텐츠 생성/검토/승인
+7. 시간이 남으면 회원가입/아이등록 확장
 ```
 
 이유:
@@ -51,7 +52,30 @@ python -m app.data.seed_demo
 python -m app.data.seed_public_data
 ```
 
-### 2.2 Production Mode
+### 2.2 MVP Auth Policy
+
+MVP에서는 회원가입/일반 로그인 UI를 만들지 않는다.
+사용자와 학생 정보는 seed로 미리 넣고, 화면은 조회성 API로 연결한다.
+
+허용:
+
+```text
+seed된 데모 교사 식별
+seed된 학생 access code
+GET /api/context/me 같은 현재 데모 사용자 조회
+```
+
+보류:
+
+```text
+교사 회원가입
+비밀번호 로그인
+로그아웃 UI
+아이 직접 등록
+보호자 가입/로그인
+```
+
+### 2.3 Production Mode
 
 동작:
 
@@ -161,18 +185,21 @@ idempotency 규칙:
 실제 학생 데이터를 seed 파일에 넣지 않는다.
 ```
 
-## 5. 초기 Auth API
+## 5. 초기 조회 API
 
-MVP 필수:
+MVP 필수는 가입/로그인이 아니라 seed 데이터 조회다.
 
 ```http
-POST /api/auth/login
-POST /api/auth/logout
-GET  /api/auth/me
+GET  /api/context/me
+GET  /api/teacher/students
+GET  /api/teacher/students/:studentId
+GET  /api/public-data/schools/:schoolId/context
 POST /api/auth/demo-login
+POST /api/auth/student-access
 ```
 
-`demo-login`은 데모 환경에서만 활성화한다.
+`demo-login`과 `student-access`는 데모 환경에서만 활성화한다.
+실제 회원가입/비밀번호 로그인은 공모전 MVP 이후 확장한다.
 
 응답 예:
 

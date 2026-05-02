@@ -46,7 +46,27 @@ AI provider key: 서버에만 보관
 Realtime client secret: 짧은 TTL로 발급
 ```
 
-## 2. Auth APIs
+## 2. Context And Demo Auth APIs
+
+MVP에서는 회원가입/일반 로그인보다 seed된 사용자/학생/학교 데이터를 조회하는 것이 먼저다.
+`demo-login`과 `student-access`는 개발/공모전 데모용이다.
+
+### GET /api/context/me
+
+현재 데모 사용자와 조직 정보를 조회한다.
+
+```json
+{
+  "data": {
+    "user": "UserProfile",
+    "organization": "Organization",
+    "mode": "demo_seed"
+  },
+  "meta": {
+    "requestId": "req_001"
+  }
+}
+```
 
 ### POST /api/auth/demo-login
 
@@ -446,6 +466,25 @@ sync job 상태 조회.
 ### GET /api/public-data/schools/:schoolId/calendar
 
 학사일정 조회.
+
+### GET /api/public-data/schools/:schoolId/context
+
+학생/교사 화면에서 바로 쓰는 학교 맥락 요약.
+
+응답:
+
+```json
+{
+  "school": "SchoolProfile",
+  "calendar": ["SchoolCalendarItem"],
+  "timetableSummary": {
+    "todaySubjects": ["수학", "국어", "영어"],
+    "source": "NEIS_TIMETABLE"
+  },
+  "educationStats": ["EducationStat"],
+  "lastSyncedAt": "2026-05-02T00:00:00.000Z"
+}
+```
 
 ### GET /api/public-data/schools/:schoolId/timetable
 

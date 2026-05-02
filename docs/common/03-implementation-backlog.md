@@ -20,12 +20,22 @@
 - [x] 기능 단위 PR 검수 계약 추가
 - [x] 기능 시작 체크리스트 추가
 - [x] 프론트/백엔드 공통 스키마 계약 추가
+- [x] MVP를 회원가입보다 seed 도메인 조회 우선으로 정리
 - [ ] AI provider 연동
 - [ ] 학생 플레이 런타임 구현
 
 ## 협업 기준
 
 프론트와 백엔드가 함께 바뀌는 작업은 먼저 [11-feature-start-checklist.md](11-feature-start-checklist.md), [01-collaboration-contract.md](01-collaboration-contract.md), [02-branch-handoff-contract.md](02-branch-handoff-contract.md), [10-pr-feature-review-contract.md](10-pr-feature-review-contract.md)를 따른다.
+
+첫 기능 분담은 가입/로그인이 아니라 아래 조회성 도메인 순서로 잡는다.
+
+```text
+1. seeded-domain-read
+2. school-public-context
+3. teacher-case-read
+4. student-mission
+```
 
 계약 변경 순서:
 

@@ -1,11 +1,263 @@
-# 단계별 기능 및 스키마 계약
+# 도메인 온보딩 및 단계별 스키마 계약
 
 이 문서는 프론트/백엔드가 기능을 시작하기 전에 먼저 맞춰야 하는 공통 계약이다.
-REST API endpoint를 먼저 외우는 문서가 아니라, 학생 미션 1~4단계가 각각 어떤 기능을 가져야 하는지 온보딩하면서 합의하기 위한 기준이다.
+REST API endpoint를 먼저 외우는 문서가 아니라, 전체 도메인과 학생 미션 단계가 각각 어떤 기능을 가져야 하는지 온보딩하면서 합의하기 위한 기준이다.
 
 endpoint 상세는 [08-rest-api-spec.md](08-rest-api-spec.md)를 보되, field와 단계 의미는 이 문서를 우선 기준으로 한다.
 
-## 1. 먼저 고정할 제품 규칙
+## 1. 먼저 고정할 MVP 범위
+
+이번 공모전 MVP는 회원가입/일반 로그인부터 만들지 않는다.
+
+우선순위는 아래다.
+
+```text
+1. seed로 센터/사용자/학생/학교/사례/공공데이터 snapshot을 미리 넣는다.
+2. 프론트는 seed된 사용자/학생/학교 정보를 조회한다.
+3. 교사 대시보드는 학생 케이스 파일과 공공데이터 기반 학교 맥락을 보여준다.
+4. 학생 미션은 published 콘텐츠를 조회해 1~4단계로 플레이한다.
+5. AI 생성/승인/realtime은 조회성 도메인 계약이 맞은 뒤 붙인다.
+```
+
+즉, 지금 먼저 맞출 것은 `가입 플로우`가 아니라 `조회 가능한 도메인 read model`이다.
+
+MVP에서 하지 않는 것:
+
+```text
+교사 회원가입
+비밀번호 로그인
+아이 직접 등록
+보호자 가입
+프로덕션 권한/초대 플로우
+```
+
+MVP에서 하는 것:
+
+```text
+seed 사용자 정보 조회
+seed 학생 정보 조회
+학생별 학교 연결 정보 조회
+공공데이터 snapshot 기반 학교/일정/통계 맥락 조회
+학생 케이스 파일 조회
+학생별 미션 조회
+```
+
+## 2. 도메인 온보딩 단계
+
+팀원이 처음 기능을 나눌 때는 아래 순서로 스키마를 고정한다.
+
+| 순서 | 기능 단위 | 목표 | 먼저 합의할 스키마 |
+| --- | --- | --- | --- |
+| 1 | `seeded-domain-read` | 센터/사용자/학생/학교 데이터가 화면에 조회되는지 확인 | Organization, UserProfile, StudentProfile, SchoolProfile |
+| 2 | `school-public-context` | 학생과 학교/공공데이터 맥락을 연결 | PublicContextBundle, SchoolCalendarItem, EducationStat |
+| 3 | `teacher-case-read` | 교사 대시보드에서 학생 케이스 파일 조회 | StudentListItem, StudentCaseFile, MemoryCard |
+| 4 | `student-mission-read` | 학생이 published 미션을 조회 | StudentMissionSummary, MissionContent |
+| 5 | `student-mission-runtime` | 1~3단계 제출과 회고 저장 | ContentAttempt, StageSubmit, Reflection |
+| 6 | `content-review` | 교사가 AI 생성 콘텐츠를 검토/승인 | ReviewableContent, ApprovalRequest |
+| 7 | `realtime-practice` | 4단계 realtime session 생성 | RealtimePracticeSpec, RealtimeSession |
+| 8 | `ai-generation` | 오케스트레이터/이미지 생성/AgentRun 기록 | AgentRun, ImageAssetJob, ContentBrief |
+
+처음 구현은 1~3번만으로도 프론트/백엔드 계약을 충분히 맞출 수 있어야 한다.
+
+## 3. 공통 도메인 read model
+
+### 3.1 Organization
+
+센터와 학교를 모두 조직으로 볼 수 있다.
+MVP에서는 센터 조직 1개와 학생이 속한 학교 정보를 seed 또는 public data snapshot으로 넣는다.
+
+```json
+{
+  "id": "org_yj_center",
+  "externalKey": "demo_org_yeongju_center",
+  "name": "영주 기초학력거점지원센터",
+  "type": "learning_support_center",
+  "regionCode": "47210"
+}
+```
+
+### 3.2 UserProfile
+
+회원가입 없이 seed로 미리 들어가는 교사/센터 사용자 정보다.
+프론트는 이 정보를 로그인 폼 구현보다 먼저 `현재 데모 사용자`로 다룬다.
+
+```json
+{
+  "id": "user_teacher_demo",
+  "organizationId": "org_yj_center",
+  "email": "teacher.demo@eduyj.local",
+  "displayName": "데모 선생님",
+  "role": "teacher",
+  "status": "active"
+}
+```
+
+### 3.3 StudentProfile
+
+학생은 회원가입 대상이 아니라 센터/교사가 관리하는 케이스 대상이다.
+학교 연결은 `schoolCode`로 한다.
+
+```json
+{
+  "id": "student_learning_fraction",
+  "organizationId": "org_yj_center",
+  "externalKey": "demo-learning-001",
+  "displayName": "수민",
+  "grade": "middle_2",
+  "schoolCode": "school_demo_001",
+  "studentType": "learning_focus",
+  "primaryNeed": "분수의 전체-부분 관계 이해",
+  "profileJson": {
+    "interests": ["음식", "탐험"],
+    "readingLoad": "low",
+    "choiceCountLimit": 3
+  },
+  "status": "active"
+}
+```
+
+### 3.4 SchoolProfile
+
+학교 정보는 학생의 학교 맥락을 만들기 위한 조회 모델이다.
+NEIS/학교알리미를 붙이기 전에는 seed snapshot으로 시작한다.
+
+```json
+{
+  "id": "school_demo_001",
+  "schoolCode": "school_demo_001",
+  "officeCode": "R10",
+  "name": "영주 데모중학교",
+  "schoolLevel": "middle",
+  "regionCode": "47210",
+  "address": "경상북도 영주시",
+  "source": "seed_snapshot"
+}
+```
+
+### 3.5 PublicContextBundle
+
+학생 상세 화면이나 오케스트레이터 입력에서 쓰는 공공데이터 요약이다.
+원본 공공데이터 전체를 프론트에 그대로 넘기지 않고, 화면과 추천에 필요한 요약만 내려준다.
+
+```json
+{
+  "studentId": "student_learning_fraction",
+  "school": "SchoolProfile",
+  "calendar": [
+    {
+      "date": "2026-05-06",
+      "title": "중간고사",
+      "source": "NEIS_SCHOOL_SCHEDULE"
+    }
+  ],
+  "timetableSummary": {
+    "todaySubjects": ["수학", "국어", "영어"],
+    "source": "NEIS_TIMETABLE"
+  },
+  "educationStats": [
+    {
+      "label": "다문화 학생 수 변화",
+      "value": "2025년 기준 증가 추세",
+      "source": "KESS"
+    }
+  ],
+  "lastSyncedAt": "2026-05-02T00:00:00.000Z"
+}
+```
+
+## 4. 교사 대시보드 read model
+
+### 4.1 StudentListItem
+
+학생 목록은 단순 이름 목록이 아니라 케이스 상태 요약이어야 한다.
+
+```json
+{
+  "studentId": "student_learning_fraction",
+  "displayName": "수민",
+  "grade": "middle_2",
+  "schoolName": "영주 데모중학교",
+  "studentType": "learning_focus",
+  "primaryNeed": "분수의 전체-부분 관계 이해",
+  "caseStatus": "open",
+  "latestContentStatus": "published",
+  "nextSessionSuggestion": "분모/분자 위치를 짧게 재확인"
+}
+```
+
+### 4.2 StudentCaseFile
+
+교사 상세 화면의 기준 read model이다.
+
+```json
+{
+  "profile": "StudentProfile",
+  "schoolContext": "PublicContextBundle",
+  "openCase": {
+    "id": "case_learning_fraction",
+    "studentId": "student_learning_fraction",
+    "ownerTeacherId": "user_teacher_demo",
+    "caseStatus": "open",
+    "currentGoal": "분수의 전체-부분 관계 이해",
+    "openedAt": "2026-05-02T00:00:00.000Z"
+  },
+  "memoryCard": "MemoryCard",
+  "weeklyRecords": ["CaseNote"],
+  "monthlySummary": "MonthlySummary",
+  "recentContents": ["MissionContent"],
+  "plannerItems": ["PlannerItem"]
+}
+```
+
+### 4.3 MemoryCard
+
+```json
+{
+  "id": "memory_learning_fraction_v1",
+  "studentId": "student_learning_fraction",
+  "caseId": "case_learning_fraction",
+  "version": 1,
+  "learningProblemTypes": ["개념 미이해", "분모/분자 혼동"],
+  "recent4wResponseJson": {
+    "summary": "시각 자료에는 잘 반응하지만 문장제 조건을 놓침"
+  },
+  "emotionalStateNote": "틀리면 금방 자신감이 낮아짐",
+  "effectiveExplanationStyles": ["visual_example", "short_steps"],
+  "frequentBlockingUnits": ["분수", "문장제"],
+  "guardianCooperationStatus": "보통",
+  "nextSessionCautions": ["첫 문제는 쉬운 성공 경험으로 시작"],
+  "teacherVerifiedAt": null,
+  "status": "active"
+}
+```
+
+## 5. 조회성 API 우선순위
+
+프론트/백엔드가 먼저 맞출 API는 아래다.
+
+```text
+GET /api/context/me
+GET /api/teacher/students
+GET /api/teacher/students/:studentId
+GET /api/public-data/schools/:schoolId/context
+GET /api/student/missions/today
+GET /api/student/missions/:contentId
+```
+
+`/api/context/me`는 실제 로그인 구현이 아니라 데모 seed 사용자를 확인하는 조회성 endpoint다.
+초기에는 `DEMO_TEACHER_EMAIL` 또는 demo token 기준으로 현재 사용자/조직을 반환하면 된다.
+
+예시:
+
+```json
+{
+  "user": "UserProfile",
+  "organization": "Organization",
+  "mode": "demo_seed"
+}
+```
+
+## 6. 학생 미션 제품 규칙
 
 - 학생 미션은 화면 기준 4단계다.
 - 회고는 5단계가 아니라 4단계 이후 후속 활동이다.
@@ -17,7 +269,7 @@ endpoint 상세는 [08-rest-api-spec.md](08-rest-api-spec.md)를 보되, field�
 - 질문, 선택지, 피드백은 이미지 안 텍스트가 아니라 UI 텍스트로 보여준다.
 - OpenAI key, realtime provider secret, prompt 원문은 프론트로 내려보내지 않는다.
 
-## 2. 두 가지 콘텐츠 트랙
+## 7. 두 가지 콘텐츠 트랙
 
 학생 유형에 따라 같은 4단계 구조를 다른 화면 이름과 기능으로 사용한다.
 
@@ -29,9 +281,9 @@ endpoint 상세는 [08-rest-api-spec.md](08-rest-api-spec.md)를 보되, field�
 프론트는 두 트랙을 완전히 다른 앱처럼 만들지 않는다.
 같은 stage shell을 쓰되 `stageRole`, `templateType`, `studentTitle`, `templateJson`으로 화면을 다르게 렌더링한다.
 
-## 3. 4단계 기능 정의
+## 8. 4단계 기능 정의
 
-### 3.1 생활지원형
+### 8.1 생활지원형
 
 | step | 학생 화면 이름 | stageRole | 기능 목표 | 결과 데이터 |
 | --- | --- | --- | --- | --- |
@@ -40,7 +292,7 @@ endpoint 상세는 [08-rest-api-spec.md](08-rest-api-spec.md)를 보되, field�
 | 3 | 행동 고르기 | `action_selection` | 지금 해야 할 행동이나 순서를 선택 | 정답 여부, 다음 행동 이해 |
 | 4 | 한 번 해보기 | `realtime_practice` | AI 역할과 실제 상황을 짧게 연습 | realtime session, 루브릭 요약 |
 
-### 3.2 학습집중형
+### 8.2 학습집중형
 
 | step | 학생 화면 이름 | stageRole | 기능 목표 | 결과 데이터 |
 | --- | --- | --- | --- | --- |
@@ -49,9 +301,9 @@ endpoint 상세는 [08-rest-api-spec.md](08-rest-api-spec.md)를 보되, field�
 | 3 | 문제 2 | `applied_problem` | 헷갈리는 답, 응용 상황, 빈칸 등으로 한 번 더 적용 | 오답 패턴, 교정 포인트 |
 | 4 | AI에게 말해보기 | `realtime_practice` | 상황 이미지와 AI 질문을 보고 말/텍스트로 설명 | realtime session, 루브릭 요약 |
 
-## 4. 단계별 기능 요구사항
+## 9. 단계별 기능 요구사항
 
-### 4.1 Step 1: 상황/개념 열기
+### 9.1 Step 1: 상황/개념 열기
 
 프론트 기능:
 
@@ -75,7 +327,7 @@ life_support: scenario_intro
 learning_focus: concept_intro
 ```
 
-### 4.2 Step 2: 핵심 확인
+### 9.2 Step 2: 핵심 확인
 
 프론트 기능:
 
@@ -100,7 +352,7 @@ life_support: scene_observation, highlight_clue, card_match
 learning_focus: scene_question, clue_question, blank_fill, partition_picker
 ```
 
-### 4.3 Step 3: 적용/결정
+### 9.3 Step 3: 적용/결정
 
 프론트 기능:
 
@@ -125,7 +377,7 @@ life_support: action_choice, sequence_ordering, decision_card
 learning_focus: applied_question, mini_simulation, card_match, sequence_ordering, explanation_choice, wrong_explanation_fix
 ```
 
-### 4.4 Step 4: realtime 연습
+### 9.4 Step 4: realtime 연습
 
 프론트 기능:
 
@@ -162,7 +414,7 @@ student has access
 attempt exists
 ```
 
-## 5. 회고는 stage가 아니다
+## 10. 회고는 stage가 아니다
 
 회고는 `post_practice_reflection` 이벤트다.
 프론트에서는 4단계 완료 후 별도 하단 카드나 완료 화면으로 보여준다.
@@ -177,7 +429,7 @@ attempt exists
 }
 ```
 
-## 6. MissionContent 최소 스키마
+## 11. MissionContent 최소 스키마
 
 ```json
 {
@@ -208,7 +460,7 @@ stages step list === [1, 2, 3, 4]
 assets has hero, stage_1, stage_2, stage_3, stage_4_realtime
 ```
 
-## 7. ContentStage 최소 스키마
+## 12. ContentStage 최소 스키마
 
 ```json
 {
@@ -232,7 +484,7 @@ assets has hero, stage_1, stage_2, stage_3, stage_4_realtime
 - `step === 4`이면 `realtimeSpec`이 null이면 안 된다.
 - `step !== 4`이면 `realtimeSpec`은 null이다.
 
-## 8. ContentAsset 최소 스키마
+## 13. ContentAsset 최소 스키마
 
 ```json
 {
@@ -261,7 +513,7 @@ stage_3
 stage_4_realtime
 ```
 
-## 9. RealtimePracticeSpec 최소 스키마
+## 14. RealtimePracticeSpec 최소 스키마
 
 ```json
 {
@@ -310,7 +562,7 @@ system prompt
 학생 진단 라벨
 ```
 
-## 10. 공통 enum
+## 15. 공통 enum
 
 ### contentType
 
@@ -366,7 +618,7 @@ realtime_roleplay
 realtime_teach_back
 ```
 
-## 11. API envelope
+## 16. API envelope
 
 성공:
 
@@ -393,7 +645,7 @@ realtime_teach_back
 
 프론트는 오류 처리 시 `error.code`를 우선 분기 기준으로 사용한다.
 
-## 12. 프론트 agent가 먼저 확인할 질문
+## 17. 프론트 agent가 먼저 확인할 질문
 
 프론트 agent는 API 연결 전에 아래를 먼저 확인한다.
 

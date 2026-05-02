@@ -17,13 +17,16 @@ PR 설명에는 아래 중 하나 이상의 기능 단위를 표시한다.
 
 | 기능 단위 | 범위 | 주로 보는 문서 |
 | --- | --- | --- |
+| `seeded-domain-read` | seed된 센터/사용자/학생/학교 기본 정보 조회 | [11-feature-start-checklist.md](11-feature-start-checklist.md), [12-schema-contract.md](12-schema-contract.md) |
+| `school-public-context` | 학생 학교 연결, 공공데이터 snapshot, 학교 맥락 조회 | [12-schema-contract.md](12-schema-contract.md), [09-public-data-strategy.md](09-public-data-strategy.md) |
+| `teacher-case-read` | 학생 케이스 파일, 메모리 카드, 주차/월별 기록 조회 | [12-schema-contract.md](12-schema-contract.md), [../backend/06-database-schema-spec.md](../backend/06-database-schema-spec.md) |
 | `teacher-dashboard` | 교사 대시보드, 학생 목록, 학생 메모리 카드 | [../frontend/00-frontend-team-guide.md](../frontend/00-frontend-team-guide.md), [08-rest-api-spec.md](08-rest-api-spec.md) |
 | `student-mission` | 학생 오늘 미션, 1~3단계 정적 플레이 | [04-child-content-experience.md](04-child-content-experience.md), [05-ai-content-template-spec.md](05-ai-content-template-spec.md) |
 | `realtime-practice` | 4단계 realtime session, 피드백, 종료 결과 | [06-realtime-practice-spec.md](06-realtime-practice-spec.md), [08-rest-api-spec.md](08-rest-api-spec.md) |
 | `content-generation` | MissionContent 생성, 이미지 패키지, 교사 승인 | [05-ai-content-template-spec.md](05-ai-content-template-spec.md), [07-image-content-package-spec.md](07-image-content-package-spec.md) |
 | `orchestrator-memory` | 오케스트레이터, 메모리 카드, AgentRun | [../backend/01-orchestrator-memory.md](../backend/01-orchestrator-memory.md), [../backend/02-ai-backend-system-design.md](../backend/02-ai-backend-system-design.md) |
 | `public-data` | 공공데이터 source, sync, snapshot | [09-public-data-strategy.md](09-public-data-strategy.md), [../backend/05-data-api-requirements.md](../backend/05-data-api-requirements.md) |
-| `seed-auth` | 데모 계정, 학생 access code, 아이등록 확장 | [../backend/04-demo-seed-auth-registration-plan.md](../backend/04-demo-seed-auth-registration-plan.md), [08-rest-api-spec.md](08-rest-api-spec.md) |
+| `seed-auth` | seed 사용자 식별, 학생 access code, 데모 세션. 일반 회원가입은 제외 | [../backend/04-demo-seed-auth-registration-plan.md](../backend/04-demo-seed-auth-registration-plan.md), [08-rest-api-spec.md](08-rest-api-spec.md) |
 | `docs-agent-harness` | AGENTS, skills, 문서 구조, 작업 규칙 | [00-agent-navigation.md](00-agent-navigation.md), [01-collaboration-contract.md](01-collaboration-contract.md) |
 
 ## 3. PR 제목 기준
@@ -32,6 +35,7 @@ PR 제목은 기능 단위가 보이게 쓴다.
 
 ```text
 [backend][student-mission] 학생 오늘 미션 조회 API 추가
+[backend][seeded-domain-read] seed 도메인 조회 API 추가
 [frontend][teacher-dashboard] 학생 메모리 카드 화면 연결
 [common][content-generation] 콘텐츠 템플릿 계약 갱신
 [dev][realtime-practice] 4단계 realtime 통합 검증
