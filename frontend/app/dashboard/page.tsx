@@ -312,7 +312,7 @@ function mapContentToReviewStages(content: MissionContent): ReviewStageDraft[] {
 function StatusBadge({ supportCase }: { supportCase: SupportCase }) {
   return (
     <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusTone[supportCase.status]}`}>
-      {learningStatus[supportCase.status].label}
+      {supportCase.statusLabel}
     </span>
   );
 }
