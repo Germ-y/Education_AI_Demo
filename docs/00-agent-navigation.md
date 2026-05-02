@@ -18,7 +18,7 @@
 | AI 백엔드 전체 구조 | [03-ai-backend-system-design.md](03-ai-backend-system-design.md) | [11-database-schema-spec.md](11-database-schema-spec.md), [12-rest-api-spec.md](12-rest-api-spec.md) |
 | 템플릿/콘텐츠 JSON | [04-ai-content-template-spec.md](04-ai-content-template-spec.md) | [09-image-content-package-spec.md](09-image-content-package-spec.md) |
 | 4단계 realtime | [07-realtime-practice-spec.md](07-realtime-practice-spec.md) | [12-rest-api-spec.md](12-rest-api-spec.md) |
-| 공공데이터 | [06-public-data-strategy.md](06-public-data-strategy.md) | [10-data-api-requirements.md](10-data-api-requirements.md) |
+| 공공데이터 | [15-neis-data-collection-plan.md](15-neis-data-collection-plan.md) | [06-public-data-strategy.md](06-public-data-strategy.md), [10-data-api-requirements.md](10-data-api-requirements.md) |
 | seed/auth/아이등록 | [08-demo-seed-auth-registration-plan.md](08-demo-seed-auth-registration-plan.md) | [11-database-schema-spec.md](11-database-schema-spec.md), [12-rest-api-spec.md](12-rest-api-spec.md) |
 | DB 모델 구현 | [11-database-schema-spec.md](11-database-schema-spec.md) | [05-backend-feature-spec.md](05-backend-feature-spec.md) |
 | REST API 구현 | [12-rest-api-spec.md](12-rest-api-spec.md) | [11-database-schema-spec.md](11-database-schema-spec.md) |

@@ -217,6 +217,7 @@ publicContextSummary
   "jobs": [
     { "type": "content_json", "status": "queued" },
     { "type": "image_package", "status": "queued" },
+    { "type": "tts_package", "status": "queued" },
     { "type": "auto_validation", "status": "queued" }
   ]
 }
@@ -241,6 +242,20 @@ AI 실행 상태/결과 조회.
   "assetRole": "stage_2",
   "reason": "강조 조각이 2개처럼 보임",
   "teacherInstruction": "한 조각만 더 명확히 빛나게 해주세요."
+}
+```
+
+### POST /api/contents/:contentId/request-tts-regeneration
+
+정적 콘텐츠 안내 음성을 재생성한다. 4단계 realtime에는 사용하지 않는다.
+
+```json
+{
+  "assetRole": "stage_2",
+  "stageId": "stage_002",
+  "sourceText": "전체 조각 수와 고른 조각 수를 차례대로 세어보세요.",
+  "reason": "문장이 너무 빠르게 들림",
+  "teacherInstruction": "더 천천히 또박또박 읽어주세요."
 }
 ```
 
@@ -420,6 +435,70 @@ ReviewAgent 실행 요청.
 
 등록된 source 목록.
 
+### GET /api/public-data/schools
+
+seed snapshot 또는 동기화된 학교 목록을 조회한다.
+
+```json
+{
+  "data": [
+    {
+      "schoolCode": "8811058",
+      "schoolName": "영주중학교",
+      "schoolKind": "중학교",
+      "officeCode": "R10",
+      "roadAddress": "경상북도 영주시 남간로 29"
+    }
+  ]
+}
+```
+
+### GET /api/public-data/schools/:schoolCode/context
+
+학교 기본정보, 학사일정, 시간표 snapshot을 한 번에 조회한다.
+
+Query:
+
+```text
+fromDate=2026-05-01
+toDate=2026-05-15
+timetableDate=2026-05-01
+grade=2
+className=1
+```
+
+응답:
+
+```json
+{
+  "school": {
+    "schoolCode": "8811058",
+    "schoolName": "영주중학교"
+  },
+  "calendar": [
+    {
+      "eventDate": "2026-05-01",
+      "eventName": "노동절",
+      "scheduleType": "공휴일",
+      "appliesToGrades": ["1", "2", "3"]
+    }
+  ],
+  "timetableSummary": [
+    {
+      "timetableDate": "2026-05-01",
+      "grade": "2",
+      "className": "1",
+      "period": 1,
+      "subjectName": "역사"
+    }
+  ],
+  "source": {
+    "sourceCode": "neis_open_api",
+    "mode": "seed_snapshot"
+  }
+}
+```
+
 ### POST /api/public-data/sources/:sourceCode/sync
 
 ```json
@@ -434,18 +513,6 @@ ReviewAgent 실행 요청.
 ### GET /api/public-data/sync-jobs/:jobId
 
 sync job 상태 조회.
-
-### GET /api/public-data/schools/search
-
-학교 검색.
-
-### GET /api/public-data/schools/:schoolId/calendar
-
-학사일정 조회.
-
-### GET /api/public-data/schools/:schoolId/timetable
-
-시간표 조회.
 
 ### GET /api/public-data/curriculum-standards
 

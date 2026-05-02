@@ -117,8 +117,8 @@ DB reset 후 schema 생성
 작업:
 
 - 영주 기초학력거점지원센터 seed
-- 데모 교사/리뷰어/admin seed
-- 학생 2명 seed: `learning_focus`, `life_support`
+- 데모 교사 1명 seed
+- 학생 3명 seed: 저연령 `learning_focus`, 고연령 `learning_focus`, `life_support`
 - 메모리 카드, 사례 메모, 주차/월별 기록 seed
 - 공공데이터 snapshot seed
 - 샘플 콘텐츠 2개 seed
@@ -187,8 +187,11 @@ student access code login 가능
 ```text
 학생 1명 기준으로 teacher_review 상태의 MissionContent가 생성된다.
 대표 이미지 + stage_1~stage_4_realtime asset record가 생성된다.
+hero + stage_1~stage_3에는 선택 TTS asset record를 붙일 수 있다.
 이미지 생성 실패 시 asset status와 job error가 남는다.
 ```
+
+ElevenLabs TTS는 4단계 realtime이 아니라 정적 콘텐츠 안내 음성 사전 생성에만 사용한다.
 
 ## Milestone 7. gpt-image-2 Asset Pipeline
 

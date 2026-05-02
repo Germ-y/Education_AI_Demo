@@ -92,6 +92,7 @@ class ContentAsset(BaseModel):
     provider: str
     model: str
     prompt_json: dict[str, Any] | None = Field(default=None, alias="promptJson")
+    source_text: str | None = Field(default=None, alias="sourceText")
     storage_url: str = Field(alias="storageUrl")
     preview_url: str | None = Field(default=None, alias="previewUrl")
     qa_status: Literal["pending", "passed", "failed"] = Field(alias="qaStatus")

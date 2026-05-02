@@ -66,6 +66,7 @@ class DemoStore:
                 continue
             if q and q not in student.display_name and q not in student.primary_need:
                 continue
+            school = self.get_school(student.school_code)
             latest_content = next((content for content in self.db.mission_contents if content.student_id == student.id), None)
             planner = next(
                 (
@@ -80,6 +81,8 @@ class DemoStore:
                     "studentId": student.id,
                     "displayName": student.display_name,
                     "grade": student.grade,
+                    "schoolCode": student.school_code,
+                    "schoolName": school.school_name if school else None,
                     "studentType": student.student_type,
                     "primaryNeed": student.primary_need,
                     "latestContentStatus": latest_content.status if latest_content else "none",
@@ -97,8 +100,10 @@ class DemoStore:
         if student is None or open_case is None:
             return None
         memory_card = next((card for card in self.db.memory_cards if card.student_id == student_id and card.status == "active"), None)
+        school = self.get_school(student.school_code)
         return {
             "profile": student.model_dump(by_alias=True),
+            "school": school.model_dump(by_alias=True) if school else None,
             "openCase": open_case.model_dump(by_alias=True),
             "memoryCard": memory_card.model_dump(by_alias=True) if memory_card else None,
             "weeklyRecords": [
@@ -113,9 +118,51 @@ class DemoStore:
             "plannerItems": [item.model_dump(by_alias=True) for item in self.db.planner_items if item.student_id == student_id],
             "publicContextSummary": {
                 "schoolCode": student.school_code,
+                "schoolName": school.school_name if school else None,
+                "schoolKind": school.school_kind if school else None,
                 "sources": [source.source_code for source in self.db.public_data_sources],
             },
         }
+
+    def get_school(self, school_code: str | None):
+        if school_code is None:
+            return None
+        return next((school for school in self.db.schools if school.school_code == school_code), None)
+
+    def list_schools(self) -> list[dict]:
+        return [school.model_dump(by_alias=True) for school in self.db.schools]
+
+    def list_school_calendar_events(self, school_code: str, from_date: str | None = None, to_date: str | None = None) -> list[dict]:
+        events = []
+        for event in self.db.school_calendar_events:
+            if event.school_code != school_code:
+                continue
+            if from_date and event.event_date < from_date:
+                continue
+            if to_date and event.event_date > to_date:
+                continue
+            events.append(event.model_dump(by_alias=True))
+        return sorted(events, key=lambda item: item["eventDate"])
+
+    def list_school_timetable_slots(
+        self,
+        school_code: str,
+        timetable_date: str | None = None,
+        grade: str | None = None,
+        class_name: str | None = None,
+    ) -> list[dict]:
+        slots = []
+        for slot in self.db.school_timetable_slots:
+            if slot.school_code != school_code:
+                continue
+            if timetable_date and slot.timetable_date != timetable_date:
+                continue
+            if grade and slot.grade != grade:
+                continue
+            if class_name and slot.class_name != class_name:
+                continue
+            slots.append(slot.model_dump(by_alias=True))
+        return sorted(slots, key=lambda item: (item["timetableDate"], item["grade"], item["className"], item["period"]))
 
     def patch_memory_card(self, student_id: str, patch: dict[str, Any]) -> MemoryCard | None:
         for index, card in enumerate(self.db.memory_cards):
@@ -248,6 +295,8 @@ def _evaluate_answer(template_json: dict[str, Any], answer: dict[str, Any]) -> d
     expected = template_json.get("answer")
     if isinstance(expected, str):
         is_correct = answer.get("choiceId") == expected
+    elif isinstance(expected, dict):
+        is_correct = answer.get("matches") == expected
     elif isinstance(expected, list):
         is_correct = answer.get("order") == expected
     elif isinstance(template_json.get("acceptedAnswers"), list):

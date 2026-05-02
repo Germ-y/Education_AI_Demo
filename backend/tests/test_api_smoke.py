@@ -15,7 +15,21 @@ def test_teacher_and_student_demo_flows() -> None:
 
     students = client.get("/api/teacher/students", headers={"authorization": f"Bearer {teacher_token}"})
     assert students.status_code == 200
-    assert len(students.json()["data"]) == 2
+    assert len(students.json()["data"]) == 3
+    assert {student["schoolName"] for student in students.json()["data"]} == {"영주중앙초등학교", "영주중학교", "영주가흥초등학교"}
+
+    school_context = client.get("/api/public-data/schools/8811058/context", headers={"authorization": f"Bearer {teacher_token}"})
+    assert school_context.status_code == 200
+    assert school_context.json()["data"]["school"]["schoolName"] == "영주중학교"
+    assert school_context.json()["data"]["calendar"]
+
+    timetable_context = client.get(
+        "/api/public-data/schools/8811058/context?timetableDate=2026-05-01&grade=2&className=1",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert timetable_context.status_code == 200
+    timetable = timetable_context.json()["data"]["timetableSummary"]
+    assert [slot["subjectName"] for slot in timetable] == ["역사", "동아리활동", "진로와 직업", "국어", "과학", "도덕"]
 
     student_login = client.post("/api/auth/student-access", json={"accessCode": "STAR-001"})
     assert student_login.status_code == 200
