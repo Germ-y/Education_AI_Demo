@@ -35,6 +35,7 @@
 5. [../../AGENTS.md](../../AGENTS.md)
 
 API나 데이터가 헷갈리면 [../common/08-rest-api-spec.md](../common/08-rest-api-spec.md)를 기준으로 본다.
+다른 브랜치 변경을 받아야 하면 [../common/02-branch-handoff-contract.md](../common/02-branch-handoff-contract.md)의 검수/승인 절차를 먼저 따른다.
 
 ## 3. 프론트 폴더 구조
 
@@ -89,6 +90,7 @@ frontend/lib/demo-data.ts
 ## 6. 백엔드 변경 후 프론트가 확인할 것
 
 백엔드가 push한 뒤에는 [../common/02-branch-handoff-contract.md](../common/02-branch-handoff-contract.md)의 “백엔드가 push하면 프론트가 확인할 문서”를 먼저 본다.
+이 단계는 단순 참고가 아니라 프론트 작업자의 승인 게이트다. 아래 항목을 확인한 뒤 `승인 / 수정 요청 / 보류` 중 하나로 기록한다.
 
 특히 확인할 것:
 
@@ -99,6 +101,15 @@ status 값이 바뀌었는가
 MissionContent 단계 구조가 바뀌었는가
 이미지 asset role이 바뀌었는가
 학생 access code나 seed 데이터가 바뀌었는가
+```
+
+승인 기록 예시:
+
+```text
+검수자: 프론트 담당자 이름
+검수 범위: 학생 미션 조회 API, MissionContent 단계 구조, 이미지 role
+승인 상태: 승인
+수정 요청: 없음
 ```
 
 ## 7. 프론트가 새 API를 요구할 때
@@ -121,7 +132,10 @@ PR이나 커밋 설명에는 아래를 남긴다.
 - 필요한 응답 필드:
 - 필요한 seed 데이터:
 - 연결할 화면:
+- 프론트 자체 검수 결과:
 ```
+
+백엔드 승인을 받기 전에는 dev 통합으로 넘기지 않는다.
 
 ## 8. 실행과 검증
 
@@ -155,3 +169,4 @@ cd backend
 - [ ] 4단계 realtime 흐름이 5단계로 보이지 않음
 - [ ] 백엔드 계약 변경이 있으면 `docs/common/08-rest-api-spec.md` 수정
 - [ ] 백엔드가 확인할 내용이 있으면 handoff 문구 작성
+- [ ] 상대 파트 확인이 필요한 변경이면 승인 상태를 기록

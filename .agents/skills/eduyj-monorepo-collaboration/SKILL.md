@@ -38,6 +38,7 @@ API 응답, 콘텐츠 JSON, seed 데이터, 프론트 mock 데이터가 같이 �
 테스트/lint 실행
 백로그 상태 갱신
 handoff 문서 확인
+상대 파트 검수/승인 기록
 커밋
 마지막 push
 ```
@@ -48,6 +49,7 @@ handoff 문서 확인
 - 백엔드 작업은 `backend` 브랜치에서 push한다.
 - 통합 검증은 `dev` 브랜치에서 한다.
 - 작업 중에는 작은 커밋을 쌓고, 검증 후 마지막에 push한다.
+- 상대 파트 확인이 필요한 변경은 `docs/common/02-branch-handoff-contract.md`에 자체 검수와 승인 상태를 남긴다.
 - provider key는 `frontend/`에 노출하지 않는다.
 - 학생 미션은 4단계다. 회고는 5단계가 아니다.
 - 4단계가 realtime이다. 1~3단계는 승인된 정적 템플릿이다.

@@ -10,6 +10,8 @@
 4. [../common/08-rest-api-spec.md](../common/08-rest-api-spec.md)
 5. [../common/02-branch-handoff-contract.md](../common/02-branch-handoff-contract.md)
 
+다른 브랜치 변경을 받아야 하거나 프론트 확인이 필요한 변경을 push할 때는 [../common/02-branch-handoff-contract.md](../common/02-branch-handoff-contract.md)의 검수/승인 절차를 먼저 따른다.
+
 ## 2. 백엔드가 담당하는 것
 
 - FastAPI API
@@ -44,3 +46,19 @@ cd backend
 ```
 
 프론트 확인이 필요한 변경이면 [../common/02-branch-handoff-contract.md](../common/02-branch-handoff-contract.md)에 있는 handoff 포맷을 사용한다.
+
+## 5. 프론트 확인을 요청할 때
+
+백엔드가 API, seed, 콘텐츠 JSON, 이미지 role, realtime session 응답을 바꿨다면 작업자가 먼저 자체 검수한 뒤 프론트 승인을 요청한다.
+
+```text
+프론트 확인 필요:
+- 변경 API:
+- 변경 응답 필드:
+- 변경 seed:
+- 변경 상태값:
+- 프론트에서 확인할 화면:
+- 백엔드 자체 검수 결과:
+```
+
+프론트 승인 상태가 `승인`이 되기 전에는 dev 통합으로 넘기지 않는다.

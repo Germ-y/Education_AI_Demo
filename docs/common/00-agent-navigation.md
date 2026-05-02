@@ -73,7 +73,7 @@ flowchart TD
 - 문서 링크는 상대 경로로 둔다.
 - 새 문서를 만들면 [../../README.md](../../README.md), 이 파일, 관련 스킬에 링크를 추가한다.
 - 파일명이나 위치를 바꾸면 `rg -n "old-file-name"`으로 역참조를 찾는다.
-- 프론트/백엔드 계약이 바뀌면 [02-branch-handoff-contract.md](02-branch-handoff-contract.md)에 handoff 기준도 같이 반영한다.
+- 프론트/백엔드 계약이 바뀌면 [02-branch-handoff-contract.md](02-branch-handoff-contract.md)에 handoff 기준과 상대 파트 승인 상태도 같이 반영한다.
 
 ## 빠른 확인 명령
 
