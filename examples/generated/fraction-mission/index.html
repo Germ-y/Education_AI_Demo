@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>분수 탐험: 빛나는 한 조각</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #172033;
+        --muted: #697386;
+        --line: #d9e1ec;
+        --blue: #2f6fed;
+        --green: #20835a;
+        --yellow: #fff3c4;
+        --bg: #f5f7fb;
+        --panel: #ffffff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Inter, Apple SD Gothic Neo, Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--ink);
+        background: var(--bg);
+      }
+
+      main {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: minmax(320px, 1fr) 380px;
+        gap: 24px;
+        padding: 28px;
+      }
+
+      .student-screen,
+      .teacher-panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: 0 12px 34px rgba(35, 46, 75, 0.08);
+      }
+
+      .student-screen {
+        overflow: hidden;
+      }
+
+      .mission-top {
+        padding: 28px 32px 18px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--blue);
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 0;
+        font-size: 30px;
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      .progress {
+        min-width: 104px;
+        height: 12px;
+        border-radius: 999px;
+        background: #e9eef7;
+        overflow: hidden;
+      }
+
+      .progress span {
+        display: block;
+        width: 62%;
+        height: 100%;
+        background: var(--green);
+      }
+
+      .mission-body {
+        display: grid;
+        grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr);
+        gap: 28px;
+        padding: 32px;
+      }
+
+      .image-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fbfcff;
+      }
+
+      .image-card img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        object-fit: cover;
+      }
+
+      .image-card p {
+        margin: 0;
+        padding: 18px;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.55;
+      }
+
+      .play-stack {
+        display: grid;
+        gap: 18px;
+        align-content: start;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 20px;
+        background: #fff;
+      }
+
+      .card.highlight {
+        border-color: #f0cf62;
+        background: var(--yellow);
+      }
+
+      .card h2 {
+        margin-bottom: 10px;
+        font-size: 22px;
+        letter-spacing: 0;
+      }
+
+      .card p {
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.55;
+      }
+
+      .choices,
+      .pills {
+        display: grid;
+        gap: 10px;
+      }
+
+      .choice,
+      .pill,
+      .approve {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        color: var(--ink);
+        min-height: 48px;
+        padding: 0 16px;
+        font: inherit;
+        font-weight: 700;
+        cursor: default;
+      }
+
+      .choice:first-child {
+        border-color: rgba(32, 131, 90, 0.45);
+        background: #eaf8f1;
+        color: #0d6844;
+      }
+
+      .pills {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .pill {
+        min-height: 40px;
+        font-size: 14px;
+      }
+
+      .teacher-panel {
+        padding: 24px;
+        align-self: start;
+      }
+
+      .teacher-panel h2 {
+        font-size: 22px;
+        margin-bottom: 16px;
+      }
+
+      .meta-list {
+        display: grid;
+        gap: 12px;
+        margin: 0 0 20px;
+      }
+
+      .meta {
+        border-left: 3px solid var(--blue);
+        padding-left: 12px;
+      }
+
+      .meta strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 14px;
+      }
+
+      .meta span {
+        display: block;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .checklist {
+        padding: 16px;
+        border-radius: 8px;
+        background: #f6f8fc;
+      }
+
+      .checklist p {
+        margin-bottom: 10px;
+        font-weight: 700;
+      }
+
+      .checklist ul {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+        line-height: 1.8;
+      }
+
+      .approve {
+        width: 100%;
+        margin-top: 18px;
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      @media (max-width: 960px) {
+        main,
+        .mission-body {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="student-screen" aria-label="학생 미션 화면">
+        <div class="mission-top">
+          <div>
+            <p class="eyebrow">오늘의 미션</p>
+            <h1>분수 탐험: 빛나는 한 조각</h1>
+          </div>
+          <div class="progress" aria-label="진행률"><span></span></div>
+        </div>
+
+        <div class="mission-body">
+          <figure class="image-card">
+            <img src="./fraction-pizza.png" alt="4개의 같은 구역으로 나뉜 피자 지도에서 한 구역이 빛나는 그림" />
+            <p>피자 지도가 똑같이 4구역으로 나뉘어 있어요. 빛나는 구역은 그중 1구역이에요.</p>
+          </figure>
+
+          <div class="play-stack">
+            <section class="card highlight">
+              <h2>오늘은 빛나는 한 조각을 찾아보면서 1/4을 알아볼 거예요.</h2>
+              <p>아래 숫자 4는 전체 조각 수예요. 위 숫자 1은 내가 고른 조각 수예요.</p>
+            </section>
+
+            <section class="card">
+              <h2>4구역 중 빛나는 1구역은 몇 분의 몇일까요?</h2>
+              <div class="choices">
+                <button class="choice" type="button">1/4</button>
+              <button class="choice" type="button">4/1</button>
+              <button class="choice" type="button">1/2</button>
+              </div>
+            </section>
+
+            <section class="card">
+              <h2>맞으면</h2>
+              <p>좋아요. 전체 4구역 중 1구역이니까 1/4이에요.</p>
+            </section>
+
+            <section class="card">
+              <h2>헷갈리면</h2>
+              <p>헷갈릴 땐 이렇게 생각해요. 전체가 몇 개인지 먼저 세고, 내가 가진 것이 몇 개인지 나중에 세요.</p>
+            </section>
+
+            <section class="card">
+              <h2>오늘 내용은 어땠나요?</h2>
+              <div class="pills">
+                <button class="pill" type="button">쉬웠어요</button>
+              <button class="pill" type="button">조금 헷갈렸어요</button>
+              <button class="pill" type="button">다시 보고 싶어요</button>
+              </div>
+            </section>
+
+            <section class="card">
+              <h2>다음 미션</h2>
+              <p>다음 미션에서는 2조각을 고르면 2/4가 되는지 알아볼 거예요.</p>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <aside class="teacher-panel" aria-label="교사 검토 패널">
+        <p class="eyebrow">교사 승인 대기</p>
+        <h2>AI 생성 콘텐츠 검토</h2>
+        <div class="meta-list">
+          <div class="meta">
+            <strong>회기 목표</strong>
+            <span>전체와 부분의 관계를 그림으로 이해하고 1/4을 말할 수 있다.</span>
+          </div>
+          <div class="meta">
+            <strong>진단</strong>
+            <span>개념 미이해, 분모/분자 역할 혼동, 자신감 저하</span>
+          </div>
+          <div class="meta">
+            <strong>전략</strong>
+            <span>첫 문항은 정답 가능성이 높은 쉬운 성공 경험으로 시작하고, 탐험 지도처럼 보이는 피자 이미지를 통해 전체 조각 수와 선택한 조각 수를 분리해서 설명한다.</span>
+          </div>
+          <div class="meta">
+            <strong>사용 이미지 모델</strong>
+            <span>gpt-image-2</span>
+          </div>
+        </div>
+        <div class="checklist">
+          <p>승인 전 확인</p>
+          <ul>
+            <li>이미지 개념 일치</li>
+            <li>문항 정답 확인</li>
+            <li>문장 길이 적절</li>
+            <li>학생에게 민감 정보 미노출</li>
+          </ul>
+        </div>
+        <button class="approve" type="button">승인하고 학생에게 배포</button>
+      </aside>
+    </main>
+  </body>
+</html>
