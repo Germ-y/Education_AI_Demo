@@ -398,11 +398,11 @@ RealtimePracticeSpec의 역할/루브릭/시간 제한 유효성
 권장 초기 구조는 Python FastAPI 기반이다. 프론트가 Next.js여도 OpenAPI/Pydantic schema를 통해 타입 계약을 생성할 수 있다.
 
 ```text
-app/api
-app/domain
-app/services
-app/data
-app/core
+backend/app/api
+backend/app/domain
+backend/app/services
+backend/app/data
+backend/app/core
 ```
 
 MVP에서는 단일 API 서버로 시작해도 된다.

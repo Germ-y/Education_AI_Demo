@@ -21,7 +21,10 @@
 
 ## Backend Quick Start
 
+백엔드 구현은 루트의 [`backend/`](backend/README.md) 폴더 안에 있습니다. 프론트엔드는 같은 레포의 `frontend/` 폴더와 나란히 두는 모노레포 구조로 맞춥니다.
+
 ```bash
+cd backend
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 4000
@@ -32,6 +35,7 @@ python3 -m venv .venv
 검증 명령:
 
 ```bash
+cd backend
 .venv/bin/ruff check app tests
 .venv/bin/python -m pytest
 .venv/bin/python -m app.data.seed_demo

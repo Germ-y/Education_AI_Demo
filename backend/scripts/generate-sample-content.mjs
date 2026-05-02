@@ -1,27 +1,31 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const rootDir = process.cwd();
-const outputDir = path.join(rootDir, "examples", "generated", "fraction-mission");
+const backendDir = process.cwd();
+const repoRoot = path.resolve(backendDir, "..");
+const outputDir = path.join(repoRoot, "examples", "generated", "fraction-mission");
 const imagePath = path.join(outputDir, "fraction-pizza.png");
 const jsonPath = path.join(outputDir, "sample-content.json");
 const htmlPath = path.join(outputDir, "index.html");
 
 async function loadEnv() {
-  const envPath = path.join(rootDir, ".env");
-  try {
-    const envText = await fs.readFile(envPath, "utf8");
-    for (const line of envText.split(/\r?\n/)) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const index = trimmed.indexOf("=");
-      if (index === -1) continue;
-      const key = trimmed.slice(0, index).trim();
-      const value = trimmed.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
-      if (!process.env[key]) process.env[key] = value;
+  const envPaths = [path.join(backendDir, ".env"), path.join(repoRoot, ".env")];
+  for (const envPath of envPaths) {
+    try {
+      const envText = await fs.readFile(envPath, "utf8");
+      for (const line of envText.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const index = trimmed.indexOf("=");
+        if (index === -1) continue;
+        const key = trimmed.slice(0, index).trim();
+        const value = trimmed.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
+        if (!process.env[key]) process.env[key] = value;
+      }
+      return;
+    } catch {
+      // Try the next supported env location.
     }
-  } catch {
-    // The API call below will surface a clearer missing-key error.
   }
 }
 

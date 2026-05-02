@@ -27,14 +27,15 @@
 
 작업:
 
-- `pyproject.toml`, app directory, framework를 확인한다.
+- `backend/pyproject.toml`, `backend/app` directory, framework를 확인한다.
 - 프론트와 공유해야 하는 타입 위치를 정한다.
-- `.env.example`에 필요한 API key와 public data key를 정리한다.
+- `backend/.env.example`에 필요한 API key와 public data key를 정리한다.
 - 실행 명령을 README에 연결한다.
 
 완료 기준:
 
 ```text
+cd backend
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 4000
@@ -73,7 +74,7 @@ step=5 또는 video asset role은 validation에서 실패한다.
 상태:
 
 ```text
-완료. tests/domain-schemas.test.ts에서 4단계/asset role/realtime stage 제약을 검증한다.
+완료. backend/tests/test_domain_schemas.py에서 4단계/asset role/realtime stage 제약을 검증한다.
 ```
 
 ## Milestone 3. Database Migration
@@ -326,6 +327,7 @@ seed 없이도 신규 학생 케이스를 생성할 수 있다.
 ```bash
 git status --short --branch
 git diff --check
+cd backend
 .venv/bin/ruff check app tests
 .venv/bin/python -m pytest
 .venv/bin/python -m app.data.seed_demo
