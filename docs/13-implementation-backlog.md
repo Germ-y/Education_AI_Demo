@@ -205,7 +205,7 @@ student access code login 가능
 
 ```text
 OPENAI_API_KEY가 있으면 실제 이미지 생성 가능
-키가 없으면 demo fallback asset 사용
+OPENAI_API_KEY가 없거나 생성 실패 시 job failed 상태와 error reason 저장
 QA 실패 시 재생성 요청 가능
 ```
 

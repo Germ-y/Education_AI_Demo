@@ -295,7 +295,7 @@ AI 역할
 허용 피드백
 시간 제한
 음성 사용 여부
-텍스트 fallback 여부
+텍스트 입력 모드 사용 여부
 ```
 
 ## 9. 저장 정책
@@ -353,8 +353,8 @@ AI instructions에는 원본 상담 메모를 넣지 않는다.
 장애 대응:
 
 ```text
-마이크 권한 실패: 텍스트 입력 fallback
-Realtime 연결 실패: 정적 roleplay_simulation fallback
+마이크 권한 실패: 같은 RealtimePracticeSpec으로 텍스트 입력 모드 전환
+Realtime 연결 실패: 세션 실패 상태 저장, 교사 알림 후보 생성, 학생에게 재시도 안내
 세션 중 끊김: 같은 spec으로 1회 재연결
 시간 초과: AI가 마무리 멘트 후 종료
 ```

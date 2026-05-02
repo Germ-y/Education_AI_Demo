@@ -1,7 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const backendDir = process.cwd();
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const backendDir = path.resolve(scriptDir, "..");
 const repoRoot = path.resolve(backendDir, "..");
 const outputDir = path.join(repoRoot, "examples", "generated", "fraction-mission");
 const imagePath = path.join(outputDir, "fraction-pizza.png");
@@ -84,36 +86,20 @@ async function generateImage() {
     throw new Error("OPENAI_API_KEY is missing. Add it to .env before running this script.");
   }
 
-  const requestedModel = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2";
-  const candidateModels = [
-    ...new Set([requestedModel, "gpt-image-2", "gpt-image-2-2026-04-21", "gpt-image-1.5", "gpt-image-1"]),
-  ];
+  const imageModel = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2";
   const prompt = getImagePrompt();
-  const failures = [];
-
-  for (const model of candidateModels) {
-    try {
-      const imageBuffer = await callImageApi(model, prompt, apiKey);
-      return { imageBuffer, imageModel: model, imagePrompt: prompt, fallbackUsed: model !== requestedModel };
-    } catch (error) {
-      failures.push({ model, error: error.message });
-    }
-  }
-
-  const detail = failures.map((failure) => `${failure.model}: ${failure.error}`).join("\n");
-  throw new Error(`All image model attempts failed:\n${detail}`);
+  const imageBuffer = await callImageApi(imageModel, prompt, apiKey);
+  return { imageBuffer, imageModel, imagePrompt: prompt };
 }
 
-function buildContent({ imageModel, imagePrompt, fallbackUsed }) {
+function buildContent({ imageModel, imagePrompt }) {
   return {
     id: "content_fraction_001",
     title: "분수 탐험: 빛나는 한 조각",
     status: "teacher_review",
     generatedAt: new Date().toISOString(),
     generation: {
-      requestedImageModel: process.env.OPENAI_IMAGE_MODEL || "gpt-image-2",
-      usedImageModel: imageModel,
-      fallbackUsed,
+      imageModel,
       promptVersion: "creative-mission-card-v2",
       imagePrompt,
     },
@@ -563,7 +549,7 @@ function buildHtml(content) {
           </div>
           <div class="meta">
             <strong>사용 이미지 모델</strong>
-            <span>${escapeHtml(content.generation.usedImageModel)}${content.generation.fallbackUsed ? " (fallback)" : ""}</span>
+            <span>${escapeHtml(content.generation.imageModel)}</span>
           </div>
         </div>
         <div class="checklist">
@@ -591,8 +577,7 @@ async function main() {
   await fs.writeFile(htmlPath, buildHtml(content), "utf8");
 
   return {
-    usedImageModel: generation.imageModel,
-    fallbackUsed: generation.fallbackUsed,
+    imageModel: generation.imageModel,
     imagePath,
     jsonPath,
     htmlPath,

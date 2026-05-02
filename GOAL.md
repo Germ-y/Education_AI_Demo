@@ -103,6 +103,6 @@
 ## Assumptions
 
 - 실제 운영 보안/개인정보 정책은 공모전 데모 이후 강화한다.
-- image generation API 비용과 속도 문제를 위해 데모 seed asset fallback을 둔다.
+- 데모 이미지도 `gpt-image-2` API로 실제 생성한다. 비용/속도 문제 때문에 seed asset으로 대체하지 않는다.
 - 공공데이터 endpoint는 provider portal에서 최종 확인 후 구현한다.
 - `gpt-image-2`와 Realtime API는 서버에서만 호출하고, 클라이언트에는 임시 토큰만 전달한다.
