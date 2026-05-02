@@ -14,7 +14,7 @@ description: EduYJ 레포에서 Codex/Ralph식 장기 작업을 이어갈 때 �
 
 ## 기본 규칙
 
-- 통합 작업 기준 브랜치는 `backend`다.
+- 프론트 작업은 `frontend`, 백엔드 작업은 `backend`, 통합 검증은 `dev` 브랜치를 기준으로 한다.
 - 커밋은 작게 나눈다.
 - 커밋 메시지는 `docs : 내용`, `feat : 내용`, `fix : 내용`, `chore : 내용`처럼 한국어로 쓴다.
 - 학생 콘텐츠는 4단계다.
