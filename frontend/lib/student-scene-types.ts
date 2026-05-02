@@ -31,7 +31,7 @@ export type StudentSceneCase = {
 };
 
 export type SceneVisual = {
-  kind: "emotion" | "fraction" | "planner";
+  kind: "emotion" | "fraction" | "planner" | "clock" | "transit";
   label: string;
   helperLabel: string;
   activeIndex: number;

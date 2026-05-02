@@ -159,9 +159,103 @@ function PlannerVisual({ visual }: { visual: SceneVisual }) {
   );
 }
 
+function ClockVisual({ visual, compact = false }: { visual: SceneVisual; compact?: boolean }) {
+  return (
+    <div
+      className={`grid h-full overflow-hidden rounded-[24px] border border-[#ead9b8] bg-[#fff6d9] p-5 shadow-[inset_0_-12px_0_rgba(166,105,38,0.10)] ${
+        compact ? "min-h-[250px] grid-cols-[minmax(170px,0.78fr)_minmax(190px,1fr)] gap-4" : "min-h-[300px] grid-cols-[minmax(240px,0.82fr)_minmax(260px,1fr)] gap-5"
+      }`}
+    >
+      <div className="relative flex min-h-0 items-center justify-center">
+        <div className="relative aspect-square w-[min(100%,360px)] rounded-full border-[12px] border-[#d28a34] bg-white shadow-[0_22px_45px_rgba(115,72,29,0.18),inset_0_10px_24px_rgba(255,255,255,0.35)]">
+          {[
+            ["12", "left-1/2 top-5 -translate-x-1/2"],
+            ["3", "right-6 top-1/2 -translate-y-1/2"],
+            ["6", "bottom-5 left-1/2 -translate-x-1/2"],
+            ["9", "left-6 top-1/2 -translate-y-1/2"],
+          ].map(([label, position]) => (
+            <span key={label} className={`absolute ${position} text-2xl font-black text-[#8a5a00]`}>
+              {label}
+            </span>
+          ))}
+          <span className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1f3a5f]" />
+          <span className="absolute left-1/2 top-1/2 h-3 w-[34%] origin-left -translate-y-1/2 rounded-full bg-[#1f3a5f] shadow-sm" />
+          <span className="absolute left-1/2 top-1/2 h-[34%] w-2 origin-bottom -translate-x-1/2 -translate-y-full rounded-full bg-[#58b957] shadow-sm" />
+          <span className="absolute bottom-9 left-1/2 -translate-x-1/2 rounded-full bg-[#fff3c4] px-3 py-1 text-xs font-black text-[#8a5a00]">
+            짧은 바늘 먼저
+          </span>
+        </div>
+      </div>
+      <div className="grid min-h-0 content-center gap-3">
+        {visual.segments.map((segment, index) => (
+          <div
+            key={`${segment.label}-${index}`}
+            className={`rounded-[18px] border bg-white/90 px-4 py-3 shadow-sm ${
+              index === visual.activeIndex ? "border-[#58b957] ring-4 ring-[#dff2de]" : "border-white/80"
+            }`}
+          >
+            <p className="text-lg font-black leading-6 break-keep">{segment.label}</p>
+            <p className="mt-1 text-xs font-bold leading-5 text-[#6d746c] break-keep">{segment.caption}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TransitVisual({ visual, compact = false }: { visual: SceneVisual; compact?: boolean }) {
+  return (
+    <div
+      className={`grid h-full overflow-hidden rounded-[24px] border border-[#cfe4d3] bg-[#eef8f0] p-5 shadow-[inset_0_-12px_0_rgba(39,174,96,0.08)] ${
+        compact ? "min-h-[250px] grid-cols-[minmax(190px,1fr)_minmax(170px,0.78fr)] gap-4" : "min-h-[300px] grid-cols-[minmax(260px,1fr)_minmax(240px,0.8fr)] gap-5"
+      }`}
+    >
+      <div className="relative min-h-0 overflow-hidden rounded-[22px] border border-[#dce5ec] bg-[#dff1ff] p-5 shadow-sm">
+        <div className="absolute inset-x-0 bottom-0 h-20 bg-[#c7dfb9]" />
+        <div className="absolute bottom-16 left-8 h-24 w-14 rounded-t-full bg-[#1f3a5f] shadow-sm">
+          <span className="absolute left-1/2 top-4 h-10 w-10 -translate-x-1/2 rounded-full bg-white text-center text-sm font-black leading-10 text-[#1f3a5f]">
+            BUS
+          </span>
+        </div>
+        <div className="absolute bottom-[76px] right-8 h-36 w-[58%] rounded-[24px] border-4 border-[#1f3a5f] bg-[#ffd36b] shadow-[0_18px_32px_rgba(31,58,95,0.18)]">
+          <div className="absolute left-5 top-5 right-5 grid grid-cols-3 gap-3">
+            <span className="h-12 rounded-lg bg-white/85" />
+            <span className="h-12 rounded-lg bg-white/85" />
+            <span className="h-12 rounded-lg bg-white/85" />
+          </div>
+          <span className="absolute bottom-5 left-7 h-8 w-8 rounded-full bg-[#1f3a5f]" />
+          <span className="absolute bottom-5 right-7 h-8 w-8 rounded-full bg-[#1f3a5f]" />
+          <span className="absolute bottom-16 left-1/2 -translate-x-1/2 rounded-full bg-white px-4 py-1 text-xl font-black text-[#1f3a5f]">
+            21
+          </span>
+        </div>
+        <div className="absolute left-8 top-8 rounded-[18px] bg-white/92 px-4 py-3 shadow-sm">
+          <p className="text-xs font-black text-[#16803c]">센터 가는 길</p>
+          <p className="mt-1 text-lg font-black text-[#1f211d]">번호를 먼저 봐요</p>
+        </div>
+      </div>
+      <div className="grid min-h-0 content-center gap-3">
+        {visual.segments.map((segment, index) => (
+          <div
+            key={`${segment.label}-${index}`}
+            className={`rounded-[18px] border bg-white/90 px-4 py-3 shadow-sm ${
+              index === visual.activeIndex ? "border-[#58b957] ring-4 ring-[#dff2de]" : "border-white/80"
+            }`}
+          >
+            <p className="text-lg font-black leading-6 break-keep">{segment.label}</p>
+            <p className="mt-1 text-xs font-bold leading-5 text-[#6d746c] break-keep">{segment.caption}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LearningVisual({ visual, compact = false }: { visual: SceneVisual; compact?: boolean }) {
   if (visual.kind === "emotion") return <EmotionVisual visual={visual} />;
   if (visual.kind === "planner") return <PlannerVisual visual={visual} />;
+  if (visual.kind === "clock") return <ClockVisual visual={visual} compact={compact} />;
+  if (visual.kind === "transit") return <TransitVisual visual={visual} compact={compact} />;
   return <FractionVisual visual={visual} compact={compact} />;
 }
 
@@ -800,18 +894,25 @@ function FillBlankTemplate({
 
 function getRealtimePracticeCopy(scene: StudentContext["scene"], question: StageQuestion) {
   const isLearningFocus = scene.contentType === "learning_focus";
+  const isClockPractice = /시계|시침|분침|짧은 바늘|긴 바늘|약속 시간/.test(
+    `${scene.title} ${scene.missionDescription} ${question.prompt}`,
+  );
+  const isTransitPractice = /버스|정류장|센터|도움|안내 직원/.test(`${scene.title} ${scene.missionDescription} ${question.prompt}`);
+  const firstPrompt = question.realtimePracticeSpec?.firstPrompt ?? question.prompt;
 
   return {
     label: isLearningFocus ? "친구에게 설명하기" : "생활에 적용하기",
     title: isLearningFocus ? "내 말로 쉽게 설명해요" : "오늘 바로 쓸 말을 연습해요",
-    partner: isLearningFocus ? "친구" : "나",
-    partnerLine: isLearningFocus
-      ? "왜 그렇게 되는지 아직 헷갈려."
-      : "오늘 비슷한 상황이 오면 뭐라고 말해볼까?",
+    partner: isLearningFocus ? "친구" : isTransitPractice ? "안내 직원" : "나",
+    partnerLine: firstPrompt,
     studentLine: isLearningFocus
-      ? "먼저 전체가 몇 조각인지 보고, 그중 고른 조각을 말해볼게."
-      : "작게 시작할 수 있는 한 문장을 골라 말해볼게.",
-    sceneLine: question.realtimePracticeSpec?.firstPrompt ?? question.prompt,
+      ? isClockPractice
+        ? "짧은 바늘을 먼저 보고, 그다음 긴 바늘을 보면 돼."
+        : "먼저 중요한 단서를 보고, 내가 이해한 순서를 짧게 말해볼게."
+      : isTransitPractice
+        ? "센터에 가야 해요. 버스 알려 주세요."
+        : "필요한 말을 짧게 말해볼게.",
+    sceneLine: firstPrompt,
     actionLabel: isLearningFocus ? "설명 연습 시작" : "생활 적용 연습 시작",
   };
 }
@@ -881,10 +982,7 @@ function RealtimePracticeRoom({
   };
 
   const startSpeechInput = () => {
-    const spokenText =
-      scene.contentType === "learning_focus"
-        ? "전체가 4조각이고 그중 1조각을 골랐으니까 1/4이야."
-        : "오늘은 먼저 한 가지 행동만 정해서 바로 시작해볼게.";
+    const spokenText = practice.studentLine;
     type SpeechRecognitionEventLike = {
       results: ArrayLike<ArrayLike<{ transcript: string }>>;
     };
@@ -1169,6 +1267,7 @@ export function StudentStageExperience({
     activeStage.step === 4 &&
     activeQuestion.stageRole === "realtime_practice" &&
     (activeQuestion.templateType === "realtime_teach_back" || activeQuestion.templateType === "realtime_roleplay");
+  const realtimePracticeCopy = isRealtimeStage ? getRealtimePracticeCopy(scene, activeQuestion) : null;
   const isChoiceStage = activeQuestion.kind === "quiz" || activeQuestion.kind === "scenario" || isOxReady;
   const isStructuredStage = activeQuestion.kind === "sequence" || activeQuestion.kind === "cardMatching" || activeQuestion.kind === "fillBlank";
   const isCorrect = (isChoiceStage || isStructuredStage) && answer === activeQuestion.correctAnswer;
@@ -1614,7 +1713,7 @@ export function StudentStageExperience({
                     {isFinished
                       ? `${scene.missionTitle}, 모두 완료했어요`
                       : isRealtimeStage
-                        ? "AI에게 오늘 배운 1/4을 직접 설명해볼까요?"
+                        ? realtimePracticeCopy?.title
                         : activeQuestion.prompt}
                   </h3>
 
@@ -1683,7 +1782,7 @@ export function StudentStageExperience({
                     />
                   ) : isRealtimeStage ? (
                     <div className="rounded-[18px] px-4 py-4 text-sm font-bold leading-6" style={{ backgroundColor: theme.accentSoft, color: theme.accentStrong }}>
-                      마이크를 켜고 AI에게 전체 4조각 중 1조각이 왜 1/4인지 설명하는 단계입니다.
+                      {realtimePracticeCopy?.sceneLine ?? activeQuestion.prompt}
                     </div>
                   ) : activeQuestion.kind === "fillBlank" ? (
                     <FillBlankTemplate

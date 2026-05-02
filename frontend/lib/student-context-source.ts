@@ -20,16 +20,38 @@ const missionTheme: SceneTheme = {
   glow: "#dff2de",
 };
 
-const missionVisual: SceneVisual = {
-  kind: "fraction",
-  label: "미션 이미지",
-  helperLabel: "오늘의 단계",
-  activeIndex: 0,
-  segments: [
-    { label: "1", caption: "첫 단계", color: "#ffd36b" },
-    { label: "2", caption: "두 번째", color: "#94d86a" },
-    { label: "3", caption: "세 번째", color: "#8fb8ff" },
-    { label: "4", caption: "연습", color: "#f08a7a" },
+const defaultStageColors = ["#ffd36b", "#94d86a", "#8fb8ff", "#f08a7a"];
+
+const visualPresets: Record<SceneVisual["kind"], Array<{ label: string; caption: string }>> = {
+  emotion: [
+    { label: "보기", caption: "그림 단서" },
+    { label: "고르기", caption: "짧은 선택" },
+    { label: "말하기", caption: "한 문장" },
+    { label: "연습", caption: "다시 시도" },
+  ],
+  fraction: [
+    { label: "전체", caption: "전체 조각 보기" },
+    { label: "부분", caption: "고른 조각 찾기" },
+    { label: "쓰기", caption: "분수로 표현" },
+    { label: "말하기", caption: "내 말로 설명" },
+  ],
+  planner: [
+    { label: "상황", caption: "오늘 장면" },
+    { label: "단서", caption: "먼저 볼 것" },
+    { label: "행동", caption: "짧게 선택" },
+    { label: "연습", caption: "직접 말하기" },
+  ],
+  clock: [
+    { label: "짧은 바늘", caption: "먼저 보기" },
+    { label: "긴 바늘", caption: "다음 보기" },
+    { label: "약속 시간", caption: "2개 중 선택" },
+    { label: "말하기", caption: "순서 설명" },
+  ],
+  transit: [
+    { label: "정류장", caption: "상황 보기" },
+    { label: "버스 번호", caption: "중요 단서" },
+    { label: "도움 요청", caption: "짧게 말하기" },
+    { label: "역할 연습", caption: "직접 말하기" },
   ],
 };
 
@@ -126,7 +148,7 @@ function missionToScene(mission: MissionContent): StudentContext["scene"] {
       subtitle: stage.studentInstruction,
       state: stage.step === 1 ? "current" : "locked",
     })),
-    visual: missionVisual,
+    visual: buildMissionVisual(mission),
     question: {
       prompt: sortedStages[0]?.studentInstruction ?? mission.sessionGoal,
       choices: ["좋아요", "다시 볼래요", "넘어갈래요"],
@@ -138,6 +160,35 @@ function missionToScene(mission: MissionContent): StudentContext["scene"] {
     },
     stageQuestions: sortedStages.map((stage) => stageToQuestion(mission, stage)),
   };
+}
+
+function buildMissionVisual(mission: MissionContent): SceneVisual {
+  const missionText = [
+    mission.title,
+    mission.sessionGoal,
+    ...mission.stages.flatMap((stage) => [stage.studentTitle, stage.studentInstruction, JSON.stringify(stage.templateJson)]),
+  ].join(" ");
+  const visualKind = inferVisualKind(mission, missionText);
+  const preset = visualPresets[visualKind];
+
+  return {
+    kind: visualKind,
+    label: "미션 이미지",
+    helperLabel: "오늘의 단계",
+    activeIndex: 0,
+    segments: preset.map((item, index) => ({
+      ...item,
+      color: defaultStageColors[index] ?? defaultStageColors[0],
+    })),
+  };
+}
+
+function inferVisualKind(mission: MissionContent, missionText: string): SceneVisual["kind"] {
+  if (/시계|시침|분침|짧은 바늘|긴 바늘|약속 시간/.test(missionText)) return "clock";
+  if (/버스|정류장|센터|이동|도움 요청|안내 직원/.test(missionText)) return "transit";
+  if (/분수|조각|전체|부분|1\/4|사분의/.test(missionText)) return "fraction";
+  if (mission.contentType === "life_support") return "planner";
+  return "emotion";
 }
 
 async function getMissionForRoute(contentId: string) {

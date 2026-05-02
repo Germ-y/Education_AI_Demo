@@ -754,7 +754,7 @@ export default function DashboardPage() {
         홈으로
       </Link>
       <div className="grid min-h-screen xl:grid-cols-[380px_minmax(0,1fr)]">
-        <aside className="sticky top-0 flex h-screen flex-col border-r border-[#d8dee8] bg-white">
+        <aside className="flex flex-col border-r border-[#d8dee8] bg-white xl:sticky xl:top-0 xl:h-screen">
           <div className="border-b border-[#e5e9f0] p-6">
             <p className="text-sm font-bold text-[#1f3a5f]">배움동행 교사용</p>
             <h1 className="mt-2 text-2xl font-black">학생 관리</h1>
@@ -778,7 +778,7 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-[#e5e9f0]">
+          <div className="divide-y divide-[#e5e9f0] xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
             {filteredStudents.map((student) => {
               const apiStudent = teacherStudentItems.find((item) => item.studentId === student.id);
               const supportCase = apiStudent
