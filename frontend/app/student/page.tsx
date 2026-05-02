@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getPrimaryStudentContext } from "@/lib/demo-data";
+import { getStudentContext } from "@/lib/demo-data";
 
 function StarterStar() {
   return (
@@ -19,10 +19,17 @@ function StarterStar() {
   );
 }
 
-export default function StudentStartPage() {
-  const { student, scene } = getPrimaryStudentContext();
+export default async function StudentStartPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const params = await searchParams;
+  const caseIdParam = Array.isArray(params.caseId) ? params.caseId[0] : params.caseId;
+  const { student, scene } = getStudentContext(caseIdParam);
   const theme = scene.theme;
   const nextStage = scene.stages[scene.currentStep - 1] ?? scene.stages[0];
+  const pathHref = `/student/path?caseId=${encodeURIComponent(scene.caseId)}`;
 
   return (
     <main className="relative flex h-screen overflow-hidden bg-[#e7edf4] p-4 text-[#1f211d]">
@@ -65,7 +72,7 @@ export default function StudentStartPage() {
 
                 <div className="mt-9 flex items-center gap-4">
                   <Link
-                    href="/student/path"
+                    href={pathHref}
                     className="rounded-[22px] px-8 py-5 text-xl font-black text-white shadow-[0_18px_40px_rgba(39,174,96,0.30)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105"
                     style={{ backgroundColor: theme.accent }}
                   >

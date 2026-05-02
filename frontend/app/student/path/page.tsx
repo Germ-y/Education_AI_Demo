@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getPrimaryStudentContext, type SceneTheme } from "@/lib/demo-data";
+import { getStudentContext, type SceneTheme } from "@/lib/demo-data";
 
 function StarMascot() {
   return (
@@ -61,11 +61,13 @@ export default async function StudentHomePage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { student, scene } = getPrimaryStudentContext();
   const params = await searchParams;
+  const caseIdParam = Array.isArray(params.caseId) ? params.caseId[0] : params.caseId;
+  const { student, scene } = getStudentContext(caseIdParam);
   const completeParam = Array.isArray(params.complete) ? params.complete[0] : params.complete;
   const isComplete = completeParam === "1";
   const theme = scene.theme;
+  const caseQuery = `caseId=${encodeURIComponent(scene.caseId)}`;
 
   return (
     <main className="relative flex h-screen overflow-hidden bg-[#e7edf4] p-4 text-[#1f211d]">
@@ -83,7 +85,7 @@ export default async function StudentHomePage({
             <header className="flex h-[92px] items-center justify-between gap-5 border-b border-[#efe7d7] bg-[#fbfaf4]/95 px-10">
               <div className="flex min-w-0 items-center gap-4">
                 <Link
-                  href="/student"
+                  href={`/student?${caseQuery}`}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-xl font-black shadow-sm transition duration-200 hover:-translate-y-0.5 hover:scale-105 hover:shadow-[0_12px_26px_rgba(57,78,97,0.16)]"
                   style={{ borderColor: theme.border, backgroundColor: theme.accentPale, color: theme.accent }}
                   aria-label="학생 시작 화면으로 돌아가기"
@@ -209,7 +211,11 @@ export default async function StudentHomePage({
                   return (
                     <Link
                       key={mission.step}
-                      href={mission.state === "locked" && !isComplete ? "/student/path" : `/student/stage?step=${mission.step}`}
+                      href={
+                        mission.state === "locked" && !isComplete
+                          ? `/student/path?${caseQuery}`
+                          : `/student/stage?${caseQuery}&step=${mission.step}`
+                      }
                       className="group absolute z-10 flex -translate-y-1/2 items-center gap-3 transition duration-300 hover:z-30"
                       style={{ left: point.x, top: point.y }}
                     >

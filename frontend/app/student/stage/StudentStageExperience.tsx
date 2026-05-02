@@ -750,12 +750,14 @@ export function StudentStageExperience({
   context,
   initialStep = context.scene.currentStep,
   initialMode = "stage",
+  pathHref,
   nextHref,
   previewMode = false,
 }: {
   context: StudentContext;
   initialStep?: number;
   initialMode?: "stage" | "complete";
+  pathHref: string;
   nextHref: string;
   previewMode?: boolean;
 }) {
@@ -1054,7 +1056,7 @@ export function StudentStageExperience({
                   </div>
                 ) : (
                   <Link
-                    href="/student/path"
+                    href={pathHref}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-xl font-black shadow-sm transition duration-200 hover:-translate-y-0.5 hover:scale-105 hover:shadow-[0_12px_26px_rgba(57,78,97,0.16)]"
                     style={{ borderColor: theme.border, backgroundColor: theme.accentPale, color: theme.accent }}
                     aria-label="학생 시작 화면으로 돌아가기"
