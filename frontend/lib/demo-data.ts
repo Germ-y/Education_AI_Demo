@@ -56,7 +56,27 @@ export type SceneVisual = {
 
 export type StageQuestion = {
   step: number;
-  kind: "concept" | "quiz" | "scenario" | "summary" | "ox" | "sequence" | "cardMatching" | "fillBlank";
+  stageId?: string;
+  stageRole?: "scenario_intro" | "clue_identification" | "action_selection" | "concept_intro" | "basic_problem" | "applied_problem" | "realtime_practice";
+  templateType?:
+    | "scenario_intro"
+    | "scene_observation"
+    | "highlight_clue"
+    | "action_choice"
+    | "sequence_ordering"
+    | "decision_card"
+    | "concept_intro"
+    | "scene_question"
+    | "clue_question"
+    | "blank_fill"
+    | "partition_picker"
+    | "applied_question"
+    | "mini_simulation"
+    | "card_match"
+    | "realtime_roleplay"
+    | "realtime_teach_back";
+  assetRole?: "hero" | "stage_1" | "stage_2" | "stage_3" | "stage_4_realtime";
+  kind: "concept" | "quiz" | "scenario" | "summary" | "ox" | "sequence" | "cardMatching" | "fillBlank" | "realtimeTeachBack";
   prompt: string;
   body?: string;
   choices?: string[];
@@ -99,6 +119,12 @@ export type StageQuestion = {
     id: string;
     label: string;
   }>;
+  realtimePracticeSpec?: {
+    role: string;
+    firstPrompt: string;
+    rubric: string[];
+    timeLimitSeconds: number;
+  };
   visualActiveIndex?: number;
 };
 
@@ -117,7 +143,10 @@ export type SceneTheme = {
 
 export type CoachingScene = {
   id: string;
+  contentId?: string;
   caseId: string;
+  contentType?: "life_support" | "learning_focus";
+  status?: "published" | "teacher_review";
   title: string;
   subtitle: string;
   pathHeadline: string;
@@ -129,6 +158,11 @@ export type CoachingScene = {
   currentStep: number;
   rewardLabel: string;
   rewardProgress: number;
+  assets?: Array<{
+    assetId: string;
+    assetRole: "hero" | "stage_1" | "stage_2" | "stage_3" | "stage_4_realtime";
+    alt: string;
+  }>;
   theme: SceneTheme;
   stages: Array<{
     step: number;
@@ -375,7 +409,10 @@ export const coachingScenes: CoachingScene[] = [
   },
   {
     id: "scene-foundation-001",
+    contentId: "content-foundation-001",
     caseId: "case-foundation-001",
+    contentType: "learning_focus",
+    status: "published",
     title: "분수 탐험: 빛나는 한 조각",
     subtitle: "빛나는 한 조각을 찾아서 다음 문을 열어보자.",
     pathHeadline: "오늘은 분수의 문을 열어요",
@@ -387,6 +424,13 @@ export const coachingScenes: CoachingScene[] = [
     currentStep: 2,
     rewardLabel: "분수 탐험 토큰",
     rewardProgress: 72,
+    assets: [
+      { assetId: "asset-foundation-hero", assetRole: "hero", alt: "Mission hero image" },
+      { assetId: "asset-foundation-stage-1", assetRole: "stage_1", alt: "Stage 1 concept image" },
+      { assetId: "asset-foundation-stage-2", assetRole: "stage_2", alt: "Stage 2 activity image" },
+      { assetId: "asset-foundation-stage-3", assetRole: "stage_3", alt: "Stage 3 activity image" },
+      { assetId: "asset-foundation-stage-4", assetRole: "stage_4_realtime", alt: "Stage 4 realtime practice image" },
+    ],
     theme: {
       accent: "#27ae60",
       accentStrong: "#16803c",
@@ -457,6 +501,10 @@ export const coachingScenes: CoachingScene[] = [
     stageQuestions: [
       {
         step: 1,
+        stageId: "stage-foundation-1",
+        stageRole: "concept_intro",
+        templateType: "concept_intro",
+        assetRole: "stage_1",
         kind: "ox",
         prompt: "그림을 보고 전체와 부분을 먼저 알아봐요",
         body: "분수는 전체를 몇 조각으로 나누었는지, 그중 몇 조각을 보았는지 함께 생각하는 방법이에요.",
@@ -496,6 +544,10 @@ export const coachingScenes: CoachingScene[] = [
       },
       {
         step: 2,
+        stageId: "stage-foundation-2",
+        stageRole: "basic_problem",
+        templateType: "sequence_ordering",
+        assetRole: "stage_2",
         kind: "sequence",
         prompt: "분수를 알아보는 순서를 맞춰보세요",
         body: "카드를 눌러 올바른 순서대로 놓아보세요.",
@@ -514,6 +566,10 @@ export const coachingScenes: CoachingScene[] = [
       },
       {
         step: 3,
+        stageId: "stage-foundation-3",
+        stageRole: "applied_problem",
+        templateType: "card_match",
+        assetRole: "stage_3",
         kind: "cardMatching",
         prompt: "서로 맞는 카드를 연결해보세요",
         body: "왼쪽 카드와 오른쪽 카드를 하나씩 눌러 연결해요.",
@@ -553,7 +609,11 @@ export const coachingScenes: CoachingScene[] = [
       },
       {
         step: 4,
-        kind: "fillBlank",
+        stageId: "stage-foundation-4",
+        stageRole: "realtime_practice",
+        templateType: "realtime_teach_back",
+        assetRole: "stage_4_realtime",
+        kind: "realtimeTeachBack",
         prompt: "빈칸에 알맞은 숫자를 채워보세요",
         body: "아래 숫자 카드를 눌러 빈칸에 넣어요.",
         correctAnswer: "1|4",
@@ -574,6 +634,13 @@ export const coachingScenes: CoachingScene[] = [
           { id: "2", label: "2" },
           { id: "4", label: "4" },
         ],
+        actionLabel: "실시간 연습 시작하기",
+        realtimePracticeSpec: {
+          role: "student_teaches_fraction",
+          firstPrompt: "피자 4조각 중 1조각이 왜 1/4인지 설명해볼래요?",
+          rubric: ["전체 조각 수를 말한다", "선택한 조각 수를 말한다", "1/4 표현과 연결한다"],
+          timeLimitSeconds: 180,
+        },
         visualActiveIndex: 3,
       },
     ],

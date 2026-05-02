@@ -712,6 +712,40 @@ function FillBlankTemplate({
   );
 }
 
+function RealtimeTeachBackTemplate({ question, theme }: { question: StageQuestion; theme: SceneTheme }) {
+  const rubric = question.realtimePracticeSpec?.rubric ?? [];
+
+  return (
+    <div className="grid min-h-[360px] grid-rows-[auto_1fr] gap-4 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-5 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]">
+      <div>
+        <p className="text-xs font-black uppercase tracking-[0.08em]" style={{ color: theme.accentStrong }}>
+          realtime teach-back
+        </p>
+        <h3 className="mt-2 text-2xl font-black leading-tight text-[#172033]">
+          AI에게 오늘 배운 1/4을 설명해볼까요?
+        </h3>
+        <p className="mt-3 text-sm font-bold leading-6 text-[#596157]">
+          상황 이미지를 보며 전체, 부분, 1/4을 말로 설명하는 4단계 realtime 연습입니다.
+        </p>
+      </div>
+
+      <div className="rounded-[20px] border border-[#f0dfb4] bg-[#fff9e8] p-4">
+        <p className="text-sm font-black text-[#8a5a00]">연습 기준</p>
+        <div className="mt-3 grid gap-2">
+          {rubric.map((item, index) => (
+            <div key={item} className="flex items-center gap-3 rounded-[16px] bg-white px-4 py-3 text-sm font-bold text-[#334155] shadow-sm">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black text-white" style={{ backgroundColor: theme.accent }}>
+                {index + 1}
+              </span>
+              {item}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function StudentStageExperience({
   context,
   initialStep = context.scene.currentStep,
@@ -769,6 +803,10 @@ export function StudentStageExperience({
     [activeStage.step, scene.question, scene.stageQuestions, scene.visual.activeIndex],
   );
   const isOxReady = activeQuestion.kind === "ox" && oxReadySteps.includes(activeStage.step);
+  const isRealtimeStage =
+    activeStage.step === 4 &&
+    activeQuestion.stageRole === "realtime_practice" &&
+    activeQuestion.templateType === "realtime_teach_back";
   const isChoiceStage = activeQuestion.kind === "quiz" || activeQuestion.kind === "scenario" || isOxReady;
   const isStructuredStage = activeQuestion.kind === "sequence" || activeQuestion.kind === "cardMatching" || activeQuestion.kind === "fillBlank";
   const isCorrect = (isChoiceStage || isStructuredStage) && answer === activeQuestion.correctAnswer;
@@ -936,6 +974,13 @@ export function StudentStageExperience({
   const completeOpenStage = () => {
     setCompletedSteps((steps) => (steps.includes(activeStage.step) ? steps : [...steps, activeStage.step]));
     setAnswer("completed");
+  };
+
+  const startRealtimePractice = () => {
+    if (!isRealtimeStage) return;
+    setAttempts((current) => current + 1);
+    setCompletedSteps((steps) => (steps.includes(activeStage.step) ? steps : [...steps, activeStage.step]));
+    setAnswer("realtime-started");
   };
 
   const showOxCheck = () => {
@@ -1115,6 +1160,8 @@ export function StudentStageExperience({
                         onLeft={(id) => setSelectedMatchLeft(id)}
                         onRight={connectMatchingCard}
                       />
+                    ) : isRealtimeStage ? (
+                      <RealtimeTeachBackTemplate question={activeQuestion} theme={theme} />
                     ) : (
                       <LearningVisual visual={activeVisual} />
                     )
@@ -1127,7 +1174,13 @@ export function StudentStageExperience({
                     style={{ borderColor: theme.highlight, backgroundColor: `${theme.highlight}99`, color: theme.highlightText }}
                   >
                     <MiniStar />
-                    <p>{isFinished ? "다시 해보거나 학습 길로 돌아갈 수 있어요." : activeQuestion.hint}</p>
+                    <p>
+                      {isFinished
+                        ? "다시 해보거나 학습 길로 돌아갈 수 있어요."
+                        : isRealtimeStage
+                          ? "4단계에서만 열리는 realtime 말하기 연습입니다."
+                          : activeQuestion.hint}
+                    </p>
                   </div>
                 )}
 
@@ -1171,7 +1224,11 @@ export function StudentStageExperience({
               >
                 <div className="relative self-center rounded-[24px] border border-[#dce5ec] bg-white p-5 shadow-[0_18px_48px_rgba(57,78,97,0.10)]">
                   <h3 className="text-[1.35rem] font-black leading-snug break-keep">
-                    {isFinished ? `${scene.missionTitle}, 모두 완료했어요` : activeQuestion.prompt}
+                    {isFinished
+                      ? `${scene.missionTitle}, 모두 완료했어요`
+                      : isRealtimeStage
+                        ? "AI에게 오늘 배운 1/4을 직접 설명해볼까요?"
+                        : activeQuestion.prompt}
                   </h3>
 
                   <StageInlineNotice
@@ -1237,6 +1294,10 @@ export function StudentStageExperience({
                       onLeft={(id) => setSelectedMatchLeft(id)}
                       onRight={connectMatchingCard}
                     />
+                  ) : isRealtimeStage ? (
+                    <div className="rounded-[18px] px-4 py-4 text-sm font-bold leading-6" style={{ backgroundColor: theme.accentSoft, color: theme.accentStrong }}>
+                      마이크를 켜고 AI에게 전체 4조각 중 1조각이 왜 1/4인지 설명하는 단계입니다.
+                    </div>
                   ) : activeQuestion.kind === "fillBlank" ? (
                     <FillBlankTemplate
                       question={activeQuestion}
@@ -1314,6 +1375,15 @@ export function StudentStageExperience({
                       학습 길로
                     </Link>
                   </div>
+                ) : isRealtimeStage && !isStageComplete ? (
+                  <button
+                    onClick={startRealtimePractice}
+                    disabled={isTransitioning}
+                    className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.28)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.32)] disabled:opacity-70 disabled:hover:translate-y-0"
+                    style={{ backgroundColor: theme.accent }}
+                  >
+                    {activeQuestion.actionLabel ?? "실시간 연습 시작하기"}
+                  </button>
                 ) : isCorrect || isStageComplete ? (
                   <button
                     onClick={goToNextStage}
