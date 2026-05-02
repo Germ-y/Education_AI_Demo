@@ -13,7 +13,17 @@ export type ApiError = {
   };
 };
 
-export type ApiEnvelope<T> = ApiSuccess<T> | ApiError;
+export type FastApiError = {
+  detail:
+    | string
+    | {
+        code?: string;
+        message?: string;
+        details?: Record<string, unknown>;
+      };
+};
+
+export type ApiEnvelope<T> = ApiSuccess<T> | ApiError | FastApiError;
 
 export type ContentType = "life_support" | "learning_focus";
 export type MissionStatus = "draft" | "generating" | "teacher_review" | "revision_requested" | "approved" | "published" | "archived";
@@ -67,6 +77,30 @@ export type UserProfile = {
   displayName: string;
   role: Exclude<UserRole, "student">;
   status: "active" | "invited" | "disabled";
+};
+
+export type AuthSession = {
+  accessToken: string;
+  expiresAt: string;
+};
+
+export type DemoLoginRequest = {
+  role: "center_admin" | "teacher" | "content_reviewer" | "guardian";
+  email?: string | null;
+};
+
+export type DemoLoginResponse = {
+  user: UserProfile;
+  session: AuthSession;
+};
+
+export type StudentAccessRequest = {
+  accessCode: string;
+};
+
+export type StudentAccessResponse = {
+  student: StudentProfile;
+  session: AuthSession;
 };
 
 export type StudentProfile = {

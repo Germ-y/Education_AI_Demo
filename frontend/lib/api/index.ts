@@ -4,6 +4,7 @@ export * from "./client";
 export * from "./features/ai-generation";
 export * from "./features/content-review";
 export * from "./features/realtime-practice";
+export * from "./features/seed-auth";
 export * from "./features/school-public-context";
 export * from "./features/seeded-domain-read";
 export * from "./features/student-mission";

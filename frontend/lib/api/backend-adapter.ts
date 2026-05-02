@@ -3,16 +3,23 @@ import type { ApiAdapter } from "./adapter";
 import type {
   AgentRunPlan,
   ContextMe,
+  DemoLoginResponse,
   MissionContent,
   PublicContextBundle,
   RealtimeSessionResponse,
   ReviewableContent,
+  StudentAccessResponse,
   StudentCaseFile,
   StudentListItem,
   StudentMissionSummary,
 } from "./contracts";
 
 export const backendAdapter: ApiAdapter = {
+  demoLogin: (payload) => apiFetch<DemoLoginResponse>("/api/auth/demo-login", { method: "POST", body: payload }),
+
+  studentAccess: (payload) =>
+    apiFetch<StudentAccessResponse>("/api/auth/student-access", { method: "POST", body: payload }),
+
   getContextMe: (options) => apiFetch<ContextMe>("/api/context/me", { token: options?.token }),
 
   getTeacherStudents: (options) => apiFetch<StudentListItem[]>("/api/teacher/students", { token: options?.token }),

@@ -4,10 +4,12 @@ import type {
   ContextMe,
   ContentAsset,
   ContentStage,
+  DemoLoginResponse,
   MissionContent,
   PublicContextBundle,
   RealtimeSessionResponse,
   SchoolProfile,
+  StudentAccessResponse,
   StudentCaseFile,
   StudentListItem,
   StudentMissionSummary,
@@ -252,6 +254,31 @@ function getMission(contentId: string): MissionContent {
 }
 
 export const devAdapter: ApiAdapter = {
+  async demoLogin(payload) {
+    return {
+      user: {
+        ...teacher,
+        role: payload.role,
+        email: payload.email ?? teacher.email,
+      },
+      session: {
+        accessToken: "dev-teacher-token",
+        expiresAt: "2026-05-02T12:00:00.000Z",
+      },
+    } satisfies DemoLoginResponse;
+  },
+
+  async studentAccess(payload) {
+    const student = payload.accessCode === "LIFE-BUS" ? getStudent("student_life_bus") : getStudent("student_learning_fraction");
+    return {
+      student,
+      session: {
+        accessToken: `dev-student-token-${student.id}`,
+        expiresAt: "2026-05-02T12:00:00.000Z",
+      },
+    } satisfies StudentAccessResponse;
+  },
+
   async getContextMe() {
     return { user: teacher, organization, mode: "demo_seed" };
   },

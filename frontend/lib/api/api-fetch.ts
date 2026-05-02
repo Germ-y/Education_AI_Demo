@@ -1,4 +1,4 @@
-import type { ApiEnvelope, ApiError } from "./contracts";
+import type { ApiEnvelope, ApiError, FastApiError } from "./contracts";
 
 export class ApiFetchError extends Error {
   code: string;
@@ -34,11 +34,44 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const envelope = (await response.json()) as ApiEnvelope<T>;
+  const envelope = (await parseJson(response)) as ApiEnvelope<T>;
 
   if ("error" in envelope) {
     throw new ApiFetchError(response.status, envelope.error);
   }
 
+  if ("detail" in envelope) {
+    throw new ApiFetchError(response.status, normalizeFastApiError(envelope));
+  }
+
   return envelope.data;
+}
+
+async function parseJson(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text) {
+    return response.ok ? { data: undefined, meta: { requestId: "" } } : { detail: response.statusText };
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { detail: text };
+  }
+}
+
+function normalizeFastApiError(envelope: FastApiError): ApiError["error"] {
+  if (typeof envelope.detail === "string") {
+    return {
+      code: "HTTP_ERROR",
+      message: envelope.detail,
+      details: {},
+    };
+  }
+
+  return {
+    code: envelope.detail.code ?? "HTTP_ERROR",
+    message: envelope.detail.message ?? "요청을 처리하지 못했습니다.",
+    details: envelope.detail.details ?? {},
+  };
 }

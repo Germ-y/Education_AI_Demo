@@ -2,11 +2,15 @@ import type {
   AgentRunPlan,
   AgentRunRequest,
   ContextMe,
+  DemoLoginRequest,
+  DemoLoginResponse,
   MissionContent,
   PublicContextBundle,
   RealtimeSessionRequest,
   RealtimeSessionResponse,
   ReviewableContent,
+  StudentAccessRequest,
+  StudentAccessResponse,
   StudentCaseFile,
   StudentListItem,
   StudentMissionSummary,
@@ -17,6 +21,8 @@ export type ApiAdapterOptions = {
 };
 
 export type ApiAdapter = {
+  demoLogin(payload: DemoLoginRequest): Promise<DemoLoginResponse>;
+  studentAccess(payload: StudentAccessRequest): Promise<StudentAccessResponse>;
   getContextMe(options?: ApiAdapterOptions): Promise<ContextMe>;
   getTeacherStudents(options?: ApiAdapterOptions): Promise<StudentListItem[]>;
   getTeacherStudent(studentId: string, options?: ApiAdapterOptions): Promise<StudentCaseFile>;
