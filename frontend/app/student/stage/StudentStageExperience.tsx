@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import type { DragEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -983,6 +984,37 @@ function RealtimePracticeRoom({
   );
 }
 
+function HintStar() {
+  return (
+    <div className="relative h-[72px] w-[72px] shrink-0" aria-hidden="true">
+      <Image
+        src="/assets/hint-star/without-eye.svg"
+        alt=""
+        fill
+        sizes="72px"
+        className="object-contain"
+        draggable={false}
+      />
+      <Image
+        src="/assets/hint-star/eye.svg"
+        alt=""
+        fill
+        sizes="72px"
+        className="animate-[hintStarBlink_4.2s_ease-in-out_infinite] object-contain"
+        draggable={false}
+      />
+      <Image
+        src="/assets/hint-star/light.svg"
+        alt=""
+        fill
+        sizes="72px"
+        className="animate-[hintStarLightFloat_2.8s_ease-in-out_infinite] object-contain"
+        draggable={false}
+      />
+    </div>
+  );
+}
+
 export function StudentStageExperience({
   context,
   initialStep = context.scene.currentStep,
@@ -1438,7 +1470,7 @@ export function StudentStageExperience({
                     className="mt-3 flex items-center gap-3 rounded-[18px] border px-4 py-3 text-sm font-bold leading-6 shadow-sm"
                     style={{ borderColor: theme.highlight, backgroundColor: `${theme.highlight}99`, color: theme.highlightText }}
                   >
-                    <MiniStar />
+                    <HintStar />
                     <p>
                       {isFinished
                         ? "다시 해보거나 학습 길로 돌아갈 수 있어요."
