@@ -128,7 +128,7 @@ seed 계정 자동 생성 없음
   "displayName": "김지우",
   "grade": "초3",
   "studentType": "learning_focus",
-  "primaryNeed": "시간 읽기 기초를 짧은 시각 단서와 2개 선택지로 익히는 수업",
+  "primaryNeed": "시간 읽기 기초를 짧은 시각 단서와 2개 선택지로 익히는 수업이 좋겠어요.",
   "effectiveStyles": [],
   "frequentBlockingUnits": []
 }
@@ -142,7 +142,7 @@ seed 계정 자동 생성 없음
   "displayName": "이민준",
   "grade": "중2",
   "studentType": "learning_focus",
-  "primaryNeed": "분수의 전체-부분 관계를 단계적으로 익히는 개념 보완 수업",
+  "primaryNeed": "분수의 전체-부분 관계를 단계적으로 익히는 개념 보완 수업이 좋겠어요.",
   "effectiveStyles": ["시각 자료", "단계 카드", "짧은 문장"],
   "frequentBlockingUnits": ["분수", "문장제 조건 찾기"]
 }
@@ -156,7 +156,7 @@ seed 계정 자동 생성 없음
   "displayName": "박수민",
   "grade": "초6",
   "studentType": "life_support",
-  "primaryNeed": "생활 상황에서 순서 확인과 도움 요청 표현을 연습하는 의사소통 수업",
+  "primaryNeed": "생활 상황에서 순서 확인과 도움 요청 표현을 연습하는 의사소통 수업이 좋겠어요.",
   "effectiveStyles": ["상황 그림", "선택지 2개", "역할극"],
   "lifeSupportNeeds": ["순서 이해", "도움 요청", "감정 표현"]
 }

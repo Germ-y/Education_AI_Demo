@@ -106,7 +106,7 @@ MVP에서는 센터 조직 1개와 학생이 속한 학교 정보를 seed 또는
   "grade": "middle_2",
   "schoolCode": "school_demo_001",
   "studentType": "learning_focus",
-  "primaryNeed": "분수의 전체-부분 관계를 단계적으로 익히는 개념 보완 수업",
+  "primaryNeed": "분수의 전체-부분 관계를 단계적으로 익히는 개념 보완 수업이 좋겠어요.",
   "profileJson": {
     "interests": ["음식", "탐험"],
     "readingLoad": "low",
@@ -178,7 +178,7 @@ NEIS/학교알리미를 붙이기 전에는 seed snapshot으로 시작한다.
   "grade": "middle_2",
   "schoolName": "영주 데모중학교",
   "studentType": "learning_focus",
-  "primaryNeed": "분수의 전체-부분 관계를 단계적으로 익히는 개념 보완 수업",
+  "primaryNeed": "분수의 전체-부분 관계를 단계적으로 익히는 개념 보완 수업이 좋겠어요.",
   "caseStatus": "open",
   "latestContentStatus": "published",
   "nextSessionSuggestion": "분모/분자 위치를 짧게 재확인"
@@ -198,7 +198,7 @@ NEIS/학교알리미를 붙이기 전에는 seed snapshot으로 시작한다.
     "studentId": "student_learning_fraction",
     "ownerTeacherId": "user_teacher_demo",
     "caseStatus": "open",
-    "currentGoal": "분수의 전체-부분 관계를 단계 카드로 안정화",
+    "currentGoal": "분수의 전체-부분 관계를 단계 카드로 안정화해보면 좋겠어요.",
     "openedAt": "2026-05-02T00:00:00.000Z"
   },
   "memoryCard": "MemoryCard",

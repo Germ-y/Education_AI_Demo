@@ -78,6 +78,7 @@ def test_teacher_and_student_demo_flows() -> None:
     assert clock_student["dashboardStageLabel"] == "자료 생성"
     assert clock_student["attendanceLabel"] == "기록 전"
     assert "시간 읽기 기초" in clock_student["primaryNeed"]
+    assert "좋겠어요" in clock_student["primaryNeed"]
     assert "시간 읽기 기초" in clock_student["summaryLine"]
     assert_no_teacher_raw_terms(
         [
@@ -150,8 +151,9 @@ def test_teacher_and_student_demo_flows() -> None:
     assert fraction_case.json()["data"]["profile"]["displayName"] == "이민준"
     assert fraction_case.json()["data"]["dashboardProfile"]["headline"] == "영주중학교 · 중2 · 고연령 학습지원형"
     assert fraction_case.json()["data"]["dashboardProfile"]["primaryNeedTitle"] == "분수 개념 보완 수업"
-    assert "수업이 필요합니다" in fraction_case.json()["data"]["dashboardProfile"]["primaryNeedDetail"]
+    assert "수업이 좋겠어요" in fraction_case.json()["data"]["dashboardProfile"]["primaryNeedDetail"]
     assert "말로 정리하기" in fraction_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
+    assert "좋겠어요" in fraction_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
     assert_no_teacher_raw_terms(fraction_case.json()["data"]["dashboardProfile"])
     life_case = client.get("/api/teacher/students/student_life_bus", headers={"authorization": f"Bearer {teacher_token}"})
     assert life_case.status_code == 200
