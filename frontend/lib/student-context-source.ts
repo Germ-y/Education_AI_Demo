@@ -1,19 +1,13 @@
 import { getContextSeed, getReviewableContent, getStudentMission, type MissionContent, type TemplateType } from "@/lib/api";
 import { getAssetUrl, getTemplateRenderer, resolveStageAssets, validateMissionContent } from "@/lib/mission-content";
-import {
-  getStudentContext,
-  type SceneTheme,
-  type SceneVisual,
-  type StageQuestion,
-  type StudentContext,
-} from "@/lib/demo-data";
+import type { SceneTheme, SceneVisual, StageQuestion, StudentContext } from "@/lib/student-scene-types";
 
 type StudentRouteParams = {
   caseId?: string;
   contentId?: string;
 };
 
-const fallbackTheme: SceneTheme = {
+const missionTheme: SceneTheme = {
   accent: "#27ae60",
   accentStrong: "#16803c",
   accentSoft: "#e8f8ee",
@@ -26,7 +20,7 @@ const fallbackTheme: SceneTheme = {
   glow: "#dff2de",
 };
 
-const fallbackVisual: SceneVisual = {
+const missionVisual: SceneVisual = {
   kind: "fraction",
   label: "미션 이미지",
   helperLabel: "오늘의 단계",
@@ -40,9 +34,13 @@ const fallbackVisual: SceneVisual = {
 };
 
 export async function getStudentContextForRoute({ caseId, contentId }: StudentRouteParams): Promise<StudentContext> {
-  if (!contentId) return getStudentContext(caseId);
+  const seed = await getContextSeed();
+  const resolvedContentId = contentId ?? resolveContentIdFromSeed(seed, caseId);
+  if (!resolvedContentId) {
+    throw new Error("학생에게 연결된 MissionContent가 없습니다.");
+  }
 
-  const [seed, mission] = await Promise.all([getContextSeed(), getMissionForRoute(contentId)]);
+  const mission = await getMissionForRoute(resolvedContentId);
   const validation = validateMissionContent(mission);
 
   if (!validation.ok) {
@@ -54,7 +52,7 @@ export async function getStudentContextForRoute({ caseId, contentId }: StudentRo
   const school = seed.schools.find((item) => item.schoolCode === student?.schoolCode);
 
   if (!student || !supportCase) {
-    return getStudentContext(caseId);
+    throw new Error("MissionContent와 연결된 학생/케이스 데이터를 찾지 못했습니다.");
   }
 
   return {
@@ -63,16 +61,16 @@ export async function getStudentContextForRoute({ caseId, contentId }: StudentRo
       name: student.displayName,
       displayName: student.displayName,
       grade: student.grade,
-      school: school?.name ?? "데모 학교",
+      school: school?.name ?? "학교 정보 확인 중",
       guardianName: "",
       phone: "",
       level: 1,
       rewardTokens: 0,
       nextRewardTokens: 10,
-      attendanceRate: 90,
-      understandingRate: 50,
+      attendanceRate: student.attendanceRate ?? 0,
+      understandingRate: 0,
       interests: readStringArray(student.profileJson.interests),
-      strengths: ["짧은 단계로 학습하기"],
+      strengths: student.strengths ?? [],
     },
     supportCase: {
       id: supportCase.id,
@@ -121,14 +119,14 @@ function missionToScene(mission: MissionContent): StudentContext["scene"] {
         url: getAssetUrl(asset),
         sourceText: asset.sourceText,
       })),
-    theme: fallbackTheme,
+    theme: missionTheme,
     stages: sortedStages.map((stage) => ({
       step: stage.step,
       title: stage.studentTitle,
       subtitle: stage.studentInstruction,
       state: stage.step === 1 ? "current" : "locked",
     })),
-    visual: fallbackVisual,
+    visual: missionVisual,
     question: {
       prompt: sortedStages[0]?.studentInstruction ?? mission.sessionGoal,
       choices: ["좋아요", "다시 볼래요", "넘어갈래요"],
@@ -148,6 +146,15 @@ async function getMissionForRoute(contentId: string) {
   } catch {
     return getReviewableContent(contentId);
   }
+}
+
+function resolveContentIdFromSeed(seed: Awaited<ReturnType<typeof getContextSeed>>, caseId?: string) {
+  if (caseId) {
+    const matched = seed.mappings.find((mapping) => mapping.caseId === caseId);
+    if (matched) return matched.contentId;
+  }
+
+  return seed.mappings[0]?.contentId;
 }
 
 function stageToQuestion(mission: MissionContent, stage: MissionContent["stages"][number]): StageQuestion {

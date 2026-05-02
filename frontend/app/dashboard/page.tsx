@@ -3,16 +3,72 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  reviewItems,
-  sessionRecords,
-  students,
-  supportCases,
-  type CaseStatus,
-  type SupportCase,
-} from "@/lib/demo-data";
-import { demoLogin, getTeacherStudent, getTeacherStudents, type StudentCaseFile, type StudentListItem } from "@/lib/api";
+  getTeacherStudent,
+  getTeacherStudentReport,
+  getTeacherStudents,
+  type MissionContent,
+  type StudentCaseFile,
+  type StudentListItem,
+  type StudentReport,
+} from "@/lib/api";
 
 type DashboardTab = "info" | "materials" | "records";
+type CaseStatus = "intake" | "structured" | "goal_set" | "scene_review" | "follow_up";
+
+type SupportCase = {
+  id: string;
+  studentId: string;
+  status: CaseStatus;
+  statusLabel: string;
+  caseType: string;
+  primaryNeed: string;
+  sessionGoal: string;
+  supportStrategy: string;
+  nextAction: string;
+  riskNote: string;
+  challengeTags: string[];
+  planTags: string[];
+};
+
+type MaterialReviewItem = {
+  id: string;
+  caseId: string;
+  title: string;
+  type: string;
+  state: string;
+  contentId: string;
+  content: MissionContent;
+};
+
+type ReviewStageDraft = {
+  step: 1 | 2 | 3 | 4;
+  stageRole: string;
+  templateType: string;
+  assetRole: string;
+  title: string;
+  description: string;
+  question: string;
+  choices: string[];
+  imagePrompt: string;
+};
+
+type SessionLog = {
+  id: string;
+  caseId: string;
+  contentId: string;
+  session: string;
+  date: string;
+  durationMinutes: number;
+  understanding: "상" | "중" | "하";
+  focus: "상" | "중" | "하";
+  note: string;
+  attemptCount: number;
+  wrongCount: number;
+  averageResponseSeconds: number;
+  completionRate: number;
+  secondsPerQuestion: number;
+  accuracyRate: number;
+};
 
 const tabs: Array<{ id: DashboardTab; label: string; description: string }> = [
   { id: "info", label: "학생 정보", description: "기본 정보와 현재 학습 상태" },
@@ -63,52 +119,7 @@ const learningStatus: Record<CaseStatus, { label: string; progress: number; curr
 
 const workflowSteps = ["자료 생성", "자료 검토", "학습", "학습 피드백"];
 
-const reviewStagePreviews = [
-  {
-    step: 1,
-    stageRole: "concept_intro",
-    templateType: "concept_intro",
-    assetRole: "stage_1",
-    title: "전체 구역 세기",
-    description: "피자 지도가 몇 개의 같은 크기 구역으로 나뉘었는지 먼저 확인합니다.",
-    question: "피자 지도는 전체 몇 구역으로 나뉘어 있나요?",
-    choices: ["2구역", "3구역", "4구역"],
-    imagePrompt: "피자 지도를 4조각으로 명확히 나누고 전체 구역이 잘 보이게 표시",
-  },
-  {
-    step: 2,
-    stageRole: "basic_problem",
-    templateType: "sequence_ordering",
-    assetRole: "stage_2",
-    title: "빛나는 구역 찾기",
-    description: "전체 중에서 빛나는 한 조각만 찾아 세어봅니다.",
-    question: "빛나는 구역은 몇 개인가요?",
-    choices: ["1구역", "2구역", "4구역"],
-    imagePrompt: "4조각 피자 지도에서 오른쪽 아래 한 조각만 은은하게 빛나게 표시",
-  },
-  {
-    step: 3,
-    stageRole: "applied_problem",
-    templateType: "card_match",
-    assetRole: "stage_3",
-    title: "분수로 문 열기",
-    description: "전체 4구역 중 1구역을 분수로 표현합니다.",
-    question: "4구역 중 1구역은 몇 분의 몇일까요?",
-    choices: ["1/4", "2/4", "4/1"],
-    imagePrompt: "4조각 중 1조각이 선택된 장면을 분수 1/4와 연결해 표현",
-  },
-  {
-    step: 4,
-    stageRole: "realtime_practice",
-    templateType: "realtime_teach_back",
-    assetRole: "stage_4_realtime",
-    title: "AI에게 말해보기",
-    description: "오늘 배운 1/4 표현을 상황 이미지와 함께 AI에게 직접 설명합니다.",
-    question: "전체 4조각 중 1조각이 왜 1/4인지 말로 설명해볼까요?",
-    choices: ["전체 조각 수 말하기", "고른 조각 수 말하기", "1/4 표현과 연결하기"],
-    imagePrompt: "4조각 피자 중 1조각을 가리키며 학생이 AI에게 설명하는 realtime 연습 상황",
-  },
-];
+const reviewStagePreviews: ReviewStageDraft[] = [];
 
 const reviewStageReasons: Record<number, string> = {
   1: "분수를 표현하기 전에 전체가 몇 등분인지 확인해 전체-부분 관계의 기준을 세웁니다.",
@@ -116,8 +127,6 @@ const reviewStageReasons: Record<number, string> = {
   3: "앞 단계에서 센 전체와 부분을 실제 분수 기호 1/4로 바꾸는 단계입니다.",
   4: "학습한 분수 표현을 생활 장면에 적용해 개념 전이를 확인합니다.",
 };
-
-type ReviewStageDraft = (typeof reviewStagePreviews)[number];
 
 type DashboardStudentView = {
   id: string;
@@ -197,6 +206,94 @@ function toDisplayLabels(values: string[] | undefined, fallback: string[] = []) 
   return source.map((value) => memoryLabelMap[value] ?? value);
 }
 
+function describeContentType(content: MissionContent) {
+  return content.contentType === "life_support" ? "일상생활 지원형" : "학습집중형";
+}
+
+function mapContentToReviewItem(content: MissionContent): MaterialReviewItem {
+  return {
+    id: content.id,
+    caseId: content.caseId,
+    title: content.title,
+    type: `AI 생성 미션 · ${describeContentType(content)}`,
+    state: content.status === "teacher_review" ? "검토 대기" : content.status === "published" ? "배포됨" : content.status,
+    contentId: content.id,
+    content,
+  };
+}
+
+function choicesFromTemplate(templateJson: Record<string, unknown>): string[] {
+  const choices = templateJson.choices;
+  if (Array.isArray(choices)) {
+    return choices
+      .map((choice) => {
+        if (typeof choice === "string") return choice;
+        if (choice && typeof choice === "object" && "text" in choice && typeof choice.text === "string") return choice.text;
+        if (choice && typeof choice === "object" && "label" in choice && typeof choice.label === "string") return choice.label;
+        return null;
+      })
+      .filter((choice): choice is string => Boolean(choice));
+  }
+
+  const rightCards = templateJson.rightCards;
+  if (Array.isArray(rightCards)) {
+    return rightCards
+      .map((card) => {
+        if (typeof card === "string") return card;
+        if (card && typeof card === "object" && "text" in card && typeof card.text === "string") return card.text;
+        if (card && typeof card === "object" && "label" in card && typeof card.label === "string") return card.label;
+        return null;
+      })
+      .filter((choice): choice is string => Boolean(choice));
+  }
+
+  const cards = templateJson.cards;
+  if (Array.isArray(cards)) {
+    return cards
+      .map((card) => {
+        if (typeof card === "string") return card;
+        if (card && typeof card === "object" && "text" in card && typeof card.text === "string") return card.text;
+        if (card && typeof card === "object" && "label" in card && typeof card.label === "string") return card.label;
+        return null;
+      })
+      .filter((choice): choice is string => Boolean(choice));
+  }
+
+  return [];
+}
+
+function mapContentToReviewStages(content: MissionContent): ReviewStageDraft[] {
+  return [...content.stages]
+    .sort((left, right) => left.step - right.step)
+    .map((stage) => {
+      const role = stage.step === 4 ? "stage_4_realtime" : `stage_${stage.step}`;
+      const imageAssetId = typeof stage.templateJson.imageAssetId === "string" ? stage.templateJson.imageAssetId : undefined;
+      const imageAsset = content.assets.find((asset) => asset.id === imageAssetId || (asset.assetType === "image" && asset.assetRole === role));
+      const imagePrompt =
+        imageAsset?.promptJson && typeof imageAsset.promptJson.prompt === "string"
+          ? imageAsset.promptJson.prompt
+          : "이미지 프롬프트가 아직 생성되지 않았습니다.";
+      const question =
+        typeof stage.templateJson.question === "string"
+          ? stage.templateJson.question
+          : typeof stage.templateJson.missionText === "string"
+            ? stage.templateJson.missionText
+            : stage.studentInstruction;
+
+      return {
+        step: stage.step,
+        stageRole: stage.stageRole,
+        templateType: stage.templateType,
+        assetRole: role,
+        title: stage.studentTitle,
+        description: stage.studentInstruction,
+        question,
+        choices: choicesFromTemplate(stage.templateJson),
+        imagePrompt,
+      };
+    });
+}
+
 function StatusBadge({ supportCase }: { supportCase: SupportCase }) {
   return (
     <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusTone[supportCase.status]}`}>
@@ -215,10 +312,10 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
 }
 
 export default function DashboardPage() {
-  const [selectedStudentId, setSelectedStudentId] = useState(students[0].id);
+  const [selectedStudentId, setSelectedStudentId] = useState("");
   const [teacherStudentItems, setTeacherStudentItems] = useState<StudentListItem[]>([]);
   const [selectedCaseFile, setSelectedCaseFile] = useState<StudentCaseFile | null>(null);
-  const [teacherToken, setTeacherToken] = useState<string | null>(null);
+  const [selectedReport, setSelectedReport] = useState<StudentReport | null>(null);
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<DashboardTab>("info");
   const [openReportId, setOpenReportId] = useState<string | null>(null);
@@ -248,19 +345,13 @@ export default function DashboardPage() {
 
     async function loadStudents() {
       try {
-        const login = await demoLogin({ role: "teacher", email: "teacher.demo@eduyj.local" });
+        const items = await getTeacherStudents();
         if (ignore) return;
 
-        const token = login.session.accessToken;
-        const items = await getTeacherStudents({ token });
-        if (ignore) return;
-
-        setTeacherToken(token);
         setTeacherStudentItems(items);
         if (items.length > 0) setSelectedStudentId(items[0].studentId);
       } catch {
         if (ignore) return;
-        setTeacherToken(null);
         setTeacherStudentItems([]);
       }
     }
@@ -277,32 +368,26 @@ export default function DashboardPage() {
 
     let ignore = false;
 
-    getTeacherStudent(selectedStudentId, teacherToken ? { token: teacherToken } : undefined)
-      .then((caseFile) => {
-        if (!ignore) setSelectedCaseFile(caseFile);
+    Promise.all([getTeacherStudent(selectedStudentId), getTeacherStudentReport(selectedStudentId)])
+      .then(([caseFile, report]) => {
+        if (!ignore) {
+          setSelectedCaseFile(caseFile);
+          setSelectedReport(report);
+        }
       })
       .catch(() => {
-        if (!ignore) setSelectedCaseFile(null);
+        if (!ignore) {
+          setSelectedCaseFile(null);
+          setSelectedReport(null);
+        }
       });
 
     return () => {
       ignore = true;
     };
-  }, [selectedStudentId, teacherStudentItems.length, teacherToken]);
+  }, [selectedStudentId, teacherStudentItems.length]);
 
   const dashboardStudents = useMemo<DashboardStudentView[]>(() => {
-    if (teacherStudentItems.length === 0) {
-      return students.map((student) => ({
-        id: student.id,
-        name: student.name,
-        school: student.school,
-        grade: student.grade,
-        attendanceRate: student.attendanceRate,
-        strengths: student.strengths,
-        weaknesses: [],
-      }));
-    }
-
     return teacherStudentItems.map((item) => ({
       id: item.studentId,
       name: item.displayName,
@@ -320,24 +405,65 @@ export default function DashboardPage() {
 
     return dashboardStudents.filter((student) => {
       const apiStudent = teacherStudentItems.find((item) => item.studentId === student.id);
-      const supportCase = supportCases.find((item) => item.studentId === student.id);
-      return [student.name, student.school, student.grade, apiStudent?.primaryNeed, supportCase?.primaryNeed, supportCase?.caseType]
+      return [student.name, student.school, student.grade, apiStudent?.primaryNeed, apiStudent?.studentType]
         .filter(Boolean)
         .some((value) => value?.toLowerCase().includes(normalized));
     });
   }, [dashboardStudents, query, teacherStudentItems]);
 
-  const selectedStudent = dashboardStudents.find((student) => student.id === selectedStudentId) ?? dashboardStudents[0] ?? students[0];
+  const selectedStudent = dashboardStudents.find((student) => student.id === selectedStudentId) ?? dashboardStudents[0] ?? {
+    id: "",
+    name: "학생 정보 로딩 중",
+    school: "학교 정보 확인 중",
+    grade: "",
+    attendanceRate: null,
+    strengths: [],
+    weaknesses: [],
+  };
   const selectedApiStudent = teacherStudentItems.find((student) => student.studentId === selectedStudent.id);
   const activeCaseFile = selectedCaseFile?.profile.id === selectedStudent.id ? selectedCaseFile : null;
-  const fallbackCase = supportCases.find((supportCase) => supportCase.studentId === selectedStudent.id) ?? supportCases[0];
   const selectedCase: SupportCase = activeCaseFile
     ? toSupportCaseFromCaseFile(activeCaseFile, selectedApiStudent)
     : selectedApiStudent
       ? toSupportCaseFromListItem(selectedApiStudent)
-      : fallbackCase;
-  const selectedReviewItems = reviewItems.filter((item) => item.caseId === selectedCase.id);
-  const selectedRecords = sessionRecords.filter((record) => record.caseId === selectedCase.id);
+      : {
+          id: "",
+          studentId: "",
+          status: "intake",
+          statusLabel: "불러오는 중",
+          caseType: "확인 중",
+          primaryNeed: "학생 데이터를 불러오는 중입니다.",
+          sessionGoal: "",
+          supportStrategy: "실제 학생 데이터 연결 대기",
+          nextAction: "학생 목록 로드",
+          riskNote: "",
+          challengeTags: [],
+          planTags: [],
+        };
+  const selectedReviewItems = (activeCaseFile?.recentContents ?? []).map(mapContentToReviewItem);
+  const selectedRecords: SessionLog[] = (selectedReport?.reports ?? []).map((record) => {
+    const durationMinutes = Math.max(1, Math.round((record.durationSec ?? 0) / 60));
+    const attemptCount = Math.max(1, record.answerCount);
+    const averageResponseSeconds = Math.round((record.durationSec ?? 0) / attemptCount);
+
+    return {
+      id: record.id,
+      caseId: record.caseId,
+      contentId: record.contentId,
+      session: record.contentTitle ?? "학습 콘텐츠",
+      date: record.completedAt?.slice(0, 10) ?? record.startedAt.slice(0, 10),
+      durationMinutes,
+      understanding: record.accuracyRate >= 80 ? "상" : record.accuracyRate >= 50 ? "중" : "하",
+      focus: record.completionRate >= 80 ? "상" : record.completionRate >= 50 ? "중" : "하",
+      note: record.shortSummary,
+      attemptCount,
+      wrongCount: record.wrongCount,
+      averageResponseSeconds,
+      completionRate: record.completionRate,
+      secondsPerQuestion: averageResponseSeconds,
+      accuracyRate: record.accuracyRate,
+    };
+  });
   const currentWorkflowStep =
     selectedCase.status === "intake"
       ? 0
@@ -348,22 +474,7 @@ export default function DashboardPage() {
           : selectedCase.status === "follow_up"
             ? 4
             : 3;
-  const sessionLogs = selectedRecords.map((record, index) => {
-    const attemptCount = index === 0 ? 9 : 7;
-    const wrongCount = index === 0 ? 4 : 2;
-    const averageResponseSeconds = index === 0 ? 42 : 55;
-    const completionRate = index === 0 ? 75 : 68;
-
-    return {
-      ...record,
-      attemptCount,
-      wrongCount,
-      averageResponseSeconds,
-      completionRate,
-      secondsPerQuestion: Math.round((record.durationMinutes * 60) / attemptCount),
-      accuracyRate: Math.round(((attemptCount - wrongCount) / attemptCount) * 100),
-    };
-  });
+  const sessionLogs = selectedRecords;
   const feedbackQueue = sessionLogs.slice(0, 2);
   const pendingFeedbackQueue = feedbackQueue.filter(
     (record) => !savedFeedbackRecords.some((feedback) => feedback.recordId === record.id),
@@ -372,10 +483,10 @@ export default function DashboardPage() {
     feedbackQueue.find((record) => record.id === selectedFeedbackId) ?? feedbackQueue[0] ?? sessionLogs[0];
   const openReport = sessionLogs.find((record) => record.id === openReportId);
   const openReportStageStep = openReport
-    ? Math.min(Math.max(sessionLogs.findIndex((record) => record.id === openReport.id) + 1, 1), reviewStagePreviews.length)
+    ? Math.min(Math.max(sessionLogs.findIndex((record) => record.id === openReport.id) + 1, 1), 4)
     : 1;
   const openReview = selectedReviewItems.find((item) => item.id === openReviewId);
-  const openReviewStages = openReview ? (reviewStageDrafts[openReview.id] ?? reviewStagePreviews) : reviewStagePreviews;
+  const openReviewStages = openReview ? (reviewStageDrafts[openReview.id] ?? mapContentToReviewStages(openReview.content)) : reviewStagePreviews;
   const isReviewEditing = openReview ? editingReviewIds.includes(openReview.id) : false;
   const savedMemo = savedMemos[selectedCase.id] ?? selectedCase.riskNote;
   const memoValue = memoDrafts[selectedCase.id] ?? savedMemo;
@@ -387,7 +498,7 @@ export default function DashboardPage() {
     updater: (stage: ReviewStageDraft) => ReviewStageDraft,
   ) => {
     setReviewStageDrafts((current) => {
-      const stages = current[reviewId] ?? reviewStagePreviews;
+      const stages = current[reviewId] ?? (openReview?.id === reviewId ? mapContentToReviewStages(openReview.content) : reviewStagePreviews);
       return {
         ...current,
         [reviewId]: stages.map((stage) => (stage.step === step ? updater(stage) : stage)),
@@ -433,7 +544,7 @@ export default function DashboardPage() {
         href="/"
         className="fixed bottom-6 right-6 z-50 rounded-full border border-[#25466f] bg-[#1f3a5f] px-5 py-3 text-base font-black text-white shadow-[0_12px_30px_rgba(31,58,95,0.25)]"
       >
-        데모 홈
+        홈으로
       </Link>
       <div className="grid min-h-screen xl:grid-cols-[380px_minmax(0,1fr)]">
         <aside className="sticky top-0 flex h-screen flex-col border-r border-[#d8dee8] bg-white">
@@ -465,7 +576,20 @@ export default function DashboardPage() {
               const apiStudent = teacherStudentItems.find((item) => item.studentId === student.id);
               const supportCase = apiStudent
                 ? toSupportCaseFromListItem(apiStudent)
-                : supportCases.find((item) => item.studentId === student.id) ?? supportCases[0];
+                : {
+                    id: "",
+                    studentId: student.id,
+                    status: "intake" as const,
+                    statusLabel: "확인 중",
+                    caseType: "확인 중",
+                    primaryNeed: "학생 정보를 불러오는 중입니다.",
+                    sessionGoal: "",
+                    supportStrategy: "",
+                    nextAction: "",
+                    riskNote: "",
+                    challengeTags: [],
+                    planTags: [],
+                  };
 
               return (
                 <button
@@ -663,7 +787,8 @@ export default function DashboardPage() {
                         <span className="text-sm font-bold text-[#64748b]">수업 내용</span>
                         <textarea
                           className="mt-2 h-36 w-full resize-none rounded-md border border-[#cbd5e1] bg-[#fbfcfe] p-4 text-sm font-semibold outline-none focus:border-[#1f3a5f]"
-                          defaultValue="분수의 전체-부분 관계를 시각 자료로 설명하고 1/4을 표현한다."
+                          key={`lesson-${selectedCase.id}`}
+                          defaultValue={selectedCase.sessionGoal}
                         />
                       </label>
 
@@ -677,9 +802,9 @@ export default function DashboardPage() {
                       </label>
 
                       <div className="rounded-md bg-[#f8fafc] p-3">
-                        <p className="text-sm font-bold text-[#64748b]">자동 반영 정보</p>
+                        <p className="text-sm font-bold text-[#64748b]">AI에 함께 전달되는 학생 컨텍스트</p>
                         <p className="mt-1 text-sm font-semibold leading-6 text-[#334155]">
-                          핵심 어려움, 강점, 약점, 최근 학습 기록
+                          {selectedStudent.name} · {selectedStudent.school} · {selectedCase.caseType} · {selectedCase.primaryNeed}
                         </p>
                       </div>
 
@@ -835,7 +960,7 @@ export default function DashboardPage() {
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                               <Link
-                                href="/student/stage?preview=1"
+                                href={`/student/stage?caseId=${encodeURIComponent(record.caseId)}&contentId=${encodeURIComponent(record.contentId)}&preview=1`}
                                 target="_blank"
                                 className="rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-xs font-black text-[#334155]"
                               >
@@ -969,7 +1094,7 @@ export default function DashboardPage() {
                 >
                   <iframe
                     title={`학습 리포트 자료 스테이지 ${openReportStageStep}`}
-                    src={`/student/stage?step=${openReportStageStep}&preview=1`}
+                    src={`/student/stage?caseId=${encodeURIComponent(openReport.caseId)}&contentId=${encodeURIComponent(openReport.contentId)}&step=${openReportStageStep}&preview=1`}
                     className="absolute left-1/2 top-1/2 h-[768px] w-[1024px] origin-center border-0"
                     style={{ transform: `translate(-50%, -50%) scale(${reportPreviewScale})` }}
                   />
@@ -1044,7 +1169,7 @@ export default function DashboardPage() {
                   <iframe
                     key={`${openReview.id}-${reviewPreviewStep}`}
                     title={`학생 화면 스테이지 ${reviewPreviewStep}`}
-                    src={`/student/stage?step=${reviewPreviewStep}&preview=1`}
+                    src={`/student/stage?caseId=${encodeURIComponent(openReview.caseId)}&contentId=${encodeURIComponent(openReview.contentId)}&step=${reviewPreviewStep}&preview=1`}
                     className="absolute left-1/2 top-1/2 h-[768px] w-[1024px] origin-center border-0"
                     style={{ transform: `translate(-50%, -50%) scale(${reviewPreviewScale})` }}
                   />
@@ -1082,7 +1207,7 @@ export default function DashboardPage() {
                             </button>
                             <iframe
                               title={`학생 화면 스테이지 ${stage.step}`}
-                              src={`/student/stage?step=${stage.step}&preview=1`}
+                              src={`/student/stage?caseId=${encodeURIComponent(openReview.caseId)}&contentId=${encodeURIComponent(openReview.contentId)}&step=${stage.step}&preview=1`}
                               className="absolute left-0 top-0 h-[768px] w-[1024px] origin-top-left scale-[0.205] border-0"
                             />
                           </div>
@@ -1263,137 +1388,6 @@ export default function DashboardPage() {
           </section>
         </div>
       )}
-      {/* Legacy review modal removed after stage-by-stage review redesign.
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/45 p-6">
-          <section className="w-full max-w-3xl rounded-xl bg-white p-6 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
-            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#e5e9f0] pb-4">
-              <div>
-                <p className="text-sm font-bold text-[#64748b]">자료 검토</p>
-                <h3 className="mt-1 text-2xl font-black">{openReview.title}</h3>
-                <p className="mt-2 text-sm font-semibold text-[#64748b]">{openReview.type}</p>
-              </div>
-              <button
-                onClick={() => setOpenReviewId(null)}
-                className="rounded-md border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-bold text-[#334155]"
-              >
-                닫기
-              </button>
-            </div>
-
-            <div className="mt-5 rounded-lg border border-[#e5e9f0] bg-[#fbfcfe] p-5">
-              <p className="text-sm font-bold text-[#64748b]">생성 자료 미리보기</p>
-              <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-                <section className="rounded-lg bg-white p-5">
-                  <h4 className="text-xl font-black">빛나는 구역 찾기</h4>
-                  <p className="mt-3 text-sm font-semibold leading-6 text-[#334155]">
-                    4조각으로 나뉜 피자 지도에서 빛나는 한 조각을 찾고, 전체 중 일부를 1/4로 표현하는
-                    학생용 미션입니다.
-                  </p>
-                  <div className="mt-5 aspect-[16/9] rounded-lg border border-[#ecd27a] bg-[#f6df7d] p-4">
-                    <div className="grid h-full grid-cols-2 gap-1 rounded-md border-4 border-[#e4bd4e] bg-[#f8e48f]">
-                      <div className="border-r border-b border-[#e4bd4e]" />
-                      <div className="border-b border-[#e4bd4e]" />
-                      <div className="border-r border-[#e4bd4e]" />
-                      <div className="ring-4 ring-[#fff176]" />
-                    </div>
-                  </div>
-                </section>
-
-                <section className="space-y-4">
-                  <div className="rounded-lg bg-white p-5">
-                    <p className="text-sm font-bold text-[#64748b]">학생 질문</p>
-                    <input
-                      className="mt-2 w-full rounded-md border border-[#cbd5e1] bg-[#fbfcfe] px-4 py-3 text-xl font-black outline-none focus:border-[#1f3a5f]"
-                      defaultValue="4구역 중 1구역은 몇 분의 몇일까요?"
-                    />
-                  </div>
-                  <div className="rounded-lg bg-white p-5">
-                    <p className="text-sm font-bold text-[#64748b]">선택지</p>
-                    <div className="mt-3 grid gap-2">
-                      {["1/4", "2/4", "4/1"].map((choice, index) => (
-                        <div
-                          key={choice}
-                          className={`rounded-md border px-4 py-3 text-lg font-black ${
-                            index === 0
-                              ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
-                              : "border-[#e5e9f0] bg-[#f8fafc] text-[#334155]"
-                          }`}
-                        >
-                          {choice}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="rounded-lg bg-white p-5">
-                    <p className="text-sm font-bold text-[#64748b]">이미지 재생성 프롬프트</p>
-                    <textarea
-                      className="mt-2 h-24 w-full resize-none rounded-md border border-[#cbd5e1] bg-[#fbfcfe] p-4 text-sm font-semibold outline-none focus:border-[#1f3a5f]"
-                      placeholder="이미지를 다시 만들 때 반영할 내용을 적어주세요."
-                      defaultValue="피자 지도를 4조각으로 명확히 나누고, 오른쪽 아래 한 조각만 빛나게 표시"
-                    />
-                  </div>
-                </section>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-wrap justify-end gap-3">
-              <button
-                onClick={() => {
-                  setRejectedMaterialIds((current) =>
-                    current.includes(openReview.id) ? current : [...current, openReview.id],
-                  );
-                  setRevisionMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                  setApprovedMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                  setAppliedMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                  setOpenReviewId(null);
-                }}
-                className="rounded-md border border-[#fecaca] bg-[#fef2f2] px-5 py-3 text-sm font-bold text-[#991b1b]"
-              >
-                사용 안 함
-              </button>
-              <button
-                onClick={() => {
-                  setRevisionMaterialIds((current) =>
-                    current.includes(openReview.id) ? current : [...current, openReview.id],
-                  );
-                  setRejectedMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                  setApprovedMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                  setAppliedMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                }}
-                className="rounded-md border border-[#cbd5e1] bg-white px-5 py-3 text-sm font-bold text-[#334155]"
-              >
-                직접 수정
-              </button>
-              <button
-                onClick={() => {
-                  setRevisionMaterialIds((current) =>
-                    current.includes(openReview.id) ? current : [...current, openReview.id],
-                  );
-                  setRejectedMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                  setApprovedMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                  setAppliedMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                }}
-                className="rounded-md border border-[#fed7aa] bg-[#fff7ed] px-5 py-3 text-sm font-bold text-[#9a3412]"
-              >
-                이미지 재생성
-              </button>
-              <button
-                onClick={() => {
-                  setApprovedMaterialIds((current) =>
-                    current.includes(openReview.id) ? current : [...current, openReview.id],
-                  );
-                  setRevisionMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                  setRejectedMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                  setOpenReviewId(null);
-                }}
-                className="rounded-md bg-[#1f3a5f] px-5 py-3 text-sm font-bold text-white"
-              >
-                사용 승인
-              </button>
-            </div>
-          </section>
-        </div>
-      */}
     </main>
   );
 }
