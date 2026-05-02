@@ -20,8 +20,8 @@ export default async function Home() {
       caseId: supportCase?.id,
       contentId: mapping?.contentId,
       studentName: student.displayName,
-      grade: student.grade,
-      label: student.studentType === "learning_focus" ? "학습 집중" : "생활 연습",
+      grade: student.gradeLabel ?? student.grade,
+      label: student.trackLabel ?? student.studentTypeLabel ?? (student.studentType === "learning_focus" ? "학습지원형" : "일상생활 지원형"),
       description: student.primaryNeed,
     };
   });
