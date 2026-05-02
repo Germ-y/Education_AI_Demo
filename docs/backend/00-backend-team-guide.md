@@ -45,6 +45,14 @@ cd backend
 .venv/bin/python -m app.data.seed_demo
 ```
 
+`app.data.seed_demo`는 `DATABASE_URL`에 연결해 schema 생성 후 seed를 DB에 적재한다.
+PostgreSQL이 아직 준비되지 않은 로컬 smoke는 아래처럼 SQLite로 확인한다.
+
+```bash
+cd backend
+DATABASE_URL=sqlite+pysqlite:///./eduyj-demo.db .venv/bin/python -m app.data.seed_demo
+```
+
 프론트 확인이 필요한 변경이면 [../common/02-branch-handoff-contract.md](../common/02-branch-handoff-contract.md)에 있는 handoff 포맷을 사용한다.
 
 ## 5. 프론트 확인을 요청할 때

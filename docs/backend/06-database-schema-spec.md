@@ -10,6 +10,20 @@
 - 학생 개인정보, AI prompt, realtime transcript는 최소 저장 원칙을 적용한다.
 - 구현 시 SQLAlchemy model 또는 SQL migration의 source of truth는 이 문서와 맞춰야 한다.
 
+## 1.1 현재 구현 상태
+
+현재 백엔드는 SQLAlchemy table model과 `DemoRepository`를 통해 seed 데이터를 DB에 적재하고 다시 domain schema로 읽는다.
+
+```text
+app.domain.db_models          SQLAlchemy table model
+app.repositories.demo_repository  seed/domain DB repository
+app.db.session                engine/session/schema helper
+app.data.seed_demo            DATABASE_URL 대상 schema 생성 + seed 적재 smoke
+```
+
+MVP 실행은 `DATABASE_URL`을 기준으로 한다. PostgreSQL이 목표 DB이고, 로컬 smoke/test는 SQLite URL로도 검증한다.
+운영용 Alembic migration은 다음 DB 고정 단계에서 추가한다.
+
 ## 2. 핵심 ERD
 
 ```mermaid

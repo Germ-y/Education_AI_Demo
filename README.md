@@ -67,6 +67,14 @@ cd backend
 .venv/bin/python -m app.data.seed_demo
 ```
 
+`app.data.seed_demo` creates the SQLAlchemy schema and writes the demo seed to `DATABASE_URL`.
+For a quick local SQLite smoke test:
+
+```bash
+cd backend
+DATABASE_URL=sqlite+pysqlite:///./eduyj-demo.db .venv/bin/python -m app.data.seed_demo
+```
+
 ## Contract Notes
 
 - Student missions are 4 stages.

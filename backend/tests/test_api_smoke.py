@@ -1,6 +1,28 @@
+import os
+
+import pytest
 from fastapi.testclient import TestClient
 
+from app.api.deps import get_store_instance
+from app.core.config import get_settings
+from app.db.session import get_engine, get_session_maker
 from app.main import create_app
+
+
+@pytest.fixture(autouse=True)
+def use_sqlite_demo_db(tmp_path) -> None:
+    os.environ["DATABASE_URL"] = f"sqlite+pysqlite:///{tmp_path / 'eduyj-test.db'}"
+    os.environ["DEMO_SEED_MODE"] = "true"
+    os.environ["DEMO_SEED_RESET"] = "true"
+    get_settings.cache_clear()
+    get_engine.cache_clear()
+    get_session_maker.cache_clear()
+    get_store_instance.cache_clear()
+    yield
+    get_store_instance.cache_clear()
+    get_session_maker.cache_clear()
+    get_engine.cache_clear()
+    get_settings.cache_clear()
 
 
 def test_teacher_and_student_demo_flows() -> None:

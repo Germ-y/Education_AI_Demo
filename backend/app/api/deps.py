@@ -1,12 +1,27 @@
+from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException
 
-from app.services.store import DemoStore, SessionPrincipal, store
+from app.core.config import get_settings
+from app.data.demo_data import create_demo_database
+from app.db.session import create_schema, get_session_maker
+from app.repositories.demo_repository import DemoRepository
+from app.services.store import DemoStore, SessionPrincipal
+
+
+@lru_cache
+def get_store_instance() -> DemoStore:
+    settings = get_settings()
+    create_schema()
+    repository = DemoRepository(get_session_maker())
+    if settings.demo_seed_mode and (settings.demo_seed_reset or repository.is_empty()):
+        repository.replace_database(create_demo_database())
+    return DemoStore(repository=repository)
 
 
 def get_store() -> DemoStore:
-    return store
+    return get_store_instance()
 
 
 def _extract_token(authorization: str | None) -> str | None:

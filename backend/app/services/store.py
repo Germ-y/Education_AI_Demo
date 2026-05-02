@@ -8,6 +8,7 @@ from app.core.config import get_settings
 from app.data.demo_data import create_demo_database
 from app.domain.models import ActivityEvent, CaseNote, ContentAttempt, DemoDatabase, MemoryCard, RealtimePracticeSession
 from app.domain.schemas import MissionContent
+from app.repositories.demo_repository import DemoRepository
 
 
 class SessionPrincipal(BaseModel):
@@ -22,11 +23,21 @@ class SessionPrincipal(BaseModel):
 
 
 class DemoStore:
-    def __init__(self, seed: DemoDatabase | None = None) -> None:
-        self.db = seed or create_demo_database()
+    def __init__(self, seed: DemoDatabase | None = None, repository: DemoRepository | None = None) -> None:
+        self.repository = repository
+        self.db = repository.load_database() if repository else seed or create_demo_database()
         self.sessions: dict[str, SessionPrincipal] = {}
 
+    def refresh(self) -> None:
+        if self.repository is not None:
+            self.db = self.repository.load_database()
+
+    def persist(self) -> None:
+        if self.repository is not None:
+            self.repository.replace_database(self.db)
+
     def create_user_session(self, role: str, email: str | None = None) -> SessionPrincipal | None:
+        self.refresh()
         user = next((candidate for candidate in self.db.users if candidate.role == role and (email is None or candidate.email == email)), None)
         if user is None:
             return None
@@ -35,6 +46,7 @@ class DemoStore:
         return session
 
     def create_student_session(self, access_code: str) -> SessionPrincipal | None:
+        self.refresh()
         account = next(
             (candidate for candidate in self.db.student_accounts if candidate.status == "active" and candidate.access_code == access_code),
             None,
@@ -51,6 +63,7 @@ class DemoStore:
         return self.sessions.get(token)
 
     def get_seed_context(self) -> dict:
+        self.refresh()
         organization = self.db.organizations[0]
         teacher = next(user for user in self.db.users if user.role == "teacher")
         student_accounts = {account.student_id: account for account in self.db.student_accounts if account.status == "active"}
@@ -91,6 +104,7 @@ class DemoStore:
         }
 
     def list_teacher_students(self, student_type: str | None = None, q: str | None = None, teacher_id: str | None = None) -> list[dict]:
+        self.refresh()
         open_cases = [
             support_case
             for support_case in self.db.support_cases
@@ -132,6 +146,7 @@ class DemoStore:
         return students
 
     def get_student_case_file(self, student_id: str) -> dict | None:
+        self.refresh()
         student = next((candidate for candidate in self.db.students if candidate.id == student_id), None)
         open_case = next(
             (support_case for support_case in self.db.support_cases if support_case.student_id == student_id and support_case.case_status == "open"),
@@ -165,6 +180,7 @@ class DemoStore:
         }
 
     def get_student_history(self, student_id: str, teacher_id: str | None = None) -> dict | None:
+        self.refresh()
         student = next((candidate for candidate in self.db.students if candidate.id == student_id), None)
         open_case = next(
             (
@@ -218,17 +234,21 @@ class DemoStore:
             createdAt=_now(),
         )
         self.db.case_notes.append(note)
+        self.persist()
         return note
 
     def get_school(self, school_code: str | None):
+        self.refresh()
         if school_code is None:
             return None
         return next((school for school in self.db.schools if school.school_code == school_code), None)
 
     def list_schools(self) -> list[dict]:
+        self.refresh()
         return [school.model_dump(by_alias=True) for school in self.db.schools]
 
     def list_school_calendar_events(self, school_code: str, from_date: str | None = None, to_date: str | None = None) -> list[dict]:
+        self.refresh()
         events = []
         for event in self.db.school_calendar_events:
             if event.school_code != school_code:
@@ -247,6 +267,7 @@ class DemoStore:
         grade: str | None = None,
         class_name: str | None = None,
     ) -> list[dict]:
+        self.refresh()
         slots = []
         for slot in self.db.school_timetable_slots:
             if slot.school_code != school_code:
@@ -265,13 +286,16 @@ class DemoStore:
             if card.student_id == student_id and card.status == "active":
                 merged = card.model_copy(update={key: value for key, value in patch.items() if value is not None})
                 self.db.memory_cards[index] = merged
+                self.persist()
                 return merged
         return None
 
     def list_published_missions_for_student(self, student_id: str) -> list[MissionContent]:
+        self.refresh()
         return [content for content in self.db.mission_contents if content.student_id == student_id and content.status == "published"]
 
     def get_published_mission_for_student(self, student_id: str, content_id: str) -> MissionContent | None:
+        self.refresh()
         return next(
             (
                 content
@@ -282,6 +306,7 @@ class DemoStore:
         )
 
     def create_attempt(self, student_id: str, mission_content_id: str) -> ContentAttempt:
+        self.refresh()
         attempt = ContentAttempt(
             id=f"attempt_{uuid4()}",
             studentId=student_id,
@@ -291,9 +316,11 @@ class DemoStore:
             startedAt=_now(),
         )
         self.db.attempts.append(attempt)
+        self.persist()
         return attempt
 
     def submit_stage(self, student_id: str, content_id: str, stage_id: str, attempt_id: str, answer: dict[str, Any]) -> dict | None:
+        self.refresh()
         mission = self.get_published_mission_for_student(student_id, content_id)
         attempt = self.get_attempt(attempt_id)
         stage = next((candidate for candidate in mission.stages if candidate.id == stage_id), None) if mission else None
@@ -315,9 +342,11 @@ class DemoStore:
                 occurredAt=_now(),
             )
         )
+        self.persist()
         return {"isRealtimeStage": False, **result, "nextStep": attempt.current_step}
 
     def create_realtime_session(self, student_id: str, content_id: str, stage_id: str, attempt_id: str) -> RealtimePracticeSession | None:
+        self.refresh()
         mission = self.get_published_mission_for_student(student_id, content_id)
         attempt = self.get_attempt(attempt_id)
         stage = next((candidate for candidate in mission.stages if candidate.id == stage_id), None) if mission else None
@@ -339,9 +368,11 @@ class DemoStore:
             durationSec=0,
         )
         self.db.realtime_sessions.append(session)
+        self.persist()
         return session
 
     def save_reflection(self, student_id: str, content_id: str, attempt_id: str, reflection_choice: str, short_text: str | None) -> dict | None:
+        self.refresh()
         attempt = self.get_attempt(attempt_id)
         if attempt is None or attempt.student_id != student_id or attempt.mission_content_id != content_id:
             return None
@@ -355,9 +386,11 @@ class DemoStore:
                 occurredAt=_now(),
             )
         )
+        self.persist()
         return {"saved": True}
 
     def complete_attempt(self, student_id: str, content_id: str, attempt_id: str) -> ContentAttempt | None:
+        self.refresh()
         attempt = self.get_attempt(attempt_id)
         if attempt is None or attempt.student_id != student_id or attempt.mission_content_id != content_id:
             return None
@@ -365,9 +398,11 @@ class DemoStore:
         attempt.current_step = 4
         attempt.completed_at = _now()
         attempt.score_json = {"completionRate": 1}
+        self.persist()
         return attempt
 
     def get_attempt(self, attempt_id: str) -> ContentAttempt | None:
+        self.refresh()
         return next((attempt for attempt in self.db.attempts if attempt.id == attempt_id), None)
 
     def _create_session(self, kind: str, id: str, role: str, student_id: str | None = None) -> SessionPrincipal:
@@ -403,6 +438,3 @@ def _evaluate_answer(template_json: dict[str, Any], answer: dict[str, Any]) -> d
         "isCorrect": is_correct,
         "feedback": correct_feedback if is_correct else wrong_feedback,
     }
-
-
-store = DemoStore()

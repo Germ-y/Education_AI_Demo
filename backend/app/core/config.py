@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     schoolinfo_api_key: str | None = None
     public_data_sync_enabled: bool = False
     demo_seed_mode: bool = True
+    demo_seed_reset: bool = False
 
     model_config = SettingsConfigDict(
         env_file=(REPO_ROOT / ".env", BACKEND_DIR / ".env"),

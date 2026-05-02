@@ -131,7 +131,8 @@ DB reset 후 스키마 생성
 상태:
 
 ```text
-부분 완료. SQLAlchemy 모델 계약과 Pydantic 검증은 완료했다. 실제 PostgreSQL 마이그레이션 적용은 다음 DB 연결 슬라이스에서 진행한다.
+부분 완료. SQLAlchemy 모델과 DB repository를 추가했고, seed upsert/load 및 API repository 연결은 완료했다.
+Alembic 기반 운영 마이그레이션은 이후 PostgreSQL 고정 단계에서 진행한다.
 ```
 
 ## 마일스톤 4. 데모 seed
@@ -160,7 +161,8 @@ seed 여러 번 실행해도 중복 생성 없음
 상태:
 
 ```text
-부분 완료. in-memory 데모 seed와 seed smoke 명령을 추가했다. DB upsert seed는 PostgreSQL 연결 뒤 진행한다.
+부분 완료. 데모 seed를 DB repository에 적재하고 다시 load하는 smoke 명령을 추가했다.
+학생 3명/교사 1명/학교 snapshot/샘플 콘텐츠 2개가 DATABASE_URL 기준 DB에 저장된다.
 ```
 
 ## 마일스톤 5. 교사 대시보드 API
