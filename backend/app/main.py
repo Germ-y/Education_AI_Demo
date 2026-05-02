@@ -5,14 +5,17 @@ from fastapi.responses import JSONResponse
 
 from app.api.response import ok
 from app.api.routes import auth, public_data, student, teacher
+from app.core.config import get_settings
 
 
 def create_app() -> FastAPI:
+    settings = get_settings()
+    cors_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
     app = FastAPI(title="EduYJ Backend", version="0.1.0")
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
