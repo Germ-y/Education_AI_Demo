@@ -245,7 +245,7 @@ def test_teacher_and_student_demo_flows() -> None:
 def test_http_errors_use_contract_envelope() -> None:
     client = TestClient(create_app())
 
-    response = client.get("/api/teacher/students")
+    response = client.get("/api/teacher/students", headers={"authorization": "Bearer invalid-token"})
 
     assert response.status_code == 401
     assert response.json() == {

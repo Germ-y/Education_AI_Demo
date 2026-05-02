@@ -49,3 +49,4 @@ backend/.pytest_cache/
 backend/.ruff_cache/
 __pycache__/
 *.py[cod]
+backend/*.db

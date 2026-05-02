@@ -45,11 +45,11 @@ def _audio_asset(content_id: str, role: str, stage_id: str | None, url: str, sou
 def build_fraction_content() -> MissionContent:
     content_id = "content_fraction_001"
     image_urls = {
-        "hero": "/examples/generated/fraction-mission/fraction-pizza-hero.png",
-        "stage_1": "/examples/generated/fraction-mission/fraction-pizza-stage-1.png",
-        "stage_2": "/examples/generated/fraction-mission/fraction-pizza-stage-2.png",
-        "stage_3": "/examples/generated/fraction-mission/fraction-pizza-stage-3.png",
-        "stage_4_realtime": "/examples/generated/fraction-mission/fraction-pizza-stage-4.png",
+        "hero": "/generated/fraction-mission/fraction-pizza.png",
+        "stage_1": "/generated/fraction-mission/fraction-pizza.png",
+        "stage_2": "/generated/fraction-mission/fraction-pizza.png",
+        "stage_3": "/generated/fraction-mission/fraction-pizza.png",
+        "stage_4_realtime": "/generated/fraction-mission/fraction-pizza.png",
     }
     audio_urls = {
         "hero": "/examples/generated/fraction-mission/audio/hero.mp3",
@@ -200,11 +200,11 @@ def build_fraction_content() -> MissionContent:
 def build_bus_content() -> MissionContent:
     content_id = "content_bus_001"
     image_urls = {
-        "hero": "/assets/demo/bus-mission-hero.png",
-        "stage_1": "/assets/demo/bus-mission-stage-1.png",
-        "stage_2": "/assets/demo/bus-mission-stage-2.png",
-        "stage_3": "/assets/demo/bus-mission-stage-3.png",
-        "stage_4_realtime": "/assets/demo/bus-mission-stage-4.png",
+        "hero": "/generated/bus-mission/bus-mission.png",
+        "stage_1": "/generated/bus-mission/bus-mission.png",
+        "stage_2": "/generated/bus-mission/bus-mission.png",
+        "stage_3": "/generated/bus-mission/bus-mission.png",
+        "stage_4_realtime": "/generated/bus-mission/bus-mission.png",
     }
     audio_urls = {
         "hero": "/assets/demo/audio/bus-hero.mp3",
