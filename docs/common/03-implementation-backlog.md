@@ -22,8 +22,8 @@
 - [x] 프론트/백엔드 공통 스키마 계약 추가
 - [x] MVP를 회원가입보다 seed 도메인 조회 우선으로 정리
 - [x] AI provider 연동 기반: AgentRun 저장, OpenAI/ElevenLabs adapter, fallback 금지 실패 기록
-- [ ] AI provider 실제 생성 workflow 완성
-- [ ] 학생 플레이 런타임 구현
+- [x] AI provider 실제 생성 workflow MVP 완성
+- [x] 학생 플레이 런타임 MVP 구현
 
 ## 협업 기준
 
@@ -230,7 +230,7 @@ hero + stage_1~stage_4_realtime에는 TTS audio asset record를 붙인다.
 AgentRun repository, OpenAI Responses/Realtime adapter, ElevenLabs TTS adapter 골격을 추가했다.
 `POST /api/ai/orchestrator-runs`, `POST /api/ai/content-generations`, `GET /api/ai/agent-runs/:id`를 추가했다.
 OPENAI_API_KEY/ELEVENLABS_*가 없거나 provider 요청이 실패하면 대체 seed asset을 만들지 않고 failed + reviewRequired 상태로 남긴다.
-다음 단계는 image/TTS job record를 MissionContent teacher_review 생성 흐름에 연결하는 것이다.
+생성된 MissionContent는 `teacher_review` 상태와 schema validation을 통과해야 저장된다.
 ```
 
 ElevenLabs TTS는 4단계 realtime이 아니라 정적 콘텐츠 안내 음성 사전 생성에만 사용한다.
@@ -253,6 +253,14 @@ OPENAI_API_KEY가 있으면 실제 이미지 생성 가능
 OPENAI_API_KEY가 없거나 생성 실패 시 job failed 상태와 error reason 저장
 QA 실패 시 재생성 요청 가능
 fallback seed asset 대체 없음
+```
+
+상태:
+
+```text
+완료(MVP). OpenAI 이미지 생성 adapter, 단일 asset 생성 API, 5개 이미지 + 5개 오디오 package 생성 API를 추가했다.
+생성 성공 시 /generated asset URL로 연결하고, 실패 시 424 + reviewRequired 오류를 반환한다.
+별도 background job queue/table은 운영 고도화 단계에서 진행한다.
 ```
 
 ## 마일스톤 8. 승인과 배포
@@ -304,7 +312,7 @@ POST /api/contents/:id/assets/generate-package로 5개 이미지 + 5개 오디�
 상태:
 
 ```text
-부분 완료. 오늘의 미션 조회, 콘텐츠 시작, 1~3단계 submit, 학생 활동 이벤트 저장, 회고, 완료 API를 추가했다.
+완료(MVP). 오늘의 미션 조회, 콘텐츠 시작, 1~3단계 submit, 학생 활동 이벤트 저장, 회고, 완료 API를 추가했다.
 ```
 
 ## 마일스톤 10. 4단계 realtime
@@ -333,7 +341,7 @@ stage.step != 4이면 session 생성 실패.
 상태:
 
 ```text
-부분 완료. OpenAI realtime client secret 발급 adapter, realtime session 생성 계약, realtime 이벤트 저장, realtime 완료 저장 API를 추가했다.
+완료(MVP). OpenAI realtime client secret 발급 adapter, realtime session 생성 계약, realtime 이벤트 저장, realtime 완료 저장 API를 추가했다.
 OPENAI_API_KEY가 없으면 가짜 secret을 반환하지 않고 424 + 검수 필요 오류를 반환한다.
 ```
 
