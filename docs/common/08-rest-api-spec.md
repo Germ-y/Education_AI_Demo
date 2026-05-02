@@ -49,11 +49,44 @@ Realtime client secret: 짧은 TTL로 발급
 ## 2. Context And Demo Auth APIs
 
 MVP에서는 회원가입/일반 로그인보다 seed된 사용자/학생/학교 데이터를 조회하는 것이 먼저다.
-`demo-login`과 `student-access`는 개발/공모전 데모용이다.
+프론트 초기 연결은 `GET /api/context/seed` 또는 `GET /api/context/me`로 teacher/student/case/content 매핑을 받은 뒤 시작한다.
+`demo-login`과 `student-access`는 개발/공모전 데모용 보조 API다.
+
+### GET /api/context/seed
+
+별도 로그인 없이 seed된 센터, 교사 1명, 학생 3명, 학생별 case/content 매핑을 조회한다.
+
+```json
+{
+  "data": {
+    "mode": "demo_seed",
+    "organization": "Organization",
+    "teacher": "UserProfile",
+    "students": ["TeacherStudentSummary"],
+    "assignments": [
+      {
+        "teacherId": "user_teacher_demo",
+        "studentId": "student_learning_fraction",
+        "caseId": "case_learning_fraction",
+        "caseStatus": "open"
+      }
+    ],
+    "missionMappings": [
+      {
+        "contentId": "content_fraction_001",
+        "studentId": "student_learning_fraction",
+        "caseId": "case_learning_fraction",
+        "status": "published",
+        "totalSteps": 4
+      }
+    ]
+  }
+}
+```
 
 ### GET /api/context/me
 
-현재 데모 사용자와 조직 정보를 조회한다.
+현재 데모 seed 기준 사용자와 조직 정보를 조회한다. MVP에서는 `context/seed`와 같은 shape을 반환한다.
 
 ```json
 {
@@ -152,6 +185,36 @@ monthlySummary
 recentContents
 plannerItems
 publicContextSummary
+```
+
+### GET /api/teacher/students/:studentId/history
+
+학생별 사례 메모, 생성/배포 콘텐츠, 시도, 활동 이벤트, realtime 세션 히스토리를 조회한다.
+
+```json
+{
+  "data": {
+    "student": "Student",
+    "openCase": "SupportCase",
+    "caseNotes": ["CaseNote"],
+    "missionContents": ["MissionContent"],
+    "attempts": ["ContentAttempt"],
+    "activityEvents": ["ActivityEvent"],
+    "realtimeSessions": ["RealtimePracticeSession"]
+  }
+}
+```
+
+### POST /api/teacher/students/:studentId/notes
+
+학생의 열린 case에 교사 메모를 추가한다.
+
+```json
+{
+  "noteType": "teacher_comment",
+  "body": "오늘은 시각 자료 반응이 좋아 분수 설명을 짧게 이어가면 좋겠습니다.",
+  "visibility": "teacher_only"
+}
 ```
 
 ### PATCH /api/teacher/students/:studentId/memory-card

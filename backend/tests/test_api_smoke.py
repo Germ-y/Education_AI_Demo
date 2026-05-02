@@ -6,6 +6,16 @@ from app.main import create_app
 def test_teacher_and_student_demo_flows() -> None:
     client = TestClient(create_app())
 
+    seed_context = client.get("/api/context/seed")
+    assert seed_context.status_code == 200
+    assert seed_context.json()["data"]["teacher"]["id"] == "user_teacher_demo"
+    assert len(seed_context.json()["data"]["students"]) == 3
+    assert {mapping["studentId"] for mapping in seed_context.json()["data"]["assignments"]} == {
+        "student_learning_clock",
+        "student_learning_fraction",
+        "student_life_bus",
+    }
+
     teacher_login = client.post(
         "/api/auth/demo-login",
         json={"role": "teacher", "email": "teacher.demo@eduyj.local"},
@@ -30,6 +40,18 @@ def test_teacher_and_student_demo_flows() -> None:
     assert timetable_context.status_code == 200
     timetable = timetable_context.json()["data"]["timetableSummary"]
     assert [slot["subjectName"] for slot in timetable] == ["역사", "동아리활동", "진로와 직업", "국어", "과학", "도덕"]
+
+    history = client.get("/api/teacher/students/student_learning_fraction/history", headers={"authorization": f"Bearer {teacher_token}"})
+    assert history.status_code == 200
+    assert history.json()["data"]["missionContents"][0]["studentId"] == "student_learning_fraction"
+
+    note = client.post(
+        "/api/teacher/students/student_learning_fraction/notes",
+        headers={"authorization": f"Bearer {teacher_token}"},
+        json={"noteType": "teacher_comment", "body": "다음 회기에는 전체 수 먼저 세기.", "visibility": "teacher_only"},
+    )
+    assert note.status_code == 200
+    assert note.json()["data"]["caseId"] == "case_learning_fraction"
 
     student_login = client.post("/api/auth/student-access", json={"accessCode": "STAR-001"})
     assert student_login.status_code == 200

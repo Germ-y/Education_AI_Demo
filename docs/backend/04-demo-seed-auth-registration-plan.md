@@ -59,6 +59,7 @@ MVP에서는 회원가입/일반 로그인 UI를 만들지 않는다.
 허용:
 
 ```text
+별도 로그인 없는 seed context 조회
 seed된 데모 교사 식별
 seed된 학생 access code
 GET /api/context/me 같은 현재 데모 사용자 조회
@@ -210,13 +211,19 @@ idempotency 규칙:
 MVP 필수는 가입/로그인이 아니라 seed 데이터 조회다.
 
 ```http
+GET  /api/context/seed
 GET  /api/context/me
 GET  /api/teacher/students
 GET  /api/teacher/students/:studentId
+GET  /api/teacher/students/:studentId/history
+POST /api/teacher/students/:studentId/notes
 GET  /api/public-data/schools/:schoolId/context
 POST /api/auth/demo-login
 POST /api/auth/student-access
 ```
+
+`context/seed`는 프론트가 처음 호출해 teacherId, studentId, caseId, contentId 매핑을 고정하는 API다.
+그 뒤 교사 대시보드, 학생 미션, 히스토리 화면은 이 ID를 기준으로 조회한다.
 
 `demo-login`과 `student-access`는 데모 환경에서만 활성화한다.
 실제 회원가입/비밀번호 로그인은 공모전 MVP 이후 확장한다.

@@ -159,6 +159,14 @@ class MemoryCardPatch(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class CaseNoteCreate(BaseModel):
+    note_type: Literal["consultation", "session", "teacher_comment", "guardian"] = Field(alias="noteType")
+    body: str
+    visibility: Literal["teacher_only", "center", "guardian_summary"] = "teacher_only"
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class StageSubmitRequest(BaseModel):
     attempt_id: str = Field(alias="attemptId")
     answer: dict[str, Any]

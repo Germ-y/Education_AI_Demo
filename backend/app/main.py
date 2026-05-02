@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.response import ok
-from app.api.routes import auth, public_data, student, teacher
+from app.api.routes import auth, context, public_data, student, teacher
 from app.core.config import get_settings
 
 
@@ -21,6 +21,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(auth.router)
+    app.include_router(context.router)
     app.include_router(teacher.router)
     app.include_router(student.router)
     app.include_router(public_data.router)
