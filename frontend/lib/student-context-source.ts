@@ -212,17 +212,25 @@ function readChoices(template: Record<string, unknown>) {
 }
 
 function readAnswer(templateType: TemplateType, template: Record<string, unknown>) {
-  if (typeof template.answer === "string") return template.answer;
+  if (typeof template.answer === "string") return readChoiceTextById(template, template.answer) ?? template.answer;
+  if (Array.isArray(template.answerOrder)) return template.answerOrder.map(String).join(">");
   if (templateType === "blank_fill") {
-    const acceptedAnswers = template.acceptedAnswers;
-    if (Array.isArray(acceptedAnswers)) {
-      const first = acceptedAnswers[0];
-      if (first && typeof first === "object" && "numerator" in first && "denominator" in first) {
-        return `${first.numerator}|${first.denominator}`;
-      }
-    }
+    const answer = readAcceptedFractionAnswer(template);
+    if (answer) return `${answer.numerator}|${answer.denominator}`;
   }
   return undefined;
+}
+
+function readChoiceTextById(template: Record<string, unknown>, answerId: string) {
+  const choices = template.choices;
+  if (!Array.isArray(choices)) return undefined;
+
+  const matchedChoice = choices.find(
+    (choice) => choice && typeof choice === "object" && "id" in choice && String(choice.id) === answerId,
+  );
+
+  if (!matchedChoice || typeof matchedChoice !== "object" || !("text" in matchedChoice)) return undefined;
+  return typeof matchedChoice.text === "string" ? matchedChoice.text : undefined;
 }
 
 function readSequenceItems(template: Record<string, unknown>) {
@@ -269,5 +277,30 @@ function readFillOptions(template: Record<string, unknown>) {
     return tiles.filter((tile): tile is string => typeof tile === "string").map((tile) => ({ id: tile, label: tile }));
   }
 
+  const answer = readAcceptedFractionAnswer(template);
+  if (answer) {
+    const values = [answer.numerator, answer.denominator].filter(
+      (value): value is string => typeof value === "string" && value.length > 0,
+    );
+
+    return Array.from(new Set(values)).map((value) => ({
+      id: value,
+      label: value,
+    }));
+  }
+
   return undefined;
+}
+
+function readAcceptedFractionAnswer(template: Record<string, unknown>) {
+  const acceptedAnswers = template.acceptedAnswers;
+  if (!Array.isArray(acceptedAnswers)) return undefined;
+
+  const first = acceptedAnswers[0];
+  if (!first || typeof first !== "object" || !("numerator" in first) || !("denominator" in first)) return undefined;
+
+  return {
+    numerator: String(first.numerator),
+    denominator: String(first.denominator),
+  };
 }

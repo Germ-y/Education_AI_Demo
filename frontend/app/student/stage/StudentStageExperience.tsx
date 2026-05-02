@@ -285,8 +285,8 @@ function ConceptCards({ question, theme }: { question: StageQuestion; theme: Sce
     <div className="space-y-3">
       {question.body && <p className="rounded-[18px] bg-[#fbfdff] px-4 py-4 text-base font-bold leading-7 text-[#4b5563]">{question.body}</p>}
       <div className="grid gap-3">
-        {question.conceptCards?.map((card) => (
-          <div key={card.title} className="rounded-[18px] border px-4 py-3" style={{ borderColor: theme.border, backgroundColor: theme.accentPale }}>
+        {question.conceptCards?.map((card, index) => (
+          <div key={`${card.title}-${index}`} className="rounded-[18px] border px-4 py-3" style={{ borderColor: theme.border, backgroundColor: theme.accentPale }}>
             <p className="text-base font-black" style={{ color: theme.accentStrong }}>
               {card.title}
             </p>
@@ -332,7 +332,7 @@ function OxTemplate({
           OX 확인
         </p>
         {items.map((item, itemIndex) => (
-          <div key={item.statement} className="rounded-[18px] bg-white/82 p-3 shadow-sm">
+          <div key={`${item.statement}-${itemIndex}`} className="rounded-[18px] bg-white/82 p-3 shadow-sm">
             <p className="text-base font-black leading-7 break-keep">
               <span className="mr-2" style={{ color: theme.accentStrong }}>
                 {itemIndex + 1}.
@@ -340,13 +340,13 @@ function OxTemplate({
               {item.statement}
             </p>
             <div className="mt-3 grid grid-cols-2 gap-3">
-              {(question.choices ?? ["O", "X"]).map((choice) => {
+              {(question.choices ?? ["O", "X"]).map((choice, choiceIndex) => {
                 const selected = answers[itemIndex] === choice;
                 const isItemCorrect = choice === item.correctAnswer;
 
                 return (
                   <button
-                    key={`${item.statement}-${choice}`}
+                    key={`${item.statement}-${choice}-${choiceIndex}`}
                     onClick={() => onSelect(itemIndex, choice)}
                     disabled={isCorrect}
                     className={`h-14 rounded-[18px] border text-2xl font-black transition hover:-translate-y-0.5 ${
@@ -689,7 +689,7 @@ function FillBlankTemplate({
           if (part.kind === "text") return <span key={`${part.value}-${index}`}>{part.value}</span>;
           const value = slots[blankIndex++];
           return (
-            <span key={part.value} className="mx-1 inline-flex h-12 min-w-16 items-center justify-center rounded-[14px] border-2 border-dashed align-middle" style={{ borderColor: theme.accent, color: theme.accentStrong }}>
+            <span key={`${part.value}-${index}`} className="mx-1 inline-flex h-12 min-w-16 items-center justify-center rounded-[14px] border-2 border-dashed align-middle" style={{ borderColor: theme.accent, color: theme.accentStrong }}>
               {value || ""}
             </span>
           );
@@ -927,7 +927,7 @@ function RealtimePracticeRoom({
             <p className="text-xs font-black text-[#8a5a00]">확인할 점</p>
             <div className="mt-2 grid gap-2">
               {rubric.map((item, index) => (
-                <div key={item} className="flex items-center gap-2 text-xs font-bold leading-5 text-[#5f4b16]">
+                <div key={`${item}-${index}`} className="flex items-center gap-2 text-xs font-bold leading-5 text-[#5f4b16]">
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white" style={{ backgroundColor: theme.accent }}>
                     {index + 1}
                   </span>
@@ -1610,8 +1610,8 @@ export function StudentStageExperience({
                   ) : activeQuestion.kind === "scenario" ? (
                     <div className="space-y-3">
                       <div className="space-y-2 rounded-[18px] bg-[#fbfdff] px-4 py-4">
-                        {activeQuestion.scenarioLines?.map((line) => (
-                          <div key={`${line.speaker}-${line.text}`} className="leading-6">
+                        {activeQuestion.scenarioLines?.map((line, index) => (
+                          <div key={`${line.speaker}-${line.text}-${index}`} className="leading-6">
                             <p className="text-xs font-black" style={{ color: theme.accentStrong }}>
                               {line.speaker}
                             </p>
@@ -1622,7 +1622,7 @@ export function StudentStageExperience({
                       <div className="grid gap-3">
                         {activeQuestion.choices?.map((choice, index) => (
                           <ChoiceButton
-                            key={choice}
+                            key={`${choice}-${index}`}
                             label={choice}
                             prefix={`${index + 1}`}
                             selected={answer === choice}
@@ -1638,7 +1638,7 @@ export function StudentStageExperience({
                     <div className="grid gap-4 pt-4">
                       {activeQuestion.choices?.map((choice, index) => (
                         <ChoiceButton
-                          key={choice}
+                          key={`${choice}-${index}`}
                           label={choice}
                           prefix={`${index + 1}`}
                           selected={answer === choice}
@@ -1719,7 +1719,13 @@ export function StudentStageExperience({
                     className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.18)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.26)]"
                     style={{ backgroundColor: `${theme.accent}99` }}
                   >
-                    {isStructuredStage ? "카드를 눌러 완성해볼까요" : answer ? "다시 골라볼까요" : "정답을 찾아볼까요"}
+                    {activeQuestion.kind === "fillBlank"
+                      ? "숫자를 골라 빈칸에 넣어볼까요"
+                      : isStructuredStage
+                        ? "카드를 눌러 완성해볼까요"
+                        : answer
+                          ? "다시 골라볼까요"
+                          : "정답을 찾아볼까요"}
                   </button>
                 )}
               </aside>

@@ -702,3 +702,41 @@ realtime_teach_back
 7. image asset role 5개를 화면에서 어디에 쓰는지 정해져 있는가?
 8. mock 데이터가 이 문서의 최소 스키마를 만족하는가?
 ```
+
+### Dashboard read-model additions
+
+Teacher dashboard APIs include UI-facing read-model fields so the frontend does not invent student observations.
+The source of student observation fields is `students.profile_json.dashboard`; the API may expose the same values on read models for UI convenience.
+
+StudentProfile.profileJson stores:
+
+```json
+{
+  "dashboard": {
+    "attendanceRate": 95,
+    "strengths": ["그림 자료 반응", "짧은 단계 설명"],
+    "weaknesses": ["분모/분자 위치 혼동"]
+  }
+}
+```
+
+StudentProfile and StudentListItem may expose:
+
+```json
+{
+  "attendanceRate": 95,
+  "strengths": ["그림 자료 반응", "짧은 단계 설명"],
+  "weaknesses": ["분모/분자 위치 혼동"]
+}
+```
+
+SupportCaseSummary and StudentListItem may include:
+
+```json
+{
+  "dashboardStage": "initial_review | material_generation | material_review | learning | feedback",
+  "supportStrategy": "그림 자료와 짧은 단계 설명으로 반복 확인"
+}
+```
+
+`latestContentStatus: "none"` and `dashboardStage: "initial_review"` means the dashboard should show 초기 확인, not 학습 중.

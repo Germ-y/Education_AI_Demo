@@ -8,3 +8,7 @@ export function getTeacherStudents(options?: ApiAdapterOptions & { source?: ApiD
 export function getTeacherStudent(studentId: string, options?: ApiAdapterOptions & { source?: ApiDataSource }) {
   return getApiAdapter(options?.source).getTeacherStudent(studentId, options);
 }
+
+export function getTeacherStudentReport(studentId: string, options?: ApiAdapterOptions & { source?: ApiDataSource }) {
+  return getApiAdapter(options?.source).getTeacherStudentReport(studentId, options);
+}

@@ -16,6 +16,7 @@ import type {
   StudentListItem,
   StudentMissionSummary,
   StudentProfile,
+  StudentReport,
 } from "./contracts";
 
 const now = "2026-05-02T00:00:00.000Z";
@@ -70,7 +71,16 @@ const students: StudentProfile[] = [
     schoolCode: "demo_middle_school",
     studentType: "learning_focus",
     primaryNeed: "분수의 전체-부분 관계 이해",
-    profileJson: { interests: ["요리", "탐험"], readingLoad: "low", choiceCountLimit: 3 },
+    profileJson: {
+      interests: ["요리", "탐험"],
+      readingLoad: "low",
+      choiceCountLimit: 3,
+      dashboard: {
+        attendanceRate: 95,
+        strengths: ["그림 자료 반응", "짧은 단계 설명"],
+        weaknesses: ["분모/분자 위치 혼동", "문장 조건 읽기 부담"],
+      },
+    },
     status: "active",
   },
   {
@@ -82,7 +92,16 @@ const students: StudentProfile[] = [
     schoolCode: "demo_elementary_school",
     studentType: "life_support",
     primaryNeed: "센터 이동 순서와 도움 요청 연습",
-    profileJson: { interests: ["동네 지도", "역할극"], readingLoad: "very_low", choiceCountLimit: 2 },
+    profileJson: {
+      interests: ["동네 지도", "역할극"],
+      readingLoad: "very_low",
+      choiceCountLimit: 2,
+      dashboard: {
+        attendanceRate: 91,
+        strengths: ["상황 그림 이해", "역할 연습 참여"],
+        weaknesses: ["이동 순서 계획", "도움 요청 말하기"],
+      },
+    },
     status: "active",
   },
   {
@@ -94,7 +113,16 @@ const students: StudentProfile[] = [
     schoolCode: "demo_middle_school",
     studentType: "life_support",
     primaryNeed: "긴 과제를 작은 첫 행동으로 나누기",
-    profileJson: { interests: ["축구", "영상 만들기"], readingLoad: "medium", choiceCountLimit: 3 },
+    profileJson: {
+      interests: ["축구", "영상 만들기"],
+      readingLoad: "medium",
+      choiceCountLimit: 3,
+      dashboard: {
+        attendanceRate: 88,
+        strengths: ["구체적 예시 기억", "목표가 보일 때 집중"],
+        weaknesses: ["긴 과제 시작 부담", "첫 행동 계획 세우기"],
+      },
+    },
     status: "active",
   },
 ];
@@ -323,6 +351,21 @@ function getSupportCase(studentId: string): SupportCaseSummary {
   return supportCase;
 }
 
+function readDashboard(profileJson: Record<string, unknown>) {
+  const dashboard = profileJson.dashboard;
+  return dashboard && typeof dashboard === "object" ? dashboard as Record<string, unknown> : {};
+}
+
+function readDashboardNumber(profileJson: Record<string, unknown>, key: string) {
+  const value = readDashboard(profileJson)[key];
+  return typeof value === "number" ? value : null;
+}
+
+function readDashboardStringList(profileJson: Record<string, unknown>, key: string) {
+  const value = readDashboard(profileJson)[key];
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
 export const devAdapter: ApiAdapter = {
   async demoLogin(payload) {
     return {
@@ -386,6 +429,9 @@ export const devAdapter: ApiAdapter = {
         schoolName: school?.name,
         studentType: student.studentType,
         primaryNeed: student.primaryNeed,
+        attendanceRate: readDashboardNumber(student.profileJson, "attendanceRate"),
+        strengths: readDashboardStringList(student.profileJson, "strengths"),
+        weaknesses: readDashboardStringList(student.profileJson, "weaknesses"),
         caseStatus: "open",
         latestContentStatus: latestMission?.status ?? "none",
         nextSessionSuggestion:
@@ -445,6 +491,58 @@ export const devAdapter: ApiAdapter = {
       ],
       publicContextSummary: { schoolCode: student.schoolCode, sources: ["seed_snapshot"] },
     } satisfies StudentCaseFile;
+  },
+
+  async getTeacherStudentReport(studentId) {
+    const student = getStudent(studentId);
+    const supportCase = getSupportCase(student.id);
+    const mission = missions.find((item) => item.studentId === student.id);
+
+    return {
+      student,
+      openCase: supportCase,
+      reports: mission
+        ? [
+            {
+              id: `review_${student.id}_dev`,
+              studentId: student.id,
+              caseId: supportCase.id,
+              contentId: mission.id,
+              contentTitle: mission.title,
+              attemptId: `attempt_${student.id}_dev`,
+              startedAt: now,
+              completedAt: now,
+              completionRate: 1,
+              accuracyRate: student.studentType === "learning_focus" ? 0.5 : 1,
+              durationSec: 840,
+              answerCount: 2,
+              wrongCount: student.studentType === "learning_focus" ? 1 : 0,
+              hintCount: 1,
+              shortSummary:
+                student.studentType === "learning_focus"
+                  ? "4단계를 모두 완료했습니다. 전체 조각 수를 먼저 세도록 안내하면 1/4 설명이 안정됩니다."
+                  : "4단계를 모두 완료했습니다. 도움 요청은 가능하며 다음 행동 확인 문장 연습이 더 필요합니다.",
+              wrongPatternJson: {
+                patterns:
+                  student.studentType === "learning_focus"
+                    ? ["전체 조각 수보다 고른 조각 수를 먼저 세는 경향"]
+                    : ["다음 행동 확인 문장은 예시 후 따라 말함"],
+              },
+              realtimeResultJson: {
+                nextSupport:
+                  student.studentType === "learning_focus"
+                    ? "전체 조각 수를 먼저 세고 고른 조각 수를 나중에 세는 순서를 반복합니다."
+                    : "짧은 확인 문장 한 가지를 먼저 연습합니다.",
+              },
+              realtimeTranscriptSummary:
+                student.studentType === "learning_focus"
+                  ? "시각 자료를 보며 1/4 설명을 마쳤고 분모 단서가 한 번 필요했습니다."
+                  : "목적지와 도움 요청은 말했지만 다음 행동 확인은 예시가 필요했습니다.",
+              reflection: { reflectionChoice: "다시 연습하고 싶어요" },
+            },
+          ]
+        : [],
+    } satisfies StudentReport;
   },
 
   async getSchoolContext(schoolId) {

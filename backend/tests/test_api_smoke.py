@@ -16,6 +16,7 @@ def use_sqlite_demo_db(tmp_path) -> None:
     os.environ["DEMO_SEED_RESET"] = "true"
     os.environ["OPENAI_API_KEY"] = ""
     os.environ["ELEVENLABS_API_KEY"] = ""
+    os.environ["NEIS_API_KEY"] = ""
     get_settings.cache_clear()
     get_engine.cache_clear()
     get_session_maker.cache_clear()
@@ -76,6 +77,10 @@ def test_teacher_and_student_demo_flows() -> None:
     history = client.get("/api/teacher/students/student_learning_fraction/history", headers={"authorization": f"Bearer {teacher_token}"})
     assert history.status_code == 200
     assert history.json()["data"]["missionContents"][0]["studentId"] == "student_learning_fraction"
+    report = client.get("/api/teacher/students/student_learning_fraction/report", headers={"authorization": f"Bearer {teacher_token}"})
+    assert report.status_code == 200
+    assert report.json()["data"]["reports"][0]["studentId"] == "student_learning_fraction"
+    assert "Completed" not in report.json()["data"]["reports"][0]["shortSummary"]
 
     teacher_content = client.get("/api/contents/content_fraction_001", headers={"authorization": f"Bearer {teacher_token}"})
     assert teacher_content.status_code == 200

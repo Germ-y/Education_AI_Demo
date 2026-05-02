@@ -10,7 +10,7 @@ import {
   type CaseStatus,
   type SupportCase,
 } from "@/lib/demo-data";
-import { getTeacherStudent, getTeacherStudents, type StudentCaseFile, type StudentListItem } from "@/lib/api";
+import { demoLogin, getTeacherStudent, getTeacherStudents, type StudentCaseFile, type StudentListItem } from "@/lib/api";
 
 type DashboardTab = "info" | "materials" | "records";
 
@@ -124,9 +124,64 @@ type DashboardStudentView = {
   name: string;
   school: string;
   grade: string;
-  attendanceRate: number;
+  attendanceRate: number | null;
   strengths: string[];
+  weaknesses: string[];
 };
+
+function toDashboardStatus(item?: StudentListItem): CaseStatus {
+  if (item?.dashboardStage === "initial_review") return "intake";
+  if (item?.dashboardStage === "material_generation") return "structured";
+  if (item?.dashboardStage === "material_review") return "scene_review";
+  if (item?.dashboardStage === "learning") return "goal_set";
+  if (item?.dashboardStage === "feedback") return "follow_up";
+  if (item?.latestContentStatus === "completed") return "follow_up";
+  if (item?.latestContentStatus && item.latestContentStatus !== "none") return "scene_review";
+  return "intake";
+}
+
+function toSupportCaseFromListItem(item: StudentListItem): SupportCase {
+  const status = toDashboardStatus(item);
+
+  return {
+    id: `${item.studentId}-case-summary`,
+    studentId: item.studentId,
+    status,
+    statusLabel: learningStatus[status].label,
+    caseType: item.studentType === "learning_focus" ? "학습 집중" : "생활 연습",
+    primaryNeed: item.primaryNeed,
+    sessionGoal: item.primaryNeed,
+    supportStrategy: item.supportStrategy ?? (item.studentType === "learning_focus" ? "초기 학습 반응 확인" : "상황 장면 기반"),
+    nextAction: item.nextSessionSuggestion,
+    riskNote: "학생 화면에는 진단 표현을 노출하지 않음",
+    challengeTags: item.weaknesses && item.weaknesses.length > 0 ? item.weaknesses : [item.primaryNeed],
+    planTags: [item.nextSessionSuggestion],
+  };
+}
+
+function toSupportCaseFromCaseFile(caseFile: StudentCaseFile, listItem?: StudentListItem): SupportCase {
+  const status = toDashboardStatus(listItem);
+
+  return {
+    id: caseFile.openCase.id,
+    studentId: caseFile.profile.id,
+    status,
+    statusLabel: learningStatus[status].label,
+    caseType: caseFile.profile.studentType === "learning_focus" ? "학습 집중" : "생활 연습",
+    primaryNeed: caseFile.profile.primaryNeed,
+    sessionGoal: caseFile.openCase.currentGoal,
+    supportStrategy:
+      caseFile.openCase.supportStrategy ??
+      toDisplayLabels(caseFile.memoryCard?.effectiveExplanationStyles, ["정적 콘텐츠", "실시간 연습"]).join(", "),
+    nextAction: listItem?.nextSessionSuggestion ?? "다음 미션 확인",
+    riskNote: caseFile.memoryCard?.nextSessionCautions.join(", ") || "학생 화면에는 진단 표현을 노출하지 않음",
+    challengeTags:
+      caseFile.profile.weaknesses && caseFile.profile.weaknesses.length > 0
+        ? caseFile.profile.weaknesses
+        : toDisplayLabels(caseFile.memoryCard?.learningProblemTypes),
+    planTags: caseFile.plannerItems.map((item) => item.goalText),
+  };
+}
 
 const memoryLabelMap: Record<string, string> = {
   visual_example: "그림 예시",
@@ -163,6 +218,7 @@ export default function DashboardPage() {
   const [selectedStudentId, setSelectedStudentId] = useState(students[0].id);
   const [teacherStudentItems, setTeacherStudentItems] = useState<StudentListItem[]>([]);
   const [selectedCaseFile, setSelectedCaseFile] = useState<StudentCaseFile | null>(null);
+  const [teacherToken, setTeacherToken] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<DashboardTab>("info");
   const [openReportId, setOpenReportId] = useState<string | null>(null);
@@ -190,16 +246,26 @@ export default function DashboardPage() {
   useEffect(() => {
     let ignore = false;
 
-    getTeacherStudents()
-      .then((items) => {
+    async function loadStudents() {
+      try {
+        const login = await demoLogin({ role: "teacher", email: "teacher.demo@eduyj.local" });
         if (ignore) return;
+
+        const token = login.session.accessToken;
+        const items = await getTeacherStudents({ token });
+        if (ignore) return;
+
+        setTeacherToken(token);
         setTeacherStudentItems(items);
         if (items.length > 0) setSelectedStudentId(items[0].studentId);
-      })
-      .catch(() => {
+      } catch {
         if (ignore) return;
+        setTeacherToken(null);
         setTeacherStudentItems([]);
-      });
+      }
+    }
+
+    loadStudents();
 
     return () => {
       ignore = true;
@@ -210,7 +276,8 @@ export default function DashboardPage() {
     if (teacherStudentItems.length === 0) return;
 
     let ignore = false;
-    getTeacherStudent(selectedStudentId)
+
+    getTeacherStudent(selectedStudentId, teacherToken ? { token: teacherToken } : undefined)
       .then((caseFile) => {
         if (!ignore) setSelectedCaseFile(caseFile);
       })
@@ -221,18 +288,29 @@ export default function DashboardPage() {
     return () => {
       ignore = true;
     };
-  }, [selectedStudentId, teacherStudentItems.length]);
+  }, [selectedStudentId, teacherStudentItems.length, teacherToken]);
 
   const dashboardStudents = useMemo<DashboardStudentView[]>(() => {
-    if (teacherStudentItems.length === 0) return students;
+    if (teacherStudentItems.length === 0) {
+      return students.map((student) => ({
+        id: student.id,
+        name: student.name,
+        school: student.school,
+        grade: student.grade,
+        attendanceRate: student.attendanceRate,
+        strengths: student.strengths,
+        weaknesses: [],
+      }));
+    }
 
     return teacherStudentItems.map((item) => ({
       id: item.studentId,
       name: item.displayName,
       school: item.schoolName ?? "학교 정보 확인 중",
       grade: item.grade,
-      attendanceRate: 90,
-      strengths: item.studentType === "learning_focus" ? ["시각 자료 반응", "짧은 단계 학습"] : ["상황 이해", "역할 연습"],
+      attendanceRate: item.attendanceRate ?? null,
+      strengths: item.strengths ?? [],
+      weaknesses: item.weaknesses ?? [],
     }));
   }, [teacherStudentItems]);
 
@@ -251,26 +329,25 @@ export default function DashboardPage() {
 
   const selectedStudent = dashboardStudents.find((student) => student.id === selectedStudentId) ?? dashboardStudents[0] ?? students[0];
   const selectedApiStudent = teacherStudentItems.find((student) => student.studentId === selectedStudent.id);
+  const activeCaseFile = selectedCaseFile?.profile.id === selectedStudent.id ? selectedCaseFile : null;
   const fallbackCase = supportCases.find((supportCase) => supportCase.studentId === selectedStudent.id) ?? supportCases[0];
-  const selectedCase: SupportCase = selectedCaseFile
-    ? {
-        id: selectedCaseFile.openCase.id,
-        studentId: selectedCaseFile.profile.id,
-        status: "scene_review",
-        statusLabel: "API 조회",
-        caseType: selectedCaseFile.profile.studentType === "learning_focus" ? "학습 집중" : "생활 연습",
-        primaryNeed: selectedCaseFile.profile.primaryNeed,
-        sessionGoal: selectedCaseFile.openCase.currentGoal,
-        supportStrategy: toDisplayLabels(selectedCaseFile.memoryCard?.effectiveExplanationStyles, ["정적 콘텐츠", "실시간 연습"]).join(", "),
-        nextAction: selectedApiStudent?.nextSessionSuggestion ?? "다음 미션 확인",
-        riskNote: selectedCaseFile.memoryCard?.nextSessionCautions.join(", ") || "학생 화면에는 진단 표현을 노출하지 않음",
-        challengeTags: toDisplayLabels(selectedCaseFile.memoryCard?.learningProblemTypes),
-        planTags: selectedCaseFile.plannerItems.map((item) => item.goalText),
-      }
-    : fallbackCase;
+  const selectedCase: SupportCase = activeCaseFile
+    ? toSupportCaseFromCaseFile(activeCaseFile, selectedApiStudent)
+    : selectedApiStudent
+      ? toSupportCaseFromListItem(selectedApiStudent)
+      : fallbackCase;
   const selectedReviewItems = reviewItems.filter((item) => item.caseId === selectedCase.id);
   const selectedRecords = sessionRecords.filter((record) => record.caseId === selectedCase.id);
-  const currentWorkflowStep = selectedCase.status === "follow_up" ? 4 : selectedCase.status === "scene_review" ? 2 : 3;
+  const currentWorkflowStep =
+    selectedCase.status === "intake"
+      ? 0
+      : selectedCase.status === "structured"
+        ? 1
+        : selectedCase.status === "scene_review"
+          ? 2
+          : selectedCase.status === "follow_up"
+            ? 4
+            : 3;
   const sessionLogs = selectedRecords.map((record, index) => {
     const attemptCount = index === 0 ? 9 : 7;
     const wrongCount = index === 0 ? 4 : 2;
@@ -385,7 +462,10 @@ export default function DashboardPage() {
 
           <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-[#e5e9f0]">
             {filteredStudents.map((student) => {
-              const supportCase = supportCases.find((item) => item.studentId === student.id) ?? supportCases[0];
+              const apiStudent = teacherStudentItems.find((item) => item.studentId === student.id);
+              const supportCase = apiStudent
+                ? toSupportCaseFromListItem(apiStudent)
+                : supportCases.find((item) => item.studentId === student.id) ?? supportCases[0];
 
               return (
                 <button
@@ -444,11 +524,15 @@ export default function DashboardPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm font-bold text-[#64748b]">현재 단계</p>
-                      <p className="mt-1 text-lg font-black text-[#172033]">{workflowSteps[currentWorkflowStep - 1]}</p>
+                      <p className="mt-1 text-lg font-black text-[#172033]">
+                        {currentWorkflowStep === 0 ? "초기 확인" : workflowSteps[currentWorkflowStep - 1]}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm font-bold text-[#64748b]">출석</p>
-                      <p className="mt-1 text-lg font-black text-[#172033]">{selectedStudent.attendanceRate}%</p>
+                      <p className="mt-1 text-lg font-black text-[#172033]">
+                        {selectedStudent.attendanceRate === null ? "기록 전" : `${selectedStudent.attendanceRate}%`}
+                      </p>
                     </div>
                   </div>
                   <div className="mt-4 grid grid-cols-4 gap-3">
@@ -498,7 +582,7 @@ export default function DashboardPage() {
                   <div className="rounded-lg border border-[#e5e9f0] bg-white p-5">
                     <h3 className="text-xl font-black">강점</h3>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {selectedStudent.strengths.map((strength) => (
+                      {(selectedStudent.strengths.length > 0 ? selectedStudent.strengths : ["기록 전"]).map((strength) => (
                         <span
                           key={strength}
                           className="rounded-full bg-[#eef4fb] px-3 py-1 text-sm font-bold text-[#1f3a5f]"

@@ -113,6 +113,9 @@ export type StudentProfile = {
   studentType: ContentType;
   primaryNeed: string;
   profileJson: Record<string, unknown>;
+  attendanceRate?: number | null;
+  strengths?: string[];
+  weaknesses?: string[];
   status: StudentStatus;
 };
 
@@ -164,8 +167,13 @@ export type StudentListItem = {
   schoolName?: string;
   studentType: ContentType;
   primaryNeed: string;
+  attendanceRate?: number | null;
+  strengths?: string[];
+  weaknesses?: string[];
   caseStatus?: CaseStatus;
   latestContentStatus: MissionStatus | "completed" | "none";
+  dashboardStage?: "initial_review" | "material_generation" | "material_review" | "learning" | "feedback";
+  supportStrategy?: string | null;
   nextSessionSuggestion: string;
 };
 
@@ -175,6 +183,8 @@ export type SupportCaseSummary = {
   ownerTeacherId: string;
   caseStatus: CaseStatus;
   currentGoal: string;
+  dashboardStage?: "initial_review" | "material_generation" | "material_review" | "learning" | "feedback";
+  supportStrategy?: string | null;
   openedAt: string;
 };
 
@@ -224,6 +234,34 @@ export type StudentCaseFile = {
   recentContents: MissionContent[];
   plannerItems: PlannerItem[];
   publicContextSummary?: Record<string, unknown>;
+};
+
+export type StudentReportItem = {
+  id: string;
+  studentId: string;
+  caseId: string;
+  contentId: string;
+  contentTitle?: string | null;
+  attemptId: string;
+  startedAt: string;
+  completedAt?: string | null;
+  completionRate: number;
+  accuracyRate: number;
+  durationSec?: number | null;
+  answerCount: number;
+  wrongCount: number;
+  hintCount: number;
+  shortSummary: string;
+  wrongPatternJson: Record<string, unknown>;
+  realtimeResultJson: Record<string, unknown>;
+  realtimeTranscriptSummary?: string | null;
+  reflection?: Record<string, unknown> | null;
+};
+
+export type StudentReport = {
+  student: StudentProfile;
+  openCase: SupportCaseSummary;
+  reports: StudentReportItem[];
 };
 
 export type Choice = {

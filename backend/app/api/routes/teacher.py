@@ -55,6 +55,26 @@ def get_student_history(
     return ok(history)
 
 
+@router.get("/students/{student_id}/report")
+def get_student_report(
+    student_id: str,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    report = demo_store.get_student_report(student_id, teacher_id=principal.id if principal.role == "teacher" else None)
+    if report is None:
+        raise HTTPException(status_code=404, detail={"code": "STUDENT_REPORT_NOT_FOUND", "message": "학생 리포트를 찾을 수 없습니다."})
+    demo_store.record_audit(
+        actor_user_id=principal.id,
+        student_id=student_id,
+        action="view_student_report",
+        resource_type="student",
+        resource_id=student_id,
+        payload_json={},
+    )
+    return ok(report)
+
+
 @router.post("/students/{student_id}/notes")
 def add_student_note(
     student_id: str,

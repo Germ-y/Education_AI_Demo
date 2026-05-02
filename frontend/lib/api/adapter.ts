@@ -15,6 +15,7 @@ import type {
   StudentCaseFile,
   StudentListItem,
   StudentMissionSummary,
+  StudentReport,
 } from "./contracts";
 
 export type ApiAdapterOptions = {
@@ -28,6 +29,7 @@ export type ApiAdapter = {
   getContextMe(options?: ApiAdapterOptions): Promise<ContextMe>;
   getTeacherStudents(options?: ApiAdapterOptions): Promise<StudentListItem[]>;
   getTeacherStudent(studentId: string, options?: ApiAdapterOptions): Promise<StudentCaseFile>;
+  getTeacherStudentReport(studentId: string, options?: ApiAdapterOptions): Promise<StudentReport>;
   getSchoolContext(schoolId: string, options?: ApiAdapterOptions): Promise<PublicContextBundle>;
   getTodayStudentMissions(options?: ApiAdapterOptions): Promise<StudentMissionSummary[]>;
   getStudentMission(contentId: string, options?: ApiAdapterOptions): Promise<MissionContent>;
