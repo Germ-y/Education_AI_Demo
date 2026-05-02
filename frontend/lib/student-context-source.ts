@@ -150,11 +150,26 @@ async function getMissionForRoute(contentId: string) {
 
 function resolveContentIdFromSeed(seed: Awaited<ReturnType<typeof getContextSeed>>, caseId?: string) {
   if (caseId) {
-    const matched = seed.mappings.find((mapping) => mapping.caseId === caseId);
+    const matched = findLatestMapping(seed.mappings, (mapping) => mapping.caseId === caseId);
     if (matched) return matched.contentId;
   }
 
-  return seed.mappings[0]?.contentId;
+  return findLatestMapping(seed.mappings)?.contentId;
+}
+
+function findLatestMapping(
+  mappings: Awaited<ReturnType<typeof getContextSeed>>["mappings"],
+  predicate: (mapping: Awaited<ReturnType<typeof getContextSeed>>["mappings"][number]) => boolean = () => true,
+) {
+  return [...mappings]
+    .filter(predicate)
+    .sort((left, right) => toTimestamp(right.updatedAt) - toTimestamp(left.updatedAt))[0];
+}
+
+function toTimestamp(value?: string | null) {
+  if (!value) return 0;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
 function stageToQuestion(mission: MissionContent, stage: MissionContent["stages"][number]): StageQuestion {

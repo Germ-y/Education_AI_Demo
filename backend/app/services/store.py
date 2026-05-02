@@ -113,8 +113,9 @@ class DemoStore:
                     "title": content.title,
                     "status": content.status,
                     "totalSteps": content.total_steps,
+                    "updatedAt": _mission_updated_at(content),
                 }
-                for content in self.db.mission_contents
+                for content in sorted(self.db.mission_contents, key=_mission_mapping_sort_key, reverse=True)
             ],
         }
 
@@ -760,6 +761,8 @@ class DemoStore:
 
     def save_generated_mission_content(self, mission: MissionContent) -> MissionContent:
         self.refresh()
+        if not isinstance(mission.brief_json.get("generatedAt"), str):
+            mission.brief_json = {**mission.brief_json, "generatedAt": _now()}
         self.db.mission_contents = [content for content in self.db.mission_contents if content.id != mission.id]
         self.db.mission_contents.append(mission)
         self.persist()
@@ -1210,6 +1213,20 @@ def _orchestrator_hints_from_subjects(subjects: list[str]) -> list[str]:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _mission_updated_at(content: MissionContent) -> str | None:
+    generated_at = content.brief_json.get("generatedAt") if isinstance(content.brief_json, dict) else None
+    candidates = [
+        value
+        for value in [content.published_at, content.approved_at, generated_at]
+        if isinstance(value, str) and value
+    ]
+    return max(candidates, default=None)
+
+
+def _mission_mapping_sort_key(content: MissionContent) -> tuple[str, str]:
+    return (_mission_updated_at(content) or "", content.id)
 
 
 def _duration_seconds(started_at: str, completed_at: str | None) -> int | None:

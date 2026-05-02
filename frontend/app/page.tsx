@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getContextSeed } from "@/lib/api";
+import { getContextSeed, type SeedContext } from "@/lib/api";
 
 const teacherRole = {
   href: "/dashboard",
@@ -25,11 +25,23 @@ function toStudentActivityDescription(primaryNeed: string) {
   return primaryNeed.replace(/(수업|콘텐츠)이 좋겠어요\.?$/, "").trim();
 }
 
+function findLatestStudentMapping(mappings: SeedContext["mappings"], studentId: string) {
+  return [...mappings]
+    .filter((mapping) => mapping.studentId === studentId)
+    .sort((left, right) => toTimestamp(right.updatedAt) - toTimestamp(left.updatedAt))[0];
+}
+
+function toTimestamp(value?: string | null) {
+  if (!value) return 0;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 export default async function Home() {
   const seed = await getContextSeed();
   const studentCases = seed.students.map((student) => {
     const supportCase = seed.cases.find((item) => item.studentId === student.id);
-    const mapping = seed.mappings.find((item) => item.studentId === student.id);
+    const mapping = findLatestStudentMapping(seed.mappings, student.id);
 
     return {
       studentId: student.id,

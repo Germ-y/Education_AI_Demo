@@ -434,6 +434,8 @@ export type SeedContext = {
     studentId: string;
     caseId: string;
     contentId: string;
+    status?: MissionStatus | string;
+    updatedAt?: string | null;
   }>;
 };
 

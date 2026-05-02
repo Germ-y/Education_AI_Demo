@@ -542,6 +542,15 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     assert [stage["step"] for stage in content["stages"]] == [1, 2, 3, 4]
     assert len([asset for asset in content["assets"] if asset["assetType"] == "image"]) == 5
     assert len([asset for asset in content["assets"] if asset["assetType"] == "audio"]) == 5
+    assert content["briefJson"]["generatedAt"]
+
+    latest_seed = client.get("/api/context/seed")
+    assert latest_seed.status_code == 200
+    latest_fraction_mapping = next(
+        mapping for mapping in latest_seed.json()["data"]["missionMappings"] if mapping["studentId"] == student_id
+    )
+    assert latest_fraction_mapping["contentId"] == "content_generated_contract_001"
+    assert latest_fraction_mapping["updatedAt"] == content["briefJson"]["generatedAt"]
 
     package = client.post("/api/contents/content_generated_contract_001/assets/generate-package")
     assert package.status_code == 200

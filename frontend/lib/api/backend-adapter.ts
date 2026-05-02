@@ -37,6 +37,7 @@ type BackendSeedContext = {
     caseId: string;
     status?: string;
     totalSteps?: number;
+    updatedAt?: string | null;
   }>;
 };
 
@@ -127,6 +128,8 @@ function normalizeSeedContext(seed: BackendSeedContext): SeedContext {
       studentId: mapping.studentId,
       caseId: mapping.caseId,
       contentId: mapping.contentId,
+      status: mapping.status,
+      updatedAt: mapping.updatedAt,
     })),
   };
 }
