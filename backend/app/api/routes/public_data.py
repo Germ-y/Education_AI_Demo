@@ -54,6 +54,85 @@ def get_school_context(
     )
 
 
+@router.get("/schools/{school_code}/timetable")
+def get_school_timetable(
+    school_code: str,
+    timetable_date: str | None = Query(default=None, alias="date"),
+    grade: str | None = None,
+    class_name: str | None = Query(default=None, alias="className"),
+    sync_if_missing: bool = Query(default=True, alias="syncIfMissing"),
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    school = demo_store.get_school(school_code)
+    if school is None:
+        raise HTTPException(status_code=404, detail={"code": "SCHOOL_NOT_FOUND", "message": "학교 정보를 찾을 수 없습니다."})
+
+    context = demo_store.get_timetable_context(
+        school_code,
+        timetable_date=timetable_date,
+        grade=grade,
+        class_name=class_name,
+    )
+    if context is None:
+        raise HTTPException(status_code=404, detail={"code": "SCHOOL_NOT_FOUND", "message": "학교 정보를 찾을 수 없습니다."})
+    if context["slots"] or not sync_if_missing:
+        return ok(context)
+
+    settings = get_settings()
+    if not settings.neis_api_key:
+        raise HTTPException(
+            status_code=424,
+            detail={
+                "code": "NEIS_API_KEY_MISSING",
+                "message": "저장된 시간표가 없고 NEIS_API_KEY가 없어 시간표를 조회할 수 없습니다.",
+                "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "cacheStatus": "empty"},
+            },
+        )
+    if not timetable_date or not grade or not class_name:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "TIMETABLE_QUERY_INCOMPLETE",
+                "message": "시간표 캐시가 없을 때 NEIS 조회를 실행하려면 date, grade, className이 필요합니다.",
+            },
+        )
+
+    try:
+        counts = demo_store.sync_neis_timetable_cache(
+            office_code=school.office_code,
+            school_code=school.school_code,
+            timetable_date=timetable_date,
+            grade=grade,
+            class_name=class_name,
+            client=NeisClient(settings),
+        )
+    except AiProviderError as exc:
+        raise HTTPException(
+            status_code=424,
+            detail={
+                "code": exc.code,
+                "message": exc.message,
+                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+            },
+        ) from exc
+
+    demo_store.record_audit(
+        actor_user_id=principal.id,
+        action="sync_timetable_cache",
+        resource_type="school_timetable",
+        resource_id=school.school_code,
+        payload_json={"date": timetable_date, "grade": grade, "className": class_name, "counts": counts},
+    )
+    synced_context = demo_store.get_timetable_context(
+        school_code,
+        timetable_date=timetable_date,
+        grade=grade,
+        class_name=class_name,
+    )
+    return ok(synced_context)
+
+
 @router.post("/sources/{source_code}/sync")
 def sync_public_data_source(
     source_code: str,

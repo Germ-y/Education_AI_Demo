@@ -8,7 +8,8 @@
 2. [../../GOAL.md](../../GOAL.md) - 장기 목표와 마일스톤
 3. [03-implementation-backlog.md](03-implementation-backlog.md) - 지금 할 일
 4. [01-collaboration-contract.md](01-collaboration-contract.md) - 프론트/백엔드 협업 규칙
-5. 현재 작업과 관련된 상세 문서
+5. [13-current-handoff-summary.md](13-current-handoff-summary.md) - 최신 구현/DB/남은 작업 요약
+6. 현재 작업과 관련된 상세 문서
 
 ## 폴더별 역할
 
@@ -26,6 +27,7 @@
 | 백엔드 신규 작업 | [../backend/00-backend-team-guide.md](../backend/00-backend-team-guide.md) | [03-implementation-backlog.md](03-implementation-backlog.md), [08-rest-api-spec.md](08-rest-api-spec.md) |
 | 프론트/백엔드 협업 | [01-collaboration-contract.md](01-collaboration-contract.md) | [02-branch-handoff-contract.md](02-branch-handoff-contract.md) |
 | 브랜치 handoff | [02-branch-handoff-contract.md](02-branch-handoff-contract.md) | [08-rest-api-spec.md](08-rest-api-spec.md) |
+| 최신 작업 이어받기 | [13-current-handoff-summary.md](13-current-handoff-summary.md) | [03-implementation-backlog.md](03-implementation-backlog.md), [08-rest-api-spec.md](08-rest-api-spec.md) |
 | PR 작성/리뷰 | [10-pr-feature-review-contract.md](10-pr-feature-review-contract.md) | [01-collaboration-contract.md](01-collaboration-contract.md), [02-branch-handoff-contract.md](02-branch-handoff-contract.md) |
 | 기능 시작 회의 | [11-feature-start-checklist.md](11-feature-start-checklist.md) | [10-pr-feature-review-contract.md](10-pr-feature-review-contract.md), [02-branch-handoff-contract.md](02-branch-handoff-contract.md) |
 | 스키마 계약 점검 | [12-schema-contract.md](12-schema-contract.md) | [08-rest-api-spec.md](08-rest-api-spec.md), [../backend/06-database-schema-spec.md](../backend/06-database-schema-spec.md) |

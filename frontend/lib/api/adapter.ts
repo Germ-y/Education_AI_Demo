@@ -1,10 +1,13 @@
 import type {
-  AgentRunPlan,
+  AssetPackageGenerationResponse,
   AgentRunRequest,
+  ContentGenerationRequest,
+  ContentGenerationResponse,
   ContextMe,
   DemoLoginRequest,
   DemoLoginResponse,
   MissionContent,
+  OrchestratorRunResponse,
   PublicContextBundle,
   RealtimeSessionRequest,
   RealtimeSessionResponse,
@@ -40,5 +43,7 @@ export type ApiAdapter = {
     payload: RealtimeSessionRequest,
     options?: ApiAdapterOptions,
   ): Promise<RealtimeSessionResponse>;
-  createAgentRun(payload: AgentRunRequest, options?: ApiAdapterOptions): Promise<AgentRunPlan>;
+  createAgentRun(payload: AgentRunRequest, options?: ApiAdapterOptions): Promise<OrchestratorRunResponse>;
+  createContentGeneration(payload: ContentGenerationRequest, options?: ApiAdapterOptions): Promise<ContentGenerationResponse>;
+  generateContentAssetPackage(contentId: string, options?: ApiAdapterOptions): Promise<AssetPackageGenerationResponse>;
 };

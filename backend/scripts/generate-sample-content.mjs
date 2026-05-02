@@ -105,7 +105,7 @@ function buildContent({ imageModel, imagePrompt }) {
     },
     student: {
       id: "stu_sumin",
-      displayName: "수민",
+      displayName: "박수민",
       grade: "중학교 2학년",
     },
     orchestratorDecision: {

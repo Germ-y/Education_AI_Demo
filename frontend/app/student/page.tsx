@@ -52,6 +52,8 @@ export default async function StudentStartPage({
   const nextStage = scene.stages[scene.currentStep - 1] ?? scene.stages[0];
   const caseQuery = `caseId=${encodeURIComponent(scene.caseId)}${scene.contentId ? `&contentId=${encodeURIComponent(scene.contentId)}` : ""}`;
   const pathHref = `/student/path?${caseQuery}`;
+  const heroImage = scene.assets?.find((asset) => asset.assetRole === "hero" && asset.assetType === "image" && asset.url);
+  const heroAudio = scene.assets?.find((asset) => asset.assetRole === "hero" && asset.assetType === "audio" && asset.url);
 
   return (
     <main className="relative flex h-screen overflow-hidden bg-[#e7edf4] p-4 text-[#1f211d]">
@@ -129,10 +131,37 @@ export default async function StudentStartPage({
               </section>
 
               <aside className="flex min-h-0 items-center justify-center">
-                <div className="relative w-full max-w-[430px]">
+                <div className="relative flex w-full max-w-[520px] flex-col items-center">
+                  {!heroImage?.url && (
                   <div className="mx-auto flex justify-center">
                     <StarterStar />
                   </div>
+                  )}
+
+                  {heroImage?.url && (
+                    <div
+                      className="relative mt-4 w-full overflow-visible rounded-[28px] border bg-white p-3 shadow-[0_20px_54px_rgba(57,78,97,0.10)]"
+                      style={{ borderColor: theme.border }}
+                    >
+                      <div className="pointer-events-none absolute -right-12 -top-28 z-10 scale-[0.58]" aria-hidden="true">
+                        <StarterStar />
+                      </div>
+                      <Image
+                        src={heroImage.url}
+                        alt={heroImage.alt}
+                        width={960}
+                        height={640}
+                        className="h-[min(44vh,390px)] min-h-[300px] w-full rounded-[20px] bg-[#f8fafc] object-contain"
+                        unoptimized
+                        priority
+                      />
+                      {heroAudio?.url && (
+                        <div className="mt-3">
+                          <audio className="w-full" src={heroAudio.url} controls preload="auto" />
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div
                     className="mt-3 rounded-[26px] border px-7 py-6 shadow-[0_20px_54px_rgba(57,78,97,0.10)]"
                     style={{ borderColor: theme.border, backgroundColor: `${theme.accentPale}f4` }}

@@ -9,12 +9,12 @@ export default async function StudentStagePage({
   const params = await searchParams;
   const caseIdParam = Array.isArray(params.caseId) ? params.caseId[0] : params.caseId;
   const contentIdParam = Array.isArray(params.contentId) ? params.contentId[0] : params.contentId;
-  const context = await getStudentContextForRoute({ caseId: caseIdParam, contentId: contentIdParam });
   const stepParam = Array.isArray(params.step) ? params.step[0] : params.step;
   const completeParam = Array.isArray(params.complete) ? params.complete[0] : params.complete;
   const previewParam = Array.isArray(params.preview) ? params.preview[0] : params.preview;
+  const context = await getStudentContextForRoute({ caseId: caseIdParam, contentId: contentIdParam, preview: previewParam === "1" });
   const requestedStep = Number(stepParam);
-  const maxOpenStep = completeParam === "1" ? context.scene.totalSteps : context.scene.currentStep;
+  const maxOpenStep = completeParam === "1" || previewParam === "1" ? context.scene.totalSteps : context.scene.currentStep;
   const initialStep =
     Number.isInteger(requestedStep) && requestedStep >= 1 && requestedStep <= maxOpenStep
       ? requestedStep

@@ -55,6 +55,26 @@ def get_student_history(
     return ok(history)
 
 
+@router.get("/students/{student_id}/context-bundle")
+def get_student_context_bundle(
+    student_id: str,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    bundle = demo_store.get_student_context_bundle(student_id)
+    if bundle is None:
+        raise HTTPException(status_code=404, detail={"code": "STUDENT_CONTEXT_NOT_FOUND", "message": "학생 컨텍스트를 찾을 수 없습니다."})
+    demo_store.record_audit(
+        actor_user_id=principal.id,
+        student_id=student_id,
+        action="view_student_context_bundle",
+        resource_type="student",
+        resource_id=student_id,
+        payload_json={},
+    )
+    return ok(bundle)
+
+
 @router.get("/students/{student_id}/report")
 def get_student_report(
     student_id: str,

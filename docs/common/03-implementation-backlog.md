@@ -1,6 +1,6 @@
 # 구현 백로그
 
-확인 기준일: 2026-05-02
+확인 기준일: 2026-05-03
 
 이 파일은 `/goal` 또는 장기 에이전트 작업에서 다음 행동을 고르는 실행 목록이다.
 
@@ -24,6 +24,17 @@
 - [x] AI provider 연동 기반: AgentRun 저장, OpenAI/ElevenLabs adapter, fallback 금지 실패 기록
 - [x] AI provider 실제 생성 workflow MVP 완성
 - [x] 학생 플레이 런타임 MVP 구현
+- [x] 교사 대시보드 학생 컨텍스트/학교 시간표/자료 검토 흐름 백엔드 데이터 연결
+- [x] 학생 홈에서 최신 published 콘텐츠로 바로 진입하는 흐름 연결
+- [x] 학생 완료 후 리뷰 요약 자동 생성과 교사 대시보드 학습 피드백 단계 연결
+- [x] 팀원 복원용 데모 SQLite SQL dump 정리
+
+## 최신 handoff 기준
+
+- 상세 요약은 [13-current-handoff-summary.md](13-current-handoff-summary.md)를 본다.
+- 데모 DB는 `backend/data/eduyj_demo_dump.sql`을 추적 파일로 사용한다.
+- 로컬 SQLite 원본 `backend/data/eduyj_demo.db`는 git 추적 대상이 아니다.
+- `dev` 통합 전에는 backend/frontend 검증과 문서 링크 검증을 다시 실행한다.
 
 ## 협업 기준
 
@@ -162,8 +173,9 @@ seed 여러 번 실행해도 중복 생성 없음
 상태:
 
 ```text
-부분 완료. 데모 seed를 DB repository에 적재하고 다시 load하는 smoke 명령을 추가했다.
-학생 3명/교사 1명/학교 snapshot/샘플 콘텐츠 2개가 DATABASE_URL 기준 DB에 저장된다.
+완료(MVP). 데모 seed를 DB repository에 적재하고 다시 load하는 smoke 명령을 추가했다.
+학생 3명/교사 1명/학교 snapshot/샘플 콘텐츠 3개가 DATABASE_URL 기준 DB에 저장된다.
+팀원 복원용 SQLite SQL dump를 backend/data/eduyj_demo_dump.sql로 추적한다.
 ```
 
 ## 마일스톤 5. 교사 대시보드 API
@@ -191,8 +203,9 @@ seed 여러 번 실행해도 중복 생성 없음
 상태:
 
 ```text
-부분 완료. demo token 기반 학생 목록/상세/memory patch API를 추가했다.
-학생 상세/히스토리 조회 감사 로그를 저장한다.
+완료(MVP). demo token 기반 학생 목록/상세/context-bundle/history/report/memory patch API를 추가했다.
+학생 상세/컨텍스트 bundle/히스토리 조회 감사 로그를 저장한다.
+교사 대시보드가 학생 정보, 자료 생성 맥락, 학습 기록을 백엔드 데이터로 표시한다.
 ```
 
 ## 마일스톤 6. AI 콘텐츠 생성
@@ -231,6 +244,8 @@ AgentRun repository, OpenAI Responses/Realtime adapter, ElevenLabs TTS adapter �
 `POST /api/ai/orchestrator-runs`, `POST /api/ai/content-generations`, `GET /api/ai/agent-runs/:id`를 추가했다.
 OPENAI_API_KEY/ELEVENLABS_*가 없거나 provider 요청이 실패하면 대체 seed asset을 만들지 않고 failed + reviewRequired 상태로 남긴다.
 생성된 MissionContent는 `teacher_review` 상태와 schema validation을 통과해야 저장된다.
+학생 context-bundle의 학생 기록, 이전 수업, 학교 시간표, 다음 목표를 오케스트레이터 입력으로 사용한다.
+품질 검증은 화면 노출 문장 한국어, 제안형 교사 요약, 4단계 실시간 발화 연습 표현을 확인한다.
 ```
 
 ElevenLabs TTS는 4단계 realtime이 아니라 정적 콘텐츠 안내 음성 사전 생성에만 사용한다.
@@ -288,6 +303,8 @@ POST /api/contents/:id/assets/:assetId/generate로 단일 이미지/TTS asset �
 POST /api/contents/:id/assets/generate-package로 5개 이미지 + 5개 오디오 batch 생성을 연결했다.
 학생 API는 published 콘텐츠만 반환한다.
 승인/반려/배포/asset 생성 audit log를 저장한다.
+교사 대시보드 자료 검토 iframe과 approve/reject/publish API를 연결했다.
+publish 성공 시 open case dashboardStage를 learning으로 이동한다.
 재생성 API는 단일 asset generate API를 재사용하며, 교사용 별도 요청 문구 저장은 다음 슬라이스에서 진행한다.
 ```
 
@@ -313,6 +330,8 @@ POST /api/contents/:id/assets/generate-package로 5개 이미지 + 5개 오디�
 
 ```text
 완료(MVP). 오늘의 미션 조회, 콘텐츠 시작, 1~3단계 submit, 학생 활동 이벤트 저장, 회고, 완료 API를 추가했다.
+학생 홈에서 학생 카드를 누르면 최신 published 콘텐츠로 이동한다.
+완료 API는 최신 attempt 기반 리뷰 요약을 자동 생성하고 open case dashboardStage를 feedback으로 이동한다.
 ```
 
 ## 마일스톤 10. 4단계 realtime
@@ -366,8 +385,18 @@ OPENAI_API_KEY가 없으면 가짜 secret을 반환하지 않고 424 + 검수 �
 ```text
 부분 완료. 저장된 attempt/activity/realtime 데이터를 기준으로 deterministic review summary 생성/조회 API를 추가했다.
 POST /api/review-summaries/:id/apply-to-memory로 active memory card에 요약을 반영한다.
+교사 대시보드 학습 기록 탭은 report API를 통해 리뷰 요약을 조회한다.
 AI ReviewAgent provider 실행과 메모리 새 버전 생성은 다음 고도화 단계에서 진행한다.
 ```
+
+## 다음 개선사항
+
+- 실제 provider key가 있는 환경에서 학생 3명 각각 콘텐츠를 새로 생성하고, 한 번 더 생성해 메모리/이전 수업 맥락 활용을 비교한다.
+- 학생 UI 4단계 실시간 발화 연습을 실제 WebRTC Realtime 연결로 완성한다.
+- 교사 메모 저장 UI를 `POST /api/teacher/students/:studentId/notes`에 완전히 연결한다.
+- 교사 피드백을 `POST /api/review-summaries/:reviewId/apply-to-memory`에 반영하는 화면을 붙인다.
+- 승인부터 학생 완료, 학습 기록 확인까지 Playwright E2E 회귀 테스트를 추가한다.
+- 운영 PostgreSQL/Alembic 마이그레이션을 확정한다.
 
 ## 마일스톤 12. 공공데이터 동기화
 

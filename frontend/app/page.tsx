@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getContextSeed } from "@/lib/api";
+import { getContextSeed, type SeedContext } from "@/lib/api";
 
 const teacherRole = {
   href: "/dashboard",
@@ -9,20 +9,48 @@ const teacherRole = {
   accent: "bg-[#1f3a5f]",
 };
 
+function toStudentActivityDescription(primaryNeed: string) {
+  if (primaryNeed.includes("시간 읽기 기초")) {
+    return "시간 읽기 기초를 짧은 시각 단서와 2개 선택지로 익혀요.";
+  }
+
+  if (primaryNeed.includes("분수의 전체-부분 관계")) {
+    return "분수의 전체-부분 관계를 단계적으로 익혀요.";
+  }
+
+  if (primaryNeed.includes("생활 상황에서 순서 확인")) {
+    return "생활 상황에서 순서 확인과 도움 요청 표현을 연습해요.";
+  }
+
+  return primaryNeed.replace(/(수업|콘텐츠)이 좋겠어요\.?$/, "").trim();
+}
+
+function findLatestStudentMapping(mappings: SeedContext["mappings"], studentId: string) {
+  return [...mappings]
+    .filter((mapping) => mapping.studentId === studentId && mapping.status === "published")
+    .sort((left, right) => toTimestamp(right.updatedAt) - toTimestamp(left.updatedAt))[0];
+}
+
+function toTimestamp(value?: string | null) {
+  if (!value) return 0;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 export default async function Home() {
   const seed = await getContextSeed();
   const studentCases = seed.students.map((student) => {
     const supportCase = seed.cases.find((item) => item.studentId === student.id);
-    const mapping = seed.mappings.find((item) => item.studentId === student.id);
+    const mapping = findLatestStudentMapping(seed.mappings, student.id);
 
     return {
       studentId: student.id,
       caseId: supportCase?.id,
       contentId: mapping?.contentId,
       studentName: student.displayName,
-      grade: student.grade,
-      label: student.studentType === "learning_focus" ? "학습 집중" : "생활 연습",
-      description: student.primaryNeed,
+      grade: student.gradeLabel ?? student.grade,
+      label: student.trackLabel ?? student.studentTypeLabel ?? (student.studentType === "learning_focus" ? "학습지원형" : "일상생활 지원형"),
+      description: toStudentActivityDescription(student.primaryNeed),
     };
   });
 

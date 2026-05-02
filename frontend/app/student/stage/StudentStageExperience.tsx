@@ -2,9 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import type { DragEvent } from "react";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { SceneTheme, SceneVisual, StageQuestion, StudentContext } from "@/lib/demo-data";
+import {
+  completeStudentMission,
+  saveStudentMissionEvent,
+  saveStudentMissionReflection,
+  startStudentMission,
+  studentAccess,
+  submitStudentMissionStage,
+} from "@/lib/api";
+import type { SceneTheme, SceneVisual, StageQuestion, StudentContext } from "@/lib/student-scene-types";
 
 function MiniStar() {
   return (
@@ -159,10 +167,179 @@ function PlannerVisual({ visual }: { visual: SceneVisual }) {
   );
 }
 
+function ClockVisual({ visual, compact = false }: { visual: SceneVisual; compact?: boolean }) {
+  return (
+    <div
+      className={`grid h-full overflow-hidden rounded-[24px] border border-[#ead9b8] bg-[#fff6d9] p-5 shadow-[inset_0_-12px_0_rgba(166,105,38,0.10)] ${
+        compact ? "min-h-[250px] grid-cols-[minmax(170px,0.78fr)_minmax(190px,1fr)] gap-4" : "min-h-[300px] grid-cols-[minmax(240px,0.82fr)_minmax(260px,1fr)] gap-5"
+      }`}
+    >
+      <div className="relative flex min-h-0 items-center justify-center">
+        <div className="relative aspect-square w-[min(100%,360px)] rounded-full border-[12px] border-[#d28a34] bg-white shadow-[0_22px_45px_rgba(115,72,29,0.18),inset_0_10px_24px_rgba(255,255,255,0.35)]">
+          {[
+            ["12", "left-1/2 top-5 -translate-x-1/2"],
+            ["3", "right-6 top-1/2 -translate-y-1/2"],
+            ["6", "bottom-5 left-1/2 -translate-x-1/2"],
+            ["9", "left-6 top-1/2 -translate-y-1/2"],
+          ].map(([label, position]) => (
+            <span key={label} className={`absolute ${position} text-2xl font-black text-[#8a5a00]`}>
+              {label}
+            </span>
+          ))}
+          <span className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1f3a5f]" />
+          <span className="absolute left-1/2 top-1/2 h-3 w-[34%] origin-left -translate-y-1/2 rounded-full bg-[#1f3a5f] shadow-sm" />
+          <span className="absolute left-1/2 top-1/2 h-[34%] w-2 origin-bottom -translate-x-1/2 -translate-y-full rounded-full bg-[#58b957] shadow-sm" />
+          <span className="absolute bottom-9 left-1/2 -translate-x-1/2 rounded-full bg-[#fff3c4] px-3 py-1 text-xs font-black text-[#8a5a00]">
+            짧은 바늘 먼저
+          </span>
+        </div>
+      </div>
+      <div className="grid min-h-0 content-center gap-3">
+        {visual.segments.map((segment, index) => (
+          <div
+            key={`${segment.label}-${index}`}
+            className={`rounded-[18px] border bg-white/90 px-4 py-3 shadow-sm ${
+              index === visual.activeIndex ? "border-[#58b957] ring-4 ring-[#dff2de]" : "border-white/80"
+            }`}
+          >
+            <p className="text-lg font-black leading-6 break-keep">{segment.label}</p>
+            <p className="mt-1 text-xs font-bold leading-5 text-[#6d746c] break-keep">{segment.caption}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TransitVisual({ visual, compact = false }: { visual: SceneVisual; compact?: boolean }) {
+  return (
+    <div
+      className={`grid h-full overflow-hidden rounded-[24px] border border-[#cfe4d3] bg-[#eef8f0] p-5 shadow-[inset_0_-12px_0_rgba(39,174,96,0.08)] ${
+        compact ? "min-h-[250px] grid-cols-[minmax(190px,1fr)_minmax(170px,0.78fr)] gap-4" : "min-h-[300px] grid-cols-[minmax(260px,1fr)_minmax(240px,0.8fr)] gap-5"
+      }`}
+    >
+      <div className="relative min-h-0 overflow-hidden rounded-[22px] border border-[#dce5ec] bg-[#dff1ff] p-5 shadow-sm">
+        <div className="absolute inset-x-0 bottom-0 h-20 bg-[#c7dfb9]" />
+        <div className="absolute bottom-16 left-8 h-24 w-14 rounded-t-full bg-[#1f3a5f] shadow-sm">
+          <span className="absolute left-1/2 top-4 h-10 w-10 -translate-x-1/2 rounded-full bg-white text-center text-sm font-black leading-10 text-[#1f3a5f]">
+            BUS
+          </span>
+        </div>
+        <div className="absolute bottom-[76px] right-8 h-36 w-[58%] rounded-[24px] border-4 border-[#1f3a5f] bg-[#ffd36b] shadow-[0_18px_32px_rgba(31,58,95,0.18)]">
+          <div className="absolute left-5 top-5 right-5 grid grid-cols-3 gap-3">
+            <span className="h-12 rounded-lg bg-white/85" />
+            <span className="h-12 rounded-lg bg-white/85" />
+            <span className="h-12 rounded-lg bg-white/85" />
+          </div>
+          <span className="absolute bottom-5 left-7 h-8 w-8 rounded-full bg-[#1f3a5f]" />
+          <span className="absolute bottom-5 right-7 h-8 w-8 rounded-full bg-[#1f3a5f]" />
+          <span className="absolute bottom-16 left-1/2 -translate-x-1/2 rounded-full bg-white px-4 py-1 text-xl font-black text-[#1f3a5f]">
+            21
+          </span>
+        </div>
+        <div className="absolute left-8 top-8 rounded-[18px] bg-white/92 px-4 py-3 shadow-sm">
+          <p className="text-xs font-black text-[#16803c]">센터 가는 길</p>
+          <p className="mt-1 text-lg font-black text-[#1f211d]">번호를 먼저 봐요</p>
+        </div>
+      </div>
+      <div className="grid min-h-0 content-center gap-3">
+        {visual.segments.map((segment, index) => (
+          <div
+            key={`${segment.label}-${index}`}
+            className={`rounded-[18px] border bg-white/90 px-4 py-3 shadow-sm ${
+              index === visual.activeIndex ? "border-[#58b957] ring-4 ring-[#dff2de]" : "border-white/80"
+            }`}
+          >
+            <p className="text-lg font-black leading-6 break-keep">{segment.label}</p>
+            <p className="mt-1 text-xs font-bold leading-5 text-[#6d746c] break-keep">{segment.caption}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LearningVisual({ visual, compact = false }: { visual: SceneVisual; compact?: boolean }) {
   if (visual.kind === "emotion") return <EmotionVisual visual={visual} />;
   if (visual.kind === "planner") return <PlannerVisual visual={visual} />;
+  if (visual.kind === "clock") return <ClockVisual visual={visual} compact={compact} />;
+  if (visual.kind === "transit") return <TransitVisual visual={visual} compact={compact} />;
   return <FractionVisual visual={visual} compact={compact} />;
+}
+
+function StageMedia({
+  question,
+  theme,
+  compact = false,
+  full = false,
+  featured = false,
+}: {
+  question: StageQuestion;
+  theme: SceneTheme;
+  compact?: boolean;
+  full?: boolean;
+  featured?: boolean;
+}) {
+  if (!question.imageUrl && !question.audioUrl) return null;
+
+  return (
+    <div
+      className={`overflow-hidden rounded-[20px] border bg-white shadow-sm ${full ? "flex h-full min-h-[300px] flex-col p-3" : compact ? "p-2" : "p-3"}`}
+      style={{ borderColor: theme.border }}
+    >
+      {question.imageUrl && (
+        <Image
+          src={question.imageUrl}
+          alt={question.prompt}
+          width={1120}
+          height={720}
+          className={`w-full rounded-[16px] bg-[#f8fafc] object-contain ${
+            full
+              ? "min-h-0 flex-1"
+              : compact
+                ? featured
+                  ? "h-[clamp(180px,24vh,220px)]"
+                  : "h-44"
+                : "h-[clamp(320px,48vh,460px)]"
+          }`}
+          unoptimized
+        />
+      )}
+      {question.audioUrl && (
+        <div className={question.imageUrl ? "mt-3 shrink-0" : ""}>
+          <audio className="w-full" src={question.audioUrl} controls preload="auto" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StageVisualBoard({
+  visual,
+  question,
+  theme,
+  compact = false,
+}: {
+  visual: SceneVisual;
+  question: StageQuestion;
+  theme: SceneTheme;
+  compact?: boolean;
+}) {
+  if (question.imageUrl || question.audioUrl) {
+    return (
+      <div className="h-full min-h-[360px]">
+        <StageMedia question={question} theme={theme} compact={compact} full={!compact} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid h-full min-h-[300px] grid-rows-1 gap-3">
+      <div className="min-h-0 overflow-hidden">
+        <LearningVisual visual={visual} compact={compact} />
+      </div>
+    </div>
+  );
 }
 
 function StageInlineNotice({
@@ -371,14 +548,12 @@ function SequenceTemplate({
   selected,
   theme,
   onPick,
-  onPlace,
   onReset,
 }: {
   question: StageQuestion;
   selected: string[];
   theme: SceneTheme;
   onPick: (id: string) => void;
-  onPlace: (id: string, index: number) => void;
   onReset: () => void;
 }) {
   const items = question.sequenceItems ?? [];
@@ -386,22 +561,11 @@ function SequenceTemplate({
   const selectedIds = slots.filter(Boolean);
   const availableItems = items.filter((item) => !selectedIds.includes(item.id));
 
-  const startDrag = (event: DragEvent<HTMLButtonElement>, id: string) => {
-    event.dataTransfer.setData("text/plain", id);
-    event.dataTransfer.effectAllowed = "move";
-  };
-
-  const dropOnSlot = (event: DragEvent<HTMLDivElement>, index: number) => {
-    event.preventDefault();
-    const id = event.dataTransfer.getData("text/plain");
-    if (id) onPlace(id, index);
-  };
-
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_auto_auto] gap-3 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-4 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-lg font-black leading-6">분수를 알아보는 순서를 맞춰보세요</p>
+          <p className="text-lg font-black leading-6">{question.prompt}</p>
           <p className="mt-1 text-xs font-bold leading-5 text-[#596157]">{question.body ?? "카드를 끌어 올바른 순서대로 놓아보세요."}</p>
         </div>
         {selectedIds.length > 0 && (
@@ -420,7 +584,7 @@ function SequenceTemplate({
           <p className="text-xs font-black" style={{ color: theme.accentStrong }}>
             순서 칸
           </p>
-          <p className="text-[11px] font-bold text-[#8a5a00]">드래그해서 놓기</p>
+          <p className="text-[11px] font-bold text-[#8a5a00]">클릭해서 순서대로 놓기</p>
         </div>
         <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}>
           {slots.map((id, index) => {
@@ -429,8 +593,6 @@ function SequenceTemplate({
           return (
             <div
               key={index}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => dropOnSlot(event, index)}
               className={`flex h-[76px] flex-col items-center justify-center rounded-[16px] border-2 border-dashed px-2 py-2 text-center transition ${
                 item ? "border-solid bg-white shadow-[0_10px_24px_rgba(57,78,97,0.10)]" : "bg-white/55"
               }`}
@@ -454,7 +616,7 @@ function SequenceTemplate({
       <div className="rounded-[18px] border border-[#f0dfb4] bg-[#fff9e8] p-3">
         <div className="flex items-center justify-between">
           <p className="text-xs font-black text-[#8a5a00]">카드 트레이</p>
-          {availableItems.length > 0 && <p className="text-[11px] font-bold text-[#8a5a00]">클릭해도 배치돼요</p>}
+          {availableItems.length > 0 && <p className="text-[11px] font-bold text-[#8a5a00]">카드를 차례대로 눌러요</p>}
         </div>
         <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}>
           {items.map((item) => {
@@ -463,8 +625,6 @@ function SequenceTemplate({
             return (
             <button
               key={item.id}
-              draggable={!picked}
-              onDragStart={(event) => startDrag(event, item.id)}
               onClick={() => onPick(item.id)}
               disabled={picked}
               className="min-h-[58px] cursor-grab rounded-[16px] border bg-white px-3 py-2 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-[0_12px_24px_rgba(57,78,97,0.12)] active:cursor-grabbing disabled:cursor-default disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
@@ -487,7 +647,6 @@ function SequenceStageBoard({
   selected,
   theme,
   onPick,
-  onPlace,
   onReset,
 }: {
   visual: SceneVisual;
@@ -495,16 +654,15 @@ function SequenceStageBoard({
   selected: string[];
   theme: SceneTheme;
   onPick: (id: string) => void;
-  onPlace: (id: string, index: number) => void;
   onReset: () => void;
 }) {
   return (
-    <div className="grid h-full min-h-[300px] grid-rows-[minmax(112px,0.32fr)_minmax(330px,1fr)] gap-3">
+    <div className="grid h-full min-h-[560px] grid-rows-[minmax(220px,0.38fr)_minmax(330px,1fr)] gap-3">
       <div className="min-h-0 overflow-hidden">
-        <LearningVisual visual={visual} compact />
+        <StageVisualBoard visual={visual} question={question} theme={theme} compact />
       </div>
       <div className="min-h-0 overflow-hidden">
-        <SequenceTemplate question={question} selected={selected} theme={theme} onPick={onPick} onPlace={onPlace} onReset={onReset} />
+        <SequenceTemplate question={question} selected={selected} theme={theme} onPick={onPick} onReset={onReset} />
       </div>
     </div>
   );
@@ -544,7 +702,11 @@ function CardMatchingTemplate({
     .filter(Boolean) as Array<{ id: string; leftY: number; rightY: number }>;
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-5 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]">
+    <div
+      className={`grid h-full min-h-0 gap-4 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-5 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)] ${
+        question.imageUrl || question.audioUrl ? "grid-rows-[auto_auto_minmax(0,1fr)]" : "grid-rows-[auto_minmax(0,1fr)]"
+      }`}
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-2xl font-black leading-8">서로 맞는 카드를 연결해보세요</p>
@@ -554,6 +716,12 @@ function CardMatchingTemplate({
           {matchedCount} / {items.length}
         </div>
       </div>
+
+      {(question.imageUrl || question.audioUrl) && (
+        <div className="min-h-0">
+          <StageMedia question={question} theme={theme} compact />
+        </div>
+      )}
 
       <div className="grid min-h-0 grid-cols-[minmax(240px,1fr)_minmax(260px,0.66fr)_minmax(240px,1fr)] items-stretch gap-4">
         <div className="grid min-h-0 gap-3">
@@ -715,18 +883,25 @@ function FillBlankTemplate({
 
 function getRealtimePracticeCopy(scene: StudentContext["scene"], question: StageQuestion) {
   const isLearningFocus = scene.contentType === "learning_focus";
+  const isClockPractice = /시계|시침|분침|짧은 바늘|긴 바늘|약속 시간/.test(
+    `${scene.title} ${scene.missionDescription} ${question.prompt}`,
+  );
+  const isTransitPractice = /버스|정류장|센터|도움|안내 직원/.test(`${scene.title} ${scene.missionDescription} ${question.prompt}`);
+  const firstPrompt = question.realtimePracticeSpec?.firstPrompt ?? question.prompt;
 
   return {
     label: isLearningFocus ? "친구에게 설명하기" : "생활에 적용하기",
     title: isLearningFocus ? "내 말로 쉽게 설명해요" : "오늘 바로 쓸 말을 연습해요",
-    partner: isLearningFocus ? "친구" : "나",
-    partnerLine: isLearningFocus
-      ? "왜 그렇게 되는지 아직 헷갈려."
-      : "오늘 비슷한 상황이 오면 뭐라고 말해볼까?",
+    partner: isLearningFocus ? "친구" : isTransitPractice ? "안내 직원" : "나",
+    partnerLine: firstPrompt,
     studentLine: isLearningFocus
-      ? "먼저 전체가 몇 조각인지 보고, 그중 고른 조각을 말해볼게."
-      : "작게 시작할 수 있는 한 문장을 골라 말해볼게.",
-    sceneLine: question.realtimePracticeSpec?.firstPrompt ?? question.prompt,
+      ? isClockPractice
+        ? "짧은 바늘을 먼저 보고, 그다음 긴 바늘을 보면 돼."
+        : "먼저 중요한 단서를 보고, 내가 이해한 순서를 짧게 말해볼게."
+      : isTransitPractice
+        ? "센터에 가야 해요. 버스 알려 주세요."
+        : "필요한 말을 짧게 말해볼게.",
+    sceneLine: firstPrompt,
     actionLabel: isLearningFocus ? "설명 연습 시작" : "생활 적용 연습 시작",
   };
 }
@@ -796,10 +971,7 @@ function RealtimePracticeRoom({
   };
 
   const startSpeechInput = () => {
-    const spokenText =
-      scene.contentType === "learning_focus"
-        ? "전체가 4조각이고 그중 1조각을 골랐으니까 1/4이야."
-        : "오늘은 먼저 한 가지 행동만 정해서 바로 시작해볼게.";
+    const spokenText = practice.studentLine;
     type SpeechRecognitionEventLike = {
       results: ArrayLike<ArrayLike<{ transcript: string }>>;
     };
@@ -847,36 +1019,41 @@ function RealtimePracticeRoom({
   };
 
   return (
-    <div className="grid h-full min-h-[440px] grid-cols-[minmax(320px,0.86fr)_minmax(390px,1fr)] gap-4 rounded-[24px] border border-[#dce5ec] bg-white p-4 shadow-[0_18px_48px_rgba(57,78,97,0.10)]">
-      <div className="relative grid min-h-0 grid-rows-[auto_1fr] overflow-hidden rounded-[22px] border p-5" style={{ borderColor: theme.border, backgroundColor: theme.accentPale }}>
+    <div className="grid h-full min-h-[440px] grid-cols-[minmax(360px,0.9fr)_minmax(390px,1fr)] gap-4 rounded-[24px] border border-[#dce5ec] bg-white p-4 shadow-[0_18px_48px_rgba(57,78,97,0.10)]">
+      <div className="relative grid min-h-0 grid-rows-[auto_1fr] overflow-hidden rounded-[22px] border p-4" style={{ borderColor: theme.border, backgroundColor: theme.accentPale }}>
         <div className="relative z-10">
           <p className="text-sm font-black" style={{ color: theme.accentStrong }}>
             {practice.label}
           </p>
-          <h3 className="mt-2 text-[2.6rem] font-black leading-tight break-keep text-[#172033]">{practice.title}</h3>
-          <p className="mt-3 text-base font-bold leading-7 break-keep text-[#596157]">{practice.sceneLine}</p>
+          <h3 className="mt-1.5 text-[1.9rem] font-black leading-tight break-keep text-[#172033]">{practice.title}</h3>
+          <div className="mt-3">
+            <StageMedia question={question} theme={theme} compact featured />
+          </div>
+          <p className="mt-2 text-sm font-bold leading-6 break-keep text-[#596157]">{practice.sceneLine}</p>
         </div>
 
-        <div className="relative z-10 grid min-h-0 grid-cols-[minmax(0,1fr)_160px] items-center gap-4 pt-5">
-          <div className="rounded-[20px] border border-white/80 bg-white/90 p-5 shadow-sm">
+        <div className="relative z-10 grid min-h-0 grid-cols-[minmax(0,1fr)_112px] items-center gap-3 pt-3">
+          <div className="rounded-[20px] border border-white/80 bg-white/90 p-4 shadow-sm">
             <p className="text-xs font-black" style={{ color: theme.accentStrong }}>
               {practice.partner}
             </p>
-            <p className="mt-3 text-2xl font-black leading-9 break-keep text-[#25312a]">{practice.partnerLine}</p>
+            <p className="mt-2 text-xl font-black leading-7 break-keep text-[#25312a]">{practice.partnerLine}</p>
           </div>
-          <div className="relative h-56 w-40 justify-self-end">
-            <div className="absolute bottom-0 left-3 h-28 w-32 rounded-t-[56px] border border-white/80 bg-[#ffe6a8] shadow-[inset_0_-10px_0_rgba(190,134,35,0.12)]" />
-            <div className="absolute bottom-[112px] left-5 h-[112px] w-[112px] rounded-full bg-[#4f3424]" />
-            <div className="absolute bottom-[94px] left-6 h-28 w-28 rounded-full border border-white/80 bg-[#ffd9bf] shadow-[inset_0_-8px_0_rgba(185,110,70,0.14)]">
-              <span className="absolute -top-3 left-4 h-9 w-9 rounded-full bg-[#4f3424]" />
-              <span className="absolute -top-4 left-11 h-10 w-10 rounded-full bg-[#4f3424]" />
-              <span className="absolute -top-2 right-5 h-8 w-8 rounded-full bg-[#4f3424]" />
-              <span className="absolute left-7 top-10 h-2.5 w-2.5 rounded-full bg-[#25312a]" />
-              <span className="absolute right-7 top-10 h-2.5 w-2.5 rounded-full bg-[#25312a]" />
-              <span className="absolute left-1/2 top-[58px] h-3 w-9 -translate-x-1/2 rounded-b-full border-b-[3px] border-[#25312a]" />
+          <div className="relative h-36 w-28 justify-self-end overflow-hidden">
+            <div className="absolute bottom-0 right-0 h-56 w-40 origin-bottom-right scale-[0.64]">
+              <div className="absolute bottom-0 left-3 h-28 w-32 rounded-t-[56px] border border-white/80 bg-[#ffe6a8] shadow-[inset_0_-10px_0_rgba(190,134,35,0.12)]" />
+              <div className="absolute bottom-[112px] left-5 h-[112px] w-[112px] rounded-full bg-[#4f3424]" />
+              <div className="absolute bottom-[94px] left-6 h-28 w-28 rounded-full border border-white/80 bg-[#ffd9bf] shadow-[inset_0_-8px_0_rgba(185,110,70,0.14)]">
+                <span className="absolute -top-3 left-4 h-9 w-9 rounded-full bg-[#4f3424]" />
+                <span className="absolute -top-4 left-11 h-10 w-10 rounded-full bg-[#4f3424]" />
+                <span className="absolute -top-2 right-5 h-8 w-8 rounded-full bg-[#4f3424]" />
+                <span className="absolute left-7 top-10 h-2.5 w-2.5 rounded-full bg-[#25312a]" />
+                <span className="absolute right-7 top-10 h-2.5 w-2.5 rounded-full bg-[#25312a]" />
+                <span className="absolute left-1/2 top-[58px] h-3 w-9 -translate-x-1/2 rounded-b-full border-b-[3px] border-[#25312a]" />
+              </div>
+              <div className="absolute bottom-[70px] left-0 h-16 w-8 rotate-[24deg] rounded-full bg-[#ffd9bf]" />
+              <div className="absolute bottom-[70px] right-0 h-16 w-8 rotate-[-24deg] rounded-full bg-[#ffd9bf]" />
             </div>
-            <div className="absolute bottom-[70px] left-0 h-16 w-8 rotate-[24deg] rounded-full bg-[#ffd9bf]" />
-            <div className="absolute bottom-[70px] right-0 h-16 w-8 rotate-[-24deg] rounded-full bg-[#ffd9bf]" />
           </div>
         </div>
 
@@ -1030,6 +1207,7 @@ export function StudentStageExperience({
   nextHref: string;
   previewMode?: boolean;
 }) {
+  const router = useRouter();
   const { student, scene } = context;
   const theme = scene.theme;
   const initialStageIndex = Math.max(
@@ -1054,7 +1232,12 @@ export function StudentStageExperience({
   const [oxReadySteps, setOxReadySteps] = useState<number[]>([]);
   const [oxAnswers, setOxAnswers] = useState<Record<number, string>>({});
   const [reflectionText, setReflectionText] = useState("");
+  const [studentAccessToken, setStudentAccessToken] = useState<string | null>(null);
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const [isCompletingMission, setIsCompletingMission] = useState(false);
   const noticeCounter = useRef(0);
+  const runtimeStartedRef = useRef(false);
 
   const activeStage = scene.stages[activeStageIndex] ?? scene.stages[0];
   const activeQuestion = useMemo(
@@ -1079,11 +1262,48 @@ export function StudentStageExperience({
     activeStage.step === 4 &&
     activeQuestion.stageRole === "realtime_practice" &&
     (activeQuestion.templateType === "realtime_teach_back" || activeQuestion.templateType === "realtime_roleplay");
+  const realtimePracticeCopy = isRealtimeStage ? getRealtimePracticeCopy(scene, activeQuestion) : null;
   const isChoiceStage = activeQuestion.kind === "quiz" || activeQuestion.kind === "scenario" || isOxReady;
   const isStructuredStage = activeQuestion.kind === "sequence" || activeQuestion.kind === "cardMatching" || activeQuestion.kind === "fillBlank";
   const isCorrect = (isChoiceStage || isStructuredStage) && answer === activeQuestion.correctAnswer;
   const isStageComplete = completedSteps.includes(activeStage.step);
   const isLastStage = activeStageIndex === scene.stages.length - 1;
+
+  useEffect(() => {
+    if (
+      previewMode ||
+      initialMode === "complete" ||
+      scene.status !== "published" ||
+      !scene.contentId ||
+      !student.accessCode ||
+      runtimeStartedRef.current
+    ) {
+      return;
+    }
+
+    runtimeStartedRef.current = true;
+    let ignore = false;
+
+    async function startRuntime() {
+      try {
+        const access = await studentAccess({ accessCode: student.accessCode ?? "" });
+        const attempt = await startStudentMission(scene.contentId ?? "", { token: access.session.accessToken });
+        if (ignore) return;
+        setStudentAccessToken(access.session.accessToken);
+        setAttemptId(attempt.id);
+        setRuntimeError(null);
+      } catch {
+        if (ignore) return;
+        setRuntimeError("학습 기록 저장 연결을 시작하지 못했습니다. 잠시 뒤 다시 시도해 주세요.");
+      }
+    }
+
+    startRuntime();
+
+    return () => {
+      ignore = true;
+    };
+  }, [initialMode, previewMode, scene.contentId, scene.status, student.accessCode]);
 
   useEffect(() => {
     if (!previewMode) return;
@@ -1104,11 +1324,45 @@ export function StudentStageExperience({
     return activeQuestion.wrongFeedback;
   }, [activeQuestion, answer, isCorrect, isFinished]);
 
+  const canPersistRuntime = !previewMode && scene.status === "published" && Boolean(scene.contentId && attemptId && studentAccessToken);
+
+  const persistStudentEvent = (question: StageQuestion, eventType: string, payloadJson: Record<string, unknown>) => {
+    if (!canPersistRuntime || !scene.contentId || !studentAccessToken) return;
+
+    void saveStudentMissionEvent(
+      scene.contentId,
+      {
+        attemptId,
+        stageId: question.stageId,
+        eventType,
+        payloadJson,
+      },
+      { token: studentAccessToken },
+    ).catch(() => {
+      setRuntimeError("학습 기록 일부를 저장하지 못했습니다. 다음 기록 저장을 다시 시도합니다.");
+    });
+  };
+
+  const submitRuntimeAnswer = (question: StageQuestion, answerPayload: Record<string, unknown>) => {
+    if (!canPersistRuntime || !scene.contentId || !attemptId || !studentAccessToken || !question.stageId) return;
+
+    void submitStudentMissionStage(scene.contentId, question.stageId, { attemptId, answer: answerPayload }, { token: studentAccessToken })
+      .then(() => setRuntimeError(null))
+      .catch(() => {
+        setRuntimeError("답안 기록을 저장하지 못했습니다. 학습은 계속할 수 있어요.");
+      });
+  };
+
+  const toRuntimeChoicePayload = (question: StageQuestion, choice: string) => {
+    return question.runtimeChoiceAnswers?.[choice] ?? { choiceText: choice };
+  };
+
   const selectAnswer = (choice: string) => {
     if (!activeQuestion.correctAnswer) return;
 
     setAnswer(choice);
     setAttempts((value) => value + 1);
+    submitRuntimeAnswer(activeQuestion, toRuntimeChoicePayload(activeQuestion, choice));
 
     if (choice === activeQuestion.correctAnswer) {
       setWrongNotice(null);
@@ -1129,6 +1383,12 @@ export function StudentStageExperience({
 
     setAnswer(value);
     setAttempts((current) => current + 1);
+    submitRuntimeAnswer(
+      activeQuestion,
+      value === activeQuestion.correctAnswer && activeQuestion.runtimeCorrectAnswer
+        ? activeQuestion.runtimeCorrectAnswer
+        : { answer: value },
+    );
 
     if (value === activeQuestion.correctAnswer) {
       setWrongNotice(null);
@@ -1182,25 +1442,6 @@ export function StudentStageExperience({
     }
   };
 
-  const placeSequenceItem = (id: string, index: number) => {
-    if (isStageComplete) return;
-
-    const itemCount = activeQuestion.sequenceItems?.length ?? 0;
-    const nextAnswer = Array.from({ length: itemCount }, (_, slotIndex) => sequenceAnswer[slotIndex] ?? "");
-    const previousIndex = nextAnswer.indexOf(id);
-
-    if (previousIndex >= 0) {
-      nextAnswer[previousIndex] = "";
-    }
-
-    nextAnswer[index] = id;
-    setSequenceAnswer(nextAnswer);
-
-    if (nextAnswer.every(Boolean)) {
-      markStructuredAnswer(nextAnswer.join(">"));
-    }
-  };
-
   const connectMatchingCard = (rightId: string) => {
     if (!selectedMatchLeft || isStageComplete) return;
 
@@ -1209,6 +1450,10 @@ export function StudentStageExperience({
     const expectedPair = activeQuestion.matchingPairs?.find((pair) => pair.leftId === selectedMatchLeft);
 
     if (expectedPair?.rightId !== rightId) {
+      persistStudentEvent(activeQuestion, "answer_submitted", {
+        answer: { matches: { [selectedMatchLeft]: rightId } },
+        isCorrect: false,
+      });
       noticeCounter.current += 1;
       const noticeId = `${selectedMatchLeft}-${rightId}-${noticeCounter.current}`;
       setWrongNotice(noticeId);
@@ -1225,6 +1470,7 @@ export function StudentStageExperience({
 
     if (Object.keys(nextAnswer).length === activeQuestion.matchingPairs?.length) {
       const finalAnswer = activeQuestion.matchingPairs.map((pair) => `${pair.leftId}:${nextAnswer[pair.leftId]}`).join("|");
+      submitRuntimeAnswer(activeQuestion, { matches: nextAnswer });
       setAnswer(finalAnswer);
       setWrongNotice(null);
       setCompletedSteps((steps) => (steps.includes(activeStage.step) ? steps : [...steps, activeStage.step]));
@@ -1244,12 +1490,17 @@ export function StudentStageExperience({
   };
 
   const completeOpenStage = () => {
+    persistStudentEvent(activeQuestion, "stage_completed", { kind: "concept_acknowledged" });
     setCompletedSteps((steps) => (steps.includes(activeStage.step) ? steps : [...steps, activeStage.step]));
     setAnswer("completed");
   };
 
   const startRealtimePractice = () => {
     if (!isRealtimeStage) return;
+    persistStudentEvent(activeQuestion, "realtime_practice_completed", {
+      mode: "simulated_text",
+      prompt: activeQuestion.realtimePracticeSpec?.firstPrompt ?? activeQuestion.prompt,
+    });
     setAttempts((current) => current + 1);
     setCompletedSteps((steps) => (steps.includes(activeStage.step) ? steps : [...steps, activeStage.step]));
     setAnswer("realtime-started");
@@ -1274,6 +1525,7 @@ export function StudentStageExperience({
 
       setAnswer(null);
       setWrongNotice(null);
+      setAttempts(0);
       setSequenceAnswer([]);
       setSelectedMatchLeft(null);
       setMatchingAnswer({});
@@ -1298,6 +1550,43 @@ export function StudentStageExperience({
     setOxReadySteps([]);
     setOxAnswers({});
     setReflectionText("");
+    setRuntimeError(null);
+    setIsCompletingMission(false);
+  };
+
+  const completeMissionAndReturn = async () => {
+    if (!reflectionText.trim() || isCompletingMission) return;
+
+    if (previewMode) {
+      router.push(nextHref);
+      return;
+    }
+
+    if (!scene.contentId || !attemptId || !studentAccessToken) {
+      setRuntimeError("학습 기록 저장 연결을 준비 중입니다. 잠시 후 다시 눌러 주세요.");
+      return;
+    }
+
+    setIsCompletingMission(true);
+    setRuntimeError(null);
+
+    try {
+      const reflection = reflectionText.trim();
+      await saveStudentMissionReflection(
+        scene.contentId,
+        {
+          attemptId,
+          reflectionChoice: reflection,
+          shortText: reflection,
+        },
+        { token: studentAccessToken },
+      );
+      await completeStudentMission(scene.contentId, attemptId, { token: studentAccessToken });
+      router.push(nextHref);
+    } catch {
+      setRuntimeError("학습 완료 기록을 저장하지 못했습니다. 다시 눌러 주세요.");
+      setIsCompletingMission(false);
+    }
   };
 
   return (
@@ -1307,7 +1596,7 @@ export function StudentStageExperience({
         href="/"
         className="fixed bottom-6 right-6 z-50 rounded-full border border-[#25466f] bg-[#1f3a5f] px-5 py-3 text-base font-black text-white shadow-[0_12px_30px_rgba(31,58,95,0.25)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(31,58,95,0.32)]"
       >
-        데모 홈
+        홈으로
       </Link>
       )}
       <div className="m-auto">
@@ -1370,7 +1659,7 @@ export function StudentStageExperience({
                       스테이지 {activeStage.step} · 시도 {attempts}회
                     </p>
                     <h2 className="mt-1 text-3xl font-black leading-tight">
-                      {isFinished ? "휼륭해요!" : activeStage.title}
+                      {isFinished ? "훌륭해요!" : activeStage.title}
                     </h2>
                   </div>
                   <ProgressTrail
@@ -1424,6 +1713,11 @@ export function StudentStageExperience({
                           className="mt-3 h-24 w-full resize-none rounded-[18px] border border-[#dce5ec] bg-[#fbfdff] px-4 py-3 text-base font-bold leading-7 outline-none transition focus:border-[#94d86a] focus:bg-white"
                           placeholder="여기에 내 생각을 적어봐요."
                         />
+                        {runtimeError && (
+                          <p className="mt-2 text-sm font-black leading-6 text-[#b45309]">
+                            {runtimeError}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -1434,7 +1728,6 @@ export function StudentStageExperience({
                         selected={sequenceAnswer}
                         theme={theme}
                         onPick={pickSequenceItem}
-                        onPlace={placeSequenceItem}
                         onReset={() => {
                           setSequenceAnswer([]);
                           setAnswer(null);
@@ -1460,7 +1753,7 @@ export function StudentStageExperience({
                         onFinish={goToNextStage}
                       />
                     ) : (
-                      <LearningVisual visual={activeVisual} />
+                      <StageVisualBoard visual={activeVisual} question={activeQuestion} theme={theme} />
                     )
                   )}
                 </div>
@@ -1475,7 +1768,7 @@ export function StudentStageExperience({
                       {isFinished
                         ? "다시 해보거나 학습 길로 돌아갈 수 있어요."
                         : isRealtimeStage
-                          ? "4단계에서만 열리는 realtime 말하기 연습입니다."
+                          ? "4단계에서만 열리는 실시간 발화 연습입니다."
                           : activeQuestion.hint}
                     </p>
                   </div>
@@ -1491,7 +1784,7 @@ export function StudentStageExperience({
                       wrongMessage={activeQuestion.wrongFeedback}
                       theme={theme}
                     />
-                    {isCorrect || isStageComplete ? (
+                    {(isCorrect || isStageComplete) && (
                       <button
                         onClick={goToNextStage}
                         disabled={isTransitioning}
@@ -1499,13 +1792,6 @@ export function StudentStageExperience({
                         style={{ backgroundColor: theme.accent }}
                       >
                         다음 스테이지 →
-                      </button>
-                    ) : (
-                      <button
-                        className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.18)]"
-                        style={{ backgroundColor: `${theme.accent}99` }}
-                      >
-                        {activeQuestion.kind === "cardMatching" ? "카드를 연결해볼까요" : "카드를 순서 칸에 놓아볼까요"}
                       </button>
                     )}
                   </div>
@@ -1524,7 +1810,7 @@ export function StudentStageExperience({
                     {isFinished
                       ? `${scene.missionTitle}, 모두 완료했어요`
                       : isRealtimeStage
-                        ? "AI에게 오늘 배운 1/4을 직접 설명해볼까요?"
+                        ? realtimePracticeCopy?.title
                         : activeQuestion.prompt}
                   </h3>
 
@@ -1593,7 +1879,7 @@ export function StudentStageExperience({
                     />
                   ) : isRealtimeStage ? (
                     <div className="rounded-[18px] px-4 py-4 text-sm font-bold leading-6" style={{ backgroundColor: theme.accentSoft, color: theme.accentStrong }}>
-                      마이크를 켜고 AI에게 전체 4조각 중 1조각이 왜 1/4인지 설명하는 단계입니다.
+                      {realtimePracticeCopy?.sceneLine ?? activeQuestion.prompt}
                     </div>
                   ) : activeQuestion.kind === "fillBlank" ? (
                     <FillBlankTemplate
@@ -1664,21 +1950,19 @@ export function StudentStageExperience({
                     >
                       다시 하기
                     </button>
-                    <Link
-                      href={nextHref}
-                      aria-disabled={!reflectionText.trim()}
-                      onClick={(event) => {
-                        if (!reflectionText.trim()) event.preventDefault();
-                      }}
+                    <button
+                      type="button"
+                      disabled={!reflectionText.trim() || isCompletingMission}
+                      onClick={completeMissionAndReturn}
                       className={`rounded-[18px] px-4 py-3 text-center text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.28)] transition duration-200 ${
-                        reflectionText.trim()
+                        reflectionText.trim() && !isCompletingMission
                           ? "hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.32)]"
                           : "cursor-not-allowed opacity-45"
                       }`}
-                      style={{ backgroundColor: reflectionText.trim() ? theme.accent : "#9aa39b" }}
+                      style={{ backgroundColor: reflectionText.trim() && !isCompletingMission ? theme.accent : "#9aa39b" }}
                     >
-                      학습 길로
-                    </Link>
+                      {isCompletingMission ? "저장 중" : "학습 길로"}
+                    </button>
                   </div>
                 ) : isRealtimeStage && !isStageComplete ? (
                   <button

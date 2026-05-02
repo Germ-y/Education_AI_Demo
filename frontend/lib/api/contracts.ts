@@ -44,6 +44,7 @@ export type TemplateType =
   | "scenario_intro"
   | "scene_observation"
   | "highlight_clue"
+  | "image_quiz"
   | "card_match"
   | "action_choice"
   | "sequence_ordering"
@@ -109,11 +110,16 @@ export type StudentProfile = {
   externalKey: string;
   displayName: string;
   grade: string;
+  gradeLabel?: string;
   schoolCode?: string | null;
   studentType: ContentType;
+  studentTypeLabel?: string;
+  trackLabel?: string;
   primaryNeed: string;
   profileJson: Record<string, unknown>;
   attendanceRate?: number | null;
+  attendanceLabel?: string;
+  accessCode?: string | null;
   strengths?: string[];
   weaknesses?: string[];
   status: StudentStatus;
@@ -123,11 +129,16 @@ export type SchoolProfile = {
   id: string;
   schoolCode: string;
   officeCode?: string | null;
-  name: string;
-  schoolLevel: "elementary" | "middle" | "high" | "unknown";
+  name?: string;
+  schoolName?: string;
+  schoolLevel?: "elementary" | "middle" | "high" | "unknown";
+  schoolKind?: string;
   regionCode?: string | null;
+  regionName?: string | null;
   address?: string | null;
-  source: "seed_snapshot" | "NEIS" | "manual";
+  roadAddress?: string | null;
+  source?: "seed_snapshot" | "NEIS" | "manual";
+  sourceCode?: string;
 };
 
 export type ContextMe = {
@@ -142,6 +153,21 @@ export type SchoolCalendarItem = {
   source: string;
 };
 
+export type SchoolTimetableSlot = {
+  id?: string;
+  schoolCode?: string;
+  officeCode?: string;
+  academicYear?: string;
+  semester?: string;
+  timetableDate: string;
+  grade: string;
+  className: string;
+  period: number;
+  subjectName?: string | null;
+  sourceCode?: string;
+  retrievedAt?: string;
+};
+
 export type EducationStat = {
   label: string;
   value: string;
@@ -151,29 +177,41 @@ export type EducationStat = {
 export type PublicContextBundle = {
   studentId?: string;
   school: SchoolProfile;
-  calendar: SchoolCalendarItem[];
+  calendar: Array<SchoolCalendarItem | Record<string, unknown>>;
+  timetable?: SchoolTimetableSlot[];
   timetableSummary: {
     todaySubjects: string[];
     source: string;
+    date?: string | null;
+    cacheStatus?: string;
   };
-  educationStats: EducationStat[];
-  lastSyncedAt: string;
+  educationStats?: EducationStat[];
+  lastSyncedAt?: string | null;
 };
 
 export type StudentListItem = {
   studentId: string;
   displayName: string;
   grade: string;
+  gradeLabel?: string;
   schoolName?: string;
   studentType: ContentType;
+  studentTypeLabel?: string;
+  trackLabel?: string;
   primaryNeed: string;
   attendanceRate?: number | null;
+  attendanceLabel?: string;
+  accessCode?: string | null;
   strengths?: string[];
   weaknesses?: string[];
   caseStatus?: CaseStatus;
   latestContentStatus: MissionStatus | "completed" | "none";
   dashboardStage?: "initial_review" | "material_generation" | "material_review" | "learning" | "feedback";
+  dashboardStageLabel?: string;
+  statusLabel?: string;
   supportStrategy?: string | null;
+  summaryLine?: string;
+  aiContextSummary?: string;
   nextSessionSuggestion: string;
 };
 
@@ -224,9 +262,55 @@ export type PlannerItem = {
   status: "planned" | "done" | "skipped";
 };
 
+export type DashboardProfile = {
+  headline: string;
+  currentStageLabel: string;
+  attendanceLabel: string;
+  primaryNeedTitle: string;
+  primaryNeedDetail: string;
+  supportStrategyTitle: string;
+  supportStrategyDetail?: string | null;
+  strengths: string[];
+  weaknesses: string[];
+  emotionalNote?: string | null;
+  responsePattern?: string | null;
+  guardianCooperation?: string | null;
+  schoolContextNote?: string | null;
+  nextSessionFocus: string[];
+  aiContextSummary: string;
+  autoContext: Array<{ label: string; value: string }>;
+};
+
+export type StudentContextBundle = {
+  student: {
+    id: string;
+    name: string;
+    displayName: string;
+    grade: string;
+    gradeLabel: string;
+    studentType: ContentType;
+    studentTypeLabel: string;
+    trackLabel: string;
+  };
+  caseSummary: Record<string, unknown>;
+  teacherInputs: CaseNote[];
+  previousLessons: Array<Record<string, unknown>>;
+  memoryCard: MemoryCard | null;
+  schoolContext: PublicContextBundle | null;
+  autoContext: Array<{ label: string; value: string }>;
+  aiReadyContext: {
+    summary: string;
+    mustUse: string[];
+    avoid: string[];
+    evidenceSources: Array<Record<string, unknown>>;
+  };
+};
+
 export type StudentCaseFile = {
   profile: StudentProfile;
   schoolContext?: PublicContextBundle;
+  dashboardProfile?: DashboardProfile;
+  contextBundle?: StudentContextBundle;
   openCase: SupportCaseSummary;
   memoryCard: MemoryCard | null;
   weeklyRecords: CaseNote[];
@@ -316,6 +400,7 @@ export type ContentAsset = {
   provider: string;
   model: string;
   promptJson?: Record<string, unknown> | null;
+  sourceText?: string | null;
   storageUrl: string;
   previewUrl?: string | null;
   qaStatus: "pending" | "passed" | "failed";
@@ -351,6 +436,8 @@ export type SeedContext = {
     studentId: string;
     caseId: string;
     contentId: string;
+    status?: MissionStatus | string;
+    updatedAt?: string | null;
   }>;
 };
 
@@ -360,6 +447,7 @@ export type StudentMissionSummary = {
   contentType: ContentType;
   totalSteps: 4;
   heroImageUrl?: string | null;
+  heroAudioUrl?: string | null;
   status: "published";
 };
 
@@ -378,6 +466,23 @@ export type StageSubmitRequest = {
   attemptId: string;
   answer: Record<string, unknown>;
   clientEventId?: string;
+};
+
+export type StudentActivityEventRequest = {
+  attemptId?: string | null;
+  stageId?: string | null;
+  eventType: string;
+  payloadJson?: Record<string, unknown>;
+};
+
+export type ReflectionRequest = {
+  attemptId: string;
+  reflectionChoice: string;
+  shortText?: string | null;
+};
+
+export type ReflectionResponse = {
+  saved: boolean;
 };
 
 export type StageSubmitResponse = {
@@ -401,6 +506,7 @@ export type RealtimeSessionResponse = {
   practiceSpec: {
     practiceTitle: string;
     imageAssetUrl?: string | null;
+    openingAudioUrl?: string | null;
     openingLine: string;
     maxTurns: number;
     maxDurationSec: number;
@@ -409,6 +515,23 @@ export type RealtimeSessionResponse = {
 
 export type ReviewableContent = MissionContent;
 
+export type AgentRun = {
+  id: string;
+  agentType: string;
+  promptVersion: string;
+  outputSchemaName: string;
+  inputSnapshotJson: Record<string, unknown>;
+  outputJson?: Record<string, unknown> | null;
+  model: string;
+  status: "running" | "succeeded" | "failed";
+  tokenUsageJson?: Record<string, unknown> | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  reviewRequired: boolean;
+  createdAt: string;
+  completedAt?: string | null;
+};
+
 export type AgentRunRequest = {
   studentId: string;
   caseId: string;
@@ -416,9 +539,23 @@ export type AgentRunRequest = {
   contentType: ContentType;
 };
 
-export type AgentRunPlan = {
+export type OrchestratorRunResponse = {
+  agentRun: AgentRun | null;
+};
+
+export type ContentGenerationRequest = {
   orchestratorRunId: string;
-  sessionGoal: string;
-  selectedFlow: TemplateType[];
-  teacherSummary: string;
+  studentId: string;
+  caseId: string;
+};
+
+export type ContentGenerationResponse = {
+  agentRun: AgentRun | null;
+  content: MissionContent | null;
+};
+
+export type AssetPackageGenerationResponse = {
+  contentId: string;
+  generatedCount: number;
+  assets: ContentAsset[];
 };

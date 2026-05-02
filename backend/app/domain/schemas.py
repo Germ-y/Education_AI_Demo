@@ -5,6 +5,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.domain.enums import AssetRole, AssetType, MissionStatus, StageRole, StudentType, TemplateType, UserRole
 
 REALTIME_TEMPLATE_TYPES = {TemplateType.REALTIME_ROLEPLAY, TemplateType.REALTIME_TEACH_BACK}
+CHOICE_TEMPLATE_TYPES = {
+    TemplateType.SCENE_OBSERVATION,
+    TemplateType.HIGHLIGHT_CLUE,
+    TemplateType.SCENE_QUESTION,
+    TemplateType.CLUE_QUESTION,
+    TemplateType.APPLIED_QUESTION,
+    TemplateType.ACTION_CHOICE,
+    TemplateType.DECISION_CARD,
+    TemplateType.EXPLANATION_CHOICE,
+    TemplateType.WRONG_EXPLANATION_FIX,
+}
 REQUIRED_ASSET_ROLES = {
     AssetRole.HERO,
     AssetRole.STAGE_1,
@@ -116,6 +127,8 @@ class ContentStage(BaseModel):
             raise ValueError("Realtime 템플릿은 4단계에서만 사용할 수 있습니다.")
         if self.step == 4 and self.realtime_spec is None:
             raise ValueError("4단계에는 승인 대상 RealtimePracticeSpec이 필요합니다.")
+        if self.step != 4 and self.realtime_spec is not None:
+            raise ValueError("1~3단계에는 realtimeSpec을 넣을 수 없습니다.")
         if self.step != 4 and self.template_type not in STATIC_STAGE_TEMPLATE_TYPES.get(self.stage_role, set()):
             raise ValueError("stageRole과 templateType 조합이 허용되지 않습니다.")
         _validate_template_json(self.template_type, self.template_json)
@@ -157,8 +170,9 @@ def _validate_template_json(template_type: TemplateType, template_json: dict[str
         if "acceptedAnswers" not in template_json and "answers" not in template_json:
             raise ValueError("blank_fill은 acceptedAnswers 또는 answers를 가져야 합니다.")
         _require_any_key(template_json, ["question", "sentence"], "blank_fill")
-    if template_type in {TemplateType.SCENE_QUESTION, TemplateType.CLUE_QUESTION, TemplateType.APPLIED_QUESTION, TemplateType.ACTION_CHOICE}:
-        _require_keys(template_json, ["question", "choices", "correctFeedback", "wrongFeedback"], template_type.value)
+    if template_type in CHOICE_TEMPLATE_TYPES:
+        _require_keys(template_json, ["question", "choices", "answer", "correctFeedback", "wrongFeedback"], template_type.value)
+        _validate_choice_answer(template_json, template_type.value)
     if template_type == TemplateType.PARTITION_PICKER:
         _require_any_key(template_json, ["question", "instruction"], "partition_picker")
         _require_any_key(template_json, ["choices", "visual"], "partition_picker")
@@ -173,6 +187,15 @@ def _require_keys(template_json: dict[str, Any], keys: list[str], template_type:
 def _require_any_key(template_json: dict[str, Any], keys: list[str], template_type: str) -> None:
     if not any(key in template_json for key in keys):
         raise ValueError(f"{template_type} templateJson에는 다음 중 하나가 필요합니다: {', '.join(keys)}")
+
+
+def _validate_choice_answer(template_json: dict[str, Any], template_type: str) -> None:
+    choices = template_json.get("choices")
+    if not isinstance(choices, list) or len(choices) < 2:
+        raise ValueError(f"{template_type}.choices는 2개 이상이어야 합니다.")
+    choice_ids = [choice.get("id") for choice in choices if isinstance(choice, dict)]
+    if len(choice_ids) != len(choices) or template_json["answer"] not in choice_ids:
+        raise ValueError(f"{template_type}.answer는 choices의 id 중 하나여야 합니다.")
 
 
 class MissionContent(BaseModel):
@@ -221,10 +244,10 @@ class MissionContent(BaseModel):
     @field_validator("assets")
     @classmethod
     def validate_required_assets(cls, assets: list[ContentAsset]) -> list[ContentAsset]:
-        roles = {asset.asset_role for asset in assets}
-        missing = REQUIRED_ASSET_ROLES - roles
-        if missing:
-            missing_labels = ", ".join(sorted(role.value for role in missing))
+        image_roles = {asset.asset_role for asset in assets if asset.asset_type == AssetType.IMAGE}
+        missing_images = REQUIRED_ASSET_ROLES - image_roles
+        if missing_images:
+            missing_labels = ", ".join(sorted(role.value for role in missing_images))
             raise ValueError(f"필수 이미지 asset role이 없습니다: {missing_labels}")
         audio_roles = {asset.asset_role for asset in assets if asset.asset_type == AssetType.AUDIO}
         missing_audio = REQUIRED_ASSET_ROLES - audio_roles

@@ -52,3 +52,4 @@ __pycache__/
 *.db
 *.sqlite
 *.sqlite3
+backend/generated/assets/

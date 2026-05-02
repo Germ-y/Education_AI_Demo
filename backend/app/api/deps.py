@@ -1,4 +1,4 @@
-from functools import lru_cache
+from threading import Lock
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException
@@ -10,15 +10,34 @@ from app.repositories.agent_run_repository import AgentRunRepository
 from app.repositories.demo_repository import DemoRepository
 from app.services.store import DemoStore, SessionPrincipal
 
+_store_init_lock = Lock()
+_store_instance: DemoStore | None = None
 
-@lru_cache
+
 def get_store_instance() -> DemoStore:
-    settings = get_settings()
-    create_schema()
-    repository = DemoRepository(get_session_maker())
-    if settings.demo_seed_mode and (settings.demo_seed_reset or repository.is_empty()):
-        repository.replace_database(create_demo_database())
-    return DemoStore(repository=repository)
+    global _store_instance
+    if _store_instance is not None:
+        return _store_instance
+
+    with _store_init_lock:
+        if _store_instance is not None:
+            return _store_instance
+        settings = get_settings()
+        create_schema()
+        repository = DemoRepository(get_session_maker())
+        if settings.demo_seed_mode and (settings.demo_seed_reset or repository.is_empty()):
+            repository.replace_database(create_demo_database())
+        _store_instance = DemoStore(repository=repository)
+        return _store_instance
+
+
+def _clear_store_instance_cache() -> None:
+    global _store_instance
+    with _store_init_lock:
+        _store_instance = None
+
+
+get_store_instance.cache_clear = _clear_store_instance_cache  # type: ignore[attr-defined]
 
 
 def get_store() -> DemoStore:
@@ -43,7 +62,10 @@ def require_principal(
     authorization: Annotated[str | None, Header()] = None,
     demo_store: DemoStore = Depends(get_store),
 ) -> SessionPrincipal:
-    principal = demo_store.get_session(_extract_token(authorization))
+    token = _extract_token(authorization)
+    principal = demo_store.get_session(token)
+    if principal is None and token is None and get_settings().demo_seed_mode:
+        principal = demo_store.create_user_session("teacher", "teacher.demo@eduyj.local")
     if principal is None:
         raise HTTPException(status_code=401, detail={"code": "UNAUTHORIZED", "message": "로그인이 필요합니다."})
     return principal

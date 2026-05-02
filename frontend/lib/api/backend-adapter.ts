@@ -1,10 +1,12 @@
 import { apiFetch } from "./api-fetch";
 import type { ApiAdapter } from "./adapter";
 import type {
-  AgentRunPlan,
+  AssetPackageGenerationResponse,
+  ContentGenerationResponse,
   ContextMe,
   DemoLoginResponse,
   MissionContent,
+  OrchestratorRunResponse,
   PublicContextBundle,
   RealtimeSessionResponse,
   ReviewableContent,
@@ -35,6 +37,7 @@ type BackendSeedContext = {
     caseId: string;
     status?: string;
     totalSteps?: number;
+    updatedAt?: string | null;
   }>;
 };
 
@@ -74,7 +77,16 @@ export const backendAdapter: ApiAdapter = {
     ),
 
   createAgentRun: (payload, options) =>
-    apiFetch<AgentRunPlan>("/api/ai/orchestrator-runs", { method: "POST", body: payload, token: options?.token }),
+    apiFetch<OrchestratorRunResponse>("/api/ai/orchestrator-runs", { method: "POST", body: payload, token: options?.token }),
+
+  createContentGeneration: (payload, options) =>
+    apiFetch<ContentGenerationResponse>("/api/ai/content-generations", { method: "POST", body: payload, token: options?.token }),
+
+  generateContentAssetPackage: (contentId, options) =>
+    apiFetch<AssetPackageGenerationResponse>(`/api/contents/${encodeURIComponent(contentId)}/assets/generate-package`, {
+      method: "POST",
+      token: options?.token,
+    }),
 };
 
 function normalizeSeedContext(seed: BackendSeedContext): SeedContext {
@@ -87,11 +99,16 @@ function normalizeSeedContext(seed: BackendSeedContext): SeedContext {
       externalKey: student.studentId,
       displayName: student.displayName,
       grade: student.grade,
+      gradeLabel: student.gradeLabel,
       schoolCode: student.schoolCode,
       studentType: student.studentType,
+      studentTypeLabel: student.studentTypeLabel,
+      trackLabel: student.trackLabel,
       primaryNeed: student.primaryNeed,
       profileJson: {},
       attendanceRate: student.attendanceRate,
+      attendanceLabel: student.attendanceLabel,
+      accessCode: student.accessCode,
       strengths: student.strengths ?? [],
       weaknesses: student.weaknesses ?? [],
       status: "active",
@@ -112,6 +129,8 @@ function normalizeSeedContext(seed: BackendSeedContext): SeedContext {
       studentId: mapping.studentId,
       caseId: mapping.caseId,
       contentId: mapping.contentId,
+      status: mapping.status,
+      updatedAt: mapping.updatedAt,
     })),
   };
 }

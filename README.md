@@ -29,6 +29,7 @@ assets/         source/reference assets
 4. [docs/common/00-agent-navigation.md](docs/common/00-agent-navigation.md)
 5. [docs/common/01-collaboration-contract.md](docs/common/01-collaboration-contract.md)
 6. [docs/common/02-branch-handoff-contract.md](docs/common/02-branch-handoff-contract.md)
+7. [docs/common/13-current-handoff-summary.md](docs/common/13-current-handoff-summary.md)
 
 ## Frontend
 
@@ -68,11 +69,21 @@ cd backend
 ```
 
 `app.data.seed_demo` creates the SQLAlchemy schema and writes the demo seed to `DATABASE_URL`.
-For a quick local SQLite smoke test:
+For the shared demo SQLite path:
 
 ```bash
 cd backend
-DATABASE_URL=sqlite+pysqlite:///./eduyj-demo.db .venv/bin/python -m app.data.seed_demo
+DATABASE_URL=sqlite+pysqlite:///./data/eduyj_demo.db .venv/bin/python -m app.data.seed_demo
+```
+
+The local `.db` file is ignored by git. A reproducible SQL dump is tracked at
+[backend/data/eduyj_demo_dump.sql](backend/data/eduyj_demo_dump.sql), with restore notes in
+[backend/data/README.md](backend/data/README.md).
+
+```bash
+cd backend
+rm -f data/eduyj_demo.db
+sqlite3 data/eduyj_demo.db < data/eduyj_demo_dump.sql
 ```
 
 ## Contract Notes

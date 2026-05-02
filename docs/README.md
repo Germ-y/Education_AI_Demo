@@ -20,6 +20,7 @@ docs/backend/   백엔드 팀원이 작업 전에 보는 문서
 - 백엔드 팀원 가이드: [backend/00-backend-team-guide.md](backend/00-backend-team-guide.md)
 - NEIS 데이터 수집/조회 계획: [backend/07-neis-data-collection-plan.md](backend/07-neis-data-collection-plan.md)
 - AI 오케스트레이터 workflow: [backend/08-ai-orchestrator-workflow.md](backend/08-ai-orchestrator-workflow.md)
+- 최신 인수인계 요약: [common/13-current-handoff-summary.md](common/13-current-handoff-summary.md)
 
 ## 문서 수정 기준
 
@@ -30,3 +31,4 @@ docs/backend/   백엔드 팀원이 작업 전에 보는 문서
 - PR을 올릴 때는 [common/10-pr-feature-review-contract.md](common/10-pr-feature-review-contract.md)에 맞춰 기능 단위와 검수 범위를 적는다.
 - 새 기능을 시작할 때는 [common/11-feature-start-checklist.md](common/11-feature-start-checklist.md)를 먼저 채운다.
 - API field, enum, MissionContent 구조가 바뀌면 [common/12-schema-contract.md](common/12-schema-contract.md)를 먼저 갱신한다.
+- dev 통합 전후의 최신 구현 상태와 DB 복원 방법은 [common/13-current-handoff-summary.md](common/13-current-handoff-summary.md)에 남긴다.
