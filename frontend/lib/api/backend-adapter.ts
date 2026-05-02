@@ -1,0 +1,42 @@
+import { apiFetch } from "./api-fetch";
+import type { ApiAdapter } from "./adapter";
+import type {
+  AgentRunPlan,
+  ContextMe,
+  MissionContent,
+  PublicContextBundle,
+  RealtimeSessionResponse,
+  ReviewableContent,
+  StudentCaseFile,
+  StudentListItem,
+  StudentMissionSummary,
+} from "./contracts";
+
+export const backendAdapter: ApiAdapter = {
+  getContextMe: (options) => apiFetch<ContextMe>("/api/context/me", { token: options?.token }),
+
+  getTeacherStudents: (options) => apiFetch<StudentListItem[]>("/api/teacher/students", { token: options?.token }),
+
+  getTeacherStudent: (studentId, options) =>
+    apiFetch<StudentCaseFile>(`/api/teacher/students/${encodeURIComponent(studentId)}`, { token: options?.token }),
+
+  getSchoolContext: (schoolId, options) =>
+    apiFetch<PublicContextBundle>(`/api/public-data/schools/${encodeURIComponent(schoolId)}/context`, { token: options?.token }),
+
+  getTodayStudentMissions: (options) => apiFetch<StudentMissionSummary[]>("/api/student/missions/today", { token: options?.token }),
+
+  getStudentMission: (contentId, options) =>
+    apiFetch<MissionContent>(`/api/student/missions/${encodeURIComponent(contentId)}`, { token: options?.token }),
+
+  getReviewableContent: (contentId, options) =>
+    apiFetch<ReviewableContent>(`/api/contents/${encodeURIComponent(contentId)}`, { token: options?.token }),
+
+  createRealtimeSession: (contentId, stageId, payload, options) =>
+    apiFetch<RealtimeSessionResponse>(
+      `/api/student/missions/${encodeURIComponent(contentId)}/stages/${encodeURIComponent(stageId)}/realtime-session`,
+      { method: "POST", body: payload, token: options?.token },
+    ),
+
+  createAgentRun: (payload, options) =>
+    apiFetch<AgentRunPlan>("/api/ai/orchestrator-runs", { method: "POST", body: payload, token: options?.token }),
+};

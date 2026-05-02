@@ -1,0 +1,44 @@
+import type { ApiEnvelope, ApiError } from "./contracts";
+
+export class ApiFetchError extends Error {
+  code: string;
+  status: number;
+  details: Record<string, unknown>;
+
+  constructor(status: number, error: ApiError["error"]) {
+    super(error.message);
+    this.name = "ApiFetchError";
+    this.code = error.code;
+    this.status = status;
+    this.details = error.details;
+  }
+}
+
+export type ApiFetchOptions = Omit<RequestInit, "body"> & {
+  baseUrl?: string;
+  token?: string;
+  body?: unknown;
+};
+
+const DEFAULT_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+
+export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
+  const { baseUrl = DEFAULT_API_BASE_URL, token, headers, body, ...init } = options;
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const envelope = (await response.json()) as ApiEnvelope<T>;
+
+  if ("error" in envelope) {
+    throw new ApiFetchError(response.status, envelope.error);
+  }
+
+  return envelope.data;
+}
