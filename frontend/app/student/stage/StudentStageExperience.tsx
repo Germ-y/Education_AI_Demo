@@ -712,35 +712,272 @@ function FillBlankTemplate({
   );
 }
 
-function RealtimeTeachBackTemplate({ question, theme }: { question: StageQuestion; theme: SceneTheme }) {
+function getRealtimePracticeCopy(scene: StudentContext["scene"], question: StageQuestion) {
+  const isLearningFocus = scene.contentType === "learning_focus";
+
+  return {
+    label: isLearningFocus ? "친구에게 설명하기" : "생활에 적용하기",
+    title: isLearningFocus ? "내 말로 쉽게 설명해요" : "오늘 바로 쓸 말을 연습해요",
+    partner: isLearningFocus ? "친구" : "나",
+    partnerLine: isLearningFocus
+      ? "왜 그렇게 되는지 아직 헷갈려."
+      : "오늘 비슷한 상황이 오면 뭐라고 말해볼까?",
+    studentLine: isLearningFocus
+      ? "먼저 전체가 몇 조각인지 보고, 그중 고른 조각을 말해볼게."
+      : "작게 시작할 수 있는 한 문장을 골라 말해볼게.",
+    sceneLine: question.realtimePracticeSpec?.firstPrompt ?? question.prompt,
+    actionLabel: isLearningFocus ? "설명 연습 시작" : "생활 적용 연습 시작",
+  };
+}
+
+function RealtimePracticeRoom({
+  question,
+  scene,
+  theme,
+  isComplete,
+  onStart,
+  onFinish,
+}: {
+  question: StageQuestion;
+  scene: StudentContext["scene"];
+  theme: SceneTheme;
+  isComplete: boolean;
+  onStart: () => void;
+  onFinish: () => void;
+}) {
   const rubric = question.realtimePracticeSpec?.rubric ?? [];
+  const practice = getRealtimePracticeCopy(scene, question);
+  const timeLimitMinutes = Math.round((question.realtimePracticeSpec?.timeLimitSeconds ?? 180) / 60);
+  const minimumStudentTurns = 3;
+  const [draft, setDraft] = useState("");
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [studentTurns, setStudentTurns] = useState(0);
+  const [messages, setMessages] = useState<Array<{ id: number; role: "partner" | "student"; text: string }>>([
+    { id: 1, role: "partner", text: practice.sceneLine },
+    { id: 2, role: "student", text: practice.studentLine },
+    { id: 3, role: "partner", text: "좋아요. 한 번 더 짧게 말해볼까요?" },
+  ]);
+  const messageListRef = useRef<HTMLDivElement>(null);
+  const hasUserSubmittedRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasUserSubmittedRef.current) return;
+
+    messageListRef.current?.scrollTo({
+      top: messageListRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages]);
+
+  const submitMessage = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    const nextTurn = studentTurns + 1;
+    const isFinalTurn = nextTurn >= minimumStudentTurns;
+
+    hasUserSubmittedRef.current = true;
+    setMessages((current) => [
+      ...current,
+      { id: current.length + 1, role: "student", text: trimmed },
+      {
+        id: current.length + 2,
+        role: "partner",
+        text: isFinalTurn
+          ? "좋아요. 이제 네 말로 충분히 설명했어요. 마무리해도 돼요."
+          : "좋아. 이제 방금 말한 내용을 더 자연스럽게 이어서 말해볼래?",
+      },
+    ]);
+    setStudentTurns(nextTurn);
+    setDraft("");
+
+    if (isFinalTurn && !isComplete) onStart();
+  };
+
+  const startSpeechInput = () => {
+    const spokenText =
+      scene.contentType === "learning_focus"
+        ? "전체가 4조각이고 그중 1조각을 골랐으니까 1/4이야."
+        : "오늘은 먼저 한 가지 행동만 정해서 바로 시작해볼게.";
+    type SpeechRecognitionEventLike = {
+      results: ArrayLike<ArrayLike<{ transcript: string }>>;
+    };
+    type SpeechRecognitionLike = {
+      lang: string;
+      interimResults: boolean;
+      maxAlternatives: number;
+      onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+      onend: (() => void) | null;
+      onerror: (() => void) | null;
+      start: () => void;
+    };
+    type SpeechRecognitionWindow = Window & {
+      SpeechRecognition?: new () => SpeechRecognitionLike;
+      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+    };
+    const Recognition =
+      (window as SpeechRecognitionWindow).SpeechRecognition ??
+      (window as SpeechRecognitionWindow).webkitSpeechRecognition;
+
+    setIsSpeaking(true);
+
+    if (Recognition) {
+      const recognition = new Recognition();
+      recognition.lang = "ko-KR";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.onresult = (event) => {
+        const transcript = event.results[0]?.[0]?.transcript;
+        if (transcript) setDraft(transcript);
+      };
+      recognition.onend = () => setIsSpeaking(false);
+      recognition.onerror = () => {
+        setIsSpeaking(false);
+        setDraft(spokenText);
+      };
+      recognition.start();
+      return;
+    }
+
+    window.setTimeout(() => {
+      setIsSpeaking(false);
+      setDraft(spokenText);
+    }, 520);
+  };
 
   return (
-    <div className="grid min-h-[360px] grid-rows-[auto_1fr] gap-4 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-5 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]">
-      <div>
-        <p className="text-xs font-black uppercase tracking-[0.08em]" style={{ color: theme.accentStrong }}>
-          realtime teach-back
-        </p>
-        <h3 className="mt-2 text-2xl font-black leading-tight text-[#172033]">
-          AI에게 오늘 배운 1/4을 설명해볼까요?
-        </h3>
-        <p className="mt-3 text-sm font-bold leading-6 text-[#596157]">
-          상황 이미지를 보며 전체, 부분, 1/4을 말로 설명하는 4단계 realtime 연습입니다.
-        </p>
+    <div className="grid h-full min-h-[440px] grid-cols-[minmax(320px,0.86fr)_minmax(390px,1fr)] gap-4 rounded-[24px] border border-[#dce5ec] bg-white p-4 shadow-[0_18px_48px_rgba(57,78,97,0.10)]">
+      <div className="relative grid min-h-0 grid-rows-[auto_1fr] overflow-hidden rounded-[22px] border p-5" style={{ borderColor: theme.border, backgroundColor: theme.accentPale }}>
+        <div className="relative z-10">
+          <p className="text-sm font-black" style={{ color: theme.accentStrong }}>
+            {practice.label}
+          </p>
+          <h3 className="mt-2 text-[2.6rem] font-black leading-tight break-keep text-[#172033]">{practice.title}</h3>
+          <p className="mt-3 text-base font-bold leading-7 break-keep text-[#596157]">{practice.sceneLine}</p>
+        </div>
+
+        <div className="relative z-10 grid min-h-0 grid-cols-[minmax(0,1fr)_160px] items-center gap-4 pt-5">
+          <div className="rounded-[20px] border border-white/80 bg-white/90 p-5 shadow-sm">
+            <p className="text-xs font-black" style={{ color: theme.accentStrong }}>
+              {practice.partner}
+            </p>
+            <p className="mt-3 text-2xl font-black leading-9 break-keep text-[#25312a]">{practice.partnerLine}</p>
+          </div>
+          <div className="relative h-56 w-40 justify-self-end">
+            <div className="absolute bottom-0 left-3 h-28 w-32 rounded-t-[56px] border border-white/80 bg-[#ffe6a8] shadow-[inset_0_-10px_0_rgba(190,134,35,0.12)]" />
+            <div className="absolute bottom-[112px] left-5 h-[112px] w-[112px] rounded-full bg-[#4f3424]" />
+            <div className="absolute bottom-[94px] left-6 h-28 w-28 rounded-full border border-white/80 bg-[#ffd9bf] shadow-[inset_0_-8px_0_rgba(185,110,70,0.14)]">
+              <span className="absolute -top-3 left-4 h-9 w-9 rounded-full bg-[#4f3424]" />
+              <span className="absolute -top-4 left-11 h-10 w-10 rounded-full bg-[#4f3424]" />
+              <span className="absolute -top-2 right-5 h-8 w-8 rounded-full bg-[#4f3424]" />
+              <span className="absolute left-7 top-10 h-2.5 w-2.5 rounded-full bg-[#25312a]" />
+              <span className="absolute right-7 top-10 h-2.5 w-2.5 rounded-full bg-[#25312a]" />
+              <span className="absolute left-1/2 top-[58px] h-3 w-9 -translate-x-1/2 rounded-b-full border-b-[3px] border-[#25312a]" />
+            </div>
+            <div className="absolute bottom-[70px] left-0 h-16 w-8 rotate-[24deg] rounded-full bg-[#ffd9bf]" />
+            <div className="absolute bottom-[70px] right-0 h-16 w-8 rotate-[-24deg] rounded-full bg-[#ffd9bf]" />
+          </div>
+        </div>
+
       </div>
 
-      <div className="rounded-[20px] border border-[#f0dfb4] bg-[#fff9e8] p-4">
-        <p className="text-sm font-black text-[#8a5a00]">연습 기준</p>
-        <div className="mt-3 grid gap-2">
-          {rubric.map((item, index) => (
-            <div key={item} className="flex items-center gap-3 rounded-[16px] bg-white px-4 py-3 text-sm font-bold text-[#334155] shadow-sm">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black text-white" style={{ backgroundColor: theme.accent }}>
-                {index + 1}
-              </span>
-              {item}
+      <div className="grid min-h-0 grid-rows-[auto_1fr_auto] overflow-hidden rounded-[22px] border border-[#e2e8f0] bg-[#f8fafc]">
+        <div className="border-b border-[#e2e8f0] bg-white px-5 py-4">
+          <p className="text-sm font-black text-[#172033]">대화 연습</p>
+          <p className="mt-1 text-xs font-bold text-[#64748b]">
+            목표 시간 {timeLimitMinutes}분 · 내 말 {studentTurns}/{minimumStudentTurns}
+          </p>
+        </div>
+
+        <div className="relative min-h-0">
+        {isComplete && (
+          <div className="pointer-events-none absolute inset-x-5 bottom-5 z-20">
+            <div className="pointer-events-auto mx-auto flex max-w-[460px] items-center justify-between gap-3 rounded-[20px] border border-[#f0dfb4] bg-[#fff9e8] px-4 py-3 shadow-[0_18px_42px_rgba(31,41,55,0.18)] animate-[stageToastIn_220ms_ease-out_both]">
+              <div className="min-w-0">
+                <p className="text-sm font-black text-[#8a5a00]">대화가 마무리됐어요</p>
+                <p className="mt-0.5 text-xs font-bold text-[#6b5a24]">오늘 연습을 완료할 수 있어요.</p>
+              </div>
+              <button
+                type="button"
+                onClick={onFinish}
+                className="shrink-0 rounded-[14px] px-4 py-2 text-sm font-black text-white shadow-[0_10px_20px_rgba(39,174,96,0.22)] transition duration-200 hover:-translate-y-0.5"
+                style={{ backgroundColor: theme.accentStrong }}
+              >
+                완료
+              </button>
+            </div>
+          </div>
+        )}
+        <div ref={messageListRef} className="h-full min-h-0 space-y-3 overflow-y-auto px-5 py-4 pb-28">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`max-w-[82%] rounded-[18px] px-4 py-3 text-sm font-bold leading-6 shadow-sm ${
+                message.role === "student"
+                  ? "ml-auto rounded-tr-[6px] text-white"
+                  : "rounded-tl-[6px] bg-white text-[#334155]"
+              }`}
+              style={message.role === "student" ? { backgroundColor: theme.accent } : undefined}
+            >
+              {message.text}
             </div>
           ))}
+          <div className="rounded-[18px] border border-[#f0dfb4] bg-[#fff9e8] px-4 py-3">
+            <p className="text-xs font-black text-[#8a5a00]">확인할 점</p>
+            <div className="mt-2 grid gap-2">
+              {rubric.map((item, index) => (
+                <div key={item} className="flex items-center gap-2 text-xs font-bold leading-5 text-[#5f4b16]">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white" style={{ backgroundColor: theme.accent }}>
+                    {index + 1}
+                  </span>
+                  <span className="break-keep">{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
+        </div>
+
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            submitMessage(draft);
+          }}
+          className="border-t border-[#e2e8f0] bg-white p-4"
+        >
+          <div className="grid grid-cols-[auto_1fr_auto] gap-2">
+            <button
+              type="button"
+              onClick={startSpeechInput}
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-[#dce5ec] bg-white shadow-sm transition hover:-translate-y-0.5"
+              style={{ color: isSpeaking ? theme.accentStrong : "#475569" }}
+              aria-label="말로 입력하기"
+              title={isSpeaking ? "듣는 중" : "말로 입력하기"}
+            >
+              <span className="relative flex h-6 w-6 items-center justify-center" aria-hidden="true">
+                <span className="absolute top-0 h-3.5 w-2.5 rounded-full border-2 border-current" />
+                <span className="absolute top-3 h-1.5 w-4 rounded-b-full border-b-2 border-l-2 border-r-2 border-current" />
+                <span className="absolute bottom-0 h-1.5 w-0.5 rounded-full bg-current" />
+                <span className="absolute bottom-0 h-0.5 w-3 rounded-full bg-current" />
+                {isSpeaking && <span className="absolute -inset-2 rounded-full border-2 border-current opacity-30" />}
+              </span>
+            </button>
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              className="min-w-0 rounded-[16px] border border-[#dce5ec] bg-[#f8fafc] px-4 py-3 text-sm font-bold outline-none focus:border-[#94d86a] focus:bg-white"
+              placeholder={question.actionLabel ?? practice.actionLabel}
+            />
+            <button
+              type="submit"
+              className="rounded-[16px] px-5 py-3 text-sm font-black text-white shadow-[0_12px_24px_rgba(39,174,96,0.22)] transition duration-200 hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
+              style={{ backgroundColor: theme.accent }}
+              disabled={!draft.trim()}
+            >
+              보내기
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -784,6 +1021,7 @@ export function StudentStageExperience({
   const [fillBlankAnswer, setFillBlankAnswer] = useState<string[]>([]);
   const [oxReadySteps, setOxReadySteps] = useState<number[]>([]);
   const [oxAnswers, setOxAnswers] = useState<Record<number, string>>({});
+  const [reflectionText, setReflectionText] = useState("");
   const noticeCounter = useRef(0);
 
   const activeStage = scene.stages[activeStageIndex] ?? scene.stages[0];
@@ -808,7 +1046,7 @@ export function StudentStageExperience({
   const isRealtimeStage =
     activeStage.step === 4 &&
     activeQuestion.stageRole === "realtime_practice" &&
-    activeQuestion.templateType === "realtime_teach_back";
+    (activeQuestion.templateType === "realtime_teach_back" || activeQuestion.templateType === "realtime_roleplay");
   const isChoiceStage = activeQuestion.kind === "quiz" || activeQuestion.kind === "scenario" || isOxReady;
   const isStructuredStage = activeQuestion.kind === "sequence" || activeQuestion.kind === "cardMatching" || activeQuestion.kind === "fillBlank";
   const isCorrect = (isChoiceStage || isStructuredStage) && answer === activeQuestion.correctAnswer;
@@ -1027,6 +1265,7 @@ export function StudentStageExperience({
     setFillBlankAnswer([]);
     setOxReadySteps([]);
     setOxAnswers({});
+    setReflectionText("");
   };
 
   return (
@@ -1083,7 +1322,7 @@ export function StudentStageExperience({
 
             <section
               className={`grid h-[calc(100%-92px)] gap-5 px-8 py-6 ${
-                (activeQuestion.kind === "sequence" || activeQuestion.kind === "cardMatching") && !isFinished
+                ((activeQuestion.kind === "sequence" || activeQuestion.kind === "cardMatching") && !isFinished) || (isRealtimeStage && !isFinished)
                   ? "grid-cols-1"
                   : "grid-cols-[minmax(0,1fr)_minmax(380px,0.62fr)]"
               }`}
@@ -1099,7 +1338,7 @@ export function StudentStageExperience({
                       스테이지 {activeStage.step} · 시도 {attempts}회
                     </p>
                     <h2 className="mt-1 text-3xl font-black leading-tight">
-                      {isFinished ? "오늘 학습을 끝냈어요" : activeStage.title}
+                      {isFinished ? "휼륭해요!" : activeStage.title}
                     </h2>
                   </div>
                   <ProgressTrail
@@ -1117,25 +1356,42 @@ export function StudentStageExperience({
                 >
                   {isFinished ? (
                     <div
-                      className="flex h-full min-h-[300px] flex-col items-center justify-center rounded-[24px] border p-6 text-center shadow-[inset_0_-12px_0_rgba(39,174,96,0.08)]"
+                      className="grid h-full min-h-[300px] grid-rows-[auto_auto_1fr] rounded-[24px] border p-6 text-center shadow-[inset_0_-12px_0_rgba(39,174,96,0.08)]"
                       style={{ borderColor: theme.border, backgroundColor: theme.accentPale }}
                     >
-                      <MiniStar />
-                      <h3 className="mt-4 text-4xl font-black" style={{ color: theme.accentStrong }}>
-                        완료!
-                      </h3>
-                      <p className="mt-3 max-w-[520px] text-lg font-black leading-7">
-                        전체, 부분, 분수 표현, 생활 연결까지 모두 해냈어요.
-                      </p>
-                      <div className="mt-6 grid w-full max-w-[560px] grid-cols-2 gap-3">
+                      <div className="flex flex-col items-center">
+                        <MiniStar />
+                        <h3 className="mt-4 text-4xl font-black" style={{ color: theme.accentStrong }}>
+                          완료!
+                        </h3>
+                        <p className="mt-3 max-w-[520px] text-lg font-black leading-7 break-keep">
+                          오늘의 4단계 미션을 모두 해냈어요.
+                        </p>
+                      </div>
+                      <div className="mt-5 grid w-full grid-cols-4 gap-2">
                         {scene.stages.map((stage) => (
-                          <div key={stage.step} className="rounded-[18px] bg-white px-5 py-4 text-center shadow-sm">
-                            <p className="text-sm font-black" style={{ color: theme.accentStrong }}>
+                          <div key={stage.step} className="rounded-[16px] bg-white px-3 py-3 text-center shadow-sm">
+                            <p className="text-xs font-black" style={{ color: theme.accentStrong }}>
                               STEP {stage.step}
                             </p>
-                            <p className="mt-1 text-lg font-black leading-snug break-keep">{stage.title}</p>
+                            <p className="mt-1 line-clamp-2 min-h-10 text-sm font-black leading-5 break-keep">{stage.title}</p>
                           </div>
                         ))}
+                      </div>
+                      <div className="mt-5 min-h-0 rounded-[20px] border bg-white/92 p-4 text-left shadow-sm" style={{ borderColor: theme.border }}>
+                        <label htmlFor="student-reflection" className="text-sm font-black" style={{ color: theme.accentStrong }}>
+                          오늘 한마디
+                        </label>
+                        <p className="mt-2 text-lg font-black leading-7 break-keep text-[#25312a]">
+                          오늘 어땠는지 한 문장으로 남겨볼까요?
+                        </p>
+                        <textarea
+                          id="student-reflection"
+                          value={reflectionText}
+                          onChange={(event) => setReflectionText(event.target.value)}
+                          className="mt-3 h-24 w-full resize-none rounded-[18px] border border-[#dce5ec] bg-[#fbfdff] px-4 py-3 text-base font-bold leading-7 outline-none transition focus:border-[#94d86a] focus:bg-white"
+                          placeholder="여기에 내 생각을 적어봐요."
+                        />
                       </div>
                     </div>
                   ) : (
@@ -1163,14 +1419,21 @@ export function StudentStageExperience({
                         onRight={connectMatchingCard}
                       />
                     ) : isRealtimeStage ? (
-                      <RealtimeTeachBackTemplate question={activeQuestion} theme={theme} />
+                      <RealtimePracticeRoom
+                        question={activeQuestion}
+                        scene={scene}
+                        theme={theme}
+                        isComplete={isStageComplete}
+                        onStart={startRealtimePractice}
+                        onFinish={goToNextStage}
+                      />
                     ) : (
                       <LearningVisual visual={activeVisual} />
                     )
                   )}
                 </div>
 
-                {activeQuestion.kind !== "sequence" && activeQuestion.kind !== "cardMatching" && (
+                {activeQuestion.kind !== "sequence" && activeQuestion.kind !== "cardMatching" && !isRealtimeStage && (
                   <div
                     className="mt-3 flex items-center gap-3 rounded-[18px] border px-4 py-3 text-sm font-bold leading-6 shadow-sm"
                     style={{ borderColor: theme.highlight, backgroundColor: `${theme.highlight}99`, color: theme.highlightText }}
@@ -1219,7 +1482,7 @@ export function StudentStageExperience({
 
               <aside
                 className={`min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 overflow-hidden transition duration-200 ease-out ${
-                  (activeQuestion.kind === "sequence" || activeQuestion.kind === "cardMatching") && !isFinished ? "hidden" : "grid"
+                  ((activeQuestion.kind === "sequence" || activeQuestion.kind === "cardMatching") && !isFinished) || (isRealtimeStage && !isFinished) ? "hidden" : "grid"
                 } ${
                   isTransitioning ? "opacity-70 blur-[1px]" : "opacity-100 blur-0"
                 }`}
@@ -1371,8 +1634,16 @@ export function StudentStageExperience({
                     </button>
                     <Link
                       href={nextHref}
-                      className="rounded-[18px] px-4 py-3 text-center text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.28)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.32)]"
-                      style={{ backgroundColor: theme.accent }}
+                      aria-disabled={!reflectionText.trim()}
+                      onClick={(event) => {
+                        if (!reflectionText.trim()) event.preventDefault();
+                      }}
+                      className={`rounded-[18px] px-4 py-3 text-center text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.28)] transition duration-200 ${
+                        reflectionText.trim()
+                          ? "hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.32)]"
+                          : "cursor-not-allowed opacity-45"
+                      }`}
+                      style={{ backgroundColor: reflectionText.trim() ? theme.accent : "#9aa39b" }}
                     >
                       학습 길로
                     </Link>

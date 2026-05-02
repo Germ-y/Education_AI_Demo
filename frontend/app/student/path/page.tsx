@@ -39,6 +39,12 @@ function StarMascot() {
   );
 }
 
+const STAGE_LAYOUT = [
+  { x: "10%", y: "18%", side: "right" },
+  { x: "45%", y: "38%", side: "left" },
+  { x: "17%", y: "61%", side: "right" },
+  { x: "55%", y: "80%", side: "left" },
+] as const;
 function StageNode({
   step,
   state,
@@ -179,36 +185,19 @@ export default async function StudentHomePage({
               </aside>
 
               <section className="relative z-[1] my-auto h-[88%] min-h-0 overflow-visible">
-                <svg
-                  className="absolute inset-0 h-full w-full"
-                  viewBox="0 0 760 500"
-                  preserveAspectRatio="none"
+                <Image
+                  src="/assets/student-learning-path-road.svg"
+                  alt=""
+                  fill
+                  sizes="760px"
+                  className="pointer-events-none absolute inset-0 h-full w-full object-fill"
+                  draggable={false}
+                  priority
                   aria-hidden="true"
-                >
-                  <path
-                    d="M175 105 C 320 72, 505 128, 492 220 C 476 314, 252 300, 268 370 C 287 450, 520 420, 555 442"
-                    fill="none"
-                    stroke={theme.path}
-                    strokeLinecap="round"
-                    strokeWidth="58"
-                  />
-                  <path
-                    d="M175 105 C 320 72, 505 128, 492 220 C 476 314, 252 300, 268 370 C 287 450, 520 420, 555 442"
-                    fill="none"
-                    stroke={theme.pathLight}
-                    strokeLinecap="round"
-                    strokeWidth="18"
-                  />
-                </svg>
-                <div className="absolute left-[18%] top-[14%] h-10 w-24 rounded-full bg-[#dbe8c5]" />
-                <div className="absolute bottom-[18%] left-[22%] h-10 w-24 rounded-full bg-[#dbe8c5]" />
+                />
 
                 {scene.stages.map((mission, index) => {
-                  const point = {
-                    x: mission.x,
-                    y: mission.y,
-                    side: index % 2 === 0 ? "right" : "left",
-                  } as const;
+                  const point = STAGE_LAYOUT[index] ?? STAGE_LAYOUT[STAGE_LAYOUT.length - 1];
                   const cardTone =
                     !isComplete && mission.state === "current"
                       ? "border"
