@@ -410,6 +410,10 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
         image_role = "stage_4_realtime" if stage["step"] == 4 else f"stage_{stage['step']}"
         stage["templateJson"]["imageAssetId"] = f"asset_{generated_content['id']}_{image_role}"
         stage["templateJson"]["audioAssetId"] = f"asset_{generated_content['id']}_{image_role}_audio"
+        stage["templateJson"]["assetBundle"] = {
+            "imageAssetId": stage["templateJson"]["imageAssetId"],
+            "audioAssetId": stage["templateJson"]["audioAssetId"],
+        }
         if stage.get("realtimeSpec"):
             stage["realtimeSpec"]["id"] = "rt_spec_generated_contract_001"
             stage["realtimeSpec"]["stageId"] = stage["id"]
@@ -421,7 +425,10 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
         asset["id"] = f"asset_{generated_content['id']}_{asset['assetRole']}{'_audio' if asset['assetType'] == 'audio' else ''}"
         asset["promptJson"] = asset.get("promptJson") or {}
         if asset["assetType"] == "image":
-            asset["promptJson"]["prompt"] = f"{asset['assetRole']} scene only, no problem text"
+            asset["promptJson"] = {
+                "prompt": f"{asset['assetRole']} 장면. 따뜻한 교실 느낌의 피자 조각 장면만 보여주고 문제 문장, 선택지, 정답, 힌트 텍스트는 넣지 않습니다.",
+                "textRenderingPolicy": "scene_only_no_problem_text",
+            }
         asset["storageUrl"] = ""
         asset["previewUrl"] = None
         asset["qaStatus"] = "pending"
@@ -432,9 +439,60 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
             return generated_content, {"input_tokens": 10, "output_tokens": 20}
         return (
             {
+                "planVersion": "orchestrator_plan_v1",
+                "studentId": student_id,
+                "caseId": case_id,
+                "contentType": "learning_focus",
                 "sessionGoal": input_snapshot["requestedGoal"],
-                "selectedFlow": ["concept_intro", "image_quiz", "blank_fill", "realtime_teach_back"],
-                "teacherSummary": "테스트 오케스트레이터 계획",
+                "targetSkill": "분모와 분자의 의미 연결",
+                "difficultyPolicy": {"level": "easy_success", "reason": "시각 자료로 쉬운 성공 경험부터 시작합니다."},
+                "selectedStrategy": ["short visual explanation", "teach-back"],
+                "stagePlan": [
+                    {
+                        "step": 1,
+                        "stageRole": "concept_intro",
+                        "templateType": "concept_intro",
+                        "studentTitle": "개념 열기",
+                        "purpose": "전체와 부분을 그림으로 확인합니다.",
+                    },
+                    {
+                        "step": 2,
+                        "stageRole": "basic_problem",
+                        "templateType": "partition_picker",
+                        "studentTitle": "전체 세기",
+                        "purpose": "전체 조각 수를 먼저 세게 합니다.",
+                    },
+                    {
+                        "step": 3,
+                        "stageRole": "applied_problem",
+                        "templateType": "blank_fill",
+                        "studentTitle": "분수 넣기",
+                        "purpose": "고른 수와 전체 수를 분수 자리에 연결합니다.",
+                    },
+                    {
+                        "step": 4,
+                        "stageRole": "realtime_practice",
+                        "templateType": "realtime_teach_back",
+                        "studentTitle": "말로 설명하기",
+                        "purpose": "왜 1/4인지 짧게 말해봅니다.",
+                    },
+                ],
+                "imagePackageIntent": [
+                    {"assetRole": "hero", "scenePurpose": "시작 장면", "mustShow": ["피자 조각"], "mustNotShow": ["problem text"]},
+                    {"assetRole": "stage_1", "scenePurpose": "전체 확인", "mustShow": ["전체 피자"], "mustNotShow": ["problem text"]},
+                    {"assetRole": "stage_2", "scenePurpose": "조각 세기", "mustShow": ["네 조각"], "mustNotShow": ["problem text"]},
+                    {"assetRole": "stage_3", "scenePurpose": "분수 연결", "mustShow": ["한 조각 강조"], "mustNotShow": ["problem text"]},
+                    {"assetRole": "stage_4_realtime", "scenePurpose": "설명 상황", "mustShow": ["마스코트"], "mustNotShow": ["problem text"]},
+                ],
+                "ttsNarrationIntent": [
+                    {"assetRole": "hero", "voicePurpose": "시작 안내", "tone": "bright"},
+                    {"assetRole": "stage_1", "voicePurpose": "전체 보기", "tone": "calm"},
+                    {"assetRole": "stage_2", "voicePurpose": "전체 세기", "tone": "calm"},
+                    {"assetRole": "stage_3", "voicePurpose": "분수 넣기", "tone": "calm"},
+                    {"assetRole": "stage_4_realtime", "voicePurpose": "말하기 준비", "tone": "reassuring"},
+                ],
+                "teacherReviewFocus": ["전체를 먼저 세는 흐름이 잘 보이는지 확인합니다."],
+                "safetyNotes": ["학생에게 진단 표현을 노출하지 않습니다."],
             },
             {"input_tokens": 5, "output_tokens": 8},
         )

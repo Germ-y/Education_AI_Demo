@@ -9,6 +9,7 @@ from app.api.response import ok
 from app.core.config import get_settings
 from app.domain.schemas import ContentGenerationRequest, MissionContent, OrchestratorRunRequest
 from app.repositories.agent_run_repository import AgentRunRepository
+from app.services.content_quality import ContentQualityError, validate_mission_content_quality, validate_orchestrator_plan_quality
 from app.services.store import DemoStore, SessionPrincipal
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -45,14 +46,30 @@ def create_orchestrator_run(
         model=settings.openai_reasoning_model,
     )
 
+    content_type = str(payload.content_type or case_file["profile"]["studentType"])
+
     try:
         output_json, token_usage = OpenAiProvider(settings).create_json_response(
             model=settings.openai_reasoning_model,
             instructions=load_prompt("orchestrator_plan"),
             input_snapshot=input_snapshot,
         )
+        validate_orchestrator_plan_quality(
+            output_json,
+            student_id=payload.student_id,
+            case_id=payload.case_id,
+            content_type=content_type,
+        )
     except AiProviderError as exc:
         failed = agent_runs.mark_failed(agent_run.id, error_code=exc.code, error_message=exc.message, review_required=True)
+        return ok({"agentRun": failed.model_dump(by_alias=True) if failed else None})
+    except ContentQualityError as exc:
+        failed = agent_runs.mark_failed(
+            agent_run.id,
+            error_code="ORCHESTRATOR_PLAN_QUALITY_INVALID",
+            error_message=str(exc),
+            review_required=True,
+        )
         return ok({"agentRun": failed.model_dump(by_alias=True) if failed else None})
 
     succeeded = agent_runs.mark_succeeded(agent_run.id, output_json=output_json, token_usage=token_usage)
@@ -110,8 +127,17 @@ def create_content_generation(
             input_snapshot=input_snapshot,
         )
         mission = _mission_from_generation(output_json, student_id=payload.student_id, case_id=payload.case_id)
+        validate_mission_content_quality(mission, case_file=case_file, orchestrator_plan=orchestrator_run.output_json)
     except AiProviderError as exc:
         failed = agent_runs.mark_failed(agent_run.id, error_code=exc.code, error_message=exc.message, review_required=True)
+        return ok({"agentRun": failed.model_dump(by_alias=True) if failed else None, "content": None})
+    except ContentQualityError as exc:
+        failed = agent_runs.mark_failed(
+            agent_run.id,
+            error_code="MISSION_CONTENT_QUALITY_INVALID",
+            error_message=str(exc),
+            review_required=True,
+        )
         return ok({"agentRun": failed.model_dump(by_alias=True) if failed else None, "content": None})
     except ValueError as exc:
         failed = agent_runs.mark_failed(agent_run.id, error_code="MISSION_CONTENT_SCHEMA_INVALID", error_message=str(exc), review_required=True)

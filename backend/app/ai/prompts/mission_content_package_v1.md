@@ -16,6 +16,9 @@ Generate a complete MissionContent JSON package from an approved OrchestratorPla
 - Do not create video fields.
 - Do not create free HTML, JavaScript, Markdown, or rich text blocks.
 - Do not tell the student diagnostic labels such as borderline intelligence, low ability, disorder, avoidance, or failure.
+- Every visible title, instruction, question, choice, feedback, narration, rubric label, reflection choice, and teacher review summary must be written in Korean.
+- Do not expose raw internal terms such as `realtime`, `teach-back`, `teach_back`, `roleplay`, `template`, or `stage_` in visible prose.
+- Student-facing content must describe what the student will do. Do not use teacher proposal phrases such as "수업이 좋겠어요" or "콘텐츠가 좋겠어요" in student content.
 - Do not place problem text, choices, answer, hints, or feedback inside image prompts.
 - All problem text lines must live in `templateJson`.
 - All visual context must reference image assets by role/id.
@@ -24,6 +27,7 @@ Generate a complete MissionContent JSON package from an approved OrchestratorPla
 - `id` is the content id. Every `stage.missionContentId` and every `asset.missionContentId` must equal that `id`.
 - The package must contain real `assets` records, not placeholders. Asset files may use an empty `storageUrl` until the provider generation endpoint fills it.
 - Every image asset must have a rich `promptJson.prompt` optimized for `gpt-image-2`.
+- Every image asset must include a `promptJson.textRenderingPolicy` or `promptJson.ocrPolicy` value that clearly means `scene_only_no_problem_text`.
 - Every audio asset must have `sourceText` that can be sent directly to ElevenLabs.
 
 ## Content Package Requirements
@@ -84,6 +88,7 @@ Audio requirements:
 - `choices` must have exactly 3 items.
 - `answer` must be one of the choice ids.
 - The question, choices, correct feedback, and wrong feedback are UI text fields.
+- Do not use `image_quiz` when the input student context has `profileJson.choiceCountLimit` lower than 3.
 
 Required:
 
@@ -166,6 +171,21 @@ Stage 4 must include:
 - `realtimeSpec`
 
 The stage 4 audio is a pre-realtime opening narration. It is not the live realtime conversation.
+
+## Quality Gate Before Return
+
+The backend will reject and not save the content if any of these fail:
+
+- `studentId`, `caseId`, and `contentType` do not match the orchestrator plan and case file.
+- The track flow is not exact:
+  - `learning_focus`: concept intro -> basic problem -> applied problem -> realtime teach-back.
+  - `life_support`: scenario intro -> clue identification -> action selection -> realtime role practice.
+- There are not exactly 5 image assets and exactly 5 audio assets, one per required role.
+- Stage asset ids do not point to the image/audio assets for that same stage role.
+- Stage 4 `RealtimePracticeSpec` does not point to the stage 4 image or uses more than 8 turns / 180 seconds.
+- Any visible text is not Korean, exposes raw internal English labels, or contains diagnostic/stigmatizing wording.
+- Choice counts exceed `profileJson.choiceCountLimit`.
+- Image prompts repeat UI question/choice/answer text instead of describing only the scene.
 
 ## Output JSON Shape
 
