@@ -49,11 +49,44 @@ Realtime client secret: 짧은 TTL로 발급
 ## 2. Context And Demo Auth APIs
 
 MVP에서는 회원가입/일반 로그인보다 seed된 사용자/학생/학교 데이터를 조회하는 것이 먼저다.
-`demo-login`과 `student-access`는 개발/공모전 데모용이다.
+프론트 초기 연결은 `GET /api/context/seed` 또는 `GET /api/context/me`로 teacher/student/case/content 매핑을 받은 뒤 시작한다.
+`demo-login`과 `student-access`는 개발/공모전 데모용 보조 API다.
+
+### GET /api/context/seed
+
+별도 로그인 없이 seed된 센터, 교사 1명, 학생 3명, 학생별 case/content 매핑을 조회한다.
+
+```json
+{
+  "data": {
+    "mode": "demo_seed",
+    "organization": "Organization",
+    "teacher": "UserProfile",
+    "students": ["TeacherStudentSummary"],
+    "assignments": [
+      {
+        "teacherId": "user_teacher_demo",
+        "studentId": "student_learning_fraction",
+        "caseId": "case_learning_fraction",
+        "caseStatus": "open"
+      }
+    ],
+    "missionMappings": [
+      {
+        "contentId": "content_fraction_001",
+        "studentId": "student_learning_fraction",
+        "caseId": "case_learning_fraction",
+        "status": "published",
+        "totalSteps": 4
+      }
+    ]
+  }
+}
+```
 
 ### GET /api/context/me
 
-현재 데모 사용자와 조직 정보를 조회한다.
+현재 데모 seed 기준 사용자와 조직 정보를 조회한다. MVP에서는 `context/seed`와 같은 shape을 반환한다.
 
 ```json
 {
@@ -154,6 +187,36 @@ plannerItems
 publicContextSummary
 ```
 
+### GET /api/teacher/students/:studentId/history
+
+학생별 사례 메모, 생성/배포 콘텐츠, 시도, 활동 이벤트, realtime 세션 히스토리를 조회한다.
+
+```json
+{
+  "data": {
+    "student": "Student",
+    "openCase": "SupportCase",
+    "caseNotes": ["CaseNote"],
+    "missionContents": ["MissionContent"],
+    "attempts": ["ContentAttempt"],
+    "activityEvents": ["ActivityEvent"],
+    "realtimeSessions": ["RealtimePracticeSession"]
+  }
+}
+```
+
+### POST /api/teacher/students/:studentId/notes
+
+학생의 열린 case에 교사 메모를 추가한다.
+
+```json
+{
+  "noteType": "teacher_comment",
+  "body": "오늘은 시각 자료 반응이 좋아 분수 설명을 짧게 이어가면 좋겠습니다.",
+  "visibility": "teacher_only"
+}
+```
+
 ### PATCH /api/teacher/students/:studentId/memory-card
 
 교사가 메모리 카드 일부를 수정한다.
@@ -241,6 +304,7 @@ publicContextSummary
   "jobs": [
     { "type": "content_json", "status": "queued" },
     { "type": "image_package", "status": "queued" },
+    { "type": "tts_package", "status": "queued" },
     { "type": "auto_validation", "status": "queued" }
   ]
 }
@@ -265,6 +329,20 @@ AI 실행 상태/결과 조회.
   "assetRole": "stage_2",
   "reason": "강조 조각이 2개처럼 보임",
   "teacherInstruction": "한 조각만 더 명확히 빛나게 해주세요."
+}
+```
+
+### POST /api/contents/:contentId/request-tts-regeneration
+
+정적 콘텐츠 안내 음성을 재생성한다. 4단계 realtime에는 사용하지 않는다.
+
+```json
+{
+  "assetRole": "stage_2",
+  "stageId": "stage_002",
+  "sourceText": "전체 조각 수와 고른 조각 수를 차례대로 세어보세요.",
+  "reason": "문장이 너무 빠르게 들림",
+  "teacherInstruction": "더 천천히 또박또박 읽어주세요."
 }
 ```
 
@@ -312,6 +390,7 @@ AI 실행 상태/결과 조회.
       "contentType": "learning_focus",
       "totalSteps": 4,
       "heroImageUrl": "https://cdn.example.com/hero.png",
+      "heroAudioUrl": "https://cdn.example.com/hero.mp3",
       "status": "published"
     }
   ]
@@ -383,6 +462,7 @@ no active duplicate session
   "practiceSpec": {
     "practiceTitle": "별이에게 분수 설명하기",
     "imageAssetUrl": "https://cdn.example.com/stage4.png",
+    "openingAudioUrl": "https://cdn.example.com/stage4-opening.mp3",
     "openingLine": "왜 4/1이 아니라 1/4인지 알려줄래?",
     "maxTurns": 6,
     "maxDurationSec": 120
@@ -444,6 +524,70 @@ ReviewAgent 실행 요청.
 
 등록된 source 목록.
 
+### GET /api/public-data/schools
+
+seed snapshot 또는 동기화된 학교 목록을 조회한다.
+
+```json
+{
+  "data": [
+    {
+      "schoolCode": "8811058",
+      "schoolName": "영주중학교",
+      "schoolKind": "중학교",
+      "officeCode": "R10",
+      "roadAddress": "경상북도 영주시 남간로 29"
+    }
+  ]
+}
+```
+
+### GET /api/public-data/schools/:schoolCode/context
+
+학교 기본정보, 학사일정, 시간표 snapshot을 한 번에 조회한다.
+
+Query:
+
+```text
+fromDate=2026-05-01
+toDate=2026-05-15
+timetableDate=2026-05-01
+grade=2
+className=1
+```
+
+응답:
+
+```json
+{
+  "school": {
+    "schoolCode": "8811058",
+    "schoolName": "영주중학교"
+  },
+  "calendar": [
+    {
+      "eventDate": "2026-05-01",
+      "eventName": "노동절",
+      "scheduleType": "공휴일",
+      "appliesToGrades": ["1", "2", "3"]
+    }
+  ],
+  "timetableSummary": [
+    {
+      "timetableDate": "2026-05-01",
+      "grade": "2",
+      "className": "1",
+      "period": 1,
+      "subjectName": "역사"
+    }
+  ],
+  "source": {
+    "sourceCode": "neis_open_api",
+    "mode": "seed_snapshot"
+  }
+}
+```
+
 ### POST /api/public-data/sources/:sourceCode/sync
 
 ```json
@@ -458,37 +602,6 @@ ReviewAgent 실행 요청.
 ### GET /api/public-data/sync-jobs/:jobId
 
 sync job 상태 조회.
-
-### GET /api/public-data/schools/search
-
-학교 검색.
-
-### GET /api/public-data/schools/:schoolId/calendar
-
-학사일정 조회.
-
-### GET /api/public-data/schools/:schoolId/context
-
-학생/교사 화면에서 바로 쓰는 학교 맥락 요약.
-
-응답:
-
-```json
-{
-  "school": "SchoolProfile",
-  "calendar": ["SchoolCalendarItem"],
-  "timetableSummary": {
-    "todaySubjects": ["수학", "국어", "영어"],
-    "source": "NEIS_TIMETABLE"
-  },
-  "educationStats": ["EducationStat"],
-  "lastSyncedAt": "2026-05-02T00:00:00.000Z"
-}
-```
-
-### GET /api/public-data/schools/:schoolId/timetable
-
-시간표 조회.
 
 ### GET /api/public-data/curriculum-standards
 

@@ -13,6 +13,28 @@ def _image_asset(content_id: str, role: str, stage_id: str | None, url: str) -> 
         "assetType": "image",
         "provider": "openai",
         "model": "gpt-image-2",
+        "promptJson": {
+            "visualRole": role,
+            "textRenderingPolicy": "scene_only_no_problem_text",
+            "forbiddenInlineText": ["문제 문장", "선택지", "정답", "힌트", "긴 설명", "복잡한 수식"],
+        },
+        "storageUrl": url,
+        "previewUrl": url,
+        "qaStatus": "passed",
+        "approvalStatus": "approved",
+    }
+
+
+def _audio_asset(content_id: str, role: str, stage_id: str | None, url: str, source_text: str) -> dict:
+    return {
+        "id": f"asset_{content_id}_{role}_audio",
+        "missionContentId": content_id,
+        "stageId": stage_id,
+        "assetRole": role,
+        "assetType": "audio",
+        "provider": "elevenlabs",
+        "model": "elevenlabs-tts",
+        "sourceText": source_text,
         "storageUrl": url,
         "previewUrl": url,
         "qaStatus": "passed",
@@ -22,7 +44,20 @@ def _image_asset(content_id: str, role: str, stage_id: str | None, url: str) -> 
 
 def build_fraction_content() -> MissionContent:
     content_id = "content_fraction_001"
-    image_url = "/examples/generated/fraction-mission/fraction-pizza.png"
+    image_urls = {
+        "hero": "/examples/generated/fraction-mission/fraction-pizza-hero.png",
+        "stage_1": "/examples/generated/fraction-mission/fraction-pizza-stage-1.png",
+        "stage_2": "/examples/generated/fraction-mission/fraction-pizza-stage-2.png",
+        "stage_3": "/examples/generated/fraction-mission/fraction-pizza-stage-3.png",
+        "stage_4_realtime": "/examples/generated/fraction-mission/fraction-pizza-stage-4.png",
+    }
+    audio_urls = {
+        "hero": "/examples/generated/fraction-mission/audio/hero.mp3",
+        "stage_1": "/examples/generated/fraction-mission/audio/stage-1.mp3",
+        "stage_2": "/examples/generated/fraction-mission/audio/stage-2.mp3",
+        "stage_3": "/examples/generated/fraction-mission/audio/stage-3.mp3",
+        "stage_4_realtime": "/examples/generated/fraction-mission/audio/stage-4-opening.mp3",
+    }
     return MissionContent.model_validate(
         {
             "id": content_id,
@@ -53,6 +88,7 @@ def build_fraction_content() -> MissionContent:
                     "sortOrder": 1,
                     "templateJson": {
                         "imageAssetId": "asset_content_fraction_001_stage_1",
+                        "audioAssetId": "asset_content_fraction_001_stage_1_audio",
                         "storyText": "피자 한 판이 같은 크기 4조각으로 나뉘어 있어요.",
                         "missionText": "빛나는 조각이 전체 중 얼마인지 찾아봐요.",
                     },
@@ -68,6 +104,7 @@ def build_fraction_content() -> MissionContent:
                     "sortOrder": 2,
                     "templateJson": {
                         "imageAssetId": "asset_content_fraction_001_stage_2",
+                        "audioAssetId": "asset_content_fraction_001_stage_2_audio",
                         "question": "전체는 몇 조각인가요?",
                         "choices": [
                             {"id": "a", "text": "1조각"},
@@ -90,6 +127,7 @@ def build_fraction_content() -> MissionContent:
                     "sortOrder": 3,
                     "templateJson": {
                         "imageAssetId": "asset_content_fraction_001_stage_3",
+                        "audioAssetId": "asset_content_fraction_001_stage_3_audio",
                         "question": "전체 4개 중 1개는 __ / __ 이에요.",
                         "acceptedAnswers": [{"numerator": "1", "denominator": "4"}],
                         "correctFeedback": "좋아요. 위에는 고른 것 1, 아래에는 전체 4가 와요.",
@@ -105,7 +143,10 @@ def build_fraction_content() -> MissionContent:
                     "studentTitle": "AI에게 말해보기",
                     "studentInstruction": "별이에게 왜 1/4인지 말로 설명해보세요.",
                     "sortOrder": 4,
-                    "templateJson": {"imageAssetId": "asset_content_fraction_001_stage_4_realtime"},
+                    "templateJson": {
+                        "imageAssetId": "asset_content_fraction_001_stage_4_realtime",
+                        "audioAssetId": "asset_content_fraction_001_stage_4_realtime_audio",
+                    },
                     "realtimeSpec": {
                         "id": "rt_spec_fraction_001",
                         "stageId": "stage_fraction_4",
@@ -135,11 +176,22 @@ def build_fraction_content() -> MissionContent:
                 },
             ],
             "assets": [
-                _image_asset(content_id, "hero", None, image_url),
-                _image_asset(content_id, "stage_1", "stage_fraction_1", image_url),
-                _image_asset(content_id, "stage_2", "stage_fraction_2", image_url),
-                _image_asset(content_id, "stage_3", "stage_fraction_3", image_url),
-                _image_asset(content_id, "stage_4_realtime", "stage_fraction_4", image_url),
+                _image_asset(content_id, "hero", None, image_urls["hero"]),
+                _image_asset(content_id, "stage_1", "stage_fraction_1", image_urls["stage_1"]),
+                _image_asset(content_id, "stage_2", "stage_fraction_2", image_urls["stage_2"]),
+                _image_asset(content_id, "stage_3", "stage_fraction_3", image_urls["stage_3"]),
+                _image_asset(content_id, "stage_4_realtime", "stage_fraction_4", image_urls["stage_4_realtime"]),
+                _audio_asset(content_id, "hero", None, audio_urls["hero"], "오늘은 빛나는 한 조각으로 분수를 배워볼 거예요."),
+                _audio_asset(content_id, "stage_1", "stage_fraction_1", audio_urls["stage_1"], "피자 지도를 보며 전체와 부분을 확인해요."),
+                _audio_asset(content_id, "stage_2", "stage_fraction_2", audio_urls["stage_2"], "전체 조각 수를 먼저 세어보세요."),
+                _audio_asset(content_id, "stage_3", "stage_fraction_3", audio_urls["stage_3"], "고른 조각 수와 전체 조각 수를 분수 자리에 넣어보세요."),
+                _audio_asset(
+                    content_id,
+                    "stage_4_realtime",
+                    "stage_fraction_4",
+                    audio_urls["stage_4_realtime"],
+                    "이제 별이에게 왜 1/4인지 말로 설명해볼 거예요.",
+                ),
             ],
         }
     )
@@ -147,7 +199,20 @@ def build_fraction_content() -> MissionContent:
 
 def build_bus_content() -> MissionContent:
     content_id = "content_bus_001"
-    image_url = "/assets/demo/bus-mission-placeholder.png"
+    image_urls = {
+        "hero": "/assets/demo/bus-mission-hero.png",
+        "stage_1": "/assets/demo/bus-mission-stage-1.png",
+        "stage_2": "/assets/demo/bus-mission-stage-2.png",
+        "stage_3": "/assets/demo/bus-mission-stage-3.png",
+        "stage_4_realtime": "/assets/demo/bus-mission-stage-4.png",
+    }
+    audio_urls = {
+        "hero": "/assets/demo/audio/bus-hero.mp3",
+        "stage_1": "/assets/demo/audio/bus-stage-1.mp3",
+        "stage_2": "/assets/demo/audio/bus-stage-2.mp3",
+        "stage_3": "/assets/demo/audio/bus-stage-3.mp3",
+        "stage_4_realtime": "/assets/demo/audio/bus-stage-4-opening.mp3",
+    }
     return MissionContent.model_validate(
         {
             "id": content_id,
@@ -175,6 +240,7 @@ def build_bus_content() -> MissionContent:
                     "sortOrder": 1,
                     "templateJson": {
                         "imageAssetId": "asset_content_bus_001_stage_1",
+                        "audioAssetId": "asset_content_bus_001_stage_1_audio",
                         "storyText": "수민이가 우리 동네 센터에 가려고 버스 정류장에 왔어요.",
                         "missionText": "무엇을 먼저 확인해야 할까요?",
                     },
@@ -190,6 +256,8 @@ def build_bus_content() -> MissionContent:
                     "sortOrder": 2,
                     "templateJson": {
                         "question": "센터에 가려면 무엇을 먼저 확인하면 좋을까요?",
+                        "imageAssetId": "asset_content_bus_001_stage_2",
+                        "audioAssetId": "asset_content_bus_001_stage_2_audio",
                         "choices": [{"id": "a", "text": "버스 번호"}, {"id": "b", "text": "하늘 색"}],
                         "answer": "a",
                         "correctFeedback": "좋아요. 버스 번호를 먼저 확인해요.",
@@ -206,8 +274,15 @@ def build_bus_content() -> MissionContent:
                     "studentInstruction": "센터에 가는 순서를 차례대로 골라보세요.",
                     "sortOrder": 3,
                     "templateJson": {
-                        "cards": ["버스 번호 확인", "버스 타기", "센터 도착"],
-                        "answer": ["버스 번호 확인", "버스 타기", "센터 도착"],
+                        "question": "센터에 가는 순서를 맞춰보세요.",
+                        "imageAssetId": "asset_content_bus_001_stage_3",
+                        "audioAssetId": "asset_content_bus_001_stage_3_audio",
+                        "cards": [
+                            {"id": "check_bus", "text": "버스 번호 확인"},
+                            {"id": "take_bus", "text": "버스 타기"},
+                            {"id": "arrive_center", "text": "센터 도착"},
+                        ],
+                        "answerOrder": ["check_bus", "take_bus", "arrive_center"],
                         "correctFeedback": "좋아요. 먼저 확인하고, 그다음 버스를 타요.",
                         "wrongFeedback": "버스를 타기 전에 확인해야 할 일을 앞으로 옮겨볼까요?",
                     },
@@ -221,7 +296,10 @@ def build_bus_content() -> MissionContent:
                     "studentTitle": "AI와 연습하기",
                     "studentInstruction": "AI 안내 직원에게 센터 가는 길을 물어보세요.",
                     "sortOrder": 4,
-                    "templateJson": {"imageAssetId": "asset_content_bus_001_stage_4_realtime"},
+                    "templateJson": {
+                        "imageAssetId": "asset_content_bus_001_stage_4_realtime",
+                        "audioAssetId": "asset_content_bus_001_stage_4_realtime_audio",
+                    },
                     "realtimeSpec": {
                         "id": "rt_spec_bus_001",
                         "stageId": "stage_bus_4",
@@ -247,11 +325,22 @@ def build_bus_content() -> MissionContent:
                 },
             ],
             "assets": [
-                _image_asset(content_id, "hero", None, image_url),
-                _image_asset(content_id, "stage_1", "stage_bus_1", image_url),
-                _image_asset(content_id, "stage_2", "stage_bus_2", image_url),
-                _image_asset(content_id, "stage_3", "stage_bus_3", image_url),
-                _image_asset(content_id, "stage_4_realtime", "stage_bus_4", image_url),
+                _image_asset(content_id, "hero", None, image_urls["hero"]),
+                _image_asset(content_id, "stage_1", "stage_bus_1", image_urls["stage_1"]),
+                _image_asset(content_id, "stage_2", "stage_bus_2", image_urls["stage_2"]),
+                _image_asset(content_id, "stage_3", "stage_bus_3", image_urls["stage_3"]),
+                _image_asset(content_id, "stage_4_realtime", "stage_bus_4", image_urls["stage_4_realtime"]),
+                _audio_asset(content_id, "hero", None, audio_urls["hero"], "오늘은 센터에 가는 길을 차근차근 연습해요."),
+                _audio_asset(content_id, "stage_1", "stage_bus_1", audio_urls["stage_1"], "센터에 가야 하는 상황을 살펴보세요."),
+                _audio_asset(content_id, "stage_2", "stage_bus_2", audio_urls["stage_2"], "버스를 타기 전에 중요한 단서를 골라보세요."),
+                _audio_asset(content_id, "stage_3", "stage_bus_3", audio_urls["stage_3"], "센터에 가는 순서를 차례대로 골라보세요."),
+                _audio_asset(
+                    content_id,
+                    "stage_4_realtime",
+                    "stage_bus_4",
+                    audio_urls["stage_4_realtime"],
+                    "이제 안내 직원에게 센터 가는 길을 물어보는 연습을 해볼 거예요.",
+                ),
             ],
         }
     )
@@ -271,13 +360,6 @@ def create_demo_database() -> DemoDatabase:
             ],
             "users": [
                 {
-                    "id": "user_admin_demo",
-                    "organizationId": "org_yeongju_center",
-                    "email": "admin.demo@eduyj.local",
-                    "displayName": "데모 관리자",
-                    "role": "center_admin",
-                },
-                {
                     "id": "user_teacher_demo",
                     "organizationId": "org_yeongju_center",
                     "email": "teacher.demo@eduyj.local",
@@ -287,15 +369,32 @@ def create_demo_database() -> DemoDatabase:
             ],
             "students": [
                 {
+                    "id": "student_learning_clock",
+                    "organizationId": "org_yeongju_center",
+                    "externalKey": "demo_student_learning_clock",
+                    "displayName": "지우",
+                    "grade": "elementary_3",
+                    "schoolCode": "8811046",
+                    "studentType": "learning_focus",
+                    "primaryNeed": "저연령 학습지원형 초기 데이터 수집 대상",
+                    "profileJson": {"ageBand": "younger", "className": "1", "readingLoad": "very_low", "choiceCountLimit": 2},
+                },
+                {
                     "id": "student_learning_fraction",
                     "organizationId": "org_yeongju_center",
                     "externalKey": "demo_student_learning_fraction",
                     "displayName": "민준",
                     "grade": "middle_2",
-                    "schoolCode": "demo_middle_school",
+                    "schoolCode": "8811058",
                     "studentType": "learning_focus",
                     "primaryNeed": "분수의 전체-부분 관계 이해",
-                    "profileJson": {"interests": ["요리", "탐험"], "readingLoad": "low", "choiceCountLimit": 3},
+                    "profileJson": {
+                        "ageBand": "older",
+                        "className": "1",
+                        "interests": ["요리", "탐험"],
+                        "readingLoad": "low",
+                        "choiceCountLimit": 3,
+                    },
                 },
                 {
                     "id": "student_life_bus",
@@ -303,17 +402,171 @@ def create_demo_database() -> DemoDatabase:
                     "externalKey": "demo_student_life_bus",
                     "displayName": "수민",
                     "grade": "elementary_6",
-                    "schoolCode": "demo_elementary_school",
+                    "schoolCode": "8811067",
                     "studentType": "life_support",
                     "primaryNeed": "센터 이동 순서와 도움 요청 연습",
-                    "profileJson": {"interests": ["동네 지도", "역할극"], "readingLoad": "very_low", "choiceCountLimit": 2},
+                    "profileJson": {
+                        "ageBand": "life_support",
+                        "className": "1",
+                        "interests": ["동네 지도", "역할극"],
+                        "readingLoad": "very_low",
+                        "choiceCountLimit": 2,
+                    },
                 },
             ],
             "studentAccounts": [
                 {"id": "student_account_learning", "studentId": "student_learning_fraction", "accessCode": "STAR-001"},
                 {"id": "student_account_life", "studentId": "student_life_bus", "accessCode": "STAR-002"},
+                {"id": "student_account_clock", "studentId": "student_learning_clock", "accessCode": "STAR-003"},
+            ],
+            "schools": [
+                {
+                    "id": "school_yeongju_jungang_elementary",
+                    "officeCode": "R10",
+                    "schoolCode": "8811046",
+                    "schoolName": "영주중앙초등학교",
+                    "schoolKind": "초등학교",
+                    "regionName": "경상북도 영주시",
+                    "roadAddress": "경상북도 영주시 중앙로 126",
+                },
+                {
+                    "id": "school_yeongju_middle",
+                    "officeCode": "R10",
+                    "schoolCode": "8811058",
+                    "schoolName": "영주중학교",
+                    "schoolKind": "중학교",
+                    "regionName": "경상북도 영주시",
+                    "roadAddress": "경상북도 영주시 남간로 29",
+                },
+                {
+                    "id": "school_yeongju_gaheung_elementary",
+                    "officeCode": "R10",
+                    "schoolCode": "8811067",
+                    "schoolName": "영주가흥초등학교",
+                    "schoolKind": "초등학교",
+                    "regionName": "경상북도 영주시",
+                    "roadAddress": "경상북도 영주시 대동로70번길 8-9",
+                },
+            ],
+            "schoolCalendarEvents": [
+                {
+                    "id": "calendar_yeongju_jungang_20260501",
+                    "schoolCode": "8811046",
+                    "officeCode": "R10",
+                    "academicYear": "2026",
+                    "eventDate": "2026-05-01",
+                    "eventName": "재량휴업일",
+                    "eventContent": "",
+                    "scheduleType": "휴업일",
+                    "appliesToGrades": ["1", "2", "3", "4", "5", "6"],
+                    "retrievedAt": NOW,
+                },
+                {
+                    "id": "calendar_yeongju_jungang_20260502",
+                    "schoolCode": "8811046",
+                    "officeCode": "R10",
+                    "academicYear": "2026",
+                    "eventDate": "2026-05-02",
+                    "eventName": "토요휴업일",
+                    "eventContent": "",
+                    "scheduleType": "휴업일",
+                    "appliesToGrades": ["1", "2", "3", "4", "5", "6"],
+                    "retrievedAt": NOW,
+                },
+                {
+                    "id": "calendar_yeongju_middle_20260501",
+                    "schoolCode": "8811058",
+                    "officeCode": "R10",
+                    "academicYear": "2026",
+                    "eventDate": "2026-05-01",
+                    "eventName": "노동절",
+                    "eventContent": "",
+                    "scheduleType": "공휴일",
+                    "appliesToGrades": ["1", "2", "3"],
+                    "retrievedAt": NOW,
+                },
+                {
+                    "id": "calendar_yeongju_middle_20260502",
+                    "schoolCode": "8811058",
+                    "officeCode": "R10",
+                    "academicYear": "2026",
+                    "eventDate": "2026-05-02",
+                    "eventName": "토요휴업일",
+                    "eventContent": "",
+                    "scheduleType": "휴업일",
+                    "appliesToGrades": ["1", "2", "3"],
+                    "retrievedAt": NOW,
+                },
+                {
+                    "id": "calendar_yeongju_middle_20260504",
+                    "schoolCode": "8811058",
+                    "officeCode": "R10",
+                    "academicYear": "2026",
+                    "eventDate": "2026-05-04",
+                    "eventName": "재량휴업일",
+                    "eventContent": "",
+                    "scheduleType": "휴업일",
+                    "appliesToGrades": ["1", "2", "3"],
+                    "retrievedAt": NOW,
+                },
+                {
+                    "id": "calendar_yeongju_gaheung_20260501",
+                    "schoolCode": "8811067",
+                    "officeCode": "R10",
+                    "academicYear": "2026",
+                    "eventDate": "2026-05-01",
+                    "eventName": "노동절",
+                    "eventContent": "",
+                    "scheduleType": "공휴일",
+                    "appliesToGrades": ["1", "2", "3", "4", "5", "6"],
+                    "retrievedAt": NOW,
+                },
+                {
+                    "id": "calendar_yeongju_gaheung_20260502",
+                    "schoolCode": "8811067",
+                    "officeCode": "R10",
+                    "academicYear": "2026",
+                    "eventDate": "2026-05-02",
+                    "eventName": "토요휴업일",
+                    "eventContent": "",
+                    "scheduleType": "휴업일",
+                    "appliesToGrades": ["1", "2", "3", "4", "5", "6"],
+                    "retrievedAt": NOW,
+                },
+            ],
+            "schoolTimetableSlots": [
+                {
+                    "id": f"timetable_yeongju_middle_20260501_2_1_{period}",
+                    "schoolCode": "8811058",
+                    "officeCode": "R10",
+                    "academicYear": "2026",
+                    "semester": "1",
+                    "timetableDate": "2026-05-01",
+                    "grade": "2",
+                    "className": "1",
+                    "period": period,
+                    "subjectName": subject,
+                    "sourceCode": "neis_mis_timetable",
+                    "retrievedAt": NOW,
+                }
+                for period, subject in [
+                    (1, "역사"),
+                    (2, "동아리활동"),
+                    (3, "진로와 직업"),
+                    (4, "국어"),
+                    (5, "과학"),
+                    (6, "도덕"),
+                ]
             ],
             "supportCases": [
+                {
+                    "id": "case_learning_clock",
+                    "studentId": "student_learning_clock",
+                    "ownerTeacherId": "user_teacher_demo",
+                    "caseStatus": "open",
+                    "currentGoal": "저연령 학습지원형 초기 진단 데이터 수집",
+                    "openedAt": NOW,
+                },
                 {
                     "id": "case_learning_fraction",
                     "studentId": "student_learning_fraction",
@@ -405,7 +658,7 @@ def create_demo_database() -> DemoDatabase:
                     "name": "나이스 교육정보 개방 포털",
                     "baseUrl": "https://open.neis.go.kr/",
                     "authType": "api_key",
-                    "enabled": False,
+                    "enabled": True,
                 },
                 {
                     "id": "source_curriculum_seed",

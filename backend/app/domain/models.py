@@ -51,6 +51,52 @@ class StudentAccount(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class SchoolProfile(BaseModel):
+    id: str
+    office_code: str = Field(alias="officeCode")
+    school_code: str = Field(alias="schoolCode")
+    school_name: str = Field(alias="schoolName")
+    school_kind: str = Field(alias="schoolKind")
+    region_name: str = Field(alias="regionName")
+    road_address: str = Field(alias="roadAddress")
+    source_code: str = Field(default="neis_open_api", alias="sourceCode")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class SchoolCalendarEvent(BaseModel):
+    id: str
+    school_code: str = Field(alias="schoolCode")
+    office_code: str = Field(alias="officeCode")
+    academic_year: str = Field(alias="academicYear")
+    event_date: str = Field(alias="eventDate")
+    event_name: str = Field(alias="eventName")
+    event_content: str | None = Field(default=None, alias="eventContent")
+    schedule_type: str | None = Field(default=None, alias="scheduleType")
+    applies_to_grades: list[str] = Field(default_factory=list, alias="appliesToGrades")
+    source_code: str = Field(default="neis_school_schedule", alias="sourceCode")
+    retrieved_at: str = Field(alias="retrievedAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class SchoolTimetableSlot(BaseModel):
+    id: str
+    school_code: str = Field(alias="schoolCode")
+    office_code: str = Field(alias="officeCode")
+    academic_year: str = Field(alias="academicYear")
+    semester: str
+    timetable_date: str = Field(alias="timetableDate")
+    grade: str
+    class_name: str = Field(alias="className")
+    period: int
+    subject_name: str | None = Field(default=None, alias="subjectName")
+    source_code: str = Field(alias="sourceCode")
+    retrieved_at: str = Field(alias="retrievedAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class SupportCase(BaseModel):
     id: str
     student_id: str = Field(alias="studentId")
@@ -165,6 +211,9 @@ class DemoDatabase(BaseModel):
     users: list[User]
     students: list[Student]
     student_accounts: list[StudentAccount] = Field(alias="studentAccounts")
+    schools: list[SchoolProfile] = Field(default_factory=list)
+    school_calendar_events: list[SchoolCalendarEvent] = Field(default_factory=list, alias="schoolCalendarEvents")
+    school_timetable_slots: list[SchoolTimetableSlot] = Field(default_factory=list, alias="schoolTimetableSlots")
     support_cases: list[SupportCase] = Field(alias="supportCases")
     case_notes: list[CaseNote] = Field(alias="caseNotes")
     memory_cards: list[MemoryCard] = Field(alias="memoryCards")

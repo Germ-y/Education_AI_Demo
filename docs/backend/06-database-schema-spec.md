@@ -10,6 +10,20 @@
 - 학생 개인정보, AI prompt, realtime transcript는 최소 저장 원칙을 적용한다.
 - 구현 시 SQLAlchemy model 또는 SQL migration의 source of truth는 이 문서와 맞춰야 한다.
 
+## 1.1 현재 구현 상태
+
+현재 백엔드는 SQLAlchemy table model과 `DemoRepository`를 통해 seed 데이터를 DB에 적재하고 다시 domain schema로 읽는다.
+
+```text
+app.domain.db_models          SQLAlchemy table model
+app.repositories.demo_repository  seed/domain DB repository
+app.db.session                engine/session/schema helper
+app.data.seed_demo            DATABASE_URL 대상 schema 생성 + seed 적재 smoke
+```
+
+MVP 실행은 `DATABASE_URL`을 기준으로 한다. PostgreSQL이 목표 DB이고, 로컬 smoke/test는 SQLite URL로도 검증한다.
+운영용 Alembic migration은 다음 DB 고정 단계에서 추가한다.
+
 ## 2. 핵심 ERD
 
 ```mermaid
@@ -210,15 +224,24 @@ step=4이면 template_type in ('realtime_roleplay','realtime_teach_back')
 | `mission_content_id` | uuid fk | 콘텐츠 |
 | `stage_id` | uuid fk nullable | 단계 |
 | `asset_role` | text | `hero`, `stage_1`, `stage_2`, `stage_3`, `stage_4_realtime` |
-| `asset_type` | text | `image`, `audio_optional` |
+| `asset_type` | text | `image`, `audio` |
 | `provider` | text | `openai`, `elevenlabs_optional` |
-| `model` | text | `gpt-image-2` 등 |
-| `prompt_json` | jsonb nullable | 이미지 프롬프트 브리프 |
+| `model` | text | `gpt-image-2`, `elevenlabs-tts` 등 |
+| `prompt_json` | jsonb nullable | 이미지 프롬프트 또는 TTS 생성 브리프 |
+| `source_text` | text nullable | 사전 TTS에 사용한 승인 문장 |
 | `storage_url` | text | object storage path |
 | `preview_url` | text nullable | 미리보기 URL |
 | `qa_status` | text | `pending`, `passed`, `failed` |
 | `approval_status` | text | `pending`, `approved`, `rejected` |
 | `created_at` | timestamptz | 생성일 |
+
+사전 TTS는 `asset_type=audio`로 저장한다.
+
+```text
+hero, stage_1, stage_2, stage_3: ElevenLabs 사전 생성 안내 음성
+stage_4_realtime: realtime 진입 전 상황 안내 음성
+4단계 실시간 대화와 피드백은 OpenAI realtime session이 담당한다
+```
 
 ## 7. Student Runtime
 

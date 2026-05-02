@@ -131,7 +131,8 @@ DB reset 후 스키마 생성
 상태:
 
 ```text
-부분 완료. SQLAlchemy 모델 계약과 Pydantic 검증은 완료했다. 실제 PostgreSQL 마이그레이션 적용은 다음 DB 연결 슬라이스에서 진행한다.
+부분 완료. SQLAlchemy 모델과 DB repository를 추가했고, seed upsert/load 및 API repository 연결은 완료했다.
+Alembic 기반 운영 마이그레이션은 이후 PostgreSQL 고정 단계에서 진행한다.
 ```
 
 ## 마일스톤 4. 데모 seed
@@ -143,8 +144,8 @@ DB reset 후 스키마 생성
 작업:
 
 - 영주 기초학력거점지원센터 seed
-- 데모 교사/리뷰어/admin seed
-- 학생 2명 seed: `learning_focus`, `life_support`
+- 데모 교사 1명 seed
+- 학생 3명 seed: 저연령 `learning_focus`, 고연령 `learning_focus`, `life_support`
 - 메모리 카드, 사례 메모, 주차/월별 기록 seed
 - 공공데이터 snapshot seed
 - 샘플 콘텐츠 2개 seed
@@ -160,7 +161,8 @@ seed 여러 번 실행해도 중복 생성 없음
 상태:
 
 ```text
-부분 완료. in-memory 데모 seed와 seed smoke 명령을 추가했다. DB upsert seed는 PostgreSQL 연결 뒤 진행한다.
+부분 완료. 데모 seed를 DB repository에 적재하고 다시 load하는 smoke 명령을 추가했다.
+학생 3명/교사 1명/학교 snapshot/샘플 콘텐츠 2개가 DATABASE_URL 기준 DB에 저장된다.
 ```
 
 ## 마일스톤 5. 교사 대시보드 API
@@ -202,6 +204,7 @@ seed 여러 번 실행해도 중복 생성 없음
 작업:
 
 - 오케스트레이터 컨텍스트 생성
+- prompt registry 및 prompt version 파일 관리
 - 콘텐츠 브리프 생성
 - 4단계 ContentStage JSON 생성
 - RealtimePracticeSpec 생성
@@ -213,8 +216,19 @@ seed 여러 번 실행해도 중복 생성 없음
 ```text
 학생 1명 기준으로 teacher_review 상태의 MissionContent가 생성된다.
 대표 이미지 + stage_1~stage_4_realtime asset record가 생성된다.
+hero + stage_1~stage_4_realtime에는 TTS audio asset record를 붙인다.
+4단계 오디오는 realtime 대화 대체가 아니라 realtime 진입 전 상황 안내용이다.
 이미지 생성 실패 시 asset status와 job error가 남는다.
 ```
+
+상태:
+
+```text
+부분 완료. prompt registry와 v1 prompt 파일을 추가했고, MVP 프레임워크는 자체 workflow + OpenAI Responses API adapter로 정했다.
+다음 단계는 AgentRun repository와 실제 provider adapter 구현이다.
+```
+
+ElevenLabs TTS는 4단계 realtime이 아니라 정적 콘텐츠 안내 음성 사전 생성에만 사용한다.
 
 ## 마일스톤 7. gpt-image-2 이미지 asset 파이프라인
 

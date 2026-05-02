@@ -266,7 +266,11 @@ GET /api/student/missions/:contentId
 - 학생 플레이 중 1~3단계에서 AI가 새 분석이나 새 생성을 하면 안 된다.
 - 학생에게 보이는 콘텐츠는 `published` 상태만 허용한다.
 - 한 미션은 대표 이미지 1장과 단계별 이미지 4장을 가진다.
+- 한 미션은 대표 오디오 1개와 단계별 오디오 4개를 가진다.
+- 프론트는 각 단계 화면 진입 시 이미지와 오디오를 먼저 resolve/load한다.
 - 질문, 선택지, 피드백은 이미지 안 텍스트가 아니라 UI 텍스트로 보여준다.
+- 이미지는 상황 설명, 관계, 대상, 감정, 마스코트 반응을 보여주는 장면 asset이다.
+- 문제 문항, 선택지, 카드 텍스트, 빈칸 문장, 힌트, 정답 피드백은 AI가 `templateJson` 필드로 반환한다.
 - OpenAI key, realtime provider secret, prompt 원문은 프론트로 내려보내지 않는다.
 
 ## 7. 두 가지 콘텐츠 트랙
@@ -331,7 +335,7 @@ learning_focus: concept_intro
 
 프론트 기능:
 
-- 단서 선택, 카드 매칭, 기본 선택형, 빈칸 등 하나의 짧은 상호작용을 제공한다.
+- 단서 선택, 이미지 3지선다 퀴즈, 카드 매칭, 순서 배열, 빈칸 등 하나의 짧은 상호작용을 제공한다.
 - 선택지는 2~3개를 기본으로 한다.
 - 제출 후 즉시 피드백을 보여준다.
 - 정답/오답 이벤트를 서버에 보낸다.
@@ -340,7 +344,7 @@ learning_focus: concept_intro
 
 - `templateType`
 - `templateJson.question`
-- `templateJson.choices` 또는 `templateJson.hotspots` 또는 `templateJson.tiles`
+- `templateJson.choices` 또는 `templateJson.hotspots` 또는 `templateJson.leftCards/rightCards` 또는 `templateJson.cards`
 - `templateJson.answer` 또는 `templateJson.acceptedAnswers`
 - `templateJson.correctFeedback`
 - `templateJson.wrongFeedback`
@@ -348,8 +352,8 @@ learning_focus: concept_intro
 허용 템플릿:
 
 ```text
-life_support: scene_observation, highlight_clue, card_match
-learning_focus: scene_question, clue_question, blank_fill, partition_picker
+life_support: scene_observation, highlight_clue, image_quiz, card_match
+learning_focus: image_quiz, card_match, sequence_ordering, blank_fill, scene_question, clue_question, partition_picker
 ```
 
 ### 9.3 Step 3: 적용/결정
@@ -373,9 +377,21 @@ learning_focus: scene_question, clue_question, blank_fill, partition_picker
 허용 템플릿:
 
 ```text
-life_support: action_choice, sequence_ordering, decision_card
-learning_focus: applied_question, mini_simulation, card_match, sequence_ordering, explanation_choice, wrong_explanation_fix
+life_support: image_quiz, card_match, sequence_ordering, action_choice, decision_card
+learning_focus: image_quiz, card_match, sequence_ordering, blank_fill, applied_question, mini_simulation, explanation_choice, wrong_explanation_fix
 ```
+
+2~3단계 랜덤 템플릿 후보의 공통 풀은 아래 4개다.
+
+```text
+image_quiz: 이미지 + 3지선다 퀴즈
+card_match: 왼쪽/오른쪽 카드 연결
+sequence_ordering: 카드 순서 배열
+blank_fill: 빈칸 채우기
+```
+
+오케스트레이터는 이 후보 중 학생 유형, 최근 반응, 교사 고정 옵션에 따라 하나를 선택한다.
+프론트는 `templateType`과 `templateJson`만 보고 해당 렌더러를 fetch/render한다.
 
 ### 9.4 Step 4: realtime 연습
 
@@ -495,9 +511,32 @@ assets has hero, stage_1, stage_2, stage_3, stage_4_realtime
   "assetType": "image",
   "provider": "openai",
   "model": "gpt-image-2",
-  "promptJson": {},
+  "promptJson": {
+    "visualRole": "stage_2",
+    "textRenderingPolicy": "scene_only_no_problem_text",
+    "forbiddenInlineText": ["문제 문장", "선택지", "정답", "힌트", "긴 설명"]
+  },
   "storageUrl": "/examples/generated/fraction-mission/fraction-pizza.png",
   "previewUrl": "/examples/generated/fraction-mission/fraction-pizza.png",
+  "qaStatus": "passed",
+  "approvalStatus": "approved"
+}
+```
+
+오디오 asset 예시:
+
+```json
+{
+  "id": "asset_content_fraction_001_stage_2_audio",
+  "missionContentId": "content_fraction_001",
+  "stageId": "stage_fraction_2",
+  "assetRole": "stage_2",
+  "assetType": "audio",
+  "provider": "elevenlabs",
+  "model": "elevenlabs-tts",
+  "sourceText": "전체 조각 수를 먼저 세어보세요.",
+  "storageUrl": "/examples/generated/fraction-mission/audio/stage-2.mp3",
+  "previewUrl": "/examples/generated/fraction-mission/audio/stage-2.mp3",
   "qaStatus": "passed",
   "approvalStatus": "approved"
 }
@@ -512,6 +551,9 @@ stage_2
 stage_3
 stage_4_realtime
 ```
+
+각 role은 `image` asset과 `audio` asset을 하나씩 가져야 한다.
+`stage_4_realtime`의 audio는 realtime 시작 전 상황 안내용이며, 실시간 대화는 realtime session에서 처리한다.
 
 ## 14. RealtimePracticeSpec 최소 스키마
 
@@ -605,6 +647,7 @@ card_match
 action_choice
 sequence_ordering
 decision_card
+image_quiz
 concept_intro
 scene_question
 clue_question

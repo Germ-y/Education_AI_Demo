@@ -195,6 +195,21 @@ AI와 실시간 설명 연습
 
 ## 5. AI 기능 범위
 
+구현 프레임워크:
+
+```text
+MVP는 자체 workflow orchestrator + OpenAI Responses API adapter로 구현한다.
+프롬프트는 backend/app/ai/prompts 아래 versioned file로 관리한다.
+Agents SDK나 LangChain은 첫 데모 범위에서는 쓰지 않는다.
+```
+
+이유:
+
+```text
+학생 화면은 자유 대화형 agent보다 엄격한 MissionContent JSON과 교사 승인 흐름이 중요하다.
+따라서 prompt version, output schema, DB AgentRun 기록, 승인 상태를 직접 통제한다.
+```
+
 ### 5.1 오케스트레이터
 
 역할:
