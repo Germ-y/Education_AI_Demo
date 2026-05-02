@@ -1,0 +1,49 @@
+from fastapi.testclient import TestClient
+
+from app.main import create_app
+
+
+def test_teacher_and_student_demo_flows() -> None:
+    client = TestClient(create_app())
+
+    teacher_login = client.post(
+        "/api/auth/demo-login",
+        json={"role": "teacher", "email": "teacher.demo@eduyj.local"},
+    )
+    assert teacher_login.status_code == 200
+    teacher_token = teacher_login.json()["data"]["session"]["accessToken"]
+
+    students = client.get("/api/teacher/students", headers={"authorization": f"Bearer {teacher_token}"})
+    assert students.status_code == 200
+    assert len(students.json()["data"]) == 2
+
+    student_login = client.post("/api/auth/student-access", json={"accessCode": "STAR-001"})
+    assert student_login.status_code == 200
+    student_token = student_login.json()["data"]["session"]["accessToken"]
+
+    today = client.get("/api/student/missions/today", headers={"authorization": f"Bearer {student_token}"})
+    assert today.status_code == 200
+    assert today.json()["data"][0]["totalSteps"] == 4
+
+    start = client.post(
+        "/api/student/missions/content_fraction_001/start",
+        headers={"authorization": f"Bearer {student_token}"},
+    )
+    assert start.status_code == 200
+    attempt_id = start.json()["data"]["id"]
+
+    submit = client.post(
+        "/api/student/missions/content_fraction_001/stages/stage_fraction_2/submit",
+        headers={"authorization": f"Bearer {student_token}"},
+        json={"attemptId": attempt_id, "answer": {"choiceId": "b"}},
+    )
+    assert submit.status_code == 200
+    assert submit.json()["data"]["isCorrect"] is True
+
+    realtime = client.post(
+        "/api/student/missions/content_fraction_001/stages/stage_fraction_4/realtime-session",
+        headers={"authorization": f"Bearer {student_token}"},
+        json={"attemptId": attempt_id},
+    )
+    assert realtime.status_code == 200
+    assert realtime.json()["data"]["practiceSpec"]["maxTurns"] == 6

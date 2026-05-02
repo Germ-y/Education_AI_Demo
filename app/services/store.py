@@ -1,0 +1,263 @@
+from datetime import UTC, datetime, timedelta
+from typing import Any
+from uuid import uuid4
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.config import get_settings
+from app.data.demo_data import create_demo_database
+from app.domain.models import ActivityEvent, ContentAttempt, DemoDatabase, MemoryCard, RealtimePracticeSession
+from app.domain.schemas import MissionContent
+
+
+class SessionPrincipal(BaseModel):
+    token: str
+    kind: str
+    id: str
+    role: str
+    student_id: str | None = Field(default=None, alias="studentId")
+    expires_at: str = Field(alias="expiresAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class DemoStore:
+    def __init__(self, seed: DemoDatabase | None = None) -> None:
+        self.db = seed or create_demo_database()
+        self.sessions: dict[str, SessionPrincipal] = {}
+
+    def create_user_session(self, role: str, email: str | None = None) -> SessionPrincipal | None:
+        user = next((candidate for candidate in self.db.users if candidate.role == role and (email is None or candidate.email == email)), None)
+        if user is None:
+            return None
+        session = self._create_session(kind="user", id=user.id, role=user.role)
+        self.sessions[session.token] = session
+        return session
+
+    def create_student_session(self, access_code: str) -> SessionPrincipal | None:
+        account = next(
+            (candidate for candidate in self.db.student_accounts if candidate.status == "active" and candidate.access_code == access_code),
+            None,
+        )
+        if account is None:
+            return None
+        session = self._create_session(kind="student", id=account.id, role="student", student_id=account.student_id)
+        self.sessions[session.token] = session
+        return session
+
+    def get_session(self, token: str | None) -> SessionPrincipal | None:
+        if token is None:
+            return None
+        return self.sessions.get(token)
+
+    def list_teacher_students(self, student_type: str | None = None, q: str | None = None, teacher_id: str | None = None) -> list[dict]:
+        open_cases = [
+            support_case
+            for support_case in self.db.support_cases
+            if support_case.case_status == "open" and (teacher_id is None or support_case.owner_teacher_id == teacher_id)
+        ]
+        open_case_by_student_id = {support_case.student_id: support_case for support_case in open_cases}
+
+        students = []
+        for student in self.db.students:
+            if student.id not in open_case_by_student_id:
+                continue
+            if student_type and student.student_type != student_type:
+                continue
+            if q and q not in student.display_name and q not in student.primary_need:
+                continue
+            latest_content = next((content for content in self.db.mission_contents if content.student_id == student.id), None)
+            planner = next(
+                (
+                    item
+                    for item in self.db.planner_items
+                    if item.student_id == student.id and item.period_type == "next_session" and item.status == "planned"
+                ),
+                None,
+            )
+            students.append(
+                {
+                    "studentId": student.id,
+                    "displayName": student.display_name,
+                    "grade": student.grade,
+                    "studentType": student.student_type,
+                    "primaryNeed": student.primary_need,
+                    "latestContentStatus": latest_content.status if latest_content else "none",
+                    "nextSessionSuggestion": planner.goal_text if planner else "다음 회기 목표를 설정해 주세요.",
+                }
+            )
+        return students
+
+    def get_student_case_file(self, student_id: str) -> dict | None:
+        student = next((candidate for candidate in self.db.students if candidate.id == student_id), None)
+        open_case = next(
+            (support_case for support_case in self.db.support_cases if support_case.student_id == student_id and support_case.case_status == "open"),
+            None,
+        )
+        if student is None or open_case is None:
+            return None
+        memory_card = next((card for card in self.db.memory_cards if card.student_id == student_id and card.status == "active"), None)
+        return {
+            "profile": student.model_dump(by_alias=True),
+            "openCase": open_case.model_dump(by_alias=True),
+            "memoryCard": memory_card.model_dump(by_alias=True) if memory_card else None,
+            "weeklyRecords": [
+                note.model_dump(by_alias=True) for note in self.db.case_notes if note.case_id == open_case.id
+            ],
+            "monthlySummary": {
+                "repeatedProblemTypes": memory_card.learning_problem_types if memory_card else [],
+                "growth": "seed 데모 기준 최근 수행 안정화",
+                "stillBlocking": memory_card.next_session_cautions if memory_card else [],
+            },
+            "recentContents": [content.model_dump(by_alias=True) for content in self.db.mission_contents if content.student_id == student_id],
+            "plannerItems": [item.model_dump(by_alias=True) for item in self.db.planner_items if item.student_id == student_id],
+            "publicContextSummary": {
+                "schoolCode": student.school_code,
+                "sources": [source.source_code for source in self.db.public_data_sources],
+            },
+        }
+
+    def patch_memory_card(self, student_id: str, patch: dict[str, Any]) -> MemoryCard | None:
+        for index, card in enumerate(self.db.memory_cards):
+            if card.student_id == student_id and card.status == "active":
+                merged = card.model_copy(update={key: value for key, value in patch.items() if value is not None})
+                self.db.memory_cards[index] = merged
+                return merged
+        return None
+
+    def list_published_missions_for_student(self, student_id: str) -> list[MissionContent]:
+        return [content for content in self.db.mission_contents if content.student_id == student_id and content.status == "published"]
+
+    def get_published_mission_for_student(self, student_id: str, content_id: str) -> MissionContent | None:
+        return next(
+            (
+                content
+                for content in self.db.mission_contents
+                if content.id == content_id and content.student_id == student_id and content.status == "published"
+            ),
+            None,
+        )
+
+    def create_attempt(self, student_id: str, mission_content_id: str) -> ContentAttempt:
+        attempt = ContentAttempt(
+            id=f"attempt_{uuid4()}",
+            studentId=student_id,
+            missionContentId=mission_content_id,
+            status="in_progress",
+            currentStep=1,
+            startedAt=_now(),
+        )
+        self.db.attempts.append(attempt)
+        return attempt
+
+    def submit_stage(self, student_id: str, content_id: str, stage_id: str, attempt_id: str, answer: dict[str, Any]) -> dict | None:
+        mission = self.get_published_mission_for_student(student_id, content_id)
+        attempt = self.get_attempt(attempt_id)
+        stage = next((candidate for candidate in mission.stages if candidate.id == stage_id), None) if mission else None
+        if mission is None or stage is None or attempt is None or attempt.student_id != student_id:
+            return None
+        if stage.step == 4:
+            return {"isRealtimeStage": True}
+
+        result = _evaluate_answer(stage.template_json, answer)
+        attempt.current_step = min(4, stage.step + 1)
+        self.db.activity_events.append(
+            ActivityEvent(
+                id=f"event_{uuid4()}",
+                attemptId=attempt.id,
+                studentId=student_id,
+                stageId=stage.id,
+                eventType="answer_submitted",
+                payloadJson={"answer": answer, "isCorrect": result["isCorrect"]},
+                occurredAt=_now(),
+            )
+        )
+        return {"isRealtimeStage": False, **result, "nextStep": attempt.current_step}
+
+    def create_realtime_session(self, student_id: str, content_id: str, stage_id: str, attempt_id: str) -> RealtimePracticeSession | None:
+        mission = self.get_published_mission_for_student(student_id, content_id)
+        attempt = self.get_attempt(attempt_id)
+        stage = next((candidate for candidate in mission.stages if candidate.id == stage_id), None) if mission else None
+        if mission is None or stage is None or attempt is None or attempt.student_id != student_id:
+            return None
+        if stage.step != 4 or stage.realtime_spec is None:
+            return None
+        session = RealtimePracticeSession(
+            id=f"rt_session_{uuid4()}",
+            attemptId=attempt.id,
+            missionContentId=mission.id,
+            stageId=stage.id,
+            studentId=student_id,
+            provider="openai",
+            model=get_settings().openai_realtime_model,
+            status="created",
+            specSnapshotJson=stage.realtime_spec.model_dump(by_alias=True),
+            turnCount=0,
+            durationSec=0,
+        )
+        self.db.realtime_sessions.append(session)
+        return session
+
+    def save_reflection(self, student_id: str, content_id: str, attempt_id: str, reflection_choice: str, short_text: str | None) -> dict | None:
+        attempt = self.get_attempt(attempt_id)
+        if attempt is None or attempt.student_id != student_id or attempt.mission_content_id != content_id:
+            return None
+        self.db.activity_events.append(
+            ActivityEvent(
+                id=f"event_{uuid4()}",
+                attemptId=attempt.id,
+                studentId=student_id,
+                eventType="post_practice_reflection",
+                payloadJson={"reflectionChoice": reflection_choice, "shortText": short_text},
+                occurredAt=_now(),
+            )
+        )
+        return {"saved": True}
+
+    def complete_attempt(self, student_id: str, content_id: str, attempt_id: str) -> ContentAttempt | None:
+        attempt = self.get_attempt(attempt_id)
+        if attempt is None or attempt.student_id != student_id or attempt.mission_content_id != content_id:
+            return None
+        attempt.status = "completed"
+        attempt.current_step = 4
+        attempt.completed_at = _now()
+        attempt.score_json = {"completionRate": 1}
+        return attempt
+
+    def get_attempt(self, attempt_id: str) -> ContentAttempt | None:
+        return next((attempt for attempt in self.db.attempts if attempt.id == attempt_id), None)
+
+    def _create_session(self, kind: str, id: str, role: str, student_id: str | None = None) -> SessionPrincipal:
+        return SessionPrincipal(
+            token=f"demo.{kind}.{uuid4()}",
+            kind=kind,
+            id=id,
+            role=role,
+            studentId=student_id,
+            expiresAt=(datetime.now(UTC) + timedelta(hours=12)).isoformat(),
+        )
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _evaluate_answer(template_json: dict[str, Any], answer: dict[str, Any]) -> dict:
+    correct_feedback = str(template_json.get("correctFeedback", "좋아요."))
+    wrong_feedback = str(template_json.get("wrongFeedback", "다시 확인해볼까요?"))
+    expected = template_json.get("answer")
+    if isinstance(expected, str):
+        is_correct = answer.get("choiceId") == expected
+    elif isinstance(expected, list):
+        is_correct = answer.get("order") == expected
+    elif isinstance(template_json.get("acceptedAnswers"), list):
+        is_correct = answer in template_json["acceptedAnswers"]
+    else:
+        is_correct = False
+    return {
+        "isCorrect": is_correct,
+        "feedback": correct_feedback if is_correct else wrong_feedback,
+    }
+
+
+store = DemoStore()
