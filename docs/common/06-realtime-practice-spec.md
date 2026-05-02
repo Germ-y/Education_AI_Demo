@@ -201,6 +201,7 @@ stage.templateType이 realtime_roleplay 또는 realtime_teach_back인가
   "practiceSpec": {
     "practiceTitle": "별이에게 분수 설명하기",
     "imageAssetUrl": "https://storage.example.com/assets/fraction.png",
+    "openingAudioUrl": "https://storage.example.com/assets/fraction-stage4-opening.mp3",
     "openingLine": "왜 4/1이 아니라 1/4인지 알려줄래?",
     "maxTurns": 6,
     "maxDurationSec": 120

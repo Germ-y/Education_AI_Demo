@@ -49,11 +49,44 @@ Realtime client secret: 짧은 TTL로 발급
 ## 2. Context And Demo Auth APIs
 
 MVP에서는 회원가입/일반 로그인보다 seed된 사용자/학생/학교 데이터를 조회하는 것이 먼저다.
-`demo-login`과 `student-access`는 개발/공모전 데모용이다.
+프론트 초기 연결은 `GET /api/context/seed` 또는 `GET /api/context/me`로 teacher/student/case/content 매핑을 받은 뒤 시작한다.
+`demo-login`과 `student-access`는 개발/공모전 데모용 보조 API다.
+
+### GET /api/context/seed
+
+별도 로그인 없이 seed된 센터, 교사 1명, 학생 3명, 학생별 case/content 매핑을 조회한다.
+
+```json
+{
+  "data": {
+    "mode": "demo_seed",
+    "organization": "Organization",
+    "teacher": "UserProfile",
+    "students": ["TeacherStudentSummary"],
+    "assignments": [
+      {
+        "teacherId": "user_teacher_demo",
+        "studentId": "student_learning_fraction",
+        "caseId": "case_learning_fraction",
+        "caseStatus": "open"
+      }
+    ],
+    "missionMappings": [
+      {
+        "contentId": "content_fraction_001",
+        "studentId": "student_learning_fraction",
+        "caseId": "case_learning_fraction",
+        "status": "published",
+        "totalSteps": 4
+      }
+    ]
+  }
+}
+```
 
 ### GET /api/context/me
 
-현재 데모 사용자와 조직 정보를 조회한다.
+현재 데모 seed 기준 사용자와 조직 정보를 조회한다. MVP에서는 `context/seed`와 같은 shape을 반환한다.
 
 ```json
 {
@@ -154,6 +187,36 @@ plannerItems
 publicContextSummary
 ```
 
+### GET /api/teacher/students/:studentId/history
+
+학생별 사례 메모, 생성/배포 콘텐츠, 시도, 활동 이벤트, realtime 세션 히스토리를 조회한다.
+
+```json
+{
+  "data": {
+    "student": "Student",
+    "openCase": "SupportCase",
+    "caseNotes": ["CaseNote"],
+    "missionContents": ["MissionContent"],
+    "attempts": ["ContentAttempt"],
+    "activityEvents": ["ActivityEvent"],
+    "realtimeSessions": ["RealtimePracticeSession"]
+  }
+}
+```
+
+### POST /api/teacher/students/:studentId/notes
+
+학생의 열린 case에 교사 메모를 추가한다.
+
+```json
+{
+  "noteType": "teacher_comment",
+  "body": "오늘은 시각 자료 반응이 좋아 분수 설명을 짧게 이어가면 좋겠습니다.",
+  "visibility": "teacher_only"
+}
+```
+
 ### PATCH /api/teacher/students/:studentId/memory-card
 
 교사가 메모리 카드 일부를 수정한다.
@@ -208,15 +271,44 @@ publicContextSummary
 
 ```json
 {
-  "orchestratorRunId": "agent_run_orch_001",
-  "sessionGoal": "전체 4개 중 1개를 1/4로 표현한다",
-  "selectedFlow": [
-    "concept_intro",
-    "basic_problem",
-    "applied_problem",
-    "realtime_teach_back"
-  ],
-  "teacherSummary": "최근 분모/분자 위치 혼동이 있어 시각 자료와 말로 설명하기를 사용합니다."
+  "data": {
+    "agentRun": {
+      "id": "agent_run_orch_001",
+      "agentType": "orchestrator",
+      "promptVersion": "orchestrator_plan_v1",
+      "outputSchemaName": "OrchestratorPlanV1",
+      "model": "gpt-5.1",
+      "status": "succeeded",
+      "outputJson": {
+        "sessionGoal": "전체 4개 중 1개를 1/4로 표현한다",
+        "selectedFlow": [
+          "concept_intro",
+          "basic_problem",
+          "applied_problem",
+          "realtime_teach_back"
+        ],
+        "teacherSummary": "최근 분모/분자 위치 혼동이 있어 시각 자료와 말로 설명하기를 사용합니다."
+      },
+      "reviewRequired": false
+    }
+  }
+}
+```
+
+provider key 없음, HTTP 오류, JSON parse 실패 등은 fallback을 만들지 않고 같은 endpoint에서 실패 실행 기록으로 반환한다.
+
+```json
+{
+  "data": {
+    "agentRun": {
+      "id": "agent_run_orch_001",
+      "status": "failed",
+      "outputJson": null,
+      "errorCode": "OPENAI_API_KEY_MISSING",
+      "errorMessage": "OPENAI_API_KEY가 없어 실제 AI 생성을 실행할 수 없습니다.",
+      "reviewRequired": true
+    }
+  }
 }
 ```
 
@@ -236,13 +328,45 @@ publicContextSummary
 
 ```json
 {
-  "contentId": "content_001",
-  "status": "generating",
-  "jobs": [
-    { "type": "content_json", "status": "queued" },
-    { "type": "image_package", "status": "queued" },
-    { "type": "auto_validation", "status": "queued" }
-  ]
+  "data": {
+    "agentRun": {
+      "id": "agent_run_content_001",
+      "agentType": "content",
+      "promptVersion": "mission_content_package_v1",
+      "outputSchemaName": "MissionContentPackageV1",
+      "status": "succeeded",
+      "reviewRequired": false
+    },
+    "content": "MissionContent"
+  }
+}
+```
+
+전제:
+
+```text
+orchestratorRun.status == succeeded
+orchestratorRun.outputJson exists
+생성된 MissionContent.status == teacher_review
+생성된 MissionContent.studentId/caseId가 요청 값과 일치
+MissionContent schema validation 통과
+```
+
+성공한 orchestrator run이 아니면 `409 ORCHESTRATOR_RUN_NOT_READY`를 반환한다.
+provider 또는 schema 오류가 나면 대체 콘텐츠를 만들지 않고 content agent run을 실패로 남긴다.
+
+```json
+{
+  "data": {
+    "agentRun": {
+      "id": "agent_run_content_001",
+      "status": "failed",
+      "errorCode": "MISSION_CONTENT_SCHEMA_INVALID",
+      "errorMessage": "생성된 MissionContent.status는 teacher_review여야 합니다.",
+      "reviewRequired": true
+    },
+    "content": null
+  }
 }
 ```
 
@@ -250,11 +374,14 @@ publicContextSummary
 
 AI 실행 상태/결과 조회.
 
+실패한 실행은 검수 화면에서 `errorCode`, `errorMessage`, `reviewRequired`를 확인한 뒤 재시도 여부를 결정한다.
+
 ## 6. Content Review APIs
 
 ### GET /api/contents/:contentId
 
 교사용 콘텐츠 상세. `teacher_review` 상태도 볼 수 있다.
+학생 API와 달리 교사 검토 API는 `teacher_review`, `approved`, `published`, `revision_requested` 상태를 조회할 수 있다.
 
 ### POST /api/contents/:contentId/request-image-regeneration
 
@@ -268,6 +395,78 @@ AI 실행 상태/결과 조회.
 }
 ```
 
+### POST /api/contents/:contentId/request-tts-regeneration
+
+정적 콘텐츠 안내 음성을 재생성한다. 4단계 realtime에는 사용하지 않는다.
+
+```json
+{
+  "assetRole": "stage_2",
+  "stageId": "stage_002",
+  "sourceText": "전체 조각 수와 고른 조각 수를 차례대로 세어보세요.",
+  "reason": "문장이 너무 빠르게 들림",
+  "teacherInstruction": "더 천천히 또박또박 읽어주세요."
+}
+```
+
+### POST /api/contents/:contentId/assets/:assetId/generate
+
+단일 이미지 또는 오디오 asset을 실제 provider로 생성한다.
+
+```text
+image asset: promptJson.prompt/imagePrompt/visualPrompt 필요
+audio asset: sourceText 필요
+```
+
+성공하면 `/generated/assets/:contentId/:assetId.(png|mp3)` 경로를 `storageUrl`, `previewUrl`에 반영한다.
+생성 직후에는 교사가 다시 확인해야 하므로 `qaStatus=pending`, `approvalStatus=pending`으로 둔다.
+
+provider key 없음, HTTP 오류, 빈 파일, b64 parse 실패는 대체 파일을 만들지 않고 `424` 오류로 반환한다.
+
+```json
+{
+  "error": {
+    "code": "ELEVENLABS_API_KEY_MISSING",
+    "message": "ELEVENLABS_API_KEY가 없어 TTS 생성을 실행할 수 없습니다.",
+    "details": {
+      "reviewRequired": true,
+      "fallbackPolicy": "disabled"
+    }
+  }
+}
+```
+
+### POST /api/contents/:contentId/assets/generate-package
+
+콘텐츠에 포함된 전체 asset 패키지를 실제 provider로 생성한다.
+
+전제:
+
+```text
+image asset role: hero, stage_1, stage_2, stage_3, stage_4_realtime 모두 존재
+audio asset role: hero, stage_1, stage_2, stage_3, stage_4_realtime 모두 존재
+OPENAI_API_KEY exists
+ELEVENLABS_API_KEY exists
+ELEVENLABS_VOICE_ID exists
+image asset promptJson has prompt/imagePrompt/visualPrompt
+audio asset sourceText exists
+```
+
+성공 응답:
+
+```json
+{
+  "data": {
+    "contentId": "content_fraction_001",
+    "generatedCount": 10,
+    "assets": ["ContentAsset"]
+  }
+}
+```
+
+provider key 또는 필수 asset이 없으면 생성을 시작하지 않고 오류를 반환한다.
+provider 호출 중 오류가 나면 해당 asset id와 함께 `424`를 반환하며 대체 asset은 만들지 않는다.
+
 ### POST /api/contents/:contentId/approve
 
 교사 승인.
@@ -280,6 +479,9 @@ AI 실행 상태/결과 조회.
 }
 ```
 
+서버는 요청의 `approvedStageIds`, `approvedAssetIds`가 콘텐츠의 모든 stage/asset을 포함하는지 확인한다.
+승인되면 콘텐츠 상태는 `approved`가 되고 asset `approvalStatus`는 `approved`가 된다.
+
 ### POST /api/contents/:contentId/reject
 
 반려/수정 요청.
@@ -291,9 +493,21 @@ AI 실행 상태/결과 조회.
 }
 ```
 
+반려되면 콘텐츠 상태는 `revision_requested`가 된다.
+반려된 콘텐츠는 학생 API에서 노출되지 않는다.
+
 ### POST /api/contents/:contentId/publish
 
 승인된 콘텐츠를 학생에게 배포한다.
+
+전제:
+
+```text
+content.status == approved
+all assets approvalStatus == approved
+```
+
+배포되면 콘텐츠 상태는 `published`가 되고 학생 미션 API에서 조회된다.
 
 ## 7. Student Mission APIs
 
@@ -312,6 +526,7 @@ AI 실행 상태/결과 조회.
       "contentType": "learning_focus",
       "totalSteps": 4,
       "heroImageUrl": "https://cdn.example.com/hero.png",
+      "heroAudioUrl": "https://cdn.example.com/hero.mp3",
       "status": "published"
     }
   ]
@@ -354,6 +569,18 @@ AI 실행 상태/결과 조회.
 
 힌트 사용, 화면 진입, 체류시간 등 이벤트 저장.
 
+```json
+{
+  "attemptId": "attempt_001",
+  "stageId": "stage_001",
+  "eventType": "stage_entered",
+  "payloadJson": {
+    "step": 1,
+    "durationMs": 1200
+  }
+}
+```
+
 ## 8. Realtime Stage APIs
 
 ### POST /api/student/missions/:contentId/stages/:stageId/realtime-session
@@ -383,6 +610,7 @@ no active duplicate session
   "practiceSpec": {
     "practiceTitle": "별이에게 분수 설명하기",
     "imageAssetUrl": "https://cdn.example.com/stage4.png",
+    "openingAudioUrl": "https://cdn.example.com/stage4-opening.mp3",
     "openingLine": "왜 4/1이 아니라 1/4인지 알려줄래?",
     "maxTurns": 6,
     "maxDurationSec": 120
@@ -393,6 +621,16 @@ no active duplicate session
 ### POST /api/student/realtime-sessions/:sessionId/events
 
 Realtime 이벤트 저장. 클라이언트 이벤트, sideband 이벤트, 서버 평가 이벤트를 같은 session에 묶는다.
+
+```json
+{
+  "eventType": "realtime_user_turn",
+  "payloadJson": {
+    "turnIndex": 1,
+    "modality": "voice"
+  }
+}
+```
 
 ### POST /api/student/realtime-sessions/:sessionId/complete
 
@@ -430,6 +668,26 @@ attempt 완료.
 
 ReviewAgent 실행 요청.
 
+현재 MVP 구현은 저장된 `ContentAttempt`, `ActivityEvent`, `RealtimePracticeSession`을 기준으로 deterministic summary를 만든다.
+실제 ReviewAgent provider 호출은 이후 `agent_runs` 기반으로 확장한다.
+
+응답:
+
+```json
+{
+  "data": {
+    "id": "review_001",
+    "attemptId": "attempt_001",
+    "studentId": "student_learning_fraction",
+    "completionRate": 1,
+    "accuracyRate": 0.5,
+    "shortSummary": "완료율 100%, 정답률 50%, 오답 1개",
+    "wrongPatternJson": {},
+    "realtimeResultJson": {}
+  }
+}
+```
+
 ### GET /api/contents/:contentId/review-summary
 
 리뷰 요약 조회.
@@ -438,57 +696,168 @@ ReviewAgent 실행 요청.
 
 교사가 리뷰 요약을 메모리 카드에 반영한다.
 
-## 10. Public Data APIs
+반영 시 active memory card의 `recent4wResponseJson`과 `nextSessionCautions`가 업데이트된다.
+
+## 10. Audit APIs
+
+### GET /api/audit-logs
+
+교사/센터 사용자의 민감 작업 기록을 조회한다.
+
+Query:
+
+```text
+studentId=student_learning_fraction
+action=approve_content
+limit=50
+```
+
+기록 대상:
+
+```text
+view_student_case
+view_student_history
+approve_content
+reject_content
+publish_content
+generate_asset
+generate_asset_package
+apply_review_to_memory
+```
+
+응답:
+
+```json
+{
+  "data": [
+    {
+      "id": "audit_001",
+      "actorUserId": "user_teacher_demo",
+      "studentId": "student_learning_fraction",
+      "action": "approve_content",
+      "resourceType": "mission_content",
+      "resourceId": "content_fraction_001",
+      "payloadJson": {},
+      "createdAt": "2026-05-02T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+## 11. Public Data APIs
 
 ### GET /api/public-data/sources
 
 등록된 source 목록.
+
+### GET /api/public-data/schools
+
+seed snapshot 또는 동기화된 학교 목록을 조회한다.
+
+```json
+{
+  "data": [
+    {
+      "schoolCode": "8811058",
+      "schoolName": "영주중학교",
+      "schoolKind": "중학교",
+      "officeCode": "R10",
+      "roadAddress": "경상북도 영주시 남간로 29"
+    }
+  ]
+}
+```
+
+### GET /api/public-data/schools/:schoolCode/context
+
+학교 기본정보, 학사일정, 시간표 snapshot을 한 번에 조회한다.
+
+Query:
+
+```text
+fromDate=2026-05-01
+toDate=2026-05-15
+timetableDate=2026-05-01
+grade=2
+className=1
+```
+
+응답:
+
+```json
+{
+  "school": {
+    "schoolCode": "8811058",
+    "schoolName": "영주중학교"
+  },
+  "calendar": [
+    {
+      "eventDate": "2026-05-01",
+      "eventName": "노동절",
+      "scheduleType": "공휴일",
+      "appliesToGrades": ["1", "2", "3"]
+    }
+  ],
+  "timetableSummary": [
+    {
+      "timetableDate": "2026-05-01",
+      "grade": "2",
+      "className": "1",
+      "period": 1,
+      "subjectName": "역사"
+    }
+  ],
+  "source": {
+    "sourceCode": "neis_open_api",
+    "mode": "seed_snapshot"
+  }
+}
+```
 
 ### POST /api/public-data/sources/:sourceCode/sync
 
 ```json
 {
   "regionCode": "47210",
-  "schoolCode": "sample_school",
+  "officeCode": "R10",
+  "schoolCode": "8811058",
   "fromDate": "2026-05-01",
-  "toDate": "2026-05-31"
+  "toDate": "2026-05-31",
+  "timetableDate": "2026-05-01",
+  "grade": "2",
+  "className": "1"
+}
+```
+
+현재 지원 source:
+
+```text
+neis_open_api
+```
+
+`NEIS_API_KEY`가 없으면 seed snapshot으로 대체 동기화를 하지 않고 `424 NEIS_API_KEY_MISSING`을 반환한다.
+키가 있으면 NEIS `schoolInfo`, `SchoolSchedule`, 시간표 endpoint를 호출하고 정규화 snapshot을 DB에 upsert한다.
+
+응답:
+
+```json
+{
+  "data": {
+    "jobId": "sync_neis_open_api",
+    "status": "completed",
+    "sourceCode": "neis_open_api",
+    "counts": {
+      "schools": 1,
+      "calendar": 4,
+      "timetable": 6
+    }
+  }
 }
 ```
 
 ### GET /api/public-data/sync-jobs/:jobId
 
 sync job 상태 조회.
-
-### GET /api/public-data/schools/search
-
-학교 검색.
-
-### GET /api/public-data/schools/:schoolId/calendar
-
-학사일정 조회.
-
-### GET /api/public-data/schools/:schoolId/context
-
-학생/교사 화면에서 바로 쓰는 학교 맥락 요약.
-
-응답:
-
-```json
-{
-  "school": "SchoolProfile",
-  "calendar": ["SchoolCalendarItem"],
-  "timetableSummary": {
-    "todaySubjects": ["수학", "국어", "영어"],
-    "source": "NEIS_TIMETABLE"
-  },
-  "educationStats": ["EducationStat"],
-  "lastSyncedAt": "2026-05-02T00:00:00.000Z"
-}
-```
-
-### GET /api/public-data/schools/:schoolId/timetable
-
-시간표 조회.
 
 ### GET /api/public-data/curriculum-standards
 
@@ -498,7 +867,7 @@ sync job 상태 조회.
 
 교육통계 조회.
 
-## 11. Admin And Seed APIs
+## 12. Admin And Seed APIs
 
 ### POST /api/admin/seed/demo
 

@@ -8,7 +8,8 @@
 2. [03-backend-feature-spec.md](03-backend-feature-spec.md)
 3. [06-database-schema-spec.md](06-database-schema-spec.md)
 4. [../common/08-rest-api-spec.md](../common/08-rest-api-spec.md)
-5. [../common/02-branch-handoff-contract.md](../common/02-branch-handoff-contract.md)
+5. [08-ai-orchestrator-workflow.md](08-ai-orchestrator-workflow.md)
+6. [../common/02-branch-handoff-contract.md](../common/02-branch-handoff-contract.md)
 
 다른 브랜치 변경을 받아야 하거나 프론트 확인이 필요한 변경을 push할 때는 [../common/02-branch-handoff-contract.md](../common/02-branch-handoff-contract.md)의 검수/승인 절차를 먼저 따른다.
 
@@ -43,6 +44,14 @@ cd backend
 .venv/bin/ruff check app tests
 .venv/bin/python -m pytest
 .venv/bin/python -m app.data.seed_demo
+```
+
+`app.data.seed_demo`는 `DATABASE_URL`에 연결해 schema 생성 후 seed를 DB에 적재한다.
+PostgreSQL이 아직 준비되지 않은 로컬 smoke는 아래처럼 SQLite로 확인한다.
+
+```bash
+cd backend
+DATABASE_URL=sqlite+pysqlite:///./eduyj-demo.db .venv/bin/python -m app.data.seed_demo
 ```
 
 프론트 확인이 필요한 변경이면 [../common/02-branch-handoff-contract.md](../common/02-branch-handoff-contract.md)에 있는 handoff 포맷을 사용한다.

@@ -1,25 +1,45 @@
 import json
 
+from app.core.config import get_settings
 from app.data.demo_data import create_demo_database
+from app.db.session import create_schema, get_session_maker
+from app.repositories.demo_repository import DemoRepository
 
 
 def main() -> None:
     db = create_demo_database()
+    create_schema()
+    repository = DemoRepository(get_session_maker())
+    repository.replace_database(db)
+    loaded = repository.load_database()
+    settings = get_settings()
     print(
         json.dumps(
             {
-                "organizations": len(db.organizations),
-                "users": len(db.users),
-                "students": len(db.students),
-                "supportCases": len(db.support_cases),
-                "memoryCards": len(db.memory_cards),
-                "missionContents": len(db.mission_contents),
-                "publicDataSources": len(db.public_data_sources),
+                "databaseUrl": _safe_database_label(settings.database_url),
+                "organizations": len(loaded.organizations),
+                "users": len(loaded.users),
+                "students": len(loaded.students),
+                "schools": len(loaded.schools),
+                "schoolCalendarEvents": len(loaded.school_calendar_events),
+                "schoolTimetableSlots": len(loaded.school_timetable_slots),
+                "supportCases": len(loaded.support_cases),
+                "memoryCards": len(loaded.memory_cards),
+                "missionContents": len(loaded.mission_contents),
+                "publicDataSources": len(loaded.public_data_sources),
             },
             ensure_ascii=False,
             indent=2,
         )
     )
+
+
+def _safe_database_label(database_url: str) -> str:
+    if database_url.startswith("sqlite"):
+        return database_url
+    scheme, _, rest = database_url.partition("://")
+    host = rest.rsplit("@", maxsplit=1)[-1].split("/", maxsplit=1)[0]
+    return f"{scheme}://{host}"
 
 
 if __name__ == "__main__":

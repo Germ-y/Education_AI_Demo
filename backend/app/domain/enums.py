@@ -42,6 +42,7 @@ class TemplateType(StrEnum):
     ACTION_CHOICE = "action_choice"
     SEQUENCE_ORDERING = "sequence_ordering"
     DECISION_CARD = "decision_card"
+    IMAGE_QUIZ = "image_quiz"
     CONCEPT_INTRO = "concept_intro"
     SCENE_QUESTION = "scene_question"
     CLUE_QUESTION = "clue_question"
@@ -65,4 +66,4 @@ class AssetRole(StrEnum):
 
 class AssetType(StrEnum):
     IMAGE = "image"
-    AUDIO_OPTIONAL = "audio_optional"
+    AUDIO = "audio"

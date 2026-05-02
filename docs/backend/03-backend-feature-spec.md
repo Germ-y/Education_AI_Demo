@@ -336,8 +336,8 @@ seeded random 허용
 | 단계 | 이름 | stageRole | 템플릿 후보 |
 | --- | --- | --- | --- |
 | 1 | 개념 열기 | `concept_intro` | `concept_intro` |
-| 2 | 문제 1 | `basic_problem` | `scene_question`, `sequence_ordering`, `blank_fill`, `partition_picker` |
-| 3 | 문제 2 | `applied_problem` | `applied_question`, `card_match`, `blank_fill`, `mini_simulation` |
+| 2 | 문제 1 | `basic_problem` | `image_quiz`, `card_match`, `sequence_ordering`, `blank_fill`, `scene_question`, `partition_picker` |
+| 3 | 문제 2 | `applied_problem` | `image_quiz`, `card_match`, `sequence_ordering`, `blank_fill`, `applied_question`, `mini_simulation` |
 | 4 | AI에게 말해보기 | `realtime_practice` | `realtime_teach_back` |
 
 생활지원형 기본 플로우:
@@ -345,8 +345,8 @@ seeded random 허용
 | 단계 | 이름 | stageRole | 템플릿 후보 |
 | --- | --- | --- | --- |
 | 1 | 상황 만나기 | `scenario_intro` | `scenario_intro` |
-| 2 | 단서 찾기 | `clue_identification` | `scene_observation`, `highlight_clue`, `card_match` |
-| 3 | 행동 고르기 | `action_selection` | `action_choice`, `sequence_ordering`, `decision_card` |
+| 2 | 단서 찾기 | `clue_identification` | `scene_observation`, `highlight_clue`, `image_quiz`, `card_match` |
+| 3 | 행동 고르기 | `action_selection` | `image_quiz`, `card_match`, `sequence_ordering`, `action_choice`, `decision_card` |
 | 4 | AI와 연습하기 | `realtime_practice` | `realtime_roleplay` |
 
 회고는 4단계 실시간 연습 뒤 `post_practice_reflection` 이벤트로 수집한다.

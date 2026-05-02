@@ -51,6 +51,52 @@ class StudentAccount(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class SchoolProfile(BaseModel):
+    id: str
+    office_code: str = Field(alias="officeCode")
+    school_code: str = Field(alias="schoolCode")
+    school_name: str = Field(alias="schoolName")
+    school_kind: str = Field(alias="schoolKind")
+    region_name: str = Field(alias="regionName")
+    road_address: str = Field(alias="roadAddress")
+    source_code: str = Field(default="neis_open_api", alias="sourceCode")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class SchoolCalendarEvent(BaseModel):
+    id: str
+    school_code: str = Field(alias="schoolCode")
+    office_code: str = Field(alias="officeCode")
+    academic_year: str = Field(alias="academicYear")
+    event_date: str = Field(alias="eventDate")
+    event_name: str = Field(alias="eventName")
+    event_content: str | None = Field(default=None, alias="eventContent")
+    schedule_type: str | None = Field(default=None, alias="scheduleType")
+    applies_to_grades: list[str] = Field(default_factory=list, alias="appliesToGrades")
+    source_code: str = Field(default="neis_school_schedule", alias="sourceCode")
+    retrieved_at: str = Field(alias="retrievedAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class SchoolTimetableSlot(BaseModel):
+    id: str
+    school_code: str = Field(alias="schoolCode")
+    office_code: str = Field(alias="officeCode")
+    academic_year: str = Field(alias="academicYear")
+    semester: str
+    timetable_date: str = Field(alias="timetableDate")
+    grade: str
+    class_name: str = Field(alias="className")
+    period: int
+    subject_name: str | None = Field(default=None, alias="subjectName")
+    source_code: str = Field(alias="sourceCode")
+    retrieved_at: str = Field(alias="retrievedAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class SupportCase(BaseModel):
     id: str
     student_id: str = Field(alias="studentId")
@@ -160,11 +206,59 @@ class PublicDataSource(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class AgentRun(BaseModel):
+    id: str
+    agent_type: str = Field(alias="agentType")
+    prompt_version: str = Field(alias="promptVersion")
+    output_schema_name: str = Field(alias="outputSchemaName")
+    input_snapshot_json: dict[str, Any] = Field(default_factory=dict, alias="inputSnapshotJson")
+    output_json: dict[str, Any] | None = Field(default=None, alias="outputJson")
+    model: str
+    status: Literal["running", "succeeded", "failed"] = "running"
+    token_usage_json: dict[str, Any] | None = Field(default=None, alias="tokenUsageJson")
+    error_code: str | None = Field(default=None, alias="errorCode")
+    error_message: str | None = Field(default=None, alias="errorMessage")
+    review_required: bool = Field(default=False, alias="reviewRequired")
+    created_at: str = Field(alias="createdAt")
+    completed_at: str | None = Field(default=None, alias="completedAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ReviewSummary(BaseModel):
+    id: str
+    attempt_id: str = Field(alias="attemptId")
+    student_id: str = Field(alias="studentId")
+    completion_rate: float = Field(alias="completionRate")
+    accuracy_rate: float = Field(alias="accuracyRate")
+    short_summary: str = Field(alias="shortSummary")
+    wrong_pattern_json: dict[str, Any] = Field(default_factory=dict, alias="wrongPatternJson")
+    realtime_result_json: dict[str, Any] = Field(default_factory=dict, alias="realtimeResultJson")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class AuditLog(BaseModel):
+    id: str
+    actor_user_id: str | None = Field(default=None, alias="actorUserId")
+    student_id: str | None = Field(default=None, alias="studentId")
+    action: str
+    resource_type: str = Field(alias="resourceType")
+    resource_id: str | None = Field(default=None, alias="resourceId")
+    payload_json: dict[str, Any] | None = Field(default=None, alias="payloadJson")
+    created_at: str = Field(alias="createdAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class DemoDatabase(BaseModel):
     organizations: list[Organization]
     users: list[User]
     students: list[Student]
     student_accounts: list[StudentAccount] = Field(alias="studentAccounts")
+    schools: list[SchoolProfile] = Field(default_factory=list)
+    school_calendar_events: list[SchoolCalendarEvent] = Field(default_factory=list, alias="schoolCalendarEvents")
+    school_timetable_slots: list[SchoolTimetableSlot] = Field(default_factory=list, alias="schoolTimetableSlots")
     support_cases: list[SupportCase] = Field(alias="supportCases")
     case_notes: list[CaseNote] = Field(alias="caseNotes")
     memory_cards: list[MemoryCard] = Field(alias="memoryCards")
@@ -174,5 +268,7 @@ class DemoDatabase(BaseModel):
     activity_events: list[ActivityEvent] = Field(default_factory=list, alias="activityEvents")
     realtime_sessions: list[RealtimePracticeSession] = Field(default_factory=list, alias="realtimeSessions")
     public_data_sources: list[PublicDataSource] = Field(alias="publicDataSources")
+    review_summaries: list[ReviewSummary] = Field(default_factory=list, alias="reviewSummaries")
+    audit_logs: list[AuditLog] = Field(default_factory=list, alias="auditLogs")
 
     model_config = ConfigDict(populate_by_name=True)
