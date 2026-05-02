@@ -50,8 +50,8 @@ export default function Home() {
                 학생용
               </span>
               <h2 className="mt-5 text-3xl font-black">학생별 학습 화면으로 이동</h2>
-              <p className="mt-3 max-w-md text-base leading-7 text-[#666b62]">
-                세 명의 학생 중 한 명을 골라 각자 다른 미션 화면을 확인합니다.
+              <p className="mt-3 text-base leading-7 text-[#666b62]">
+                학생을 선택해 각자 다른 미션 화면으로 이동합니다.
               </p>
 
               <div className="mt-5 grid gap-3">
@@ -66,9 +66,6 @@ export default function Home() {
                         <p className="truncate text-lg font-black">{studentCase.studentName}</p>
                         <p className="mt-1 text-sm font-bold text-[#66705f]">
                           {studentCase.grade} · {studentCase.label}
-                        </p>
-                        <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-[#4f5b4b]">
-                          {studentCase.title}
                         </p>
                       </div>
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-xl transition group-hover:bg-[#27ae60] group-hover:text-white">
