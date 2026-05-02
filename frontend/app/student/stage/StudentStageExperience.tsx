@@ -174,7 +174,7 @@ function StageMedia({
   theme: SceneTheme;
   compact?: boolean;
 }) {
-  if (!question.imageUrl && !question.audioSourceText) return null;
+  if (!question.imageUrl && !question.audioUrl) return null;
 
   return (
     <div
@@ -191,14 +191,9 @@ function StageMedia({
           unoptimized
         />
       )}
-      {question.audioSourceText && (
+      {question.audioUrl && (
         <div className={question.imageUrl ? "mt-2" : ""}>
-          <p className="mb-1 text-[11px] font-black" style={{ color: theme.accentStrong }}>
-            음성 안내 원문
-          </p>
-          <p className="rounded-[12px] bg-[#f8fafc] px-3 py-2 text-xs font-bold leading-5 text-[#475569]">
-            {question.audioSourceText}
-          </p>
+          <audio className="w-full" src={question.audioUrl} controls preload="auto" />
         </div>
       )}
     </div>
@@ -217,7 +212,7 @@ function StageVisualBoard({
   compact?: boolean;
 }) {
   return (
-    <div className={`grid h-full min-h-[300px] gap-3 ${question.imageUrl || question.audioSourceText ? "grid-rows-[auto_1fr]" : "grid-rows-1"}`}>
+    <div className={`grid h-full min-h-[300px] gap-3 ${question.imageUrl || question.audioUrl ? "grid-rows-[auto_1fr]" : "grid-rows-1"}`}>
       <StageMedia question={question} theme={theme} compact={compact} />
       <div className="min-h-0 overflow-hidden">
         <LearningVisual visual={visual} compact={compact} />

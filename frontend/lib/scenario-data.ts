@@ -67,8 +67,28 @@ export async function getBackendStudentCaseSummaries(): Promise<StudentScenarioC
   }));
 }
 
-export async function getBackendStudentScenario(studentId?: string): Promise<StudentScenarioResult> {
+export async function getBackendStudentScenario(studentId?: string, contentId?: string): Promise<StudentScenarioResult> {
   const resolvedStudentId = resolveStudentId(studentId);
+
+  if (contentId) {
+    const caseFile = await backendAdapter.getTeacherStudent(resolvedStudentId);
+    const mission = await backendAdapter.getReviewableContent(contentId);
+    if (mission.studentId !== resolvedStudentId) {
+      throw new Error(`요청한 학생과 콘텐츠 학생이 다릅니다: ${resolvedStudentId} / ${mission.studentId}`);
+    }
+
+    return {
+      kind: "ready",
+      studentId: resolvedStudentId,
+      contentId: mission.id,
+      context: {
+        student: mapStudentProfile(caseFile),
+        supportCase: mapSupportCase(caseFile, mission),
+        scene: mapMissionScene(caseFile, mission),
+      },
+    };
+  }
+
   const studentToken = await getStudentAccessToken(resolvedStudentId);
 
   const caseFile = await backendAdapter.getTeacherStudent(resolvedStudentId);
@@ -252,7 +272,7 @@ function mapStageQuestion(stage: ContentStage, mission: MissionContent, index: n
   }
 
   if (stage.templateType === "card_match") {
-    const pairs = parseMatchingPairs(template.matchingPairs);
+    const pairs = parseMatchingPairs(template);
     return {
       ...common,
       kind: "cardMatching",
@@ -264,7 +284,7 @@ function mapStageQuestion(stage: ContentStage, mission: MissionContent, index: n
 
   if (stage.templateType === "blank_fill") {
     const accepted = firstAcceptedAnswer(template.acceptedAnswers);
-    const fillOptions = uniqueStrings([accepted.numerator, accepted.denominator, "2", "3", "4"])
+    const fillOptions = uniqueStrings([...stringArray(template.tiles), accepted.numerator, accepted.denominator, "2", "3", "4"])
       .slice(0, 4)
       .map((value) => ({ id: value, label: value }));
 
@@ -275,6 +295,17 @@ function mapStageQuestion(stage: ContentStage, mission: MissionContent, index: n
       fillBlankText: fillBlankText(asString(template.question) ?? "__ / __"),
       fillOptions,
       correctAnswer: `${accepted.numerator}|${accepted.denominator}`,
+    };
+  }
+
+  if (stage.templateType === "image_quiz") {
+    return {
+      ...common,
+      kind: mission.contentType === "life_support" ? "scenario" : "quiz",
+      body: asString(template.question) ?? stage.studentInstruction,
+      choices: choices.map((choice) => choice.text),
+      correctAnswer,
+      actionLabel: "정답 확인",
     };
   }
 
@@ -380,7 +411,25 @@ function parseCards(value: unknown): Array<{ id: string; label: string; caption?
     .filter((item): item is { id: string; label: string; caption?: string } => item !== null);
 }
 
-function parseMatchingPairs(value: unknown): Array<{ leftId: string; left: string; rightId: string; right: string }> {
+function parseMatchingPairs(template: Record<string, unknown>): Array<{ leftId: string; left: string; rightId: string; right: string }> {
+  const legacyPairs = parseLegacyMatchingPairs(template.matchingPairs);
+  if (legacyPairs.length > 0) return legacyPairs;
+
+  const leftCards = parseCards(template.leftCards);
+  const rightCards = parseCards(template.rightCards);
+  const matches = isRecord(template.matches) ? template.matches : {};
+
+  return Object.entries(matches)
+    .map(([leftId, rightIdValue]) => {
+      const rightId = asString(rightIdValue);
+      const left = leftCards.find((card) => card.id === leftId);
+      const right = rightCards.find((card) => card.id === rightId);
+      return left && right ? { leftId, left: left.label, rightId: right.id, right: right.label } : null;
+    })
+    .filter((item): item is { leftId: string; left: string; rightId: string; right: string } => item !== null);
+}
+
+function parseLegacyMatchingPairs(value: unknown): Array<{ leftId: string; left: string; rightId: string; right: string }> {
   if (!Array.isArray(value)) return [];
   return value
     .map((item, index) => {

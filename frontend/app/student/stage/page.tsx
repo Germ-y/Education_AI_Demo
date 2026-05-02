@@ -9,7 +9,8 @@ export default async function StudentStagePage({
 }) {
   const params = await searchParams;
   const studentIdParam = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
-  const result = await getBackendStudentScenario(studentIdParam);
+  const contentIdParam = Array.isArray(params.contentId) ? params.contentId[0] : params.contentId;
+  const result = await getBackendStudentScenario(studentIdParam, contentIdParam);
 
   if (result.kind === "empty") {
     return (
@@ -36,7 +37,9 @@ export default async function StudentStagePage({
       ? requestedStep
       : context.scene.currentStep;
 
-  const studentQuery = `studentId=${encodeURIComponent(result.studentId)}`;
+  const studentQuery = `studentId=${encodeURIComponent(result.studentId)}${
+    contentIdParam ? `&contentId=${encodeURIComponent(contentIdParam)}` : ""
+  }`;
 
   return (
     <StudentStageExperience

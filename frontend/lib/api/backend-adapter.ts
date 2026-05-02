@@ -1,10 +1,12 @@
 import { apiFetch } from "./api-fetch";
 import type { ApiAdapter } from "./adapter";
 import type {
-  AgentRunPlan,
+  AssetPackageGenerationResponse,
+  ContentGenerationResponse,
   ContextMe,
   DemoLoginResponse,
   MissionContent,
+  OrchestratorRunResponse,
   PublicContextBundle,
   RealtimeSessionResponse,
   ReviewableContent,
@@ -45,5 +47,14 @@ export const backendAdapter: ApiAdapter = {
     ),
 
   createAgentRun: (payload, options) =>
-    apiFetch<AgentRunPlan>("/api/ai/orchestrator-runs", { method: "POST", body: payload, token: options?.token }),
+    apiFetch<OrchestratorRunResponse>("/api/ai/orchestrator-runs", { method: "POST", body: payload, token: options?.token }),
+
+  createContentGeneration: (payload, options) =>
+    apiFetch<ContentGenerationResponse>("/api/ai/content-generations", { method: "POST", body: payload, token: options?.token }),
+
+  generateContentAssetPackage: (contentId, options) =>
+    apiFetch<AssetPackageGenerationResponse>(`/api/contents/${encodeURIComponent(contentId)}/assets/generate-package`, {
+      method: "POST",
+      token: options?.token,
+    }),
 };

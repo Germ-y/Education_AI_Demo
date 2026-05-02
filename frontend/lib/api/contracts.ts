@@ -44,6 +44,7 @@ export type TemplateType =
   | "scenario_intro"
   | "scene_observation"
   | "highlight_clue"
+  | "image_quiz"
   | "card_match"
   | "action_choice"
   | "sequence_ordering"
@@ -360,6 +361,23 @@ export type RealtimeSessionResponse = {
 
 export type ReviewableContent = MissionContent;
 
+export type AgentRun = {
+  id: string;
+  agentType: string;
+  promptVersion: string;
+  outputSchemaName: string;
+  inputSnapshotJson: Record<string, unknown>;
+  outputJson?: Record<string, unknown> | null;
+  model: string;
+  status: "running" | "succeeded" | "failed";
+  tokenUsageJson?: Record<string, unknown> | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  reviewRequired: boolean;
+  createdAt: string;
+  completedAt?: string | null;
+};
+
 export type AgentRunRequest = {
   studentId: string;
   caseId: string;
@@ -367,9 +385,23 @@ export type AgentRunRequest = {
   contentType: ContentType;
 };
 
-export type AgentRunPlan = {
+export type OrchestratorRunResponse = {
+  agentRun: AgentRun | null;
+};
+
+export type ContentGenerationRequest = {
   orchestratorRunId: string;
-  sessionGoal: string;
-  selectedFlow: TemplateType[];
-  teacherSummary: string;
+  studentId: string;
+  caseId: string;
+};
+
+export type ContentGenerationResponse = {
+  agentRun: AgentRun | null;
+  content: MissionContent | null;
+};
+
+export type AssetPackageGenerationResponse = {
+  contentId: string;
+  generatedCount: number;
+  assets: ContentAsset[];
 };

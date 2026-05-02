@@ -1,6 +1,5 @@
 import type { ApiAdapter } from "./adapter";
 import type {
-  AgentRunPlan,
   ContextMe,
   ContentAsset,
   ContentStage,
@@ -408,6 +407,7 @@ export const devAdapter: ApiAdapter = {
       practiceSpec: {
         practiceTitle: stage.realtimeSpec.practiceTitle,
         imageAssetUrl: asset?.previewUrl,
+        openingAudioUrl: mission.assets.find((item) => item.assetRole === "stage_4_realtime" && item.assetType === "audio")?.previewUrl,
         openingLine: stage.realtimeSpec.openingLine,
         maxTurns: stage.realtimeSpec.maxTurns,
         maxDurationSec: stage.realtimeSpec.maxDurationSec,
@@ -417,13 +417,61 @@ export const devAdapter: ApiAdapter = {
 
   async createAgentRun(payload) {
     return {
-      orchestratorRunId: `agent_run_dev_${payload.studentId}`,
-      sessionGoal: "seed 기반 생성 계획",
-      selectedFlow:
-        payload.contentType === "learning_focus"
-          ? ["concept_intro", "partition_picker", "blank_fill", "realtime_teach_back"]
-          : ["scenario_intro", "scene_observation", "sequence_ordering", "realtime_roleplay"],
-      teacherSummary: "dev adapter preview plan",
-    } satisfies AgentRunPlan;
+      agentRun: {
+        id: `agent_run_dev_${payload.studentId}`,
+        agentType: "orchestrator",
+        promptVersion: "orchestrator_plan_v1",
+        outputSchemaName: "OrchestratorPlanV1",
+        inputSnapshotJson: payload,
+        outputJson: {
+          sessionGoal: "seed 기반 생성 계획",
+          selectedFlow:
+            payload.contentType === "learning_focus"
+              ? ["concept_intro", "partition_picker", "blank_fill", "realtime_teach_back"]
+              : ["scenario_intro", "scene_observation", "sequence_ordering", "realtime_roleplay"],
+          teacherSummary: "dev adapter preview plan",
+        },
+        model: "dev",
+        status: "succeeded",
+        tokenUsageJson: null,
+        errorCode: null,
+        errorMessage: null,
+        reviewRequired: false,
+        createdAt: "2026-05-02T00:00:00.000Z",
+        completedAt: "2026-05-02T00:00:00.000Z",
+      },
+    };
+  },
+
+  async createContentGeneration(payload) {
+    const mission = getMission("content_fraction_001");
+    return {
+      agentRun: {
+        id: `agent_run_content_dev_${payload.studentId}`,
+        agentType: "content",
+        promptVersion: "mission_content_package_v1",
+        outputSchemaName: "MissionContentPackageV1",
+        inputSnapshotJson: payload,
+        outputJson: mission,
+        model: "dev",
+        status: "succeeded",
+        tokenUsageJson: null,
+        errorCode: null,
+        errorMessage: null,
+        reviewRequired: false,
+        createdAt: "2026-05-02T00:00:00.000Z",
+        completedAt: "2026-05-02T00:00:00.000Z",
+      },
+      content: mission,
+    };
+  },
+
+  async generateContentAssetPackage(contentId) {
+    const mission = getMission(contentId);
+    return {
+      contentId,
+      generatedCount: mission.assets.length,
+      assets: mission.assets,
+    };
   },
 };

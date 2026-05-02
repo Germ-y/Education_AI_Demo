@@ -62,6 +62,7 @@ export type StageQuestion = {
     | "scenario_intro"
     | "scene_observation"
     | "highlight_clue"
+    | "image_quiz"
     | "action_choice"
     | "sequence_ordering"
     | "decision_card"
