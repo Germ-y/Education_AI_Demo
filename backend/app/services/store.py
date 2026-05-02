@@ -303,15 +303,13 @@ class DemoStore:
                 }
             )
 
-        auto_context = [
-            {"label": "학생 기록", "value": dashboard.get("responsePattern") or student.primary_need},
-            {"label": "이전 수업", "value": previous_lessons[0]["summary"] if previous_lessons else "이전 수행 기록 없음"},
-            {
-                "label": "학교 시간표",
-                "value": _timetable_context_text(timetable_slots),
-            },
-            {"label": "다음 목표", "value": planner.goal_text if planner else open_case.current_goal},
-        ]
+        auto_context = [{"label": "학생 기록", "value": dashboard.get("responsePattern") or student.primary_need}]
+        if previous_lessons:
+            auto_context.append({"label": "이전 수업", "value": previous_lessons[0]["summary"]})
+        timetable_context = _timetable_context_text(timetable_slots)
+        if timetable_context:
+            auto_context.append({"label": "학교 시간표", "value": timetable_context})
+        auto_context.append({"label": "다음 목표", "value": planner.goal_text if planner else open_case.current_goal})
 
         return {
             "student": {
@@ -1026,8 +1024,11 @@ def _attendance_label(value: Any) -> str:
 def _dashboard_profile(student, open_case, school, memory_card, context_bundle: dict | None) -> dict[str, Any]:
     dashboard = _student_dashboard(student.profile_json)
     auto_context = context_bundle.get("autoContext", []) if context_bundle else []
+    school_name = school.school_name if school else "학교 정보 확인 중"
+    grade_label = dashboard.get("gradeLabel") or _grade_label(student.grade)
+    track_label = dashboard.get("trackLabel") or _student_type_label(student.student_type)
     return {
-        "headline": f"{student.display_name} · {school.school_name if school else '학교 정보 확인 중'} · {dashboard.get('gradeLabel') or _grade_label(student.grade)} · {dashboard.get('trackLabel') or _student_type_label(student.student_type)}",
+        "headline": f"{student.display_name} · {school_name} · {grade_label} · {track_label}",
         "currentStageLabel": _dashboard_stage_label(open_case.dashboard_stage),
         "attendanceLabel": dashboard.get("attendanceLabel") or _attendance_label(dashboard.get("attendanceRate")),
         "primaryNeedTitle": dashboard.get("primaryNeedTitle") or student.primary_need,
@@ -1089,10 +1090,10 @@ def _latest_reflection_text(events: list[ActivityEvent], attempt_id: str) -> str
     return None
 
 
-def _timetable_context_text(slots: list[dict]) -> str:
+def _timetable_context_text(slots: list[dict]) -> str | None:
     subjects = [slot.get("subjectName") for slot in slots if slot.get("subjectName")]
     if not subjects:
-        return "저장된 시간표 snapshot 없음"
+        return None
     date = slots[0].get("timetableDate", "최근")
     return f"{date} 시간표: {', '.join(subjects[:6])}"
 

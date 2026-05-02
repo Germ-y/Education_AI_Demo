@@ -494,9 +494,10 @@ export default function DashboardPage() {
   const openReview = selectedReviewItems.find((item) => item.id === openReviewId);
   const openReviewStages = openReview ? (reviewStageDrafts[openReview.id] ?? mapContentToReviewStages(openReview.content)) : reviewStagePreviews;
   const isReviewEditing = openReview ? editingReviewIds.includes(openReview.id) : false;
-  const savedMemo = savedMemos[selectedCase.id] ?? selectedCase.riskNote;
+  const savedMemo = savedMemos[selectedCase.id] ?? "";
   const memoValue = memoDrafts[selectedCase.id] ?? savedMemo;
   const isMemoDirty = memoValue !== savedMemo;
+  const canSaveMemo = isMemoDirty && memoValue.trim().length > 0;
 
   const updateReviewStageDraft = (
     reviewId: string,
@@ -703,9 +704,10 @@ export default function DashboardPage() {
             <div className="min-h-[560px]">
             {activeTab === "info" && (
               <section className="space-y-6 p-6">
-                <section className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
+                <section className="grid gap-5 lg:grid-cols-3">
                   <InfoBlock label="핵심 어려움" value={dashboardProfile?.primaryNeedDetail ?? selectedCase.primaryNeed} />
                   <InfoBlock label="지원 전략" value={dashboardProfile?.supportStrategyDetail ?? selectedCase.supportStrategy} />
+                  <InfoBlock label="수업 유의점" value={selectedCase.riskNote} />
                 </section>
 
                 <section className="grid gap-5 lg:grid-cols-2">
@@ -744,9 +746,22 @@ export default function DashboardPage() {
                 </section>
 
                 <section className="rounded-lg border border-[#e5e9f0] bg-white p-5">
-                  <h3 className="text-xl font-black">추가 메모</h3>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-xl font-black">교사 메모</h3>
+                      <p className="mt-1 text-sm font-semibold text-[#64748b]">
+                        저장한 내용만 메모리 기록으로 남습니다.
+                      </p>
+                    </div>
+                    {savedMemo && (
+                      <span className="rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-1 text-xs font-bold text-[#15803d]">
+                        저장됨
+                      </span>
+                    )}
+                  </div>
                   <textarea
                     value={memoValue}
+                    placeholder="선생님이 관찰한 반응, 다음 회기에 기억할 점, 보호자 공유 전 확인할 내용을 입력하세요."
                     onChange={(event) =>
                       setMemoDrafts((current) => ({
                         ...current,
@@ -760,15 +775,20 @@ export default function DashboardPage() {
                       수정
                     </button>
                     <button
-                      disabled={!isMemoDirty}
+                      disabled={!canSaveMemo}
                       onClick={() => {
+                        const nextMemo = memoValue.trim();
                         setSavedMemos((current) => ({
                           ...current,
-                          [selectedCase.id]: memoValue,
+                          [selectedCase.id]: nextMemo,
+                        }));
+                        setMemoDrafts((current) => ({
+                          ...current,
+                          [selectedCase.id]: nextMemo,
                         }));
                       }}
                       className={`rounded-md px-4 py-2 text-sm font-bold transition ${
-                        isMemoDirty
+                        canSaveMemo
                           ? "bg-[#1f3a5f] text-white shadow-[0_8px_18px_rgba(31,58,95,0.18)]"
                           : "cursor-not-allowed bg-[#e2e8f0] text-[#94a3b8]"
                       }`}

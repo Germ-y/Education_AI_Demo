@@ -3,9 +3,9 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api.deps import get_store_instance
 from app.ai.elevenlabs_provider import ElevenLabsProvider
 from app.ai.openai_provider import OpenAiProvider
+from app.api.deps import get_store_instance
 from app.core.config import get_settings
 from app.data.demo_data import create_demo_database
 from app.db.session import get_engine, get_session_maker
@@ -126,6 +126,14 @@ def test_teacher_and_student_demo_flows() -> None:
     assert bundle["schoolContext"]["timetableSummary"]["todaySubjects"] == ["역사", "동아리활동", "진로와 직업", "국어", "과학", "도덕"]
     assert [item["label"] for item in bundle["autoContext"]] == ["학생 기록", "이전 수업", "학교 시간표", "다음 목표"]
     assert bundle["aiReadyContext"]["evidenceSources"]
+    clock_bundle = client.get(
+        "/api/teacher/students/student_learning_clock/context-bundle",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert clock_bundle.status_code == 200
+    clock_auto_context = clock_bundle.json()["data"]["autoContext"]
+    assert [item["label"] for item in clock_auto_context] == ["학생 기록", "학교 시간표", "다음 목표"]
+    assert "이전 수행 기록 없음" not in {item["value"] for item in clock_auto_context}
     life_bundle = client.get(
         "/api/teacher/students/student_life_bus/context-bundle",
         headers={"authorization": f"Bearer {teacher_token}"},
@@ -347,7 +355,8 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
             stage["realtimeSpec"]["imageAssetId"] = stage["templateJson"]["imageAssetId"]
     for asset in generated_content["assets"]:
         asset["missionContentId"] = generated_content["id"]
-        asset["stageId"] = None if asset["assetRole"] == "hero" else f"stage_generated_contract_{4 if asset['assetRole'] == 'stage_4_realtime' else asset['assetRole'][-1]}"
+        asset_step = 4 if asset["assetRole"] == "stage_4_realtime" else asset["assetRole"][-1]
+        asset["stageId"] = None if asset["assetRole"] == "hero" else f"stage_generated_contract_{asset_step}"
         asset["id"] = f"asset_{generated_content['id']}_{asset['assetRole']}{'_audio' if asset['assetType'] == 'audio' else ''}"
         asset["promptJson"] = asset.get("promptJson") or {}
         if asset["assetType"] == "image":
