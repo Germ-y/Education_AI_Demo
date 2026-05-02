@@ -780,13 +780,6 @@ export function StudentStageExperience({
     window.parent.postMessage({ type: "student-preview-stage", step: activeStage.step }, window.location.origin);
   }, [activeStage.step, previewMode]);
 
-  useEffect(() => {
-    setSequenceAnswer([]);
-    setSelectedMatchLeft(null);
-    setMatchingAnswer({});
-    setFillBlankAnswer([]);
-    setOxAnswers({});
-  }, [activeStage.step]);
   const progressPercent = Math.round((completedSteps.length / scene.stages.length) * 100);
   const activeVisual = {
     ...scene.visual,
@@ -964,6 +957,11 @@ export function StudentStageExperience({
 
       setAnswer(null);
       setWrongNotice(null);
+      setSequenceAnswer([]);
+      setSelectedMatchLeft(null);
+      setMatchingAnswer({});
+      setFillBlankAnswer([]);
+      setOxAnswers({});
       window.setTimeout(() => setIsTransitioning(false), 80);
     }, 120);
   };
