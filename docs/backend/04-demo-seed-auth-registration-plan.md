@@ -32,8 +32,6 @@
 ```text
 DEMO_SEED_MODE=true
 DEMO_SEED_RESET=false
-DEMO_TEACHER_EMAIL=teacher.demo@eduyj.local
-DEMO_STUDENT_CODE=STAR-001
 ```
 
 동작:
@@ -41,6 +39,7 @@ DEMO_STUDENT_CODE=STAR-001
 ```text
 서버 시작 또는 seed 명령 실행 시 샘플 조직/교사/학생/사례/콘텐츠를 적재한다.
 같은 seed를 여러 번 실행해도 중복 생성되지 않게 external_key를 둔다.
+데모 교사 이메일과 학생 접근 코드는 env가 아니라 seed 데이터에 고정한다.
 운영 환경에서는 DEMO_SEED_MODE를 끈다.
 ```
 
@@ -103,17 +102,38 @@ seed 계정 자동 생성 없음
 
 | 역할 | 계정 | 목적 |
 | --- | --- | --- |
-| 센터 관리자 | `admin.demo@eduyj.local` | 전체 학생/교사/공공데이터 확인 |
 | 교사 | `teacher.demo@eduyj.local` | 학생 케이스 관리, 콘텐츠 승인 |
-| 콘텐츠 검수자 | `reviewer.demo@eduyj.local` | AI 생성물 검토 |
-| 학생 1 | `STAR-001` | 학습집중형 분수 미션 플레이 |
-| 학생 2 | `STAR-002` | 생활지원형 버스/센터 시나리오 플레이 |
+| 학생 1 | `STAR-003` | 저연령 학습지원형 시계 읽기 미션 플레이 |
+| 학생 2 | `STAR-001` | 고연령 학습지원형 분수 미션 플레이 |
+| 학생 3 | `STAR-002` | 일상생활 지원형 버스/센터 시나리오 플레이 |
 
-데모 비밀번호는 코드에 하드코딩하지 않고 환경 변수 또는 로컬 seed 설정에서만 관리한다.
+데모 접근 코드는 운영 비밀번호가 아니라 공모전용 seed 식별자다. 실제 학생 개인정보와 연결하지 않는다.
+
+학교 정보는 NEIS 학교기본정보에서 영주시 학교를 조회한 seed snapshot을 사용한다.
+
+| 학생 | NEIS 학교코드 | 학교명 | 학교급 |
+| --- | --- | --- | --- |
+| 지우 | `8811046` | 영주중앙초등학교 | 초등학교 |
+| 민준 | `8811058` | 영주중학교 | 중학교 |
+| 수민 | `8811067` | 영주가흥초등학교 | 초등학교 |
 
 ### 3.3 학생 샘플
 
-학습집중형 학생:
+저연령 학습지원형 학생:
+
+```json
+{
+  "externalKey": "demo_student_learning_clock",
+  "displayName": "지우",
+  "grade": "초3",
+  "studentType": "learning_focus",
+  "primaryNeed": "저연령 학습지원형 초기 데이터 수집 대상",
+  "effectiveStyles": [],
+  "frequentBlockingUnits": []
+}
+```
+
+고연령 학습지원형 학생:
 
 ```json
 {
@@ -127,7 +147,7 @@ seed 계정 자동 생성 없음
 }
 ```
 
-생활지원형 학생:
+일상생활 지원형 학생:
 
 ```json
 {
@@ -368,7 +388,7 @@ created_at
 
 ```text
 seed 계정 로그인
-seed 학생 2명 이상
+seed 학생 3명
 teacher_review / published 콘텐츠 각각 1개 이상
 학생 플레이 가능한 access_code
 ```

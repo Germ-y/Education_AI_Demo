@@ -17,6 +17,33 @@ AI 생성 JSON
 
 단, 4단계는 `Realtime Practice`로 분리한다. 이 단계는 자유 생성 콘텐츠가 아니라 교사가 승인한 `RealtimePracticeSpec` 안에서만 AI가 대화와 짧은 피드백을 제공한다.
 
+## 1.1 사전 TTS 원칙
+
+ElevenLabs는 4단계 realtime 대화에 붙이지 않는다.
+
+ElevenLabs는 교사가 승인한 정적 콘텐츠의 안내 음성을 **사전 생성**하는 선택 provider다.
+
+```text
+AI 콘텐츠 JSON 생성
+→ 이미지 생성
+→ hero + 1~3단계 narrationText 확정
+→ ElevenLabs TTS MP3 사전 생성
+→ 교사 검토/승인
+→ 학생 화면에서 audio asset 로드
+```
+
+적용 범위:
+
+| 위치 | 용도 | provider |
+| --- | --- | --- |
+| `hero` | 대표 시나리오/오늘 미션 도입 음성 | ElevenLabs optional |
+| `stage_1` | 상황/개념 설명 음성 | ElevenLabs optional |
+| `stage_2` | 문제 안내 음성 | ElevenLabs optional |
+| `stage_3` | 응용/심화 안내 음성 | ElevenLabs optional |
+| `stage_4_realtime` | 실시간 대화 | ElevenLabs 사용 안 함 |
+
+프론트는 `assetType: audio_optional` asset이 있으면 재생 버튼을 보여주고, 없으면 텍스트만 보여준다. 오디오가 없다고 seed 이미지나 다른 음성으로 조용히 대체하지 않는다.
+
 ## 2. 공통 MissionContent 스키마
 
 ```json
@@ -35,6 +62,25 @@ AI 생성 JSON
     "highlight": "#fff3c4"
   },
   "stages": []
+}
+```
+
+오디오 asset은 이미지 asset과 같은 `assetRole`을 공유한다. 구분은 `assetType`으로 한다.
+
+```json
+{
+  "id": "asset_content_001_stage_1_audio",
+  "missionContentId": "content_001",
+  "stageId": "stage_001",
+  "assetRole": "stage_1",
+  "assetType": "audio_optional",
+  "provider": "elevenlabs",
+  "model": "elevenlabs-tts",
+  "sourceText": "피자 지도를 보며 전체와 부분을 확인해요.",
+  "storageUrl": "/generated/audio/content_001/stage_1.mp3",
+  "previewUrl": "/generated/audio/content_001/stage_1.mp3",
+  "qaStatus": "passed",
+  "approvalStatus": "approved"
 }
 ```
 

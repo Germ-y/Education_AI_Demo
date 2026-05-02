@@ -36,7 +36,7 @@
 | 오케스트레이터/메모리 | [../backend/01-orchestrator-memory.md](../backend/01-orchestrator-memory.md) | [../backend/02-ai-backend-system-design.md](../backend/02-ai-backend-system-design.md), [../backend/03-backend-feature-spec.md](../backend/03-backend-feature-spec.md) |
 | DB 모델 구현 | [../backend/06-database-schema-spec.md](../backend/06-database-schema-spec.md) | [../backend/03-backend-feature-spec.md](../backend/03-backend-feature-spec.md) |
 | seed/auth/아이등록 | [../backend/04-demo-seed-auth-registration-plan.md](../backend/04-demo-seed-auth-registration-plan.md) | [../backend/06-database-schema-spec.md](../backend/06-database-schema-spec.md), [08-rest-api-spec.md](08-rest-api-spec.md) |
-| 공공데이터 | [09-public-data-strategy.md](09-public-data-strategy.md) | [../backend/05-data-api-requirements.md](../backend/05-data-api-requirements.md) |
+| 공공데이터 | [09-public-data-strategy.md](09-public-data-strategy.md) | [../backend/05-data-api-requirements.md](../backend/05-data-api-requirements.md), [../backend/07-neis-data-collection-plan.md](../backend/07-neis-data-collection-plan.md) |
 
 ## 공통 용어
 
