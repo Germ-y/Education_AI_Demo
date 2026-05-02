@@ -72,7 +72,7 @@ type SessionLog = {
 
 const tabs: Array<{ id: DashboardTab; label: string; description: string }> = [
   { id: "info", label: "학생 정보", description: "기본 정보와 현재 학습 상태" },
-  { id: "materials", label: "자료 생성·검토", description: "AI 자료를 만들고 수업 전 확인" },
+  { id: "materials", label: "자료 제안·검토", description: "AI 수업 자료 제안을 확인" },
   { id: "records", label: "학습 기록", description: "피드백과 관찰 기록" },
 ];
 
@@ -117,16 +117,9 @@ const learningStatus: Record<CaseStatus, { label: string; progress: number; curr
   },
 };
 
-const workflowSteps = ["자료 생성", "자료 검토", "학습", "학습 피드백"];
+const workflowSteps = ["자료 제안", "제안 검토", "학습", "학습 피드백"];
 
 const reviewStagePreviews: ReviewStageDraft[] = [];
-
-const reviewStageReasons: Record<number, string> = {
-  1: "분수를 표현하기 전에 전체가 몇 등분인지 확인해 전체-부분 관계의 기준을 세웁니다.",
-  2: "전체 중에서 특정 부분만 구분하게 하여 분자의 의미를 시각적으로 연결합니다.",
-  3: "앞 단계에서 센 전체와 부분을 실제 분수 기호 1/4로 바꾸는 단계입니다.",
-  4: "학습한 분수 표현을 생활 장면에 적용해 개념 전이를 확인합니다.",
-};
 
 type DashboardStudentView = {
   id: string;
@@ -221,16 +214,43 @@ function toDisplayLabels(values: string[] | undefined, fallback: string[] = []) 
   return source.map((value) => memoryLabelMap[value] ?? value);
 }
 
+function toProposalLabel(label: string) {
+  if (label === "자료 생성") return "자료 제안";
+  if (label === "자료 검토") return "제안 검토";
+  if (label === "AI 자료 확인") return "AI 제안 확인";
+  return label;
+}
+
 function describeContentType(content: MissionContent) {
   return content.contentType === "life_support" ? "일상생활 지원형" : "학습집중형";
 }
 
-function mapContentToReviewItem(content: MissionContent): MaterialReviewItem {
+function getReviewStageReason(stage: ReviewStageDraft) {
+  if (stage.step === 4) {
+    return "앞 단계에서 익힌 내용을 실제 말하기 상황으로 옮기는 실시간 발화 연습을 넣으면 좋겠어요.";
+  }
+
+  if (stage.step === 1) {
+    return "긴 설명 전에 그림 단서를 먼저 확인하며 쉬운 성공 경험으로 시작하면 좋겠어요.";
+  }
+
+  if (stage.step === 2) {
+    return "짧은 선택지나 카드로 핵심 단서를 한 번 더 고르게 하면 좋겠어요.";
+  }
+
+  return "앞 단계에서 고른 단서를 문장이나 기호와 연결해 수업 목표로 정리하면 좋겠어요.";
+}
+
+function mapContentToReviewItem(content: MissionContent, lessonProposalTitle?: string): MaterialReviewItem {
+  const title = lessonProposalTitle?.trim()
+    ? `${lessonProposalTitle.trim()} 자료 제안`
+    : "검토할 수업 자료 제안";
+
   return {
     id: content.id,
     caseId: content.caseId,
-    title: content.title,
-    type: `AI 생성 미션 · ${describeContentType(content)}`,
+    title,
+    type: `수업 전 검토 제안 · ${describeContentType(content)}`,
     state: content.status === "teacher_review" ? "검토 대기" : content.status === "published" ? "배포됨" : content.status,
     contentId: content.id,
     content,
@@ -312,7 +332,7 @@ function mapContentToReviewStages(content: MissionContent): ReviewStageDraft[] {
 function StatusBadge({ supportCase }: { supportCase: SupportCase }) {
   return (
     <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusTone[supportCase.status]}`}>
-      {supportCase.statusLabel}
+      {toProposalLabel(supportCase.statusLabel)}
     </span>
   );
 }
@@ -457,7 +477,9 @@ export default function DashboardPage() {
           challengeTags: [],
           planTags: [],
         };
-  const selectedReviewItems = (activeCaseFile?.recentContents ?? []).map(mapContentToReviewItem);
+  const selectedReviewItems = (activeCaseFile?.recentContents ?? []).map((content) =>
+    mapContentToReviewItem(content, dashboardProfile?.primaryNeedTitle),
+  );
   const selectedRecords: SessionLog[] = (selectedReport?.reports ?? []).map((record) => {
     const durationMinutes = Math.max(1, Math.round((record.durationSec ?? 0) / 60));
     const attemptCount = Math.max(1, record.answerCount);
@@ -664,7 +686,10 @@ export default function DashboardPage() {
                     <div>
                       <p className="text-sm font-bold text-[#64748b]">현재 단계</p>
                       <p className="mt-1 text-lg font-black text-[#172033]">
-                        {dashboardProfile?.currentStageLabel ?? (currentWorkflowStep === 0 ? "초기 확인" : workflowSteps[currentWorkflowStep - 1])}
+                        {toProposalLabel(
+                          dashboardProfile?.currentStageLabel ??
+                            (currentWorkflowStep === 0 ? "초기 확인" : workflowSteps[currentWorkflowStep - 1]),
+                        )}
                       </p>
                     </div>
                     <div>
@@ -814,20 +839,21 @@ export default function DashboardPage() {
                   <div className="flex h-full flex-col">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <h3 className="text-xl font-black">자료 만들기</h3>
+                        <h3 className="text-xl font-black">수업 자료 제안</h3>
                         <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                          수업 내용과 난이도를 정하면 학생 정보는 자동으로 반영됩니다.
+                          학생 맥락을 바탕으로 수업 자료 방향을 제안받습니다.
                         </p>
                       </div>
                     </div>
 
                     <div className="mt-5 space-y-4">
                       <label className="block">
-                        <span className="text-sm font-bold text-[#64748b]">수업 내용</span>
+                        <span className="text-sm font-bold text-[#64748b]">수업 제안 초안</span>
                         <textarea
                           className="mt-2 h-36 w-full resize-none rounded-md border border-[#cbd5e1] bg-[#fbfcfe] p-4 text-sm font-semibold outline-none focus:border-[#1f3a5f]"
                           key={`lesson-${selectedCase.id}`}
                           defaultValue={selectedCase.sessionGoal}
+                          placeholder="선생님이 조정하고 싶은 수업 방향을 적어주세요."
                         />
                       </label>
 
@@ -841,7 +867,7 @@ export default function DashboardPage() {
                       </label>
 
                       <div className="rounded-md bg-[#f8fafc] p-3">
-                        <p className="text-sm font-bold text-[#64748b]">AI에 함께 전달되는 학생 컨텍스트</p>
+                        <p className="text-sm font-bold text-[#64748b]">AI가 참고할 학생 맥락</p>
                         <div className="mt-2 space-y-2">
                           {(autoContextItems.length > 0
                             ? autoContextItems
@@ -850,7 +876,7 @@ export default function DashboardPage() {
                                   label: "학생 기록",
                                   value: `${selectedStudent.name} · ${selectedStudent.school} · ${selectedCase.caseType}`,
                                 },
-                                { label: "다음 목표", value: selectedCase.primaryNeed },
+                                { label: "수업 제안", value: selectedCase.primaryNeed },
                               ]
                           ).map((item) => (
                             <div key={`${item.label}-${item.value}`} className="grid gap-1 rounded-md bg-white px-3 py-2 md:grid-cols-[88px_minmax(0,1fr)]">
@@ -862,7 +888,7 @@ export default function DashboardPage() {
                       </div>
 
                       <button className="w-full rounded-md bg-[#1f3a5f] px-4 py-3 text-sm font-bold text-white">
-                        AI 자료 생성하기
+                        AI 수업 자료 제안받기
                       </button>
                     </div>
                   </div>
@@ -871,9 +897,9 @@ export default function DashboardPage() {
                 <div className="space-y-4">
                   <section className="space-y-3">
                     <div>
-                      <h3 className="text-xl font-black">생성된 자료</h3>
+                      <h3 className="text-xl font-black">검토할 수업 자료 제안</h3>
                       <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                        검토가 끝난 자료는 학생 화면으로 보낼 수 있습니다.
+                        AI가 제안한 자료를 확인하고 선생님 판단으로 적용합니다.
                       </p>
                     </div>
                     {selectedReviewItems.map((item) => (
@@ -915,7 +941,7 @@ export default function DashboardPage() {
                             }}
                             className="rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-bold text-[#334155]"
                           >
-                            검토하기
+                            제안 검토하기
                           </button>
                           <button
                             onClick={() => {
@@ -1176,10 +1202,10 @@ export default function DashboardPage() {
           <section className="flex h-[min(90vh,920px)] w-[min(94vw,1560px)] flex-col rounded-xl bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
             <div className="flex items-start justify-between gap-4 border-b border-[#e5e9f0] px-6 py-5">
               <div>
-                <p className="text-sm font-bold text-[#64748b]">자료 검토</p>
+                <p className="text-sm font-bold text-[#64748b]">자료 제안 검토</p>
                 <h3 className="mt-1 text-2xl font-black">{openReview.title}</h3>
                 <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                  4개 스테이지를 확인하고 필요한 부분만 수정합니다.
+                  4개 스테이지를 확인하고 선생님 판단으로 필요한 부분만 조정합니다.
                 </p>
               </div>
               <button
@@ -1317,7 +1343,7 @@ export default function DashboardPage() {
                                     설계 의도
                                   </p>
                                   <p className="mt-2 text-sm font-bold leading-6 text-[#26364d]">
-                                    {reviewStageReasons[stage.step]}
+                                    {getReviewStageReason(stage)}
                                   </p>
                                 </div>
                               </>
