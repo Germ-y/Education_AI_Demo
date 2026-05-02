@@ -47,3 +47,18 @@ def test_teacher_and_student_demo_flows() -> None:
     )
     assert realtime.status_code == 200
     assert realtime.json()["data"]["practiceSpec"]["maxTurns"] == 6
+
+
+def test_http_errors_use_contract_envelope() -> None:
+    client = TestClient(create_app())
+
+    response = client.get("/api/teacher/students")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "error": {
+            "code": "UNAUTHORIZED",
+            "message": "로그인이 필요합니다.",
+            "details": {},
+        }
+    }

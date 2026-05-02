@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -38,6 +38,30 @@ def create_app() -> FastAPI:
                     "details": exc.errors(),
                 }
             },
+        )
+
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:
+        detail = exc.detail
+        if isinstance(detail, dict):
+            code = str(detail.get("code", "HTTP_ERROR"))
+            message = str(detail.get("message", "요청을 처리할 수 없습니다."))
+            details = detail.get("details", {})
+        else:
+            code = "HTTP_ERROR"
+            message = str(detail)
+            details = {}
+
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error": {
+                    "code": code,
+                    "message": message,
+                    "details": details,
+                }
+            },
+            headers=exc.headers,
         )
 
     return app
