@@ -531,6 +531,19 @@ export default function DashboardPage() {
   const memoValue = memoDrafts[selectedCase.id] ?? savedMemo;
   const isMemoDirty = memoValue !== savedMemo;
   const canSaveMemo = isMemoDirty && memoValue.trim().length > 0;
+  const baseMaterialContextItems =
+    autoContextItems.length > 0
+      ? autoContextItems
+      : [
+          {
+            label: "학생 기록",
+            value: `${selectedStudent.name} · ${selectedStudent.school} · ${selectedCase.caseType}`,
+          },
+          { label: "수업 제안", value: selectedCase.primaryNeed },
+        ];
+  const materialContextItems = savedMemo
+    ? [...baseMaterialContextItems, { label: "교사 메모리", value: savedMemo }]
+    : baseMaterialContextItems;
 
   const updateReviewStageDraft = (
     reviewId: string,
@@ -783,18 +796,18 @@ export default function DashboardPage() {
                     <div>
                       <h3 className="text-xl font-black">교사 메모</h3>
                       <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                        저장한 내용만 메모리 기록으로 남습니다.
+                        저장한 메모는 다음 자료 제안에서 AI가 참고할 학생 메모리로 이어집니다.
                       </p>
                     </div>
                     {savedMemo && (
                       <span className="rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-1 text-xs font-bold text-[#15803d]">
-                        저장됨
+                        메모리 저장됨
                       </span>
                     )}
                   </div>
                   <textarea
                     value={memoValue}
-                    placeholder="선생님이 관찰한 반응, 다음 회기에 기억할 점, 보호자 공유 전 확인할 내용을 입력하세요."
+                    placeholder="AI가 다음 자료를 제안할 때 기억해야 할 반응, 수업 조정점, 보호자 공유 전 확인할 내용을 적어주세요."
                     onChange={(event) =>
                       setMemoDrafts((current) => ({
                         ...current,
@@ -826,7 +839,7 @@ export default function DashboardPage() {
                           : "cursor-not-allowed bg-[#e2e8f0] text-[#94a3b8]"
                       }`}
                     >
-                      저장
+                      메모리로 저장
                     </button>
                   </div>
                 </section>
@@ -869,16 +882,7 @@ export default function DashboardPage() {
                       <div className="rounded-md bg-[#f8fafc] p-3">
                         <p className="text-sm font-bold text-[#64748b]">AI가 참고할 학생 맥락</p>
                         <div className="mt-2 space-y-2">
-                          {(autoContextItems.length > 0
-                            ? autoContextItems
-                            : [
-                                {
-                                  label: "학생 기록",
-                                  value: `${selectedStudent.name} · ${selectedStudent.school} · ${selectedCase.caseType}`,
-                                },
-                                { label: "수업 제안", value: selectedCase.primaryNeed },
-                              ]
-                          ).map((item) => (
+                          {materialContextItems.map((item) => (
                             <div key={`${item.label}-${item.value}`} className="grid gap-1 rounded-md bg-white px-3 py-2 md:grid-cols-[88px_minmax(0,1fr)]">
                               <span className="text-xs font-black text-[#1f3a5f]">{item.label}</span>
                               <span className="text-sm font-semibold leading-6 text-[#334155]">{item.value}</span>
