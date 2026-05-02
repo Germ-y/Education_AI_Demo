@@ -159,7 +159,7 @@ caseStatus=open
   "data": [
     {
       "studentId": "student_001",
-      "displayName": "민준",
+      "displayName": "이민준",
       "grade": "middle_2",
       "studentType": "learning_focus",
       "primaryNeed": "분수의 전체-부분 관계 이해",

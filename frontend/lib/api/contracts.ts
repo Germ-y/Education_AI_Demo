@@ -283,6 +283,7 @@ export type StudentContextBundle = {
   student: {
     id: string;
     name: string;
+    displayName: string;
     grade: string;
     gradeLabel: string;
     studentType: ContentType;

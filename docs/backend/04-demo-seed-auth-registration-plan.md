@@ -114,9 +114,9 @@ seed 계정 자동 생성 없음
 
 | 학생 | NEIS 학교코드 | 학교명 | 학교급 |
 | --- | --- | --- | --- |
-| 지우 | `8811046` | 영주중앙초등학교 | 초등학교 |
-| 민준 | `8811058` | 영주중학교 | 중학교 |
-| 수민 | `8811067` | 영주가흥초등학교 | 초등학교 |
+| 김지우 | `8811046` | 영주중앙초등학교 | 초등학교 |
+| 이민준 | `8811058` | 영주중학교 | 중학교 |
+| 박수민 | `8811067` | 영주가흥초등학교 | 초등학교 |
 
 ### 3.3 학생 샘플
 
@@ -125,7 +125,7 @@ seed 계정 자동 생성 없음
 ```json
 {
   "externalKey": "demo_student_learning_clock",
-  "displayName": "지우",
+  "displayName": "김지우",
   "grade": "초3",
   "studentType": "learning_focus",
   "primaryNeed": "저연령 학습지원형 초기 데이터 수집 대상",
@@ -139,7 +139,7 @@ seed 계정 자동 생성 없음
 ```json
 {
   "externalKey": "demo_student_learning_fraction",
-  "displayName": "민준",
+  "displayName": "이민준",
   "grade": "중2",
   "studentType": "learning_focus",
   "primaryNeed": "분수의 전체-부분 관계 이해",
@@ -153,7 +153,7 @@ seed 계정 자동 생성 없음
 ```json
 {
   "externalKey": "demo_student_life_bus",
-  "displayName": "수민",
+  "displayName": "박수민",
   "grade": "초6",
   "studentType": "life_support",
   "primaryNeed": "센터 이동 순서와 도움 요청 연습",

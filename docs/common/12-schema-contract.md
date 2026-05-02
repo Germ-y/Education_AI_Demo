@@ -102,7 +102,7 @@ MVP에서는 센터 조직 1개와 학생이 속한 학교 정보를 seed 또는
   "id": "student_learning_fraction",
   "organizationId": "org_yj_center",
   "externalKey": "demo-learning-001",
-  "displayName": "수민",
+  "displayName": "이민준",
   "grade": "middle_2",
   "schoolCode": "school_demo_001",
   "studentType": "learning_focus",
@@ -174,7 +174,7 @@ NEIS/학교알리미를 붙이기 전에는 seed snapshot으로 시작한다.
 ```json
 {
   "studentId": "student_learning_fraction",
-  "displayName": "수민",
+  "displayName": "이민준",
   "grade": "middle_2",
   "schoolName": "영주 데모중학교",
   "studentType": "learning_focus",

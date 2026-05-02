@@ -70,7 +70,9 @@ def test_teacher_and_student_demo_flows() -> None:
     assert students.status_code == 200
     assert len(students.json()["data"]) == 3
     assert {student["schoolName"] for student in students.json()["data"]} == {"영주중앙초등학교", "영주중학교", "영주가흥초등학교"}
+    assert {student["displayName"] for student in students.json()["data"]} == {"김지우", "이민준", "박수민"}
     clock_student = next(student for student in students.json()["data"] if student["studentId"] == "student_learning_clock")
+    assert clock_student["displayName"] == "김지우"
     assert clock_student["gradeLabel"] == "초3"
     assert clock_student["trackLabel"] == "저연령 학습지원형"
     assert clock_student["dashboardStageLabel"] == "자료 생성"
@@ -144,6 +146,8 @@ def test_teacher_and_student_demo_flows() -> None:
     assert history.json()["data"]["missionContents"][0]["studentId"] == "student_learning_fraction"
     fraction_case = client.get("/api/teacher/students/student_learning_fraction", headers={"authorization": f"Bearer {teacher_token}"})
     assert fraction_case.status_code == 200
+    assert fraction_case.json()["data"]["profile"]["displayName"] == "이민준"
+    assert fraction_case.json()["data"]["dashboardProfile"]["headline"] == "영주중학교 · 중2 · 고연령 학습지원형"
     assert "말로 다시 설명" in fraction_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
     assert_no_teacher_raw_terms(fraction_case.json()["data"]["dashboardProfile"])
     life_case = client.get("/api/teacher/students/student_life_bus", headers={"authorization": f"Bearer {teacher_token}"})
@@ -157,6 +161,8 @@ def test_teacher_and_student_demo_flows() -> None:
     assert context_bundle.status_code == 200
     bundle = context_bundle.json()["data"]
     assert bundle["student"]["gradeLabel"] == "중2"
+    assert bundle["student"]["name"] == "이민준"
+    assert bundle["student"]["displayName"] == "이민준"
     assert bundle["schoolContext"]["timetableSummary"]["todaySubjects"] == ["역사", "동아리활동", "진로와 직업", "국어", "과학", "도덕"]
     assert [item["label"] for item in bundle["autoContext"]] == ["학생 기록", "이전 수업", "학교 시간표", "다음 목표"]
     assert bundle["aiReadyContext"]["evidenceSources"]

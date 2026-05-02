@@ -315,6 +315,7 @@ class DemoStore:
             "student": {
                 "id": student.id,
                 "name": student.display_name,
+                "displayName": student.display_name,
                 "grade": student.grade,
                 "gradeLabel": dashboard.get("gradeLabel") or _grade_label(student.grade),
                 "studentType": student.student_type,
@@ -1081,7 +1082,7 @@ def _dashboard_profile(student, open_case, school, memory_card, context_bundle: 
     grade_label = _teacher_facing_text(dashboard.get("gradeLabel") or _grade_label(student.grade))
     track_label = _teacher_facing_text(dashboard.get("trackLabel") or _student_type_label(student.student_type))
     return {
-        "headline": f"{student.display_name} · {school_name} · {grade_label} · {track_label}",
+        "headline": f"{school_name} · {grade_label} · {track_label}",
         "currentStageLabel": _dashboard_stage_label(open_case.dashboard_stage),
         "attendanceLabel": _teacher_facing_text(dashboard.get("attendanceLabel") or _attendance_label(dashboard.get("attendanceRate"))),
         "primaryNeedTitle": _teacher_facing_text(dashboard.get("primaryNeedTitle") or student.primary_need),

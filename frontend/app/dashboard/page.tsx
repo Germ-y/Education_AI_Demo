@@ -645,11 +645,8 @@ export default function DashboardPage() {
           <article className="overflow-hidden rounded-xl border border-[#d8dee8] bg-white">
             <section className="border-b border-[#e5e9f0] bg-[#fbfcfe] p-6">
               <div className="flex flex-wrap items-start justify-between gap-5">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#dfe8f4] text-2xl font-black text-[#1f3a5f]">
-                    {selectedStudent.name.slice(0, 1)}
-                  </div>
-                  <div>
+                <div className="flex min-w-0 items-start">
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-3">
                       <h3 className="text-3xl font-black">{selectedStudent.name}</h3>
                       <StatusBadge supportCase={selectedCase} />
