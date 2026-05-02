@@ -30,6 +30,37 @@ def test_allows_realtime_templates_only_at_stage_4() -> None:
         ContentStage.model_validate(stage)
 
 
+def test_rejects_invalid_stage_template_pair() -> None:
+    stage = create_demo_database().mission_contents[0].stages[1].model_dump(by_alias=True)
+    stage["stageRole"] = "concept_intro"
+
+    with pytest.raises(ValueError):
+        ContentStage.model_validate(stage)
+
+
+def test_validates_image_quiz_template_shape() -> None:
+    stage = create_demo_database().mission_contents[0].stages[1].model_dump(by_alias=True)
+    stage["templateType"] = "image_quiz"
+    stage["templateJson"] = {
+        "imageAssetId": "asset_content_fraction_001_stage_2",
+        "question": "빛나는 조각은 전체 중 몇 개인가요?",
+        "choices": [
+            {"id": "a", "text": "1개"},
+            {"id": "b", "text": "2개"},
+            {"id": "c", "text": "4개"},
+        ],
+        "answer": "a",
+        "correctFeedback": "좋아요. 빛나는 조각은 1개예요.",
+        "wrongFeedback": "빛나는 부분만 다시 세어볼까요?",
+    }
+
+    assert ContentStage.model_validate(stage).template_type == "image_quiz"
+
+    stage["templateJson"]["choices"].pop()
+    with pytest.raises(ValueError):
+        ContentStage.model_validate(stage)
+
+
 def test_rejects_video_asset_roles() -> None:
     asset = create_demo_database().mission_contents[0].assets[0].model_dump(by_alias=True)
     asset["assetRole"] = "video"

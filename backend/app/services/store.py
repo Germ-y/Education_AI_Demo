@@ -430,6 +430,10 @@ def _evaluate_answer(template_json: dict[str, Any], answer: dict[str, Any]) -> d
         is_correct = answer.get("matches") == expected
     elif isinstance(expected, list):
         is_correct = answer.get("order") == expected
+    elif isinstance(template_json.get("matches"), dict):
+        is_correct = answer.get("matches") == template_json["matches"]
+    elif isinstance(template_json.get("answerOrder"), list):
+        is_correct = answer.get("order") == template_json["answerOrder"]
     elif isinstance(template_json.get("acceptedAnswers"), list):
         is_correct = answer in template_json["acceptedAnswers"]
     else:

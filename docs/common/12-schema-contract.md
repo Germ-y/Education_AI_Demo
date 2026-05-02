@@ -331,7 +331,7 @@ learning_focus: concept_intro
 
 프론트 기능:
 
-- 단서 선택, 카드 매칭, 기본 선택형, 빈칸 등 하나의 짧은 상호작용을 제공한다.
+- 단서 선택, 이미지 3지선다 퀴즈, 카드 매칭, 순서 배열, 빈칸 등 하나의 짧은 상호작용을 제공한다.
 - 선택지는 2~3개를 기본으로 한다.
 - 제출 후 즉시 피드백을 보여준다.
 - 정답/오답 이벤트를 서버에 보낸다.
@@ -340,7 +340,7 @@ learning_focus: concept_intro
 
 - `templateType`
 - `templateJson.question`
-- `templateJson.choices` 또는 `templateJson.hotspots` 또는 `templateJson.tiles`
+- `templateJson.choices` 또는 `templateJson.hotspots` 또는 `templateJson.leftCards/rightCards` 또는 `templateJson.cards`
 - `templateJson.answer` 또는 `templateJson.acceptedAnswers`
 - `templateJson.correctFeedback`
 - `templateJson.wrongFeedback`
@@ -348,8 +348,8 @@ learning_focus: concept_intro
 허용 템플릿:
 
 ```text
-life_support: scene_observation, highlight_clue, card_match
-learning_focus: scene_question, clue_question, blank_fill, partition_picker
+life_support: scene_observation, highlight_clue, image_quiz, card_match
+learning_focus: image_quiz, card_match, sequence_ordering, blank_fill, scene_question, clue_question, partition_picker
 ```
 
 ### 9.3 Step 3: 적용/결정
@@ -373,9 +373,21 @@ learning_focus: scene_question, clue_question, blank_fill, partition_picker
 허용 템플릿:
 
 ```text
-life_support: action_choice, sequence_ordering, decision_card
-learning_focus: applied_question, mini_simulation, card_match, sequence_ordering, explanation_choice, wrong_explanation_fix
+life_support: image_quiz, card_match, sequence_ordering, action_choice, decision_card
+learning_focus: image_quiz, card_match, sequence_ordering, blank_fill, applied_question, mini_simulation, explanation_choice, wrong_explanation_fix
 ```
+
+2~3단계 랜덤 템플릿 후보의 공통 풀은 아래 4개다.
+
+```text
+image_quiz: 이미지 + 3지선다 퀴즈
+card_match: 왼쪽/오른쪽 카드 연결
+sequence_ordering: 카드 순서 배열
+blank_fill: 빈칸 채우기
+```
+
+오케스트레이터는 이 후보 중 학생 유형, 최근 반응, 교사 고정 옵션에 따라 하나를 선택한다.
+프론트는 `templateType`과 `templateJson`만 보고 해당 렌더러를 fetch/render한다.
 
 ### 9.4 Step 4: realtime 연습
 
@@ -605,6 +617,7 @@ card_match
 action_choice
 sequence_ordering
 decision_card
+image_quiz
 concept_intro
 scene_question
 clue_question

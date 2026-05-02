@@ -206,8 +206,13 @@ def build_bus_content() -> MissionContent:
                     "studentInstruction": "센터에 가는 순서를 차례대로 골라보세요.",
                     "sortOrder": 3,
                     "templateJson": {
-                        "cards": ["버스 번호 확인", "버스 타기", "센터 도착"],
-                        "answer": ["버스 번호 확인", "버스 타기", "센터 도착"],
+                        "question": "센터에 가는 순서를 맞춰보세요.",
+                        "cards": [
+                            {"id": "check_bus", "text": "버스 번호 확인"},
+                            {"id": "take_bus", "text": "버스 타기"},
+                            {"id": "arrive_center", "text": "센터 도착"},
+                        ],
+                        "answerOrder": ["check_bus", "take_bus", "arrive_center"],
                         "correctFeedback": "좋아요. 먼저 확인하고, 그다음 버스를 타요.",
                         "wrongFeedback": "버스를 타기 전에 확인해야 할 일을 앞으로 옮겨볼까요?",
                     },

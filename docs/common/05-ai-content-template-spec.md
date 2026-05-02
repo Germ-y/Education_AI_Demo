@@ -89,8 +89,8 @@ AI 콘텐츠 JSON 생성
 | 단계 | 이름 | stageRole | 허용 템플릿 |
 | --- | --- | --- | --- |
 | 1 | 상황 만나기 | `scenario_intro` | `scenario_intro` |
-| 2 | 단서 찾기 | `clue_identification` | `scene_observation`, `highlight_clue`, `card_match` |
-| 3 | 행동 고르기 | `action_selection` | `action_choice`, `sequence_ordering`, `decision_card` |
+| 2 | 단서 찾기 | `clue_identification` | `scene_observation`, `highlight_clue`, `image_quiz`, `card_match` |
+| 3 | 행동 고르기 | `action_selection` | `image_quiz`, `card_match`, `sequence_ordering`, `action_choice`, `decision_card` |
 | 4 | AI와 연습하기 | `realtime_practice` | `realtime_roleplay` |
 
 ## 4. 학습집중형 단계
@@ -98,13 +98,25 @@ AI 콘텐츠 JSON 생성
 | 단계 | 이름 | stageRole | 허용 템플릿 |
 | --- | --- | --- | --- |
 | 1 | 개념 열기 | `concept_intro` | `concept_intro` |
-| 2 | 문제 1 | `basic_problem` | `scene_question`, `clue_question`, `blank_fill`, `partition_picker` |
-| 3 | 문제 2 | `applied_problem` | `applied_question`, `mini_simulation`, `card_match`, `sequence_ordering`, `explanation_choice`, `wrong_explanation_fix` |
+| 2 | 문제 1 | `basic_problem` | `image_quiz`, `card_match`, `sequence_ordering`, `blank_fill`, `scene_question`, `clue_question`, `partition_picker` |
+| 3 | 문제 2 | `applied_problem` | `image_quiz`, `card_match`, `sequence_ordering`, `blank_fill`, `applied_question`, `mini_simulation`, `explanation_choice`, `wrong_explanation_fix` |
 | 4 | AI에게 말해보기 | `realtime_practice` | `realtime_teach_back` |
 
 학습집중형 4단계는 개념 정리가 아니라 **상황 이미지와 AI 대화로 설명을 직접 연습하는 realtime 단계**다. AI는 교사가 승인한 역할/루브릭 안에서만 피드백한다.
 
 회고는 4단계 실시간 연습 종료 후 `post_practice_reflection` 이벤트로 수집한다. 별도 스테이지로 카운트하지 않는다.
+
+2~3단계는 오케스트레이터가 허용 목록 안에서 템플릿을 선택한다.
+프론트는 `templateType`별 렌더러를 준비하고, 콘텐츠 fetch 결과의 `templateJson`을 그대로 사용한다.
+
+공통 랜덤 후보:
+
+| templateType | 화면 성격 | 핵심 데이터 |
+| --- | --- | --- |
+| `image_quiz` | 이미지 + 3지선다 퀴즈 | `imageAssetId`, `choices[3]`, `answer` |
+| `card_match` | 카드 매칭 | `leftCards`, `rightCards`, `matches` |
+| `sequence_ordering` | 순서 배열 | `cards`, `answerOrder` |
+| `blank_fill` | 빈칸 채우기 | `tiles`, `acceptedAnswers` 또는 `answers` |
 
 ## 5. 템플릿 목록
 
@@ -191,7 +203,72 @@ AI 콘텐츠 JSON 생성
 }
 ```
 
-### 5.5 `sequence_ordering`
+### 5.5 `image_quiz`
+
+목적:
+
+```text
+시나리오/개념 이미지를 보고 3개 선택지 중 하나를 고르게 한다.
+```
+
+필드:
+
+```json
+{
+  "templateType": "image_quiz",
+  "imageAssetId": "asset_content_001_stage_2",
+  "question": "빛나는 조각은 전체 중 몇 개인가요?",
+  "choices": [
+    { "id": "a", "text": "1개" },
+    { "id": "b", "text": "2개" },
+    { "id": "c", "text": "4개" }
+  ],
+  "answer": "a",
+  "correctFeedback": "좋아요. 빛나는 조각은 1개예요.",
+  "wrongFeedback": "빛나는 부분만 다시 세어볼까요?"
+}
+```
+
+제약:
+
+```text
+choices는 정확히 3개다.
+answer는 choices의 id 중 하나다.
+이미지는 content_assets의 stage_2 또는 stage_3 asset을 참조한다.
+```
+
+### 5.6 `card_match`
+
+목적:
+
+```text
+왼쪽 카드와 오른쪽 카드를 연결해 개념-예시, 상황-행동, 단서-의미 관계를 확인한다.
+```
+
+필드:
+
+```json
+{
+  "templateType": "card_match",
+  "question": "서로 맞는 카드를 연결해보세요.",
+  "leftCards": [
+    { "id": "left_part", "text": "전체 4개 중 1개" },
+    { "id": "left_feeling", "text": "걱정돼요" }
+  ],
+  "rightCards": [
+    { "id": "right_fraction", "text": "1/4" },
+    { "id": "right_help", "text": "도움 요청하기" }
+  ],
+  "matches": {
+    "left_part": "right_fraction",
+    "left_feeling": "right_help"
+  },
+  "correctFeedback": "좋아요. 서로 맞게 연결했어요.",
+  "wrongFeedback": "왼쪽 카드가 어떤 뜻인지 다시 살펴볼까요?"
+}
+```
+
+### 5.7 `sequence_ordering`
 
 목적:
 
@@ -214,7 +291,7 @@ AI 콘텐츠 JSON 생성
 }
 ```
 
-### 5.6 `roleplay_simulation`
+### 5.8 `roleplay_simulation`
 
 목적:
 
@@ -236,7 +313,7 @@ AI 콘텐츠 JSON 생성
 }
 ```
 
-### 5.7 `concept_intro`
+### 5.9 `concept_intro`
 
 목적:
 
@@ -256,7 +333,7 @@ AI 콘텐츠 JSON 생성
 }
 ```
 
-### 5.8 `scene_question`
+### 5.10 `scene_question`
 
 목적:
 
@@ -275,7 +352,7 @@ AI 콘텐츠 JSON 생성
 }
 ```
 
-### 5.9 `blank_fill`
+### 5.11 `blank_fill`
 
 목적:
 
@@ -298,7 +375,7 @@ AI 콘텐츠 JSON 생성
 }
 ```
 
-### 5.10 `partition_picker`
+### 5.12 `partition_picker`
 
 목적:
 
@@ -321,7 +398,7 @@ AI 콘텐츠 JSON 생성
 }
 ```
 
-### 5.11 `trap_finder`
+### 5.13 `trap_finder`
 
 목적:
 
@@ -343,7 +420,7 @@ AI 콘텐츠 JSON 생성
 }
 ```
 
-### 5.12 `wrong_answer_compare`
+### 5.14 `wrong_answer_compare`
 
 목적:
 
@@ -369,7 +446,7 @@ AI 콘텐츠 JSON 생성
 }
 ```
 
-### 5.13 `help_friend`
+### 5.15 `help_friend`
 
 목적:
 
@@ -391,7 +468,7 @@ AI 콘텐츠 JSON 생성
 }
 ```
 
-### 5.14 `explanation_choice`
+### 5.16 `explanation_choice`
 
 목적:
 
@@ -422,7 +499,7 @@ AI 콘텐츠 JSON 생성
 }
 ```
 
-### 5.15 `wrong_explanation_fix`
+### 5.17 `wrong_explanation_fix`
 
 목적:
 
@@ -452,7 +529,7 @@ AI 콘텐츠 JSON 생성
 }
 ```
 
-### 5.16 `realtime_roleplay`
+### 5.18 `realtime_roleplay`
 
 목적:
 
@@ -486,7 +563,7 @@ AI 콘텐츠 JSON 생성
 }
 ```
 
-### 5.17 `realtime_teach_back`
+### 5.19 `realtime_teach_back`
 
 목적:
 
@@ -520,7 +597,7 @@ AI 콘텐츠 JSON 생성
 }
 ```
 
-### 5.18 `reflection_check`
+### 5.20 `reflection_check`
 
 목적:
 
