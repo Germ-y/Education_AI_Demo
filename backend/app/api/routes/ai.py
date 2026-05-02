@@ -13,6 +13,7 @@ from app.services.content_quality import ContentQualityError, validate_mission_c
 from app.services.store import DemoStore, SessionPrincipal
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
+MAX_CONTENT_GENERATION_ATTEMPTS = 2
 
 
 @router.post("/orchestrator-runs")
@@ -121,13 +122,14 @@ def create_content_generation(
     )
 
     try:
-        output_json, token_usage = OpenAiProvider(settings).create_json_response(
-            model=settings.openai_reasoning_model,
-            instructions=load_prompt("mission_content_package"),
+        mission, output_json, token_usage = _generate_valid_mission_content(
+            settings=settings,
             input_snapshot=input_snapshot,
+            student_id=payload.student_id,
+            case_id=payload.case_id,
+            case_file=case_file,
+            orchestrator_plan=orchestrator_run.output_json,
         )
-        mission = _mission_from_generation(output_json, student_id=payload.student_id, case_id=payload.case_id)
-        validate_mission_content_quality(mission, case_file=case_file, orchestrator_plan=orchestrator_run.output_json)
     except AiProviderError as exc:
         failed = agent_runs.mark_failed(agent_run.id, error_code=exc.code, error_message=exc.message, review_required=True)
         return ok({"agentRun": failed.model_dump(by_alias=True) if failed else None, "content": None})
@@ -173,3 +175,60 @@ def _mission_from_generation(output_json: dict, *, student_id: str, case_id: str
     if mission.status != "teacher_review":
         raise ValueError("생성된 MissionContent.status는 teacher_review여야 합니다.")
     return mission
+
+
+def _generate_valid_mission_content(
+    *,
+    settings,
+    input_snapshot: dict,
+    student_id: str,
+    case_id: str,
+    case_file: dict,
+    orchestrator_plan: dict,
+) -> tuple[MissionContent, dict, dict | None]:
+    provider = OpenAiProvider(settings)
+    instructions = load_prompt("mission_content_package")
+    attempt_usages: list[dict | None] = []
+    previous_output: dict | None = None
+    validation_errors: list[str] = []
+
+    for attempt in range(1, MAX_CONTENT_GENERATION_ATTEMPTS + 1):
+        generation_snapshot = input_snapshot
+        if attempt > 1:
+            generation_snapshot = {
+                **input_snapshot,
+                "qualityRepair": {
+                    "attempt": attempt,
+                    "instruction": "이전 출력은 저장되지 않았습니다. validationErrors를 모두 반영해 완전한 MissionContent JSON 전체를 다시 반환하세요.",
+                    "validationErrors": validation_errors,
+                    "previousOutput": previous_output,
+                },
+            }
+
+        output_json, token_usage = provider.create_json_response(
+            model=settings.openai_reasoning_model,
+            instructions=instructions,
+            input_snapshot=generation_snapshot,
+        )
+        attempt_usages.append(token_usage)
+        previous_output = output_json
+        try:
+            mission = _mission_from_generation(output_json, student_id=student_id, case_id=case_id)
+            validate_mission_content_quality(mission, case_file=case_file, orchestrator_plan=orchestrator_plan)
+            return mission, output_json, _merge_token_usage(attempt_usages)
+        except ContentQualityError as exc:
+            validation_errors = exc.issues
+            if attempt == MAX_CONTENT_GENERATION_ATTEMPTS:
+                raise
+        except ValueError as exc:
+            validation_errors = [str(exc)]
+            if attempt == MAX_CONTENT_GENERATION_ATTEMPTS:
+                raise
+
+    raise ContentQualityError(["콘텐츠 생성 품질 재시도 흐름이 예기치 않게 종료되었습니다."])
+
+
+def _merge_token_usage(attempt_usages: list[dict | None]) -> dict | None:
+    if len(attempt_usages) == 1:
+        return attempt_usages[0]
+    return {"attempts": [{"attempt": index + 1, "tokenUsage": usage} for index, usage in enumerate(attempt_usages)]}

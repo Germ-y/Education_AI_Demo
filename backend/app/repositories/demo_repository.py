@@ -16,9 +16,9 @@ class DemoRepository:
         with self.session_factory() as session:
             return session.scalar(select(rows.OrganizationRow.id).limit(1)) is None
 
-    def replace_database(self, db: DemoDatabase) -> None:
+    def replace_database(self, db: DemoDatabase, *, preserve_agent_runs: bool = False) -> None:
         with self.session_factory() as session:
-            _delete_all(session)
+            _delete_all(session, preserve_agent_runs=preserve_agent_runs)
             _insert_all(session, db)
             session.commit()
 
@@ -79,9 +79,8 @@ class DemoRepository:
             )
 
 
-def _delete_all(session: Session) -> None:
-    for model in [
-        rows.AgentRunRow,
+def _delete_all(session: Session, *, preserve_agent_runs: bool = False) -> None:
+    models = [
         rows.AuditLogRow,
         rows.ReviewSummaryRow,
         rows.RealtimePracticeSessionRow,
@@ -102,7 +101,10 @@ def _delete_all(session: Session) -> None:
         rows.UserRow,
         rows.OrganizationRow,
         rows.PublicDataSourceRow,
-    ]:
+    ]
+    if not preserve_agent_runs:
+        models.insert(0, rows.AgentRunRow)
+    for model in models:
         session.execute(delete(model))
 
 

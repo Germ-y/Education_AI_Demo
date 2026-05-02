@@ -63,6 +63,18 @@ def test_validates_image_quiz_template_shape() -> None:
         ContentStage.model_validate(stage)
 
 
+def test_choice_question_requires_answer_id_from_choices() -> None:
+    stage = next(stage for stage in create_demo_database().mission_contents[0].stages if stage.template_type == "scene_question").model_dump(by_alias=True)
+
+    stage["templateJson"].pop("answer")
+    with pytest.raises(ValueError, match="answer"):
+        ContentStage.model_validate(stage)
+
+    stage["templateJson"]["answer"] = "missing"
+    with pytest.raises(ValueError, match="choices"):
+        ContentStage.model_validate(stage)
+
+
 def test_rejects_video_asset_roles() -> None:
     asset = create_demo_database().mission_contents[0].assets[0].model_dump(by_alias=True)
     asset["assetRole"] = "video"

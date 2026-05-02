@@ -5,6 +5,17 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.domain.enums import AssetRole, AssetType, MissionStatus, StageRole, StudentType, TemplateType, UserRole
 
 REALTIME_TEMPLATE_TYPES = {TemplateType.REALTIME_ROLEPLAY, TemplateType.REALTIME_TEACH_BACK}
+CHOICE_TEMPLATE_TYPES = {
+    TemplateType.SCENE_OBSERVATION,
+    TemplateType.HIGHLIGHT_CLUE,
+    TemplateType.SCENE_QUESTION,
+    TemplateType.CLUE_QUESTION,
+    TemplateType.APPLIED_QUESTION,
+    TemplateType.ACTION_CHOICE,
+    TemplateType.DECISION_CARD,
+    TemplateType.EXPLANATION_CHOICE,
+    TemplateType.WRONG_EXPLANATION_FIX,
+}
 REQUIRED_ASSET_ROLES = {
     AssetRole.HERO,
     AssetRole.STAGE_1,
@@ -159,8 +170,9 @@ def _validate_template_json(template_type: TemplateType, template_json: dict[str
         if "acceptedAnswers" not in template_json and "answers" not in template_json:
             raise ValueError("blank_fill은 acceptedAnswers 또는 answers를 가져야 합니다.")
         _require_any_key(template_json, ["question", "sentence"], "blank_fill")
-    if template_type in {TemplateType.SCENE_QUESTION, TemplateType.CLUE_QUESTION, TemplateType.APPLIED_QUESTION, TemplateType.ACTION_CHOICE}:
-        _require_keys(template_json, ["question", "choices", "correctFeedback", "wrongFeedback"], template_type.value)
+    if template_type in CHOICE_TEMPLATE_TYPES:
+        _require_keys(template_json, ["question", "choices", "answer", "correctFeedback", "wrongFeedback"], template_type.value)
+        _validate_choice_answer(template_json, template_type.value)
     if template_type == TemplateType.PARTITION_PICKER:
         _require_any_key(template_json, ["question", "instruction"], "partition_picker")
         _require_any_key(template_json, ["choices", "visual"], "partition_picker")
@@ -175,6 +187,15 @@ def _require_keys(template_json: dict[str, Any], keys: list[str], template_type:
 def _require_any_key(template_json: dict[str, Any], keys: list[str], template_type: str) -> None:
     if not any(key in template_json for key in keys):
         raise ValueError(f"{template_type} templateJson에는 다음 중 하나가 필요합니다: {', '.join(keys)}")
+
+
+def _validate_choice_answer(template_json: dict[str, Any], template_type: str) -> None:
+    choices = template_json.get("choices")
+    if not isinstance(choices, list) or len(choices) < 2:
+        raise ValueError(f"{template_type}.choices는 2개 이상이어야 합니다.")
+    choice_ids = [choice.get("id") for choice in choices if isinstance(choice, dict)]
+    if len(choice_ids) != len(choices) or template_json["answer"] not in choice_ids:
+        raise ValueError(f"{template_type}.answer는 choices의 id 중 하나여야 합니다.")
 
 
 class MissionContent(BaseModel):

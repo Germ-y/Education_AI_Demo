@@ -23,8 +23,11 @@ Generate a complete MissionContent JSON package from an approved OrchestratorPla
 - All problem text lines must live in `templateJson`.
 - All visual context must reference image assets by role/id.
 - All stage entry narration must reference audio assets by role/id.
+- If the input contains `qualityRepair`, treat `qualityRepair.validationErrors` as authoritative. Return a corrected complete MissionContent JSON, not a patch or explanation.
 - Return the backend `MissionContent` schema directly. Do not invent wrapper-only id fields or placeholder asset lists.
 - `id` is the content id. Every `stage.missionContentId` and every `asset.missionContentId` must equal that `id`.
+- Every stage must copy `step`, `stageRole`, and `templateType` exactly from `orchestratorPlan.stagePlan`.
+- Do not rename, translate, or substitute internal stage/template values. In particular, keep `scene_observation`, `highlight_clue`, `action_choice`, `sequence_ordering`, `scene_question`, and `applied_question` exactly when the plan uses them.
 - The package must contain real `assets` records, not placeholders. Asset files may use an empty `storageUrl` until the provider generation endpoint fills it.
 - Every image asset must have a rich `promptJson.prompt` optimized for `gpt-image-2`.
 - Every image asset must include a `promptJson.textRenderingPolicy` or `promptJson.ocrPolicy` value that clearly means `scene_only_no_problem_text`.
@@ -82,6 +85,79 @@ Audio requirements:
 
 ## Template JSON Rules
 
+Use the `orchestratorPlan.stagePlan[*].templateType` unless it violates the profile limits below.
+For any choice-based template other than `image_quiz`, use this choice object shape:
+
+```json
+{ "id": "a", "text": "string" }
+```
+
+When `caseFile.profile.profileJson.choiceCountLimit` is present:
+
+- No `choices`, `leftCards`, or `rightCards` array may exceed that number.
+- If the limit is 2, create exactly 2 short choices for `scene_question`, `clue_question`, `applied_question`, `action_choice`, `explanation_choice`, and `wrong_explanation_fix`.
+- If the limit is 2, do not use `image_quiz`, because `image_quiz` requires exactly 3 choices.
+- If the limit is 2, `sequence_ordering.cards` should normally use 2 cards and must not exceed 3 cards.
+
+Allowed stage/template flow:
+
+- `learning_focus`
+  - step 1: `concept_intro` + `concept_intro`
+  - step 2: `basic_problem` + one of `image_quiz`, `card_match`, `sequence_ordering`, `blank_fill`, `scene_question`, `clue_question`, `partition_picker`
+  - step 3: `applied_problem` + one of `image_quiz`, `card_match`, `sequence_ordering`, `blank_fill`, `applied_question`, `mini_simulation`, `explanation_choice`, `wrong_explanation_fix`
+  - step 4: `realtime_practice` + `realtime_teach_back`
+- `life_support`
+  - step 1: `scenario_intro` + `scenario_intro`
+  - step 2: `clue_identification` + one of `scene_observation`, `highlight_clue`, `image_quiz`, `card_match`
+  - step 3: `action_selection` + one of `image_quiz`, `card_match`, `sequence_ordering`, `action_choice`, `decision_card`
+  - step 4: `realtime_practice` + `realtime_roleplay`
+
+Any other stageRole/templateType pair is invalid and will be rejected before saving.
+
+### `concept_intro`, `scenario_intro`
+
+Use for the opening stage. It should introduce the scene with short UI text and no answer checking.
+
+Required:
+
+```json
+{
+  "imageAssetId": "string",
+  "audioAssetId": "string",
+  "assetBundle": {
+    "imageAssetId": "string",
+    "audioAssetId": "string"
+  },
+  "storyText": "string",
+  "missionText": "string"
+}
+```
+
+### `scene_observation`, `highlight_clue`
+
+Use for `life_support` stage 2 clue finding. Respect `choiceCountLimit`; for 박수민 use 2 choices.
+
+Required:
+
+```json
+{
+  "imageAssetId": "string",
+  "audioAssetId": "string",
+  "assetBundle": {
+    "imageAssetId": "string",
+    "audioAssetId": "string"
+  },
+  "question": "string",
+  "choices": [
+    { "id": "a", "text": "string" },
+    { "id": "b", "text": "string" }
+  ],
+  "answer": "a",
+  "correctFeedback": "string",
+  "wrongFeedback": "string"
+}
+```
+
 ### `image_quiz`
 
 - Use for image + 3 choices.
@@ -129,6 +205,31 @@ Required:
 }
 ```
 
+### `scene_question`, `clue_question`, `applied_question`, `action_choice`
+
+Use these when the student needs 2 choices or a short visual question. `answer` must be one of the choice ids.
+
+Required:
+
+```json
+{
+  "imageAssetId": "string",
+  "audioAssetId": "string",
+  "assetBundle": {
+    "imageAssetId": "string",
+    "audioAssetId": "string"
+  },
+  "question": "string",
+  "choices": [
+    { "id": "a", "text": "string" },
+    { "id": "b", "text": "string" }
+  ],
+  "answer": "a",
+  "correctFeedback": "string",
+  "wrongFeedback": "string"
+}
+```
+
 ### `sequence_ordering`
 
 Required:
@@ -140,6 +241,71 @@ Required:
   "question": "string",
   "cards": [{ "id": "string", "text": "string" }],
   "answerOrder": ["string"],
+  "correctFeedback": "string",
+  "wrongFeedback": "string"
+}
+```
+
+### `explanation_choice`
+
+Use for a short explain-back choice before realtime. Respect `choiceCountLimit`.
+
+Required:
+
+```json
+{
+  "imageAssetId": "string",
+  "audioAssetId": "string",
+  "question": "string",
+  "choices": [
+    { "id": "a", "text": "string" },
+    { "id": "b", "text": "string" }
+  ],
+  "answer": "a",
+  "correctFeedback": "string",
+  "wrongFeedback": "string"
+}
+```
+
+### `decision_card`
+
+Use for one everyday-life decision. Respect `choiceCountLimit`.
+
+Required:
+
+```json
+{
+  "imageAssetId": "string",
+  "audioAssetId": "string",
+  "question": "string",
+  "choices": [
+    { "id": "a", "text": "string" },
+    { "id": "b", "text": "string" }
+  ],
+  "answer": "a",
+  "correctFeedback": "string",
+  "wrongFeedback": "string"
+}
+```
+
+### `wrong_explanation_fix`
+
+Use for correcting one mistaken explanation. Respect `choiceCountLimit`.
+
+Required:
+
+```json
+{
+  "imageAssetId": "string",
+  "audioAssetId": "string",
+  "question": "string",
+  "wrongLine": "string",
+  "choices": [
+    { "id": "a", "text": "string" },
+    { "id": "b", "text": "string" }
+  ],
+  "answer": "a",
+  "fixedLine": "string",
   "correctFeedback": "string",
   "wrongFeedback": "string"
 }

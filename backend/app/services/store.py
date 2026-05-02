@@ -47,7 +47,7 @@ class DemoStore:
 
     def persist(self) -> None:
         if self.repository is not None:
-            self.repository.replace_database(self.db)
+            self.repository.replace_database(self.db, preserve_agent_runs=True)
 
     def create_user_session(self, role: str, email: str | None = None) -> SessionPrincipal | None:
         self.refresh()

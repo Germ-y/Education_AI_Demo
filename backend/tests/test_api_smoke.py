@@ -1,3 +1,4 @@
+import copy
 import os
 
 import pytest
@@ -434,8 +435,17 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
         asset["qaStatus"] = "pending"
         asset["approvalStatus"] = "pending"
 
+    invalid_generated_content = copy.deepcopy(generated_content)
+    invalid_generated_content["stages"][3]["studentTitle"] = "realtime practice"
+    content_generation_calls = {"count": 0}
+
     def fake_json_response(self, *, model, instructions, input_snapshot, timeout_sec=90):
         if "MissionContent" in instructions:
+            content_generation_calls["count"] += 1
+            if content_generation_calls["count"] == 1:
+                assert "qualityRepair" not in input_snapshot
+                return invalid_generated_content, {"input_tokens": 10, "output_tokens": 20}
+            assert input_snapshot["qualityRepair"]["validationErrors"]
             return generated_content, {"input_tokens": 10, "output_tokens": 20}
         return (
             {
@@ -539,6 +549,8 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     assert content["id"] == "content_generated_contract_001"
     assert content["status"] == "teacher_review"
     assert content["totalSteps"] == 4
+    assert content_generation_calls["count"] == 2
+    assert content_generation.json()["data"]["agentRun"]["status"] == "succeeded"
     assert [stage["step"] for stage in content["stages"]] == [1, 2, 3, 4]
     assert len([asset for asset in content["assets"] if asset["assetType"] == "image"]) == 5
     assert len([asset for asset in content["assets"] if asset["assetType"] == "audio"]) == 5
