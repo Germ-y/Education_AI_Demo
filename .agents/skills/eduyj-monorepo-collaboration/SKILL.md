@@ -10,8 +10,9 @@ description: EduYJ 레포에서 프론트엔드와 백엔드가 함께 바뀌는
 1. `AGENTS.md`
 2. `docs/common/01-collaboration-contract.md`
 3. `docs/common/02-branch-handoff-contract.md`
-4. `docs/common/00-agent-navigation.md`
-5. 지금 작업과 관련된 상세 문서
+4. `docs/common/10-pr-feature-review-contract.md`
+5. `docs/common/00-agent-navigation.md`
+6. 지금 작업과 관련된 상세 문서
 
 ## 1. 작업 영역 먼저 정하기
 
@@ -22,6 +23,7 @@ description: EduYJ 레포에서 프론트엔드와 백엔드가 함께 바뀌는
 - API 계약 작업: `docs/common/08-rest-api-spec.md`, `backend/app/domain/schemas.py`, `frontend/lib/demo-data.ts`
 - AI 콘텐츠 작업: `docs/common/05-*`, `docs/common/06-*`, `docs/common/07-*`, `backend/scripts/`
 - 작업 규칙/문서 작업: `AGENTS.md`, `GOAL.md`, `.agents/skills/`, `docs/common/00-*`, `docs/common/03-*`
+- PR 기준 작업: `docs/common/10-pr-feature-review-contract.md`
 
 프론트와 백엔드가 같이 바뀌면 코드보다 문서를 먼저 고친다.
 의미 단위마다 커밋해서 작업 로그를 남기고, push는 마지막 handoff 시점에 한다.
@@ -41,6 +43,7 @@ handoff 문서 확인
 상대 파트 검수/승인 기록
 커밋
 마지막 push
+기능 단위 PR 설명 작성
 ```
 
 ## 3. 지켜야 할 것
@@ -50,6 +53,7 @@ handoff 문서 확인
 - 통합 검증은 `dev` 브랜치에서 한다.
 - 작업 중에는 작은 커밋을 쌓고, 검증 후 마지막에 push한다.
 - 상대 파트 확인이 필요한 변경은 `docs/common/02-branch-handoff-contract.md`에 자체 검수와 승인 상태를 남긴다.
+- PR을 작성하거나 리뷰할 때는 `docs/common/10-pr-feature-review-contract.md`의 기능 단위와 템플릿을 따른다.
 - provider key는 `frontend/`에 노출하지 않는다.
 - 학생 미션은 4단계다. 회고는 5단계가 아니다.
 - 4단계가 realtime이다. 1~3단계는 승인된 정적 템플릿이다.

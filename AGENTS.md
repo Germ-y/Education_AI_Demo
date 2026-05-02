@@ -25,7 +25,8 @@ git status --short --branch
 3. [docs/common/00-agent-navigation.md](docs/common/00-agent-navigation.md) - 작업별 문서 지도
 4. [docs/common/01-collaboration-contract.md](docs/common/01-collaboration-contract.md) - 프론트/백엔드 협업 계약
 5. [docs/common/02-branch-handoff-contract.md](docs/common/02-branch-handoff-contract.md) - 브랜치 간 handoff 기준
-6. [docs/common/03-implementation-backlog.md](docs/common/03-implementation-backlog.md) - 현재 백로그
+6. [docs/common/10-pr-feature-review-contract.md](docs/common/10-pr-feature-review-contract.md) - 기능 단위 PR 기준
+7. [docs/common/03-implementation-backlog.md](docs/common/03-implementation-backlog.md) - 현재 백로그
 
 ## 3. 작업 유형별 시작 문서
 
@@ -35,6 +36,7 @@ git status --short --branch
 | 백엔드 API/DB/seed | [docs/backend/00-backend-team-guide.md](docs/backend/00-backend-team-guide.md) | [eduyj-backend-contracts](.agents/skills/eduyj-backend-contracts/SKILL.md) |
 | 콘텐츠/이미지/realtime | [docs/common/05-ai-content-template-spec.md](docs/common/05-ai-content-template-spec.md) | [eduyj-content-package](.agents/skills/eduyj-content-package/SKILL.md) |
 | 프론트/백엔드 동시 변경 | [docs/common/02-branch-handoff-contract.md](docs/common/02-branch-handoff-contract.md) | [eduyj-monorepo-collaboration](.agents/skills/eduyj-monorepo-collaboration/SKILL.md) |
+| PR 작성/리뷰 | [docs/common/10-pr-feature-review-contract.md](docs/common/10-pr-feature-review-contract.md) | [eduyj-monorepo-collaboration](.agents/skills/eduyj-monorepo-collaboration/SKILL.md) |
 | 장기 목표 이어가기 | [docs/common/03-implementation-backlog.md](docs/common/03-implementation-backlog.md) | [eduyj-agent-loop](.agents/skills/eduyj-agent-loop/SKILL.md) |
 
 문서 링크를 따라갈 때의 기준:

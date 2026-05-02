@@ -16,6 +16,7 @@ dev 브랜치에서 통합 검증
 ```
 
 handoff는 단순 알림이 아니라 검수와 승인 흐름이다.
+PR을 올릴 때는 이 문서의 승인 상태를 [10-pr-feature-review-contract.md](10-pr-feature-review-contract.md)의 PR 설명에 연결한다.
 
 ```text
 1. 변경한 작업자가 먼저 이 문서의 체크리스트를 읽고 자체 검수한다.

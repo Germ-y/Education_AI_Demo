@@ -26,6 +26,7 @@
 | 백엔드 신규 작업 | [../backend/00-backend-team-guide.md](../backend/00-backend-team-guide.md) | [03-implementation-backlog.md](03-implementation-backlog.md), [08-rest-api-spec.md](08-rest-api-spec.md) |
 | 프론트/백엔드 협업 | [01-collaboration-contract.md](01-collaboration-contract.md) | [02-branch-handoff-contract.md](02-branch-handoff-contract.md) |
 | 브랜치 handoff | [02-branch-handoff-contract.md](02-branch-handoff-contract.md) | [08-rest-api-spec.md](08-rest-api-spec.md) |
+| PR 작성/리뷰 | [10-pr-feature-review-contract.md](10-pr-feature-review-contract.md) | [01-collaboration-contract.md](01-collaboration-contract.md), [02-branch-handoff-contract.md](02-branch-handoff-contract.md) |
 | 학생 콘텐츠 경험 | [04-child-content-experience.md](04-child-content-experience.md) | [05-ai-content-template-spec.md](05-ai-content-template-spec.md), [07-image-content-package-spec.md](07-image-content-package-spec.md) |
 | 템플릿/콘텐츠 JSON | [05-ai-content-template-spec.md](05-ai-content-template-spec.md) | [07-image-content-package-spec.md](07-image-content-package-spec.md) |
 | 4단계 realtime | [06-realtime-practice-spec.md](06-realtime-practice-spec.md) | [08-rest-api-spec.md](08-rest-api-spec.md) |
@@ -74,6 +75,7 @@ flowchart TD
 - 새 문서를 만들면 [../../README.md](../../README.md), 이 파일, 관련 스킬에 링크를 추가한다.
 - 파일명이나 위치를 바꾸면 `rg -n "old-file-name"`으로 역참조를 찾는다.
 - 프론트/백엔드 계약이 바뀌면 [02-branch-handoff-contract.md](02-branch-handoff-contract.md)에 handoff 기준과 상대 파트 승인 상태도 같이 반영한다.
+- PR 기준이 바뀌면 [10-pr-feature-review-contract.md](10-pr-feature-review-contract.md)에 기능 단위와 리뷰 순서를 같이 반영한다.
 
 ## 빠른 확인 명령
 

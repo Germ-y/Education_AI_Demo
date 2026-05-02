@@ -12,6 +12,7 @@
 - 작업 시작 전에 내가 건드릴 파일 범위를 먼저 정한다.
 - 커밋은 작업 로그이므로 의미 단위마다 작게 남긴다.
 - push는 작업 중간이 아니라, 검증과 handoff 준비가 끝난 마지막에 한다.
+- PR은 [10-pr-feature-review-contract.md](10-pr-feature-review-contract.md)에 맞춰 기능 단위가 보이게 작성한다.
 - `node_modules`, `.venv`, cache, 실제 `.env`는 커밋하지 않는다.
 
 ## 2. 폴더별 역할
@@ -111,7 +112,7 @@ npm run lint
 
 ## 7. 작업 끝날 때 남길 내용
 
-최종 보고나 PR 설명에는 아래 내용을 남긴다.
+최종 보고에는 아래 내용을 남긴다.
 
 ```text
 목표:
@@ -122,6 +123,8 @@ API/데이터 계약 변경 여부:
 다음 추천 작업:
 커밋:
 ```
+
+PR 설명은 [10-pr-feature-review-contract.md](10-pr-feature-review-contract.md)의 템플릿을 따른다.
 
 ## 8. 커밋 로그 기준
 
