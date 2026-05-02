@@ -55,6 +55,12 @@ def test_teacher_and_student_demo_flows() -> None:
     assert students.status_code == 200
     assert len(students.json()["data"]) == 3
     assert {student["schoolName"] for student in students.json()["data"]} == {"영주중앙초등학교", "영주중학교", "영주가흥초등학교"}
+    clock_student = next(student for student in students.json()["data"] if student["studentId"] == "student_learning_clock")
+    assert clock_student["gradeLabel"] == "초3"
+    assert clock_student["trackLabel"] == "저연령 학습지원형"
+    assert clock_student["dashboardStageLabel"] == "자료 생성"
+    assert clock_student["attendanceLabel"] == "기록 전"
+    assert "그림 단서" in clock_student["summaryLine"]
 
     no_token_students = client.get("/api/teacher/students")
     assert no_token_students.status_code == 200
@@ -72,6 +78,32 @@ def test_teacher_and_student_demo_flows() -> None:
     assert timetable_context.status_code == 200
     timetable = timetable_context.json()["data"]["timetableSummary"]
     assert [slot["subjectName"] for slot in timetable] == ["역사", "동아리활동", "진로와 직업", "국어", "과학", "도덕"]
+    timetable_cache = client.get(
+        "/api/public-data/schools/8811058/timetable?date=2026-05-01&grade=2&className=1",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert timetable_cache.status_code == 200
+    assert timetable_cache.json()["data"]["source"]["cacheStatus"] == "cached_snapshot"
+    assert timetable_cache.json()["data"]["orchestratorHints"]
+    elementary_timetable_cache = client.get(
+        "/api/public-data/schools/8811046/timetable?date=2026-05-01&grade=3&className=1",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert elementary_timetable_cache.status_code == 200
+    assert [slot["subjectName"] for slot in elementary_timetable_cache.json()["data"]["slots"]] == [
+        "국어",
+        "수학",
+        "사회",
+        "과학",
+        "창의적체험활동",
+    ]
+    missing_timetable = client.get(
+        "/api/public-data/schools/8811046/timetable?date=2026-05-03&grade=3&className=1&syncIfMissing=false",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert missing_timetable.status_code == 200
+    assert missing_timetable.json()["data"]["slots"] == []
+    assert missing_timetable.json()["data"]["source"]["cacheStatus"] == "empty"
     public_sync = client.post(
         "/api/public-data/sources/neis_open_api/sync",
         headers={"authorization": f"Bearer {teacher_token}"},
@@ -84,6 +116,22 @@ def test_teacher_and_student_demo_flows() -> None:
     history = client.get("/api/teacher/students/student_learning_fraction/history", headers={"authorization": f"Bearer {teacher_token}"})
     assert history.status_code == 200
     assert history.json()["data"]["missionContents"][0]["studentId"] == "student_learning_fraction"
+    context_bundle = client.get(
+        "/api/teacher/students/student_learning_fraction/context-bundle",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert context_bundle.status_code == 200
+    bundle = context_bundle.json()["data"]
+    assert bundle["student"]["gradeLabel"] == "중2"
+    assert bundle["schoolContext"]["timetableSummary"]["todaySubjects"] == ["역사", "동아리활동", "진로와 직업", "국어", "과학", "도덕"]
+    assert [item["label"] for item in bundle["autoContext"]] == ["학생 기록", "이전 수업", "학교 시간표", "다음 목표"]
+    assert bundle["aiReadyContext"]["evidenceSources"]
+    life_bundle = client.get(
+        "/api/teacher/students/student_life_bus/context-bundle",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert life_bundle.status_code == 200
+    assert life_bundle.json()["data"]["schoolContext"]["timetableSummary"]["todaySubjects"] == ["국어", "수학", "사회", "실과", "미술"]
     report = client.get("/api/teacher/students/student_learning_fraction/report", headers={"authorization": f"Bearer {teacher_token}"})
     assert report.status_code == 200
     assert report.json()["data"]["reports"][0]["studentId"] == "student_learning_fraction"

@@ -156,11 +156,11 @@ function toSupportCaseFromListItem(item: StudentListItem): SupportCase {
     id: `${item.studentId}-case-summary`,
     studentId: item.studentId,
     status,
-    statusLabel: learningStatus[status].label,
-    caseType: item.studentType === "learning_focus" ? "학습 집중" : "생활 연습",
+    statusLabel: item.statusLabel ?? item.dashboardStageLabel ?? learningStatus[status].label,
+    caseType: item.trackLabel ?? item.studentTypeLabel ?? (item.studentType === "learning_focus" ? "학습지원형" : "일상생활 지원형"),
     primaryNeed: item.primaryNeed,
     sessionGoal: item.primaryNeed,
-    supportStrategy: item.supportStrategy ?? (item.studentType === "learning_focus" ? "초기 학습 반응 확인" : "상황 장면 기반"),
+    supportStrategy: item.supportStrategy ?? item.aiContextSummary ?? (item.studentType === "learning_focus" ? "초기 학습 반응 확인" : "상황 장면 기반"),
     nextAction: item.nextSessionSuggestion,
     riskNote: "학생 화면에는 진단 표현을 노출하지 않음",
     challengeTags: item.weaknesses && item.weaknesses.length > 0 ? item.weaknesses : [item.primaryNeed],
@@ -170,25 +170,29 @@ function toSupportCaseFromListItem(item: StudentListItem): SupportCase {
 
 function toSupportCaseFromCaseFile(caseFile: StudentCaseFile, listItem?: StudentListItem): SupportCase {
   const status = toDashboardStatus(listItem);
+  const dashboard = caseFile.dashboardProfile;
 
   return {
     id: caseFile.openCase.id,
     studentId: caseFile.profile.id,
     status,
-    statusLabel: learningStatus[status].label,
-    caseType: caseFile.profile.studentType === "learning_focus" ? "학습 집중" : "생활 연습",
-    primaryNeed: caseFile.profile.primaryNeed,
+    statusLabel: dashboard?.currentStageLabel ?? listItem?.statusLabel ?? learningStatus[status].label,
+    caseType: caseFile.profile.trackLabel ?? caseFile.profile.studentTypeLabel ?? (caseFile.profile.studentType === "learning_focus" ? "학습지원형" : "일상생활 지원형"),
+    primaryNeed: dashboard?.primaryNeedTitle ?? caseFile.profile.primaryNeed,
     sessionGoal: caseFile.openCase.currentGoal,
     supportStrategy:
+      dashboard?.supportStrategyTitle ??
       caseFile.openCase.supportStrategy ??
       toDisplayLabels(caseFile.memoryCard?.effectiveExplanationStyles, ["정적 콘텐츠", "실시간 연습"]).join(", "),
     nextAction: listItem?.nextSessionSuggestion ?? "다음 미션 확인",
-    riskNote: caseFile.memoryCard?.nextSessionCautions.join(", ") || "학생 화면에는 진단 표현을 노출하지 않음",
+    riskNote: dashboard?.aiContextSummary ?? (caseFile.memoryCard?.nextSessionCautions.join(", ") || "학생 화면에는 진단 표현을 노출하지 않음"),
     challengeTags:
-      caseFile.profile.weaknesses && caseFile.profile.weaknesses.length > 0
+      dashboard?.weaknesses && dashboard.weaknesses.length > 0
+        ? dashboard.weaknesses
+        : caseFile.profile.weaknesses && caseFile.profile.weaknesses.length > 0
         ? caseFile.profile.weaknesses
         : toDisplayLabels(caseFile.memoryCard?.learningProblemTypes),
-    planTags: caseFile.plannerItems.map((item) => item.goalText),
+    planTags: dashboard?.nextSessionFocus && dashboard.nextSessionFocus.length > 0 ? dashboard.nextSessionFocus : caseFile.plannerItems.map((item) => item.goalText),
   };
 }
 
@@ -392,7 +396,7 @@ export default function DashboardPage() {
       id: item.studentId,
       name: item.displayName,
       school: item.schoolName ?? "학교 정보 확인 중",
-      grade: item.grade,
+      grade: item.gradeLabel ?? item.grade,
       attendanceRate: item.attendanceRate ?? null,
       strengths: item.strengths ?? [],
       weaknesses: item.weaknesses ?? [],
@@ -422,6 +426,8 @@ export default function DashboardPage() {
   };
   const selectedApiStudent = teacherStudentItems.find((student) => student.studentId === selectedStudent.id);
   const activeCaseFile = selectedCaseFile?.profile.id === selectedStudent.id ? selectedCaseFile : null;
+  const dashboardProfile = activeCaseFile?.dashboardProfile;
+  const autoContextItems = dashboardProfile?.autoContext ?? activeCaseFile?.contextBundle?.autoContext ?? [];
   const selectedCase: SupportCase = activeCaseFile
     ? toSupportCaseFromCaseFile(activeCaseFile, selectedApiStudent)
     : selectedApiStudent
@@ -637,7 +643,7 @@ export default function DashboardPage() {
                       <StatusBadge supportCase={selectedCase} />
                     </div>
                     <p className="mt-2 font-semibold text-[#64748b]">
-                      {selectedStudent.school} · {selectedStudent.grade} · {selectedCase.caseType}
+                      {dashboardProfile?.headline ?? `${selectedStudent.school} · ${selectedStudent.grade} · ${selectedCase.caseType}`}
                     </p>
                     <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-[#334155]">
                       {selectedCase.primaryNeed}
@@ -649,13 +655,13 @@ export default function DashboardPage() {
                     <div>
                       <p className="text-sm font-bold text-[#64748b]">현재 단계</p>
                       <p className="mt-1 text-lg font-black text-[#172033]">
-                        {currentWorkflowStep === 0 ? "초기 확인" : workflowSteps[currentWorkflowStep - 1]}
+                        {dashboardProfile?.currentStageLabel ?? (currentWorkflowStep === 0 ? "초기 확인" : workflowSteps[currentWorkflowStep - 1])}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm font-bold text-[#64748b]">출석</p>
                       <p className="mt-1 text-lg font-black text-[#172033]">
-                        {selectedStudent.attendanceRate === null ? "기록 전" : `${selectedStudent.attendanceRate}%`}
+                        {dashboardProfile?.attendanceLabel ?? (selectedStudent.attendanceRate === null ? "기록 전" : `${selectedStudent.attendanceRate}%`)}
                       </p>
                     </div>
                   </div>
@@ -698,15 +704,20 @@ export default function DashboardPage() {
             {activeTab === "info" && (
               <section className="space-y-6 p-6">
                 <section className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-                  <InfoBlock label="핵심 어려움" value={selectedCase.primaryNeed} />
-                  <InfoBlock label="지원 전략" value={selectedCase.supportStrategy} />
+                  <InfoBlock label="핵심 어려움" value={dashboardProfile?.primaryNeedDetail ?? selectedCase.primaryNeed} />
+                  <InfoBlock label="지원 전략" value={dashboardProfile?.supportStrategyDetail ?? selectedCase.supportStrategy} />
                 </section>
 
                 <section className="grid gap-5 lg:grid-cols-2">
                   <div className="rounded-lg border border-[#e5e9f0] bg-white p-5">
                     <h3 className="text-xl font-black">강점</h3>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {(selectedStudent.strengths.length > 0 ? selectedStudent.strengths : ["기록 전"]).map((strength) => (
+                      {((dashboardProfile?.strengths?.length ? dashboardProfile.strengths : selectedStudent.strengths).length > 0
+                        ? dashboardProfile?.strengths?.length
+                          ? dashboardProfile.strengths
+                          : selectedStudent.strengths
+                        : ["기록 전"]
+                      ).map((strength) => (
                         <span
                           key={strength}
                           className="rounded-full bg-[#eef4fb] px-3 py-1 text-sm font-bold text-[#1f3a5f]"
@@ -720,7 +731,7 @@ export default function DashboardPage() {
                   <div className="rounded-lg border border-[#e5e9f0] bg-white p-5">
                     <h3 className="text-xl font-black">약점</h3>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {selectedCase.challengeTags.map((tag) => (
+                      {(dashboardProfile?.weaknesses?.length ? dashboardProfile.weaknesses : selectedCase.challengeTags).map((tag) => (
                         <span
                           key={tag}
                           className="rounded-full bg-[#fff7ed] px-3 py-1 text-sm font-bold text-[#9a3412]"
@@ -803,9 +814,23 @@ export default function DashboardPage() {
 
                       <div className="rounded-md bg-[#f8fafc] p-3">
                         <p className="text-sm font-bold text-[#64748b]">AI에 함께 전달되는 학생 컨텍스트</p>
-                        <p className="mt-1 text-sm font-semibold leading-6 text-[#334155]">
-                          {selectedStudent.name} · {selectedStudent.school} · {selectedCase.caseType} · {selectedCase.primaryNeed}
-                        </p>
+                        <div className="mt-2 space-y-2">
+                          {(autoContextItems.length > 0
+                            ? autoContextItems
+                            : [
+                                {
+                                  label: "학생 기록",
+                                  value: `${selectedStudent.name} · ${selectedStudent.school} · ${selectedCase.caseType}`,
+                                },
+                                { label: "다음 목표", value: selectedCase.primaryNeed },
+                              ]
+                          ).map((item) => (
+                            <div key={`${item.label}-${item.value}`} className="grid gap-1 rounded-md bg-white px-3 py-2 md:grid-cols-[88px_minmax(0,1fr)]">
+                              <span className="text-xs font-black text-[#1f3a5f]">{item.label}</span>
+                              <span className="text-sm font-semibold leading-6 text-[#334155]">{item.value}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
 
                       <button className="w-full rounded-md bg-[#1f3a5f] px-4 py-3 text-sm font-bold text-white">

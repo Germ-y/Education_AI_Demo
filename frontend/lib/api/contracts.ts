@@ -110,11 +110,15 @@ export type StudentProfile = {
   externalKey: string;
   displayName: string;
   grade: string;
+  gradeLabel?: string;
   schoolCode?: string | null;
   studentType: ContentType;
+  studentTypeLabel?: string;
+  trackLabel?: string;
   primaryNeed: string;
   profileJson: Record<string, unknown>;
   attendanceRate?: number | null;
+  attendanceLabel?: string;
   strengths?: string[];
   weaknesses?: string[];
   status: StudentStatus;
@@ -124,11 +128,16 @@ export type SchoolProfile = {
   id: string;
   schoolCode: string;
   officeCode?: string | null;
-  name: string;
-  schoolLevel: "elementary" | "middle" | "high" | "unknown";
+  name?: string;
+  schoolName?: string;
+  schoolLevel?: "elementary" | "middle" | "high" | "unknown";
+  schoolKind?: string;
   regionCode?: string | null;
+  regionName?: string | null;
   address?: string | null;
-  source: "seed_snapshot" | "NEIS" | "manual";
+  roadAddress?: string | null;
+  source?: "seed_snapshot" | "NEIS" | "manual";
+  sourceCode?: string;
 };
 
 export type ContextMe = {
@@ -143,6 +152,21 @@ export type SchoolCalendarItem = {
   source: string;
 };
 
+export type SchoolTimetableSlot = {
+  id?: string;
+  schoolCode?: string;
+  officeCode?: string;
+  academicYear?: string;
+  semester?: string;
+  timetableDate: string;
+  grade: string;
+  className: string;
+  period: number;
+  subjectName?: string | null;
+  sourceCode?: string;
+  retrievedAt?: string;
+};
+
 export type EducationStat = {
   label: string;
   value: string;
@@ -152,29 +176,40 @@ export type EducationStat = {
 export type PublicContextBundle = {
   studentId?: string;
   school: SchoolProfile;
-  calendar: SchoolCalendarItem[];
+  calendar: Array<SchoolCalendarItem | Record<string, unknown>>;
+  timetable?: SchoolTimetableSlot[];
   timetableSummary: {
     todaySubjects: string[];
     source: string;
+    date?: string | null;
+    cacheStatus?: string;
   };
-  educationStats: EducationStat[];
-  lastSyncedAt: string;
+  educationStats?: EducationStat[];
+  lastSyncedAt?: string | null;
 };
 
 export type StudentListItem = {
   studentId: string;
   displayName: string;
   grade: string;
+  gradeLabel?: string;
   schoolName?: string;
   studentType: ContentType;
+  studentTypeLabel?: string;
+  trackLabel?: string;
   primaryNeed: string;
   attendanceRate?: number | null;
+  attendanceLabel?: string;
   strengths?: string[];
   weaknesses?: string[];
   caseStatus?: CaseStatus;
   latestContentStatus: MissionStatus | "completed" | "none";
   dashboardStage?: "initial_review" | "material_generation" | "material_review" | "learning" | "feedback";
+  dashboardStageLabel?: string;
+  statusLabel?: string;
   supportStrategy?: string | null;
+  summaryLine?: string;
+  aiContextSummary?: string;
   nextSessionSuggestion: string;
 };
 
@@ -225,9 +260,54 @@ export type PlannerItem = {
   status: "planned" | "done" | "skipped";
 };
 
+export type DashboardProfile = {
+  headline: string;
+  currentStageLabel: string;
+  attendanceLabel: string;
+  primaryNeedTitle: string;
+  primaryNeedDetail: string;
+  supportStrategyTitle: string;
+  supportStrategyDetail?: string | null;
+  strengths: string[];
+  weaknesses: string[];
+  emotionalNote?: string | null;
+  responsePattern?: string | null;
+  guardianCooperation?: string | null;
+  schoolContextNote?: string | null;
+  nextSessionFocus: string[];
+  aiContextSummary: string;
+  autoContext: Array<{ label: string; value: string }>;
+};
+
+export type StudentContextBundle = {
+  student: {
+    id: string;
+    name: string;
+    grade: string;
+    gradeLabel: string;
+    studentType: ContentType;
+    studentTypeLabel: string;
+    trackLabel: string;
+  };
+  caseSummary: Record<string, unknown>;
+  teacherInputs: CaseNote[];
+  previousLessons: Array<Record<string, unknown>>;
+  memoryCard: MemoryCard | null;
+  schoolContext: PublicContextBundle | null;
+  autoContext: Array<{ label: string; value: string }>;
+  aiReadyContext: {
+    summary: string;
+    mustUse: string[];
+    avoid: string[];
+    evidenceSources: Array<Record<string, unknown>>;
+  };
+};
+
 export type StudentCaseFile = {
   profile: StudentProfile;
   schoolContext?: PublicContextBundle;
+  dashboardProfile?: DashboardProfile;
+  contextBundle?: StudentContextBundle;
   openCase: SupportCaseSummary;
   memoryCard: MemoryCard | null;
   weeklyRecords: CaseNote[];

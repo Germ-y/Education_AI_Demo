@@ -178,21 +178,31 @@ class DemoStore:
                 ),
                 None,
             )
+            dashboard = _student_dashboard(student.profile_json)
+            stage_label = _dashboard_stage_label(open_case_by_student_id[student.id].dashboard_stage)
             students.append(
                 {
                     "studentId": student.id,
                     "displayName": student.display_name,
                     "grade": student.grade,
+                    "gradeLabel": dashboard.get("gradeLabel") or _grade_label(student.grade),
                     "schoolCode": student.school_code,
                     "schoolName": school.school_name if school else None,
                     "studentType": student.student_type,
+                    "studentTypeLabel": dashboard.get("studentTypeLabel") or _student_type_label(student.student_type),
+                    "trackLabel": dashboard.get("trackLabel") or _student_type_label(student.student_type),
                     "primaryNeed": student.primary_need,
-                    "attendanceRate": _student_dashboard_value(student.profile_json, "attendanceRate"),
+                    "attendanceRate": dashboard.get("attendanceRate"),
+                    "attendanceLabel": dashboard.get("attendanceLabel") or _attendance_label(dashboard.get("attendanceRate")),
                     "strengths": _student_dashboard_list(student.profile_json, "strengths"),
                     "weaknesses": _student_dashboard_list(student.profile_json, "weaknesses"),
                     "latestContentStatus": latest_content.status if latest_content else "none",
                     "dashboardStage": open_case_by_student_id[student.id].dashboard_stage,
+                    "dashboardStageLabel": stage_label,
+                    "statusLabel": dashboard.get("statusLabel") or stage_label,
                     "supportStrategy": open_case_by_student_id[student.id].support_strategy,
+                    "summaryLine": dashboard.get("summaryLine") or student.primary_need,
+                    "aiContextSummary": dashboard.get("aiContextSummary") or student.primary_need,
                     "nextSessionSuggestion": planner.goal_text if planner else "다음 회기 목표를 설정해 주세요.",
                 }
             )
@@ -210,9 +220,16 @@ class DemoStore:
         memory_card = next((card for card in self.db.memory_cards if card.student_id == student_id and card.status == "active"), None)
         school = self.get_school(student.school_code)
         profile = student.model_dump(by_alias=True)
+        dashboard = _student_dashboard(student.profile_json)
+        timetable_slots = self._latest_timetable_slots_for_student(student)
+        context_bundle = self.get_student_context_bundle(student_id)
         profile.update(
             {
-                "attendanceRate": _student_dashboard_value(student.profile_json, "attendanceRate"),
+                "gradeLabel": dashboard.get("gradeLabel") or _grade_label(student.grade),
+                "studentTypeLabel": dashboard.get("studentTypeLabel") or _student_type_label(student.student_type),
+                "trackLabel": dashboard.get("trackLabel") or _student_type_label(student.student_type),
+                "attendanceRate": dashboard.get("attendanceRate"),
+                "attendanceLabel": dashboard.get("attendanceLabel") or _attendance_label(dashboard.get("attendanceRate")),
                 "strengths": _student_dashboard_list(student.profile_json, "strengths"),
                 "weaknesses": _student_dashboard_list(student.profile_json, "weaknesses"),
             }
@@ -220,6 +237,9 @@ class DemoStore:
         return {
             "profile": profile,
             "school": school.model_dump(by_alias=True) if school else None,
+            "schoolContext": _school_context_bundle(school, self.db.school_calendar_events, timetable_slots) if school else None,
+            "dashboardProfile": _dashboard_profile(student, open_case, school, memory_card, context_bundle),
+            "contextBundle": context_bundle,
             "openCase": open_case.model_dump(by_alias=True),
             "memoryCard": memory_card.model_dump(by_alias=True) if memory_card else None,
             "weeklyRecords": [
@@ -237,6 +257,90 @@ class DemoStore:
                 "schoolName": school.school_name if school else None,
                 "schoolKind": school.school_kind if school else None,
                 "sources": [source.source_code for source in self.db.public_data_sources],
+            },
+        }
+
+    def get_student_context_bundle(self, student_id: str) -> dict | None:
+        self.refresh()
+        student = next((candidate for candidate in self.db.students if candidate.id == student_id), None)
+        open_case = next(
+            (support_case for support_case in self.db.support_cases if support_case.student_id == student_id and support_case.case_status == "open"),
+            None,
+        )
+        if student is None or open_case is None:
+            return None
+
+        school = self.get_school(student.school_code)
+        memory_card = next((card for card in self.db.memory_cards if card.student_id == student_id and card.status == "active"), None)
+        notes = [note for note in self.db.case_notes if note.case_id == open_case.id]
+        planner = next(
+            (
+                item
+                for item in self.db.planner_items
+                if item.student_id == student.id and item.period_type == "next_session" and item.status == "planned"
+            ),
+            None,
+        )
+        contents = [content for content in self.db.mission_contents if content.student_id == student.id]
+        attempts = [attempt for attempt in self.db.attempts if attempt.student_id == student.id]
+        reviews = [summary for summary in self.db.review_summaries if summary.student_id == student.id]
+        timetable_slots = self._latest_timetable_slots_for_student(student)
+        calendar = _upcoming_calendar_for_school(self.db.school_calendar_events, student.school_code)
+        dashboard = _student_dashboard(student.profile_json)
+
+        previous_lessons = []
+        for attempt in sorted(attempts, key=lambda item: item.started_at, reverse=True)[:3]:
+            content = next((candidate for candidate in contents if candidate.id == attempt.mission_content_id), None)
+            review = next((candidate for candidate in reviews if candidate.attempt_id == attempt.id), None)
+            previous_lessons.append(
+                {
+                    "contentId": content.id if content else attempt.mission_content_id,
+                    "title": content.title if content else "이전 학습 콘텐츠",
+                    "completedAt": attempt.completed_at,
+                    "summary": review.short_summary if review else "아직 리뷰 요약이 없습니다.",
+                    "accuracyRate": review.accuracy_rate if review else None,
+                    "studentReviewText": _latest_reflection_text(self.db.activity_events, attempt.id),
+                }
+            )
+
+        auto_context = [
+            {"label": "학생 기록", "value": dashboard.get("responsePattern") or student.primary_need},
+            {"label": "이전 수업", "value": previous_lessons[0]["summary"] if previous_lessons else "이전 수행 기록 없음"},
+            {
+                "label": "학교 시간표",
+                "value": _timetable_context_text(timetable_slots),
+            },
+            {"label": "다음 목표", "value": planner.goal_text if planner else open_case.current_goal},
+        ]
+
+        return {
+            "student": {
+                "id": student.id,
+                "name": student.display_name,
+                "grade": student.grade,
+                "gradeLabel": dashboard.get("gradeLabel") or _grade_label(student.grade),
+                "studentType": student.student_type,
+                "studentTypeLabel": dashboard.get("studentTypeLabel") or _student_type_label(student.student_type),
+                "trackLabel": dashboard.get("trackLabel") or _student_type_label(student.student_type),
+            },
+            "caseSummary": {
+                "caseId": open_case.id,
+                "currentGoal": open_case.current_goal,
+                "primaryNeed": student.primary_need,
+                "supportStrategy": open_case.support_strategy,
+                "dashboardStage": open_case.dashboard_stage,
+                "dashboardStageLabel": _dashboard_stage_label(open_case.dashboard_stage),
+            },
+            "teacherInputs": [note.model_dump(by_alias=True) for note in sorted(notes, key=lambda item: item.created_at, reverse=True)[:5]],
+            "previousLessons": previous_lessons,
+            "memoryCard": memory_card.model_dump(by_alias=True) if memory_card else None,
+            "schoolContext": _school_context_bundle(school, calendar, timetable_slots) if school else None,
+            "autoContext": auto_context,
+            "aiReadyContext": {
+                "summary": dashboard.get("aiContextSummary") or student.primary_need,
+                "mustUse": dashboard.get("nextSessionFocus") or [],
+                "avoid": _default_ai_avoid_list(student.student_type),
+                "evidenceSources": _evidence_sources(school, calendar, timetable_slots),
             },
         }
 
@@ -557,6 +661,36 @@ class DemoStore:
             slots.append(slot.model_dump(by_alias=True))
         return sorted(slots, key=lambda item: (item["timetableDate"], item["grade"], item["className"], item["period"]))
 
+    def get_timetable_context(
+        self,
+        school_code: str,
+        *,
+        timetable_date: str | None = None,
+        grade: str | None = None,
+        class_name: str | None = None,
+    ) -> dict | None:
+        self.refresh()
+        school = self.get_school(school_code)
+        if school is None:
+            return None
+        slots = self.list_school_timetable_slots(
+            school_code,
+            timetable_date=timetable_date,
+            grade=grade,
+            class_name=class_name,
+        )
+        if not slots:
+            return {
+                "school": school.model_dump(by_alias=True),
+                "date": timetable_date,
+                "grade": grade,
+                "className": class_name,
+                "slots": [],
+                "source": {"provider": "NEIS", "cacheStatus": "empty", "retrievedAt": None},
+                "orchestratorHints": ["저장된 시간표 snapshot이 없어 NEIS 동기화가 필요합니다."],
+            }
+        return _timetable_context_response(school.model_dump(by_alias=True), slots, requested_date=timetable_date)
+
     def upsert_public_school_context(
         self,
         *,
@@ -578,6 +712,39 @@ class DemoStore:
         self.db.school_timetable_slots = [item for item in self.db.school_timetable_slots if item.id not in timetable_ids] + timetable_models
         self.persist()
         return {"schools": len(school_models), "calendar": len(calendar_models), "timetable": len(timetable_models)}
+
+    def sync_neis_timetable_cache(
+        self,
+        *,
+        office_code: str,
+        school_code: str,
+        timetable_date: str,
+        grade: str,
+        class_name: str,
+        client,
+    ) -> dict[str, int]:
+        result = client.sync_school_context(
+            office_code=office_code,
+            school_code=school_code,
+            from_date=None,
+            to_date=None,
+            timetable_date=timetable_date,
+            grade=grade,
+            class_name=class_name,
+        )
+        return self.upsert_public_school_context(**result)
+
+    def _latest_timetable_slots_for_student(self, student) -> list[dict]:
+        dashboard = _student_dashboard(student.profile_json)
+        grade = str(student.profile_json.get("gradeNumber") or _grade_number(student.grade) or "")
+        class_name = str(student.profile_json.get("className") or "")
+        slots = self.list_school_timetable_slots(student.school_code or "", grade=grade, class_name=class_name)
+        if not slots:
+            return []
+        latest_date = max(slot["timetableDate"] for slot in slots)
+        preferred_date = dashboard.get("preferredTimetableDate")
+        active_date = preferred_date if preferred_date in {slot["timetableDate"] for slot in slots} else latest_date
+        return [slot for slot in slots if slot["timetableDate"] == active_date]
 
     def patch_memory_card(self, student_id: str, patch: dict[str, Any]) -> MemoryCard | None:
         for index, card in enumerate(self.db.memory_cards):
@@ -808,6 +975,182 @@ class DemoStore:
             studentId=student_id,
             expiresAt=(datetime.now(UTC) + timedelta(hours=12)).isoformat(),
         )
+
+
+def _student_dashboard(profile_json: dict[str, Any]) -> dict[str, Any]:
+    dashboard = profile_json.get("dashboard")
+    return dashboard if isinstance(dashboard, dict) else {}
+
+
+def _grade_number(grade: str) -> str | None:
+    if grade.startswith("elementary_"):
+        return grade.removeprefix("elementary_")
+    if grade.startswith("middle_"):
+        return grade.removeprefix("middle_")
+    if grade.startswith("high_"):
+        return grade.removeprefix("high_")
+    return None
+
+
+def _grade_label(grade: str) -> str:
+    number = _grade_number(grade)
+    if grade.startswith("elementary_") and number:
+        return f"초{number}"
+    if grade.startswith("middle_") and number:
+        return f"중{number}"
+    if grade.startswith("high_") and number:
+        return f"고{number}"
+    return grade
+
+
+def _student_type_label(student_type: str) -> str:
+    return "일상생활 지원형" if student_type == "life_support" else "학습지원형"
+
+
+def _dashboard_stage_label(stage: str) -> str:
+    return {
+        "initial_review": "초기 확인",
+        "material_generation": "자료 생성",
+        "material_review": "자료 검토",
+        "learning": "학습",
+        "feedback": "학습 피드백",
+    }.get(stage, stage)
+
+
+def _attendance_label(value: Any) -> str:
+    if value is None:
+        return "기록 전"
+    return f"{value}%"
+
+
+def _dashboard_profile(student, open_case, school, memory_card, context_bundle: dict | None) -> dict[str, Any]:
+    dashboard = _student_dashboard(student.profile_json)
+    auto_context = context_bundle.get("autoContext", []) if context_bundle else []
+    return {
+        "headline": f"{student.display_name} · {school.school_name if school else '학교 정보 확인 중'} · {dashboard.get('gradeLabel') or _grade_label(student.grade)} · {dashboard.get('trackLabel') or _student_type_label(student.student_type)}",
+        "currentStageLabel": _dashboard_stage_label(open_case.dashboard_stage),
+        "attendanceLabel": dashboard.get("attendanceLabel") or _attendance_label(dashboard.get("attendanceRate")),
+        "primaryNeedTitle": dashboard.get("primaryNeedTitle") or student.primary_need,
+        "primaryNeedDetail": dashboard.get("primaryNeedDetail") or student.primary_need,
+        "supportStrategyTitle": dashboard.get("supportStrategyTitle") or "지원 전략",
+        "supportStrategyDetail": dashboard.get("supportStrategyDetail") or open_case.support_strategy,
+        "strengths": dashboard.get("strengths") or [],
+        "weaknesses": dashboard.get("weaknesses") or [],
+        "emotionalNote": dashboard.get("emotionalNote") or (memory_card.emotional_state_note if memory_card else None),
+        "responsePattern": dashboard.get("responsePattern"),
+        "guardianCooperation": dashboard.get("guardianCooperation") or (memory_card.guardian_cooperation_status if memory_card else None),
+        "schoolContextNote": dashboard.get("schoolContextNote"),
+        "nextSessionFocus": dashboard.get("nextSessionFocus") or [],
+        "aiContextSummary": dashboard.get("aiContextSummary") or student.primary_need,
+        "autoContext": auto_context,
+    }
+
+
+def _school_context_bundle(school, calendar_items: list[Any], timetable_slots: list[dict]) -> dict[str, Any]:
+    calendar = [_model_or_dict(item) for item in calendar_items if _model_or_dict(item).get("schoolCode") == school.school_code]
+    sorted_calendar = sorted(calendar, key=lambda item: item.get("eventDate", ""))[:5]
+    latest_sync_candidates = [
+        *(item.get("retrievedAt") for item in sorted_calendar if item.get("retrievedAt")),
+        *(slot.get("retrievedAt") for slot in timetable_slots if slot.get("retrievedAt")),
+    ]
+    latest_sync = max(latest_sync_candidates) if latest_sync_candidates else None
+    return {
+        "school": school.model_dump(by_alias=True),
+        "calendar": sorted_calendar,
+        "timetable": timetable_slots,
+        "timetableSummary": {
+            "todaySubjects": [slot["subjectName"] for slot in timetable_slots if slot.get("subjectName")],
+            "source": "NEIS_TIMETABLE_CACHE" if timetable_slots else "NEIS_TIMETABLE_EMPTY",
+            "date": timetable_slots[0]["timetableDate"] if timetable_slots else None,
+            "cacheStatus": "cached_snapshot" if timetable_slots else "empty",
+        },
+        "lastSyncedAt": latest_sync,
+    }
+
+
+def _model_or_dict(item: Any) -> dict[str, Any]:
+    if hasattr(item, "model_dump"):
+        return item.model_dump(by_alias=True)
+    return item if isinstance(item, dict) else {}
+
+
+def _upcoming_calendar_for_school(events: list[SchoolCalendarEvent], school_code: str | None) -> list[SchoolCalendarEvent]:
+    if not school_code:
+        return []
+    return sorted([event for event in events if event.school_code == school_code], key=lambda item: item.event_date)[:5]
+
+
+def _latest_reflection_text(events: list[ActivityEvent], attempt_id: str) -> str | None:
+    for event in reversed(events):
+        if event.attempt_id != attempt_id or event.event_type != "post_practice_reflection":
+            continue
+        text = event.payload_json.get("shortText")
+        return text if isinstance(text, str) and text else None
+    return None
+
+
+def _timetable_context_text(slots: list[dict]) -> str:
+    subjects = [slot.get("subjectName") for slot in slots if slot.get("subjectName")]
+    if not subjects:
+        return "저장된 시간표 snapshot 없음"
+    date = slots[0].get("timetableDate", "최근")
+    return f"{date} 시간표: {', '.join(subjects[:6])}"
+
+
+def _default_ai_avoid_list(student_type: str) -> list[str]:
+    common = ["진단 라벨 노출", "개인정보 노출", "이미지 안에 문제/정답 텍스트 삽입"]
+    if student_type == "life_support":
+        return [*common, "긴 설명문", "복잡한 선택지"]
+    return [*common, "한 번에 여러 개념 설명", "정답을 먼저 알려주는 이미지"]
+
+
+def _evidence_sources(school, calendar: list[Any], timetable_slots: list[dict]) -> list[dict[str, Any]]:
+    sources = []
+    if school:
+        sources.append({"type": "school_info", "provider": "NEIS", "schoolCode": school.school_code, "sourceCode": school.source_code})
+    if calendar:
+        sources.append({"type": "school_schedule", "provider": "NEIS", "count": len(calendar), "sourceCode": "neis_school_schedule"})
+    if timetable_slots:
+        sources.append(
+            {
+                "type": "timetable",
+                "provider": "NEIS",
+                "date": timetable_slots[0].get("timetableDate"),
+                "count": len(timetable_slots),
+                "sourceCode": timetable_slots[0].get("sourceCode"),
+            }
+        )
+    return sources
+
+
+def _timetable_context_response(school: dict, slots: list[dict], *, requested_date: str | None) -> dict[str, Any]:
+    active_date = requested_date if requested_date and any(slot["timetableDate"] == requested_date for slot in slots) else slots[0]["timetableDate"]
+    active_slots = [slot for slot in slots if slot["timetableDate"] == active_date]
+    retrieved_at = max((slot.get("retrievedAt") for slot in active_slots if slot.get("retrievedAt")), default=None)
+    subjects = [slot["subjectName"] for slot in active_slots if slot.get("subjectName")]
+    return {
+        "school": school,
+        "date": active_date,
+        "grade": active_slots[0].get("grade") if active_slots else None,
+        "className": active_slots[0].get("className") if active_slots else None,
+        "slots": active_slots,
+        "source": {"provider": "NEIS", "cacheStatus": "cached_snapshot", "retrievedAt": retrieved_at},
+        "orchestratorHints": _orchestrator_hints_from_subjects(subjects),
+    }
+
+
+def _orchestrator_hints_from_subjects(subjects: list[str]) -> list[str]:
+    hints = []
+    joined = " ".join(subjects)
+    if any(keyword in joined for keyword in ["수학", "수리"]):
+        hints.append("오늘 또는 최근 시간표에 수학 흐름이 있어 학습형 콘텐츠를 학교 수업 맥락과 연결할 수 있습니다.")
+    if any(keyword in joined for keyword in ["국어", "독서"]):
+        hints.append("국어/읽기 수업 흐름이 있어 긴 문장 부담 학생은 지시문을 짧게 나누는 것이 좋습니다.")
+    if any(keyword in joined for keyword in ["체육", "행사", "동아리"]):
+        hints.append("활동량이 있는 수업 흐름이 있어 회기 시작은 짧은 성공 경험형 미션이 적합합니다.")
+    if not hints:
+        hints.append("저장된 시간표 snapshot을 참고하되 학생 개인 능력 판단에는 사용하지 않습니다.")
+    return hints
 
 
 def _now() -> str:
