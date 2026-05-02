@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { DragEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { SceneTheme, SceneVisual, StageQuestion, StudentContext } from "@/lib/demo-data";
+import type { SceneTheme, SceneVisual, StageQuestion, StudentContext } from "@/lib/student-scene-types";
 
 function MiniStar() {
   return (
@@ -169,30 +169,42 @@ function StageMedia({
   question,
   theme,
   compact = false,
+  full = false,
+  featured = false,
 }: {
   question: StageQuestion;
   theme: SceneTheme;
   compact?: boolean;
+  full?: boolean;
+  featured?: boolean;
 }) {
   if (!question.imageUrl && !question.audioUrl) return null;
 
   return (
     <div
-      className={`overflow-hidden rounded-[20px] border bg-white shadow-sm ${compact ? "p-2" : "p-3"}`}
+      className={`overflow-hidden rounded-[20px] border bg-white shadow-sm ${full ? "flex h-full min-h-[300px] flex-col p-3" : compact ? "p-2" : "p-3"}`}
       style={{ borderColor: theme.border }}
     >
       {question.imageUrl && (
         <Image
           src={question.imageUrl}
           alt={question.prompt}
-          width={720}
-          height={360}
-          className={`w-full rounded-[16px] object-cover ${compact ? "h-28" : "h-48"}`}
+          width={1120}
+          height={720}
+          className={`w-full rounded-[16px] bg-[#f8fafc] object-contain ${
+            full
+              ? "min-h-0 flex-1"
+              : compact
+                ? featured
+                  ? "h-[clamp(180px,24vh,220px)]"
+                  : "h-44"
+                : "h-[clamp(320px,48vh,460px)]"
+          }`}
           unoptimized
         />
       )}
       {question.audioUrl && (
-        <div className={question.imageUrl ? "mt-2" : ""}>
+        <div className={question.imageUrl ? "mt-3 shrink-0" : ""}>
           <audio className="w-full" src={question.audioUrl} controls preload="auto" />
         </div>
       )}
@@ -211,9 +223,16 @@ function StageVisualBoard({
   theme: SceneTheme;
   compact?: boolean;
 }) {
+  if (question.imageUrl || question.audioUrl) {
+    return (
+      <div className="h-full min-h-[360px]">
+        <StageMedia question={question} theme={theme} compact={compact} full={!compact} />
+      </div>
+    );
+  }
+
   return (
-    <div className={`grid h-full min-h-[300px] gap-3 ${question.imageUrl || question.audioUrl ? "grid-rows-[auto_1fr]" : "grid-rows-1"}`}>
-      <StageMedia question={question} theme={theme} compact={compact} />
+    <div className="grid h-full min-h-[300px] grid-rows-1 gap-3">
       <div className="min-h-0 overflow-hidden">
         <LearningVisual visual={visual} compact={compact} />
       </div>
@@ -555,7 +574,7 @@ function SequenceStageBoard({
   onReset: () => void;
 }) {
   return (
-    <div className="grid h-full min-h-[300px] grid-rows-[minmax(112px,0.32fr)_minmax(330px,1fr)] gap-3">
+    <div className="grid h-full min-h-[560px] grid-rows-[minmax(220px,0.38fr)_minmax(330px,1fr)] gap-3">
       <div className="min-h-0 overflow-hidden">
         <StageVisualBoard visual={visual} question={question} theme={theme} compact />
       </div>
@@ -600,7 +619,11 @@ function CardMatchingTemplate({
     .filter(Boolean) as Array<{ id: string; leftY: number; rightY: number }>;
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-5 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]">
+    <div
+      className={`grid h-full min-h-0 gap-4 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-5 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)] ${
+        question.imageUrl || question.audioUrl ? "grid-rows-[auto_auto_minmax(0,1fr)]" : "grid-rows-[auto_minmax(0,1fr)]"
+      }`}
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-2xl font-black leading-8">서로 맞는 카드를 연결해보세요</p>
@@ -610,6 +633,12 @@ function CardMatchingTemplate({
           {matchedCount} / {items.length}
         </div>
       </div>
+
+      {(question.imageUrl || question.audioUrl) && (
+        <div className="min-h-0">
+          <StageMedia question={question} theme={theme} compact />
+        </div>
+      )}
 
       <div className="grid min-h-0 grid-cols-[minmax(240px,1fr)_minmax(260px,0.66fr)_minmax(240px,1fr)] items-stretch gap-4">
         <div className="grid min-h-0 gap-3">
@@ -903,39 +932,41 @@ function RealtimePracticeRoom({
   };
 
   return (
-    <div className="grid h-full min-h-[440px] grid-cols-[minmax(320px,0.86fr)_minmax(390px,1fr)] gap-4 rounded-[24px] border border-[#dce5ec] bg-white p-4 shadow-[0_18px_48px_rgba(57,78,97,0.10)]">
-      <div className="relative grid min-h-0 grid-rows-[auto_1fr] overflow-hidden rounded-[22px] border p-5" style={{ borderColor: theme.border, backgroundColor: theme.accentPale }}>
+    <div className="grid h-full min-h-[440px] grid-cols-[minmax(360px,0.9fr)_minmax(390px,1fr)] gap-4 rounded-[24px] border border-[#dce5ec] bg-white p-4 shadow-[0_18px_48px_rgba(57,78,97,0.10)]">
+      <div className="relative grid min-h-0 grid-rows-[auto_1fr] overflow-hidden rounded-[22px] border p-4" style={{ borderColor: theme.border, backgroundColor: theme.accentPale }}>
         <div className="relative z-10">
           <p className="text-sm font-black" style={{ color: theme.accentStrong }}>
             {practice.label}
           </p>
-          <h3 className="mt-2 text-[2.6rem] font-black leading-tight break-keep text-[#172033]">{practice.title}</h3>
-          <p className="mt-3 text-base font-bold leading-7 break-keep text-[#596157]">{practice.sceneLine}</p>
-          <div className="mt-4">
-            <StageMedia question={question} theme={theme} compact />
+          <h3 className="mt-1.5 text-[1.9rem] font-black leading-tight break-keep text-[#172033]">{practice.title}</h3>
+          <div className="mt-3">
+            <StageMedia question={question} theme={theme} compact featured />
           </div>
+          <p className="mt-2 text-sm font-bold leading-6 break-keep text-[#596157]">{practice.sceneLine}</p>
         </div>
 
-        <div className="relative z-10 grid min-h-0 grid-cols-[minmax(0,1fr)_160px] items-center gap-4 pt-5">
-          <div className="rounded-[20px] border border-white/80 bg-white/90 p-5 shadow-sm">
+        <div className="relative z-10 grid min-h-0 grid-cols-[minmax(0,1fr)_112px] items-center gap-3 pt-3">
+          <div className="rounded-[20px] border border-white/80 bg-white/90 p-4 shadow-sm">
             <p className="text-xs font-black" style={{ color: theme.accentStrong }}>
               {practice.partner}
             </p>
-            <p className="mt-3 text-2xl font-black leading-9 break-keep text-[#25312a]">{practice.partnerLine}</p>
+            <p className="mt-2 text-xl font-black leading-7 break-keep text-[#25312a]">{practice.partnerLine}</p>
           </div>
-          <div className="relative h-56 w-40 justify-self-end">
-            <div className="absolute bottom-0 left-3 h-28 w-32 rounded-t-[56px] border border-white/80 bg-[#ffe6a8] shadow-[inset_0_-10px_0_rgba(190,134,35,0.12)]" />
-            <div className="absolute bottom-[112px] left-5 h-[112px] w-[112px] rounded-full bg-[#4f3424]" />
-            <div className="absolute bottom-[94px] left-6 h-28 w-28 rounded-full border border-white/80 bg-[#ffd9bf] shadow-[inset_0_-8px_0_rgba(185,110,70,0.14)]">
-              <span className="absolute -top-3 left-4 h-9 w-9 rounded-full bg-[#4f3424]" />
-              <span className="absolute -top-4 left-11 h-10 w-10 rounded-full bg-[#4f3424]" />
-              <span className="absolute -top-2 right-5 h-8 w-8 rounded-full bg-[#4f3424]" />
-              <span className="absolute left-7 top-10 h-2.5 w-2.5 rounded-full bg-[#25312a]" />
-              <span className="absolute right-7 top-10 h-2.5 w-2.5 rounded-full bg-[#25312a]" />
-              <span className="absolute left-1/2 top-[58px] h-3 w-9 -translate-x-1/2 rounded-b-full border-b-[3px] border-[#25312a]" />
+          <div className="relative h-36 w-28 justify-self-end overflow-hidden">
+            <div className="absolute bottom-0 right-0 h-56 w-40 origin-bottom-right scale-[0.64]">
+              <div className="absolute bottom-0 left-3 h-28 w-32 rounded-t-[56px] border border-white/80 bg-[#ffe6a8] shadow-[inset_0_-10px_0_rgba(190,134,35,0.12)]" />
+              <div className="absolute bottom-[112px] left-5 h-[112px] w-[112px] rounded-full bg-[#4f3424]" />
+              <div className="absolute bottom-[94px] left-6 h-28 w-28 rounded-full border border-white/80 bg-[#ffd9bf] shadow-[inset_0_-8px_0_rgba(185,110,70,0.14)]">
+                <span className="absolute -top-3 left-4 h-9 w-9 rounded-full bg-[#4f3424]" />
+                <span className="absolute -top-4 left-11 h-10 w-10 rounded-full bg-[#4f3424]" />
+                <span className="absolute -top-2 right-5 h-8 w-8 rounded-full bg-[#4f3424]" />
+                <span className="absolute left-7 top-10 h-2.5 w-2.5 rounded-full bg-[#25312a]" />
+                <span className="absolute right-7 top-10 h-2.5 w-2.5 rounded-full bg-[#25312a]" />
+                <span className="absolute left-1/2 top-[58px] h-3 w-9 -translate-x-1/2 rounded-b-full border-b-[3px] border-[#25312a]" />
+              </div>
+              <div className="absolute bottom-[70px] left-0 h-16 w-8 rotate-[24deg] rounded-full bg-[#ffd9bf]" />
+              <div className="absolute bottom-[70px] right-0 h-16 w-8 rotate-[-24deg] rounded-full bg-[#ffd9bf]" />
             </div>
-            <div className="absolute bottom-[70px] left-0 h-16 w-8 rotate-[24deg] rounded-full bg-[#ffd9bf]" />
-            <div className="absolute bottom-[70px] right-0 h-16 w-8 rotate-[-24deg] rounded-full bg-[#ffd9bf]" />
           </div>
         </div>
 
@@ -1366,7 +1397,7 @@ export function StudentStageExperience({
         href="/"
         className="fixed bottom-6 right-6 z-50 rounded-full border border-[#25466f] bg-[#1f3a5f] px-5 py-3 text-base font-black text-white shadow-[0_12px_30px_rgba(31,58,95,0.25)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(31,58,95,0.32)]"
       >
-        데모 홈
+        홈으로
       </Link>
       )}
       <div className="m-auto">

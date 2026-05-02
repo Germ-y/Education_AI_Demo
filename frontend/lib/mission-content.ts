@@ -57,7 +57,17 @@ export function getAssetByRole(
 
 export function getAssetUrl(asset: ContentAsset | null) {
   if (!asset) return null;
-  return asset.previewUrl || asset.storageUrl || null;
+  const url = asset.previewUrl || asset.storageUrl || null;
+  if (!url) return null;
+  if (/^https?:\/\//.test(url)) return url;
+
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+  if (url.startsWith("/generated/")) return `${apiBaseUrl}${url}`;
+
+  // Legacy demo paths are intentionally not rendered as fallback assets.
+  if (url.startsWith("/examples/generated/") || url.startsWith("/assets/demo/")) return null;
+
+  return url;
 }
 
 export function getStageAssetRole(step: ContentStage["step"]): AssetRole {

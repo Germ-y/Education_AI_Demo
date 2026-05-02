@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import type { SceneTheme } from "@/lib/demo-data";
+import type { SceneTheme } from "@/lib/student-scene-types";
 import { getStudentContextForRoute } from "@/lib/student-context-source";
 
 function StarMascot() {
@@ -96,7 +96,7 @@ export default async function StudentHomePage({
         href="/"
         className="fixed bottom-6 right-6 z-50 rounded-full border border-[#25466f] bg-[#1f3a5f] px-5 py-3 text-base font-black text-white shadow-[0_12px_30px_rgba(31,58,95,0.25)]"
       >
-        데모 홈
+        홈으로
       </Link>
       <div className="m-auto">
         <div className="relative aspect-[4/3] h-[min(calc(100vh-32px),820px)] rounded-[44px] bg-[#202939] p-4 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">

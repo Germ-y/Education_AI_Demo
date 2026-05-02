@@ -14,7 +14,7 @@ export default async function StudentStagePage({
   const completeParam = Array.isArray(params.complete) ? params.complete[0] : params.complete;
   const previewParam = Array.isArray(params.preview) ? params.preview[0] : params.preview;
   const requestedStep = Number(stepParam);
-  const maxOpenStep = completeParam === "1" ? context.scene.totalSteps : context.scene.currentStep;
+  const maxOpenStep = completeParam === "1" || previewParam === "1" ? context.scene.totalSteps : context.scene.currentStep;
   const initialStep =
     Number.isInteger(requestedStep) && requestedStep >= 1 && requestedStep <= maxOpenStep
       ? requestedStep

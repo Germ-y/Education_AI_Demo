@@ -131,18 +131,27 @@ export default async function StudentStartPage({
               </section>
 
               <aside className="flex min-h-0 items-center justify-center">
-                <div className="relative w-full max-w-[430px]">
-                  {heroImage?.url ? (
+                <div className="relative flex w-full max-w-[520px] flex-col items-center">
+                  {!heroImage?.url && (
+                  <div className="mx-auto flex justify-center">
+                    <StarterStar />
+                  </div>
+                  )}
+
+                  {heroImage?.url && (
                     <div
-                      className="overflow-hidden rounded-[28px] border bg-white p-3 shadow-[0_20px_54px_rgba(57,78,97,0.10)]"
+                      className="relative mt-4 w-full overflow-visible rounded-[28px] border bg-white p-3 shadow-[0_20px_54px_rgba(57,78,97,0.10)]"
                       style={{ borderColor: theme.border }}
                     >
+                      <div className="pointer-events-none absolute -right-12 -top-28 z-10 scale-[0.58]" aria-hidden="true">
+                        <StarterStar />
+                      </div>
                       <Image
                         src={heroImage.url}
                         alt={heroImage.alt}
-                        width={720}
-                        height={480}
-                        className="h-[240px] w-full rounded-[20px] object-cover"
+                        width={960}
+                        height={640}
+                        className="h-[min(44vh,390px)] min-h-[300px] w-full rounded-[20px] bg-[#f8fafc] object-contain"
                         unoptimized
                         priority
                       />
@@ -151,10 +160,6 @@ export default async function StudentStartPage({
                           <audio className="w-full" src={heroAudio.url} controls preload="auto" />
                         </div>
                       )}
-                    </div>
-                  ) : (
-                    <div className="mx-auto flex justify-center">
-                      <StarterStar />
                     </div>
                   )}
                   <div
