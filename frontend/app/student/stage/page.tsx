@@ -22,7 +22,7 @@ export default async function StudentStagePage({
       context={context}
       initialStep={initialStep}
       initialMode={completeParam === "1" ? "complete" : "stage"}
-      nextHref="/student?complete=1"
+      nextHref="/student/path?complete=1"
       previewMode={previewParam === "1"}
     />
   );
