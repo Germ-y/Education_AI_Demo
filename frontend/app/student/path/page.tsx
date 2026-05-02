@@ -1,27 +1,40 @@
 import Link from "next/link";
+import Image from "next/image";
 import { getStudentContext, type SceneTheme } from "@/lib/demo-data";
 
 function StarMascot() {
   return (
-    <div className="relative h-[136px] w-[136px]">
-      <div
-        className="absolute left-[30px] top-2 z-10 h-24 w-24 bg-[#ffd84d] shadow-[inset_0_-8px_0_rgba(184,122,0,0.16),0_16px_30px_rgba(184,122,0,0.14)]"
-        style={{
-          clipPath:
-            "polygon(50% 0%, 61% 34%, 97% 35%, 68% 55%, 79% 91%, 50% 69%, 21% 91%, 32% 55%, 3% 35%, 39% 34%)",
-        }}
-      />
-      <div className="absolute bottom-4 left-1 z-0 h-12 w-12 rotate-[-8deg] rounded-[16px] bg-[#58b957] p-3 shadow-[inset_0_-6px_0_rgba(40,120,44,0.18)]">
-        <div className="h-6 w-6 rounded-full bg-white/85">
-          <div className="mx-auto translate-y-[8px] h-2 w-2 rounded-full bg-[#58b957]" />
+    <div className="relative h-[154px] w-[172px]" aria-hidden="true">
+      <div className="absolute bottom-3 left-1/2 h-4 w-24 -translate-x-1/2 rounded-full bg-black/10 blur-md" />
+      <div className="absolute inset-0 animate-[starMascotFloat_4.8s_ease-in-out_infinite]">
+        <Image
+          src="/assets/star-mascot/without-arm-eyes.svg"
+          alt=""
+          fill
+          sizes="172px"
+          className="object-contain"
+          draggable={false}
+          priority
+        />
+        <div className="absolute inset-0 animate-[starMascotWave_2.6s_ease-in-out_infinite]">
+          <Image
+            src="/assets/star-mascot/arm.svg"
+            alt=""
+            fill
+            sizes="172px"
+            className="object-contain"
+            draggable={false}
+          />
         </div>
+        <Image
+          src="/assets/star-mascot/eyes.svg"
+          alt=""
+          fill
+          sizes="172px"
+          className="animate-[starMascotBlink_4.2s_ease-in-out_infinite] object-contain"
+          draggable={false}
+        />
       </div>
-      <div className="absolute left-[58px] top-[43px] z-20 h-3.5 w-3.5 rounded-full bg-[#25312a]" />
-      <div className="absolute left-[86px] top-[43px] z-20 h-3.5 w-3.5 rounded-full bg-[#25312a]" />
-      <div className="absolute left-[70px] top-[61px] z-20 h-4 w-7 rounded-b-full bg-[#25312a]">
-        <div className="mx-auto mt-2.5 h-1.5 w-4 rounded-full bg-[#ff8a7a]" />
-      </div>
-      <div className="absolute bottom-3 left-8 h-3 w-24 rounded-full bg-black/10 blur-sm" />
     </div>
   );
 }
