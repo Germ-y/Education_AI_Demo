@@ -271,6 +271,14 @@ published 콘텐츠만 학생 API에서 조회된다.
 승인/반려/배포가 audit log에 남는다.
 ```
 
+상태:
+
+```text
+부분 완료. GET /api/contents/:id, approve, reject, publish API를 추가했다.
+학생 API는 published 콘텐츠만 반환한다.
+audit log 영속화와 재생성 API는 다음 슬라이스에서 진행한다.
+```
+
 ## 마일스톤 9. 학생 플레이 런타임
 
 작업:

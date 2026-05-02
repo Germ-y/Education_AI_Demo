@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.config import get_settings
 from app.data.demo_data import create_demo_database
+from app.domain.enums import MissionStatus
 from app.domain.models import ActivityEvent, CaseNote, ContentAttempt, DemoDatabase, MemoryCard, RealtimePracticeSession
 from app.domain.schemas import MissionContent
 from app.repositories.demo_repository import DemoRepository
@@ -216,6 +217,64 @@ class DemoStore:
                 session.model_dump(by_alias=True) for session in self.db.realtime_sessions if session.mission_content_id in content_ids
             ],
         }
+
+    def get_mission_for_teacher(self, content_id: str, teacher_id: str | None = None) -> MissionContent | None:
+        self.refresh()
+        mission = next((content for content in self.db.mission_contents if content.id == content_id), None)
+        if mission is None:
+            return None
+        support_case = next((case for case in self.db.support_cases if case.id == mission.case_id), None)
+        if support_case is None or (teacher_id is not None and support_case.owner_teacher_id != teacher_id):
+            return None
+        return mission
+
+    def approve_mission_content(
+        self,
+        content_id: str,
+        teacher_id: str,
+        approved_stage_ids: list[str],
+        approved_asset_ids: list[str],
+        review_note: str | None,
+    ) -> MissionContent | None:
+        self.refresh()
+        mission = self.get_mission_for_teacher(content_id, teacher_id)
+        if mission is None:
+            return None
+        stage_ids = {stage.id for stage in mission.stages}
+        asset_ids = {asset.id for asset in mission.assets}
+        if not stage_ids.issubset(set(approved_stage_ids)) or not asset_ids.issubset(set(approved_asset_ids)):
+            return None
+        for asset in mission.assets:
+            asset.approval_status = "approved"
+        mission.status = MissionStatus.APPROVED
+        mission.teacher_review_summary = review_note
+        mission.approved_by_user_id = teacher_id
+        mission.approved_at = _now()
+        self.persist()
+        return mission
+
+    def reject_mission_content(self, content_id: str, teacher_id: str, reason: str, requested_changes: list[str]) -> MissionContent | None:
+        self.refresh()
+        mission = self.get_mission_for_teacher(content_id, teacher_id)
+        if mission is None:
+            return None
+        mission.status = MissionStatus.REVISION_REQUESTED
+        mission.teacher_review_summary = reason
+        mission.brief_json = {**mission.brief_json, "requestedChanges": requested_changes}
+        self.persist()
+        return mission
+
+    def publish_mission_content(self, content_id: str, teacher_id: str) -> MissionContent | None:
+        self.refresh()
+        mission = self.get_mission_for_teacher(content_id, teacher_id)
+        if mission is None or mission.status != MissionStatus.APPROVED:
+            return None
+        if any(asset.approval_status != "approved" for asset in mission.assets):
+            return None
+        mission.status = MissionStatus.PUBLISHED
+        mission.published_at = _now()
+        self.persist()
+        return mission
 
     def add_student_note(self, student_id: str, author_id: str, payload: dict[str, Any]) -> CaseNote | None:
         open_case = next(

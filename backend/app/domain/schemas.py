@@ -309,3 +309,18 @@ class ContentGenerationRequest(BaseModel):
     case_id: str = Field(alias="caseId")
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class ContentApprovalRequest(BaseModel):
+    approved_stage_ids: list[str] = Field(alias="approvedStageIds")
+    approved_asset_ids: list[str] = Field(alias="approvedAssetIds")
+    review_note: str | None = Field(default=None, alias="reviewNote")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ContentRejectRequest(BaseModel):
+    reason: str
+    requested_changes: list[str] = Field(default_factory=list, alias="requestedChanges")
+
+    model_config = ConfigDict(populate_by_name=True)

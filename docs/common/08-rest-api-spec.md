@@ -381,6 +381,7 @@ AI 실행 상태/결과 조회.
 ### GET /api/contents/:contentId
 
 교사용 콘텐츠 상세. `teacher_review` 상태도 볼 수 있다.
+학생 API와 달리 교사 검토 API는 `teacher_review`, `approved`, `published`, `revision_requested` 상태를 조회할 수 있다.
 
 ### POST /api/contents/:contentId/request-image-regeneration
 
@@ -420,6 +421,9 @@ AI 실행 상태/결과 조회.
 }
 ```
 
+서버는 요청의 `approvedStageIds`, `approvedAssetIds`가 콘텐츠의 모든 stage/asset을 포함하는지 확인한다.
+승인되면 콘텐츠 상태는 `approved`가 되고 asset `approvalStatus`는 `approved`가 된다.
+
 ### POST /api/contents/:contentId/reject
 
 반려/수정 요청.
@@ -431,9 +435,21 @@ AI 실행 상태/결과 조회.
 }
 ```
 
+반려되면 콘텐츠 상태는 `revision_requested`가 된다.
+반려된 콘텐츠는 학생 API에서 노출되지 않는다.
+
 ### POST /api/contents/:contentId/publish
 
 승인된 콘텐츠를 학생에게 배포한다.
+
+전제:
+
+```text
+content.status == approved
+all assets approvalStatus == approved
+```
+
+배포되면 콘텐츠 상태는 `published`가 되고 학생 미션 API에서 조회된다.
 
 ## 7. Student Mission APIs
 

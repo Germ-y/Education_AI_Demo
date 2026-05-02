@@ -69,6 +69,24 @@ def test_teacher_and_student_demo_flows() -> None:
     assert history.status_code == 200
     assert history.json()["data"]["missionContents"][0]["studentId"] == "student_learning_fraction"
 
+    teacher_content = client.get("/api/contents/content_fraction_001", headers={"authorization": f"Bearer {teacher_token}"})
+    assert teacher_content.status_code == 200
+    content_payload = teacher_content.json()["data"]
+    approve = client.post(
+        "/api/contents/content_fraction_001/approve",
+        headers={"authorization": f"Bearer {teacher_token}"},
+        json={
+            "approvedStageIds": [stage["id"] for stage in content_payload["stages"]],
+            "approvedAssetIds": [asset["id"] for asset in content_payload["assets"]],
+            "reviewNote": "데모 검수 완료",
+        },
+    )
+    assert approve.status_code == 200
+    assert approve.json()["data"]["status"] == "approved"
+    publish = client.post("/api/contents/content_fraction_001/publish", headers={"authorization": f"Bearer {teacher_token}"})
+    assert publish.status_code == 200
+    assert publish.json()["data"]["status"] == "published"
+
     note = client.post(
         "/api/teacher/students/student_learning_fraction/notes",
         headers={"authorization": f"Bearer {teacher_token}"},
