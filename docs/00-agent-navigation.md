@@ -22,6 +22,7 @@
 | seed/auth/아이등록 | [08-demo-seed-auth-registration-plan.md](08-demo-seed-auth-registration-plan.md) | [11-database-schema-spec.md](11-database-schema-spec.md), [12-rest-api-spec.md](12-rest-api-spec.md) |
 | DB 모델 구현 | [11-database-schema-spec.md](11-database-schema-spec.md) | [05-backend-feature-spec.md](05-backend-feature-spec.md) |
 | REST API 구현 | [12-rest-api-spec.md](12-rest-api-spec.md) | [11-database-schema-spec.md](11-database-schema-spec.md) |
+| 프론트/백엔드 협업 | [14-collaboration-contract.md](14-collaboration-contract.md) | [12-rest-api-spec.md](12-rest-api-spec.md), [13-implementation-backlog.md](13-implementation-backlog.md) |
 
 ## Canonical Vocabulary
 

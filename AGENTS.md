@@ -5,6 +5,7 @@
 1. [GOAL.md](GOAL.md)
 2. [docs/00-agent-navigation.md](docs/00-agent-navigation.md)
 3. [docs/13-implementation-backlog.md](docs/13-implementation-backlog.md)
+4. 프론트/백엔드가 함께 바뀌는 작업이면 [docs/14-collaboration-contract.md](docs/14-collaboration-contract.md)
 
 ## Repository Layout
 
@@ -34,6 +35,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - 학생에게 노출되는 모든 AI 생성 콘텐츠는 자동 검수와 교사 승인 뒤에만 배포한다.
 - 공공데이터는 학생 개인 진단값이 아니라 교육과정, 학사일정, 지역 맥락, 통계 근거로 사용한다.
 - 데모 MVP는 seed 학생/교사/센터 데이터로 먼저 완성한다. 회원가입/아이등록은 시간이 남을 때 확장한다.
+- 프론트/백엔드 계약 변경은 문서 → 백엔드 스키마/API → seed → 프론트 소비 코드 → 검증 순서로 진행한다.
 
 ## Agent Loop
 
@@ -59,3 +61,10 @@ git diff --check
 구현 작업이라면 추가로 타입체크, 테스트, seed 실행, API smoke test를 수행한다.
 
 FastAPI 백엔드 검증은 루트에서 `cd backend` 후 실행한다.
+
+## Project Skills
+
+- [.agents/skills/eduyj-agent-loop/SKILL.md](.agents/skills/eduyj-agent-loop/SKILL.md)
+- [.agents/skills/eduyj-monorepo-collaboration/SKILL.md](.agents/skills/eduyj-monorepo-collaboration/SKILL.md)
+- [.agents/skills/eduyj-backend-contracts/SKILL.md](.agents/skills/eduyj-backend-contracts/SKILL.md)
+- [.agents/skills/eduyj-content-package/SKILL.md](.agents/skills/eduyj-content-package/SKILL.md)

@@ -19,6 +19,7 @@ assets/     OCR/공공데이터 시각 자료
 2. [GOAL.md](GOAL.md) - `/goal` 장기 실행 기준
 3. [문서 내비게이션](docs/00-agent-navigation.md) - 기능별 참조 문서 라우팅
 4. [구현 백로그](docs/13-implementation-backlog.md) - 다음 구현 순서
+5. [협업 계약](docs/14-collaboration-contract.md) - 프론트/백엔드 동시 작업 기준
 
 ## Core Decisions
 
@@ -27,6 +28,7 @@ assets/     OCR/공공데이터 시각 자료
 - 영상 생성은 범위에서 제외한다. AI는 `gpt-image-2`로 대표 이미지 1장과 단계별 이미지 4장을 실제 생성한다.
 - AI 생성물은 자동 검수 후 교사가 승인해야 학생에게 배포된다.
 - 공공데이터는 학생 개인 진단이 아니라 교육과정, 학사일정, 통계, 지역 맥락 연결 근거로 사용한다.
+- 프론트/백엔드 계약 변경은 문서, 백엔드 스키마/API, seed, 프론트 소비 코드 순서로 맞춘다.
 
 ## Frontend
 
@@ -69,3 +71,8 @@ curl -s -X POST http://localhost:4000/api/auth/student-access \
   -H 'content-type: application/json' \
   -d '{"accessCode":"STAR-001"}'
 ```
+
+## Collaboration
+
+- 협업 기준: [docs/14-collaboration-contract.md](docs/14-collaboration-contract.md)
+- 에이전트 스킬: [.agents/skills/eduyj-monorepo-collaboration/SKILL.md](.agents/skills/eduyj-monorepo-collaboration/SKILL.md)

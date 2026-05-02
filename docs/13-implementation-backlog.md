@@ -14,8 +14,19 @@
 - [x] DB schema 구현
 - [x] seed 데이터 구현
 - [x] 기본 API 구현
+- [x] 프론트/백엔드 협업 계약 문서와 monorepo skill 추가
 - [ ] AI provider 연동
 - [ ] 학생 플레이 runtime 구현
+
+## Collaboration Gate
+
+프론트와 백엔드가 함께 바뀌는 작업은 먼저 [14-collaboration-contract.md](14-collaboration-contract.md)를 따른다.
+
+계약 변경 순서:
+
+```text
+문서 스펙 -> 백엔드 스키마/API -> seed -> 프론트 소비 코드 -> 검증 -> backlog 갱신
+```
 
 ## Milestone 1. Repo And App Structure
 
