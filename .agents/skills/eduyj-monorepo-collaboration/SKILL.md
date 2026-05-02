@@ -24,6 +24,7 @@ description: EduYJ 레포에서 프론트엔드와 백엔드가 함께 바뀌는
 - 작업 규칙/문서 작업: `AGENTS.md`, `GOAL.md`, `.agents/skills/`, `docs/common/00-*`, `docs/common/03-*`
 
 프론트와 백엔드가 같이 바뀌면 코드보다 문서를 먼저 고친다.
+의미 단위마다 커밋해서 작업 로그를 남기고, push는 마지막 handoff 시점에 한다.
 
 ## 2. 계약 변경 순서
 
@@ -38,6 +39,7 @@ API 응답, 콘텐츠 JSON, seed 데이터, 프론트 mock 데이터가 같이 �
 백로그 상태 갱신
 handoff 문서 확인
 커밋
+마지막 push
 ```
 
 ## 3. 지켜야 할 것
@@ -45,6 +47,7 @@ handoff 문서 확인
 - 프론트 작업은 `frontend` 브랜치에서 push한다.
 - 백엔드 작업은 `backend` 브랜치에서 push한다.
 - 통합 검증은 `dev` 브랜치에서 한다.
+- 작업 중에는 작은 커밋을 쌓고, 검증 후 마지막에 push한다.
 - provider key는 `frontend/`에 노출하지 않는다.
 - 학생 미션은 4단계다. 회고는 5단계가 아니다.
 - 4단계가 realtime이다. 1~3단계는 승인된 정적 템플릿이다.

@@ -7,7 +7,8 @@
 ```text
 frontend 브랜치에서 프론트 작업
 backend 브랜치에서 백엔드 작업
-각자 브랜치 push
+각자 브랜치에서 작은 커밋으로 작업 로그 관리
+검증 후 각자 브랜치 push
 dev 브랜치에서 pull/merge
 dev 브랜치에서 통합 검증
 검증 결과를 문서/PR에 남김
@@ -134,4 +135,24 @@ npm run lint
 공통 계약: docs/common/*
 프론트 전용 설명: docs/frontend/*
 백엔드 전용 설명: docs/backend/*
+```
+
+## 6. push 전 확인
+
+작업 중간에는 커밋만 남기고, push는 handoff 가능한 상태에서 마지막에 한다.
+
+```bash
+git status --short --branch
+git diff --check
+git log --oneline --decorate -n 8
+```
+
+push 메시지나 PR 설명에는 다음을 남긴다.
+
+```text
+이번 push 목적:
+주요 커밋:
+프론트 확인 필요:
+백엔드 확인 필요:
+실행한 검증:
 ```
