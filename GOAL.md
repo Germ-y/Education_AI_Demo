@@ -25,7 +25,7 @@
 
 ### M1. Domain Contract
 
-- DB 스키마를 [docs/11-database-schema-spec.md](docs/11-database-schema-spec.md)에 맞춰 Prisma 또는 ORM 모델로 옮긴다.
+- DB 스키마를 [docs/11-database-schema-spec.md](docs/11-database-schema-spec.md)에 맞춰 SQLAlchemy ORM 모델로 옮긴다.
 - 공통 enum, 상태값, JSON 스키마를 `packages/shared` 또는 백엔드 공통 모듈로 정의한다.
 - `MissionContent`, `ContentStage`, `RealtimePracticeSpec`, `MemoryCard` 타입을 먼저 고정한다.
 

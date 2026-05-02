@@ -105,20 +105,20 @@ AI 프롬프트와 로그에는 불필요한 실명/연락처/주소를 넣지 �
 MVP 권장 스택:
 
 ```text
-Runtime: Node.js + TypeScript
-API Framework: NestJS 또는 Fastify
-ORM: Prisma
+Runtime: Python
+API Framework: FastAPI
+ORM: SQLAlchemy
 DB: PostgreSQL
-Queue: Redis + BullMQ
+Queue: Redis + RQ 또는 Celery
 Object Storage: S3 호환 스토리지
 AI: OpenAI reasoning/content JSON + gpt-image-2 이미지 생성
 Realtime: OpenAI Realtime API + WebRTC
 Voice(Optional): ElevenLabs
-Validation: Zod 또는 JSON Schema
+Validation: Pydantic 또는 JSON Schema
 Observability: structured log + job trace id
 ```
 
-프론트가 Next.js/TypeScript 기반이므로 `packages/shared`에 콘텐츠 스키마와 타입을 두고 프론트/백엔드가 같이 쓰는 구조가 좋다.
+프론트가 Next.js/TypeScript 기반이므로 백엔드는 Pydantic schema와 OpenAPI를 source of truth로 두고, 프론트는 OpenAPI 기반 타입 생성으로 계약을 맞춘다.
 
 권장 구조:
 

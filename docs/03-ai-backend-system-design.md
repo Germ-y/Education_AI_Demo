@@ -395,13 +395,14 @@ RealtimePracticeSpec의 역할/루브릭/시간 제한 유효성
 
 ## 6. 백엔드 모듈
 
-권장 초기 구조는 Node.js/TypeScript 기반이다. 프론트가 Next.js이므로 타입 공유와 JSON 스키마 관리가 쉽다.
+권장 초기 구조는 Python FastAPI 기반이다. 프론트가 Next.js여도 OpenAPI/Pydantic schema를 통해 타입 계약을 생성할 수 있다.
 
 ```text
-apps/api
-packages/shared
-packages/ai
-packages/content-runtime
+app/api
+app/domain
+app/services
+app/data
+app/core
 ```
 
 MVP에서는 단일 API 서버로 시작해도 된다.
@@ -435,11 +436,11 @@ ConsentModule
 
 ```text
 PostgreSQL: 핵심 데이터
-Prisma: ORM
-Redis + BullMQ: AI 생성/이미지 생성 작업 큐
+SQLAlchemy: ORM
+Redis + RQ 또는 Celery: AI 생성/이미지 생성 작업 큐
 S3 호환 스토리지: 생성 이미지/음성
 OpenAI: reasoning, content JSON, image-2
-ElevenLabs: 음성 생성
+ElevenLabs: 선택 음성 생성
 ```
 
 ## 7. 주요 데이터 모델

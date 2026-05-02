@@ -22,8 +22,9 @@
 ## Backend Quick Start
 
 ```bash
-npm install
-npm run dev
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 4000
 ```
 
 기본 서버는 `http://localhost:4000`에서 실행됩니다.
@@ -31,17 +32,16 @@ npm run dev
 검증 명령:
 
 ```bash
-npm run typecheck
-npm run prisma:validate
-npm run test
-npm run db:seed:demo
+.venv/bin/ruff check app tests
+.venv/bin/python -m pytest
+.venv/bin/python -m app.data.seed_demo
 ```
 
 현재 구현된 첫 슬라이스:
 
-- Fastify + TypeScript API 서버
-- Zod 기반 4단계 콘텐츠/RealtimePracticeSpec 검증
-- Prisma PostgreSQL 스키마 계약
+- FastAPI + Pydantic API 서버
+- Pydantic 기반 4단계 콘텐츠/RealtimePracticeSpec 검증
+- SQLAlchemy PostgreSQL 모델 계약
 - in-memory demo seed store
 - 데모 로그인, 학생 목록/상세, 학생 미션 조회/시작/제출, 4단계 realtime session mock API
 

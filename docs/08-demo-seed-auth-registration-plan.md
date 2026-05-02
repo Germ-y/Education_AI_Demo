@@ -46,9 +46,8 @@ DEMO_STUDENT_CODE=STAR-001
 명령 예:
 
 ```text
-npm run db:seed
-npm run db:seed:demo
-npm run db:seed:public-data
+python -m app.data.seed_demo
+python -m app.data.seed_public_data
 ```
 
 ### 2.2 Production Mode

@@ -8,7 +8,7 @@
 - AI 생성물, 교사 승인, 학생 활동, 메모리 업데이트는 모두 버전/상태를 가진다.
 - 원본 공공데이터와 정규화 데이터를 분리한다.
 - 학생 개인정보, AI prompt, realtime transcript는 최소 저장 원칙을 적용한다.
-- 구현 시 Prisma schema 또는 SQL migration의 source of truth는 이 문서와 맞춰야 한다.
+- 구현 시 SQLAlchemy model 또는 SQL migration의 source of truth는 이 문서와 맞춰야 한다.
 
 ## 2. 핵심 ERD
 

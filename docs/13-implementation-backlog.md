@@ -27,7 +27,7 @@
 
 작업:
 
-- `package.json`, app directory, framework를 확인한다.
+- `pyproject.toml`, app directory, framework를 확인한다.
 - 프론트와 공유해야 하는 타입 위치를 정한다.
 - `.env.example`에 필요한 API key와 public data key를 정리한다.
 - 실행 명령을 README에 연결한다.
@@ -35,15 +35,17 @@
 완료 기준:
 
 ```text
-npm install 또는 pnpm install
-npm run dev
-npm run lint/typecheck
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 4000
+.venv/bin/ruff check app tests
+.venv/bin/python -m pytest
 ```
 
 상태:
 
 ```text
-완료. Fastify + TypeScript + Zod + Prisma 스키마 기반 첫 서버 구조를 추가했다.
+완료. FastAPI + Pydantic + SQLAlchemy 모델 기반 첫 서버 구조를 추가했다.
 ```
 
 ## Milestone 2. Domain Types And Schemas
@@ -102,7 +104,7 @@ DB reset 후 schema 생성
 상태:
 
 ```text
-부분 완료. prisma/schema.prisma 계약과 prisma validate는 완료했다. 실제 PostgreSQL migration 적용은 다음 DB 연결 슬라이스에서 진행한다.
+부분 완료. SQLAlchemy model 계약과 Pydantic 검증은 완료했다. 실제 PostgreSQL migration 적용은 다음 DB 연결 슬라이스에서 진행한다.
 ```
 
 ## Milestone 4. Demo Seed
@@ -324,10 +326,9 @@ seed 없이도 신규 학생 케이스를 생성할 수 있다.
 ```bash
 git status --short --branch
 git diff --check
-npm run lint
-npm run typecheck
-npm run test
-npm run db:seed:demo
+.venv/bin/ruff check app tests
+.venv/bin/python -m pytest
+.venv/bin/python -m app.data.seed_demo
 ```
 
 ## Commit Plan
