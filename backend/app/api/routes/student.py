@@ -177,6 +177,7 @@ def complete_mission(
     completed = demo_store.complete_attempt(_student_id(principal), content_id, payload.attempt_id)
     if completed is None:
         raise HTTPException(status_code=404, detail={"code": "ATTEMPT_NOT_FOUND", "message": "진행 중인 시도를 찾을 수 없습니다."})
+    demo_store.create_review_summary_for_content(content_id)
     return ok(completed.model_dump(by_alias=True))
 
 

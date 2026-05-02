@@ -13,6 +13,7 @@ export type StudentSceneProfile = {
   understandingRate: number;
   interests: string[];
   strengths: string[];
+  accessCode?: string | null;
 };
 
 export type StudentSceneCase = {
@@ -75,6 +76,8 @@ export type StageQuestion = {
   body?: string;
   choices?: string[];
   correctAnswer?: string;
+  runtimeCorrectAnswer?: Record<string, unknown>;
+  runtimeChoiceAnswers?: Record<string, Record<string, unknown>>;
   hint: string;
   correctFeedback: string;
   wrongFeedback: string;

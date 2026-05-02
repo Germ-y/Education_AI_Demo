@@ -2,8 +2,16 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import type { DragEvent } from "react";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  completeStudentMission,
+  saveStudentMissionEvent,
+  saveStudentMissionReflection,
+  startStudentMission,
+  studentAccess,
+  submitStudentMissionStage,
+} from "@/lib/api";
 import type { SceneTheme, SceneVisual, StageQuestion, StudentContext } from "@/lib/student-scene-types";
 
 function MiniStar() {
@@ -540,14 +548,12 @@ function SequenceTemplate({
   selected,
   theme,
   onPick,
-  onPlace,
   onReset,
 }: {
   question: StageQuestion;
   selected: string[];
   theme: SceneTheme;
   onPick: (id: string) => void;
-  onPlace: (id: string, index: number) => void;
   onReset: () => void;
 }) {
   const items = question.sequenceItems ?? [];
@@ -555,22 +561,11 @@ function SequenceTemplate({
   const selectedIds = slots.filter(Boolean);
   const availableItems = items.filter((item) => !selectedIds.includes(item.id));
 
-  const startDrag = (event: DragEvent<HTMLButtonElement>, id: string) => {
-    event.dataTransfer.setData("text/plain", id);
-    event.dataTransfer.effectAllowed = "move";
-  };
-
-  const dropOnSlot = (event: DragEvent<HTMLDivElement>, index: number) => {
-    event.preventDefault();
-    const id = event.dataTransfer.getData("text/plain");
-    if (id) onPlace(id, index);
-  };
-
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_auto_auto] gap-3 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-4 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-lg font-black leading-6">분수를 알아보는 순서를 맞춰보세요</p>
+          <p className="text-lg font-black leading-6">{question.prompt}</p>
           <p className="mt-1 text-xs font-bold leading-5 text-[#596157]">{question.body ?? "카드를 끌어 올바른 순서대로 놓아보세요."}</p>
         </div>
         {selectedIds.length > 0 && (
@@ -589,7 +584,7 @@ function SequenceTemplate({
           <p className="text-xs font-black" style={{ color: theme.accentStrong }}>
             순서 칸
           </p>
-          <p className="text-[11px] font-bold text-[#8a5a00]">드래그해서 놓기</p>
+          <p className="text-[11px] font-bold text-[#8a5a00]">클릭해서 순서대로 놓기</p>
         </div>
         <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}>
           {slots.map((id, index) => {
@@ -598,8 +593,6 @@ function SequenceTemplate({
           return (
             <div
               key={index}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => dropOnSlot(event, index)}
               className={`flex h-[76px] flex-col items-center justify-center rounded-[16px] border-2 border-dashed px-2 py-2 text-center transition ${
                 item ? "border-solid bg-white shadow-[0_10px_24px_rgba(57,78,97,0.10)]" : "bg-white/55"
               }`}
@@ -623,7 +616,7 @@ function SequenceTemplate({
       <div className="rounded-[18px] border border-[#f0dfb4] bg-[#fff9e8] p-3">
         <div className="flex items-center justify-between">
           <p className="text-xs font-black text-[#8a5a00]">카드 트레이</p>
-          {availableItems.length > 0 && <p className="text-[11px] font-bold text-[#8a5a00]">클릭해도 배치돼요</p>}
+          {availableItems.length > 0 && <p className="text-[11px] font-bold text-[#8a5a00]">카드를 차례대로 눌러요</p>}
         </div>
         <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}>
           {items.map((item) => {
@@ -632,8 +625,6 @@ function SequenceTemplate({
             return (
             <button
               key={item.id}
-              draggable={!picked}
-              onDragStart={(event) => startDrag(event, item.id)}
               onClick={() => onPick(item.id)}
               disabled={picked}
               className="min-h-[58px] cursor-grab rounded-[16px] border bg-white px-3 py-2 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-[0_12px_24px_rgba(57,78,97,0.12)] active:cursor-grabbing disabled:cursor-default disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
@@ -656,7 +647,6 @@ function SequenceStageBoard({
   selected,
   theme,
   onPick,
-  onPlace,
   onReset,
 }: {
   visual: SceneVisual;
@@ -664,7 +654,6 @@ function SequenceStageBoard({
   selected: string[];
   theme: SceneTheme;
   onPick: (id: string) => void;
-  onPlace: (id: string, index: number) => void;
   onReset: () => void;
 }) {
   return (
@@ -673,7 +662,7 @@ function SequenceStageBoard({
         <StageVisualBoard visual={visual} question={question} theme={theme} compact />
       </div>
       <div className="min-h-0 overflow-hidden">
-        <SequenceTemplate question={question} selected={selected} theme={theme} onPick={onPick} onPlace={onPlace} onReset={onReset} />
+        <SequenceTemplate question={question} selected={selected} theme={theme} onPick={onPick} onReset={onReset} />
       </div>
     </div>
   );
@@ -1218,6 +1207,7 @@ export function StudentStageExperience({
   nextHref: string;
   previewMode?: boolean;
 }) {
+  const router = useRouter();
   const { student, scene } = context;
   const theme = scene.theme;
   const initialStageIndex = Math.max(
@@ -1242,7 +1232,12 @@ export function StudentStageExperience({
   const [oxReadySteps, setOxReadySteps] = useState<number[]>([]);
   const [oxAnswers, setOxAnswers] = useState<Record<number, string>>({});
   const [reflectionText, setReflectionText] = useState("");
+  const [studentAccessToken, setStudentAccessToken] = useState<string | null>(null);
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const [isCompletingMission, setIsCompletingMission] = useState(false);
   const noticeCounter = useRef(0);
+  const runtimeStartedRef = useRef(false);
 
   const activeStage = scene.stages[activeStageIndex] ?? scene.stages[0];
   const activeQuestion = useMemo(
@@ -1275,6 +1270,42 @@ export function StudentStageExperience({
   const isLastStage = activeStageIndex === scene.stages.length - 1;
 
   useEffect(() => {
+    if (
+      previewMode ||
+      initialMode === "complete" ||
+      scene.status !== "published" ||
+      !scene.contentId ||
+      !student.accessCode ||
+      runtimeStartedRef.current
+    ) {
+      return;
+    }
+
+    runtimeStartedRef.current = true;
+    let ignore = false;
+
+    async function startRuntime() {
+      try {
+        const access = await studentAccess({ accessCode: student.accessCode ?? "" });
+        const attempt = await startStudentMission(scene.contentId ?? "", { token: access.session.accessToken });
+        if (ignore) return;
+        setStudentAccessToken(access.session.accessToken);
+        setAttemptId(attempt.id);
+        setRuntimeError(null);
+      } catch {
+        if (ignore) return;
+        setRuntimeError("학습 기록 저장 연결을 시작하지 못했습니다. 잠시 뒤 다시 시도해 주세요.");
+      }
+    }
+
+    startRuntime();
+
+    return () => {
+      ignore = true;
+    };
+  }, [initialMode, previewMode, scene.contentId, scene.status, student.accessCode]);
+
+  useEffect(() => {
     if (!previewMode) return;
     window.parent.postMessage({ type: "student-preview-stage", step: activeStage.step }, window.location.origin);
   }, [activeStage.step, previewMode]);
@@ -1293,11 +1324,45 @@ export function StudentStageExperience({
     return activeQuestion.wrongFeedback;
   }, [activeQuestion, answer, isCorrect, isFinished]);
 
+  const canPersistRuntime = !previewMode && scene.status === "published" && Boolean(scene.contentId && attemptId && studentAccessToken);
+
+  const persistStudentEvent = (question: StageQuestion, eventType: string, payloadJson: Record<string, unknown>) => {
+    if (!canPersistRuntime || !scene.contentId || !studentAccessToken) return;
+
+    void saveStudentMissionEvent(
+      scene.contentId,
+      {
+        attemptId,
+        stageId: question.stageId,
+        eventType,
+        payloadJson,
+      },
+      { token: studentAccessToken },
+    ).catch(() => {
+      setRuntimeError("학습 기록 일부를 저장하지 못했습니다. 다음 기록 저장을 다시 시도합니다.");
+    });
+  };
+
+  const submitRuntimeAnswer = (question: StageQuestion, answerPayload: Record<string, unknown>) => {
+    if (!canPersistRuntime || !scene.contentId || !attemptId || !studentAccessToken || !question.stageId) return;
+
+    void submitStudentMissionStage(scene.contentId, question.stageId, { attemptId, answer: answerPayload }, { token: studentAccessToken })
+      .then(() => setRuntimeError(null))
+      .catch(() => {
+        setRuntimeError("답안 기록을 저장하지 못했습니다. 학습은 계속할 수 있어요.");
+      });
+  };
+
+  const toRuntimeChoicePayload = (question: StageQuestion, choice: string) => {
+    return question.runtimeChoiceAnswers?.[choice] ?? { choiceText: choice };
+  };
+
   const selectAnswer = (choice: string) => {
     if (!activeQuestion.correctAnswer) return;
 
     setAnswer(choice);
     setAttempts((value) => value + 1);
+    submitRuntimeAnswer(activeQuestion, toRuntimeChoicePayload(activeQuestion, choice));
 
     if (choice === activeQuestion.correctAnswer) {
       setWrongNotice(null);
@@ -1318,6 +1383,12 @@ export function StudentStageExperience({
 
     setAnswer(value);
     setAttempts((current) => current + 1);
+    submitRuntimeAnswer(
+      activeQuestion,
+      value === activeQuestion.correctAnswer && activeQuestion.runtimeCorrectAnswer
+        ? activeQuestion.runtimeCorrectAnswer
+        : { answer: value },
+    );
 
     if (value === activeQuestion.correctAnswer) {
       setWrongNotice(null);
@@ -1371,25 +1442,6 @@ export function StudentStageExperience({
     }
   };
 
-  const placeSequenceItem = (id: string, index: number) => {
-    if (isStageComplete) return;
-
-    const itemCount = activeQuestion.sequenceItems?.length ?? 0;
-    const nextAnswer = Array.from({ length: itemCount }, (_, slotIndex) => sequenceAnswer[slotIndex] ?? "");
-    const previousIndex = nextAnswer.indexOf(id);
-
-    if (previousIndex >= 0) {
-      nextAnswer[previousIndex] = "";
-    }
-
-    nextAnswer[index] = id;
-    setSequenceAnswer(nextAnswer);
-
-    if (nextAnswer.every(Boolean)) {
-      markStructuredAnswer(nextAnswer.join(">"));
-    }
-  };
-
   const connectMatchingCard = (rightId: string) => {
     if (!selectedMatchLeft || isStageComplete) return;
 
@@ -1398,6 +1450,10 @@ export function StudentStageExperience({
     const expectedPair = activeQuestion.matchingPairs?.find((pair) => pair.leftId === selectedMatchLeft);
 
     if (expectedPair?.rightId !== rightId) {
+      persistStudentEvent(activeQuestion, "answer_submitted", {
+        answer: { matches: { [selectedMatchLeft]: rightId } },
+        isCorrect: false,
+      });
       noticeCounter.current += 1;
       const noticeId = `${selectedMatchLeft}-${rightId}-${noticeCounter.current}`;
       setWrongNotice(noticeId);
@@ -1414,6 +1470,7 @@ export function StudentStageExperience({
 
     if (Object.keys(nextAnswer).length === activeQuestion.matchingPairs?.length) {
       const finalAnswer = activeQuestion.matchingPairs.map((pair) => `${pair.leftId}:${nextAnswer[pair.leftId]}`).join("|");
+      submitRuntimeAnswer(activeQuestion, { matches: nextAnswer });
       setAnswer(finalAnswer);
       setWrongNotice(null);
       setCompletedSteps((steps) => (steps.includes(activeStage.step) ? steps : [...steps, activeStage.step]));
@@ -1433,12 +1490,17 @@ export function StudentStageExperience({
   };
 
   const completeOpenStage = () => {
+    persistStudentEvent(activeQuestion, "stage_completed", { kind: "concept_acknowledged" });
     setCompletedSteps((steps) => (steps.includes(activeStage.step) ? steps : [...steps, activeStage.step]));
     setAnswer("completed");
   };
 
   const startRealtimePractice = () => {
     if (!isRealtimeStage) return;
+    persistStudentEvent(activeQuestion, "realtime_practice_completed", {
+      mode: "simulated_text",
+      prompt: activeQuestion.realtimePracticeSpec?.firstPrompt ?? activeQuestion.prompt,
+    });
     setAttempts((current) => current + 1);
     setCompletedSteps((steps) => (steps.includes(activeStage.step) ? steps : [...steps, activeStage.step]));
     setAnswer("realtime-started");
@@ -1463,6 +1525,7 @@ export function StudentStageExperience({
 
       setAnswer(null);
       setWrongNotice(null);
+      setAttempts(0);
       setSequenceAnswer([]);
       setSelectedMatchLeft(null);
       setMatchingAnswer({});
@@ -1487,6 +1550,43 @@ export function StudentStageExperience({
     setOxReadySteps([]);
     setOxAnswers({});
     setReflectionText("");
+    setRuntimeError(null);
+    setIsCompletingMission(false);
+  };
+
+  const completeMissionAndReturn = async () => {
+    if (!reflectionText.trim() || isCompletingMission) return;
+
+    if (previewMode) {
+      router.push(nextHref);
+      return;
+    }
+
+    if (!scene.contentId || !attemptId || !studentAccessToken) {
+      setRuntimeError("학습 기록 저장 연결을 준비 중입니다. 잠시 후 다시 눌러 주세요.");
+      return;
+    }
+
+    setIsCompletingMission(true);
+    setRuntimeError(null);
+
+    try {
+      const reflection = reflectionText.trim();
+      await saveStudentMissionReflection(
+        scene.contentId,
+        {
+          attemptId,
+          reflectionChoice: reflection,
+          shortText: reflection,
+        },
+        { token: studentAccessToken },
+      );
+      await completeStudentMission(scene.contentId, attemptId, { token: studentAccessToken });
+      router.push(nextHref);
+    } catch {
+      setRuntimeError("학습 완료 기록을 저장하지 못했습니다. 다시 눌러 주세요.");
+      setIsCompletingMission(false);
+    }
   };
 
   return (
@@ -1559,7 +1659,7 @@ export function StudentStageExperience({
                       스테이지 {activeStage.step} · 시도 {attempts}회
                     </p>
                     <h2 className="mt-1 text-3xl font-black leading-tight">
-                      {isFinished ? "휼륭해요!" : activeStage.title}
+                      {isFinished ? "훌륭해요!" : activeStage.title}
                     </h2>
                   </div>
                   <ProgressTrail
@@ -1613,6 +1713,11 @@ export function StudentStageExperience({
                           className="mt-3 h-24 w-full resize-none rounded-[18px] border border-[#dce5ec] bg-[#fbfdff] px-4 py-3 text-base font-bold leading-7 outline-none transition focus:border-[#94d86a] focus:bg-white"
                           placeholder="여기에 내 생각을 적어봐요."
                         />
+                        {runtimeError && (
+                          <p className="mt-2 text-sm font-black leading-6 text-[#b45309]">
+                            {runtimeError}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -1623,7 +1728,6 @@ export function StudentStageExperience({
                         selected={sequenceAnswer}
                         theme={theme}
                         onPick={pickSequenceItem}
-                        onPlace={placeSequenceItem}
                         onReset={() => {
                           setSequenceAnswer([]);
                           setAnswer(null);
@@ -1680,7 +1784,7 @@ export function StudentStageExperience({
                       wrongMessage={activeQuestion.wrongFeedback}
                       theme={theme}
                     />
-                    {isCorrect || isStageComplete ? (
+                    {(isCorrect || isStageComplete) && (
                       <button
                         onClick={goToNextStage}
                         disabled={isTransitioning}
@@ -1688,13 +1792,6 @@ export function StudentStageExperience({
                         style={{ backgroundColor: theme.accent }}
                       >
                         다음 스테이지 →
-                      </button>
-                    ) : (
-                      <button
-                        className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.18)]"
-                        style={{ backgroundColor: `${theme.accent}99` }}
-                      >
-                        {activeQuestion.kind === "cardMatching" ? "카드를 연결해볼까요" : "카드를 순서 칸에 놓아볼까요"}
                       </button>
                     )}
                   </div>
@@ -1853,21 +1950,19 @@ export function StudentStageExperience({
                     >
                       다시 하기
                     </button>
-                    <Link
-                      href={nextHref}
-                      aria-disabled={!reflectionText.trim()}
-                      onClick={(event) => {
-                        if (!reflectionText.trim()) event.preventDefault();
-                      }}
+                    <button
+                      type="button"
+                      disabled={!reflectionText.trim() || isCompletingMission}
+                      onClick={completeMissionAndReturn}
                       className={`rounded-[18px] px-4 py-3 text-center text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.28)] transition duration-200 ${
-                        reflectionText.trim()
+                        reflectionText.trim() && !isCompletingMission
                           ? "hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.32)]"
                           : "cursor-not-allowed opacity-45"
                       }`}
-                      style={{ backgroundColor: reflectionText.trim() ? theme.accent : "#9aa39b" }}
+                      style={{ backgroundColor: reflectionText.trim() && !isCompletingMission ? theme.accent : "#9aa39b" }}
                     >
-                      학습 길로
-                    </Link>
+                      {isCompletingMission ? "저장 중" : "학습 길로"}
+                    </button>
                   </div>
                 ) : isRealtimeStage && !isStageComplete ? (
                   <button

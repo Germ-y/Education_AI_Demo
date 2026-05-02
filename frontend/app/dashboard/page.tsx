@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  approveContent,
   createAgentRun,
   createContentGeneration,
   getTeacherStudent,
   getTeacherStudentReport,
   getTeacherStudents,
+  publishContent,
+  rejectContent,
   type AgentRun,
   type MissionContent,
   type StudentCaseFile,
@@ -286,6 +289,16 @@ function getClientGenerationErrorMessage(error: unknown) {
   return "자료 제안 요청 중 문제가 생겼습니다. 잠시 뒤 다시 시도해 주세요.";
 }
 
+function describeMissionStatus(status: MissionContent["status"]) {
+  if (status === "teacher_review") return "검토 대기";
+  if (status === "revision_requested") return "사용 안 함";
+  if (status === "approved") return "검토 완료";
+  if (status === "published") return "배포됨";
+  if (status === "generating") return "생성 중";
+  if (status === "archived") return "보관됨";
+  return "초안";
+}
+
 function mapContentToReviewItem(content: MissionContent, lessonProposalTitle?: string): MaterialReviewItem {
   const title = lessonProposalTitle?.trim()
     ? `${lessonProposalTitle.trim()} 자료 제안`
@@ -296,7 +309,7 @@ function mapContentToReviewItem(content: MissionContent, lessonProposalTitle?: s
     caseId: content.caseId,
     title,
     type: `수업 전 검토 제안 · ${describeContentType(content)}`,
-    state: content.status === "teacher_review" ? "검토 대기" : content.status === "published" ? "배포됨" : content.status,
+    state: describeMissionStatus(content.status),
     contentId: content.id,
     content,
   };
@@ -406,7 +419,7 @@ export default function DashboardPage() {
   const [revisionMaterialIds, setRevisionMaterialIds] = useState<string[]>([]);
   const [rejectedMaterialIds, setRejectedMaterialIds] = useState<string[]>([]);
   const [editingReviewIds, setEditingReviewIds] = useState<string[]>([]);
-  const [editingImageKey, setEditingImageKey] = useState<string | null>(null);
+  const [reviewActionId, setReviewActionId] = useState<string | null>(null);
   const [reviewPreviewStep, setReviewPreviewStep] = useState(1);
   const [reviewPreviewScale, setReviewPreviewScale] = useState(1);
   const reviewPreviewFrameRef = useRef<HTMLDivElement>(null);
@@ -582,6 +595,12 @@ export default function DashboardPage() {
   const openReview = selectedReviewItems.find((item) => item.id === openReviewId);
   const openReviewStages = openReview ? (reviewStageDrafts[openReview.id] ?? mapContentToReviewStages(openReview.content)) : reviewStagePreviews;
   const isReviewEditing = openReview ? editingReviewIds.includes(openReview.id) : false;
+  const isMaterialApproved = (item: MaterialReviewItem) =>
+    item.content.status === "approved" || item.content.status === "published" || approvedMaterialIds.includes(item.id);
+  const isMaterialApplied = (item: MaterialReviewItem) =>
+    item.content.status === "published" || appliedMaterialIds.includes(item.id);
+  const isMaterialRejected = (item: MaterialReviewItem) =>
+    item.content.status === "revision_requested" || rejectedMaterialIds.includes(item.id);
   const savedMemo = savedMemos[selectedCase.id] ?? "";
   const memoValue = memoDrafts[selectedCase.id] ?? savedMemo;
   const isMemoDirty = memoValue !== savedMemo;
@@ -710,6 +729,102 @@ export default function DashboardPage() {
           message: getClientGenerationErrorMessage(error),
         },
       }));
+    }
+  };
+
+  const refreshSelectedStudentData = async () => {
+    if (!selectedCase.studentId) return;
+
+    const [items, caseFile, report] = await Promise.all([
+      getTeacherStudents(),
+      getTeacherStudent(selectedCase.studentId),
+      getTeacherStudentReport(selectedCase.studentId),
+    ]);
+    setTeacherStudentItems(items);
+    setSelectedCaseFile(caseFile);
+    setSelectedReport(report);
+  };
+
+  const updateCurrentContent = (content: MissionContent) => {
+    setSelectedCaseFile((current) =>
+      current && current.profile.id === content.studentId
+        ? {
+            ...current,
+            recentContents: current.recentContents.map((item) => (item.id === content.id ? content : item)),
+          }
+        : current,
+    );
+  };
+
+  const setReviewActionError = (message: string) => {
+    if (!selectedCase.id) return;
+    setGenerationStatuses((current) => ({
+      ...current,
+      [selectedCase.id]: { state: "failed", message },
+    }));
+  };
+
+  const handleRejectReview = async () => {
+    if (!openReview || reviewActionId) return;
+
+    setReviewActionId(openReview.id);
+    try {
+      const content = await rejectContent(openReview.contentId, {
+        reason: "교사 검토에서 이번 수업에 사용하지 않음",
+        requestedChanges: [],
+      });
+      updateCurrentContent(content);
+      setRejectedMaterialIds((current) => (current.includes(openReview.id) ? current : [...current, openReview.id]));
+      setRevisionMaterialIds((current) => current.filter((id) => id !== openReview.id));
+      setApprovedMaterialIds((current) => current.filter((id) => id !== openReview.id));
+      setAppliedMaterialIds((current) => current.filter((id) => id !== openReview.id));
+      setEditingReviewIds((current) => current.filter((id) => id !== openReview.id));
+      await refreshSelectedStudentData();
+      setOpenReviewId(null);
+    } catch {
+      setReviewActionError("자료 제안 사용 안 함 상태를 저장하지 못했습니다.");
+    } finally {
+      setReviewActionId(null);
+    }
+  };
+
+  const handleApproveReview = async () => {
+    if (!openReview || reviewActionId) return;
+
+    setReviewActionId(openReview.id);
+    try {
+      const content = await approveContent(openReview.contentId, {
+        approvedStageIds: openReview.content.stages.map((stage) => stage.id),
+        approvedAssetIds: openReview.content.assets.map((asset) => asset.id),
+        reviewNote: "교사 검토 완료",
+      });
+      updateCurrentContent(content);
+      setApprovedMaterialIds((current) => (current.includes(openReview.id) ? current : [...current, openReview.id]));
+      setRevisionMaterialIds((current) => current.filter((id) => id !== openReview.id));
+      setRejectedMaterialIds((current) => current.filter((id) => id !== openReview.id));
+      setEditingReviewIds((current) => current.filter((id) => id !== openReview.id));
+      await refreshSelectedStudentData();
+      setOpenReviewId(null);
+    } catch {
+      setReviewActionError("자료 제안 승인 상태를 저장하지 못했습니다.");
+    } finally {
+      setReviewActionId(null);
+    }
+  };
+
+  const handlePublishMaterial = async (item: MaterialReviewItem) => {
+    if (isMaterialApplied(item) || !isMaterialApproved(item) || isMaterialRejected(item) || reviewActionId) return;
+
+    setReviewActionId(item.id);
+    try {
+      const content = await publishContent(item.contentId);
+      updateCurrentContent(content);
+      setAppliedMaterialIds((current) => (current.includes(item.id) ? current : [...current, item.id]));
+      await refreshSelectedStudentData();
+    } catch {
+      setReviewActionError("수업 적용 상태를 저장하지 못했습니다. 승인된 자료인지 다시 확인해 주세요.");
+    } finally {
+      setReviewActionId(null);
     }
   };
 
@@ -1087,7 +1202,13 @@ export default function DashboardPage() {
                         AI가 제안한 자료를 확인하고 선생님 판단으로 적용합니다.
                       </p>
                     </div>
-                    {selectedReviewItems.map((item) => (
+                    {selectedReviewItems.map((item) => {
+                      const materialApplied = isMaterialApplied(item);
+                      const materialApproved = isMaterialApproved(item);
+                      const materialRejected = isMaterialRejected(item);
+                      const isActionRunning = reviewActionId === item.id;
+
+                      return (
                       <div key={item.id} className="rounded-md border border-[#e5e9f0] bg-white p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -1096,22 +1217,22 @@ export default function DashboardPage() {
                           </div>
                           <span
                             className={`shrink-0 rounded-full border px-3 py-1 text-xs font-bold ${
-                              appliedMaterialIds.includes(item.id)
+                              materialApplied
                                 ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
-                                : approvedMaterialIds.includes(item.id)
+                                : materialApproved
                                   ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
-                                  : rejectedMaterialIds.includes(item.id)
+                                  : materialRejected
                                     ? "border-[#fecaca] bg-[#fef2f2] text-[#991b1b]"
                                     : revisionMaterialIds.includes(item.id)
                                       ? "border-[#fed7aa] bg-[#fff7ed] text-[#9a3412]"
                                       : "border-[#cbd5e1] bg-[#f8fafc] text-[#475569]"
                             }`}
                           >
-                            {appliedMaterialIds.includes(item.id)
+                            {materialApplied
                               ? "적용 완료"
-                              : approvedMaterialIds.includes(item.id)
+                              : materialApproved
                                 ? "검토 완료"
-                                : rejectedMaterialIds.includes(item.id)
+                                : materialRejected
                                   ? "사용 안 함"
                                   : revisionMaterialIds.includes(item.id)
                                     ? "수정 중"
@@ -1129,25 +1250,22 @@ export default function DashboardPage() {
                             제안 검토하기
                           </button>
                           <button
-                            onClick={() => {
-                              if (!approvedMaterialIds.includes(item.id) || rejectedMaterialIds.includes(item.id)) return;
-                              setAppliedMaterialIds((current) =>
-                                current.includes(item.id) ? current : [...current, item.id],
-                              );
-                            }}
+                            onClick={() => handlePublishMaterial(item)}
+                            disabled={materialApplied || !materialApproved || materialRejected || isActionRunning}
                             className={`rounded-md px-3 py-2 text-sm font-bold ${
-                              appliedMaterialIds.includes(item.id)
+                              materialApplied
                                 ? "bg-[#dcfce7] text-[#15803d]"
-                                : approvedMaterialIds.includes(item.id)
+                                : materialApproved
                                   ? "bg-[#1f3a5f] text-white"
                                   : "bg-[#e2e8f0] text-[#64748b]"
                             }`}
                           >
-                            {appliedMaterialIds.includes(item.id) ? "적용됨" : "수업에 적용하기"}
+                            {isActionRunning ? "저장 중" : materialApplied ? "적용됨" : "수업에 적용하기"}
                           </button>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </section>
                 </div>
               </section>
@@ -1406,7 +1524,6 @@ export default function DashboardPage() {
               <button
                 onClick={() => {
                   setOpenReviewId(null);
-                  setEditingImageKey(null);
                 }}
                 aria-label="닫기"
                 className="flex h-11 w-11 items-center justify-center rounded-md border border-[#cbd5e1] bg-white text-2xl font-bold leading-none text-[#334155]"
@@ -1451,9 +1568,6 @@ export default function DashboardPage() {
               </section>
               <div className="min-h-0 space-y-4 overflow-y-auto pr-2">
                 {openReviewStages.map((stage, index) => {
-                  const imageKey = `${openReview.id}-${stage.step}`;
-                  const isImageEditing = editingImageKey === imageKey;
-
                   return (
                     <section key={stage.step} className="rounded-lg border border-[#e5e9f0] bg-[#fbfcfe] p-5">
                       <div className="mb-3 flex items-center justify-between gap-3">
@@ -1471,51 +1585,6 @@ export default function DashboardPage() {
                       </div>
 
                       <div className="grid gap-4">
-                        <div className="hidden">
-                          <div className="relative aspect-[4/3] overflow-hidden rounded-lg border border-[#d8dee8] bg-[#e7edf4]">
-                            <button
-                              onClick={() => setEditingImageKey(isImageEditing ? null : imageKey)}
-                              className="absolute right-2 top-2 z-10 rounded-full border border-[#cbd5e1] bg-white/95 px-3 py-1 text-xs font-black text-[#334155] shadow-sm"
-                            >
-                              화면 수정
-                            </button>
-                            <iframe
-                              title={`학생 화면 스테이지 ${stage.step}`}
-                              src={`/student/stage?caseId=${encodeURIComponent(openReview.caseId)}&contentId=${encodeURIComponent(openReview.contentId)}&step=${stage.step}&preview=1`}
-                              className="absolute left-0 top-0 h-[768px] w-[1024px] origin-top-left scale-[0.205] border-0"
-                            />
-                          </div>
-                          {isImageEditing && (
-                            <div className="absolute left-[calc(100%+12px)] top-1 z-30 w-72 rounded-lg border border-[#fed7aa] bg-[#fff7ed] p-3 shadow-[0_18px_45px_rgba(154,52,18,0.18)] before:absolute before:left-[-7px] before:top-8 before:h-3 before:w-3 before:rotate-45 before:border-b before:border-l before:border-[#fed7aa] before:bg-[#fff7ed] max-lg:left-0 max-lg:top-[calc(100%+10px)] max-lg:w-full max-lg:before:left-8 max-lg:before:top-[-7px] max-lg:before:border-b-0 max-lg:before:border-l-0 max-lg:before:border-r max-lg:before:border-t">
-                              <label className="text-xs font-black text-[#9a3412]" htmlFor={`image-prompt-${stage.step}`}>
-                                화면 수정 프롬프트
-                              </label>
-                              <textarea
-                                id={`image-prompt-${stage.step}`}
-                                className="mt-2 h-20 w-full resize-none rounded-md border border-[#fdba74] bg-white p-3 text-xs font-semibold leading-5 outline-none focus:border-[#ea580c]"
-                                value={stage.imagePrompt}
-                                onChange={(event) =>
-                                  updateReviewStageDraft(openReview.id, stage.step, (currentStage) => ({
-                                    ...currentStage,
-                                    imagePrompt: event.target.value,
-                                  }))
-                                }
-                              />
-                              <button
-                                onClick={() => {
-                                  setRevisionMaterialIds((current) =>
-                                    current.includes(openReview.id) ? current : [...current, openReview.id],
-                                  );
-                                  setEditingImageKey(null);
-                                }}
-                                className="mt-2 w-full rounded-md bg-[#9a3412] px-3 py-2 text-xs font-black text-white"
-                              >
-                                화면 재생성
-                              </button>
-                            </div>
-                          )}
-                        </div>
-
                         <div className="grid gap-3">
                           <div className="rounded-md bg-white p-4">
                             <p className="text-xs font-black text-[#64748b]">내용</p>
@@ -1604,30 +1673,20 @@ export default function DashboardPage() {
 
             <div className="flex flex-wrap justify-end gap-3 border-t border-[#e5e9f0] px-6 py-4">
               <button
-                onClick={() => {
-                  setRejectedMaterialIds((current) =>
-                    current.includes(openReview.id) ? current : [...current, openReview.id],
-                  );
-                  setRevisionMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                  setApprovedMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                  setAppliedMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                  setEditingReviewIds((current) => current.filter((id) => id !== openReview.id));
-                  setEditingImageKey(null);
-                  setOpenReviewId(null);
-                }}
+                onClick={handleRejectReview}
+                disabled={reviewActionId === openReview.id}
                 className="rounded-md border border-[#fecaca] bg-[#fef2f2] px-5 py-3 text-sm font-bold text-[#991b1b]"
               >
-                사용 안 함
+                {reviewActionId === openReview.id ? "저장 중" : "사용 안 함"}
               </button>
               <button
                 onClick={() => {
-	                  if (isReviewEditing) {
-	                    setEditingReviewIds((current) => current.filter((id) => id !== openReview.id));
-	                    setEditingImageKey(null);
-	                    return;
-	                  }
+                  if (isReviewEditing) {
+                    setEditingReviewIds((current) => current.filter((id) => id !== openReview.id));
+                    return;
+                  }
 
-	                  setEditingReviewIds((current) => [...current, openReview.id]);
+                  setEditingReviewIds((current) => [...current, openReview.id]);
                   setRevisionMaterialIds((current) =>
                     current.includes(openReview.id) ? current : [...current, openReview.id],
                   );
@@ -1635,28 +1694,20 @@ export default function DashboardPage() {
                   setApprovedMaterialIds((current) => current.filter((id) => id !== openReview.id));
                   setAppliedMaterialIds((current) => current.filter((id) => id !== openReview.id));
                 }}
-	                className={`rounded-md border px-5 py-3 text-sm font-bold ${
-	                  isReviewEditing
-	                    ? "border-[#1f3a5f] bg-[#1f3a5f] text-white"
-	                    : "border-[#cbd5e1] bg-white text-[#334155]"
-	                }`}
+                className={`rounded-md border px-5 py-3 text-sm font-bold ${
+                  isReviewEditing
+                    ? "border-[#1f3a5f] bg-[#1f3a5f] text-white"
+                    : "border-[#cbd5e1] bg-white text-[#334155]"
+                }`}
               >
                 {isReviewEditing ? "수정 저장" : "직접 수정"}
               </button>
               <button
-                onClick={() => {
-                  setApprovedMaterialIds((current) =>
-                    current.includes(openReview.id) ? current : [...current, openReview.id],
-                  );
-                  setRevisionMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                  setRejectedMaterialIds((current) => current.filter((id) => id !== openReview.id));
-                  setEditingReviewIds((current) => current.filter((id) => id !== openReview.id));
-                  setEditingImageKey(null);
-                  setOpenReviewId(null);
-                }}
+                onClick={handleApproveReview}
+                disabled={reviewActionId === openReview.id}
                 className="rounded-md bg-[#1f3a5f] px-5 py-3 text-sm font-bold text-white"
               >
-                사용 승인
+                {reviewActionId === openReview.id ? "저장 중" : "사용 승인"}
               </button>
             </div>
           </section>

@@ -5,6 +5,7 @@ import type { SceneTheme, SceneVisual, StageQuestion, StudentContext } from "@/l
 type StudentRouteParams = {
   caseId?: string;
   contentId?: string;
+  preview?: boolean;
 };
 
 const missionTheme: SceneTheme = {
@@ -55,14 +56,14 @@ const visualPresets: Record<SceneVisual["kind"], Array<{ label: string; caption:
   ],
 };
 
-export async function getStudentContextForRoute({ caseId, contentId }: StudentRouteParams): Promise<StudentContext> {
+export async function getStudentContextForRoute({ caseId, contentId, preview = false }: StudentRouteParams): Promise<StudentContext> {
   const seed = await getContextSeed();
-  const resolvedContentId = contentId ?? resolveContentIdFromSeed(seed, caseId);
+  const resolvedContentId = contentId ?? resolveContentIdFromSeed(seed, caseId, { preview });
   if (!resolvedContentId) {
     throw new Error("학생에게 연결된 MissionContent가 없습니다.");
   }
 
-  const mission = await getMissionForRoute(resolvedContentId);
+  const mission = await getMissionForRoute(resolvedContentId, { allowReviewable: preview });
   const validation = validateMissionContent(mission);
 
   if (!validation.ok) {
@@ -93,6 +94,7 @@ export async function getStudentContextForRoute({ caseId, contentId }: StudentRo
       understandingRate: 0,
       interests: readStringArray(student.profileJson.interests),
       strengths: student.strengths ?? [],
+      accessCode: student.accessCode ?? null,
     },
     supportCase: {
       id: supportCase.id,
@@ -191,21 +193,28 @@ function inferVisualKind(mission: MissionContent, missionText: string): SceneVis
   return "emotion";
 }
 
-async function getMissionForRoute(contentId: string) {
+async function getMissionForRoute(contentId: string, options: { allowReviewable: boolean }) {
   try {
     return await getStudentMission(contentId);
-  } catch {
-    return getReviewableContent(contentId);
+  } catch (error) {
+    const content = await getReviewableContent(contentId);
+    if (options.allowReviewable || content.status === "published") {
+      return content;
+    }
+    throw error;
   }
 }
 
-function resolveContentIdFromSeed(seed: Awaited<ReturnType<typeof getContextSeed>>, caseId?: string) {
+function resolveContentIdFromSeed(seed: Awaited<ReturnType<typeof getContextSeed>>, caseId?: string, options: { preview: boolean } = { preview: false }) {
+  const isAllowed = (mapping: Awaited<ReturnType<typeof getContextSeed>>["mappings"][number]) =>
+    options.preview || mapping.status === "published";
+
   if (caseId) {
-    const matched = findLatestMapping(seed.mappings, (mapping) => mapping.caseId === caseId);
+    const matched = findLatestMapping(seed.mappings, (mapping) => mapping.caseId === caseId && isAllowed(mapping));
     if (matched) return matched.contentId;
   }
 
-  return findLatestMapping(seed.mappings)?.contentId;
+  return findLatestMapping(seed.mappings, isAllowed)?.contentId;
 }
 
 function findLatestMapping(
@@ -255,6 +264,8 @@ function stageToQuestion(mission: MissionContent, stage: MissionContent["stages"
     body: readString(template.storyText) ?? readString(template.shortExplanation) ?? readString(template.scenario),
     choices: readChoices(template),
     correctAnswer,
+    runtimeCorrectAnswer: readRuntimeCorrectAnswer(stage.templateType, template),
+    runtimeChoiceAnswers: readChoiceAnswerMap(template),
     hint: stage.studentInstruction,
     correctFeedback: readString(template.correctFeedback) ?? "좋아요. 다음 단계로 이동할 수 있어요.",
     wrongFeedback: readString(template.wrongFeedback) ?? "괜찮아요. 다시 한 번 살펴봐요.",
@@ -322,6 +333,35 @@ function readAnswer(templateType: TemplateType, template: Record<string, unknown
     if (answer) return `${answer.numerator}|${answer.denominator}`;
   }
   return undefined;
+}
+
+function readRuntimeCorrectAnswer(templateType: TemplateType, template: Record<string, unknown>) {
+  if (typeof template.answer === "string") return { choiceId: template.answer };
+  if (Array.isArray(template.answerOrder)) return { order: template.answerOrder.map(String) };
+  if (templateType === "blank_fill") {
+    const answer = readAcceptedFractionAnswer(template);
+    if (answer) return answer;
+  }
+  return undefined;
+}
+
+function readChoiceAnswerMap(template: Record<string, unknown>) {
+  const choices = template.choices;
+  if (!Array.isArray(choices)) return undefined;
+
+  const answers: Record<string, Record<string, unknown>> = {};
+  for (const choice of choices) {
+    if (!choice || typeof choice !== "object" || !("id" in choice)) continue;
+    const text =
+      "text" in choice && typeof choice.text === "string"
+        ? choice.text
+        : "label" in choice && typeof choice.label === "string"
+          ? choice.label
+          : null;
+    if (text) answers[text] = { choiceId: String(choice.id) };
+  }
+
+  return Object.keys(answers).length > 0 ? answers : undefined;
 }
 
 function readChoiceTextById(template: Record<string, unknown>, answerId: string) {

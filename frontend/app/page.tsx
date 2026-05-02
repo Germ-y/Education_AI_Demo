@@ -27,7 +27,7 @@ function toStudentActivityDescription(primaryNeed: string) {
 
 function findLatestStudentMapping(mappings: SeedContext["mappings"], studentId: string) {
   return [...mappings]
-    .filter((mapping) => mapping.studentId === studentId)
+    .filter((mapping) => mapping.studentId === studentId && mapping.status === "published")
     .sort((left, right) => toTimestamp(right.updatedAt) - toTimestamp(left.updatedAt))[0];
 }
 

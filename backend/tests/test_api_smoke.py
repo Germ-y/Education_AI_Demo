@@ -237,6 +237,12 @@ def test_teacher_and_student_demo_flows() -> None:
     publish = client.post("/api/contents/content_fraction_001/publish", headers={"authorization": f"Bearer {teacher_token}"})
     assert publish.status_code == 200
     assert publish.json()["data"]["status"] == "published"
+    students_after_publish = client.get("/api/teacher/students", headers={"authorization": f"Bearer {teacher_token}"})
+    assert students_after_publish.status_code == 200
+    fraction_student_after_publish = next(
+        item for item in students_after_publish.json()["data"] if item["studentId"] == "student_learning_fraction"
+    )
+    assert fraction_student_after_publish["dashboardStage"] == "learning"
     content_audit = client.get(
         "/api/audit-logs?studentId=student_learning_fraction",
         headers={"authorization": f"Bearer {teacher_token}"},
@@ -317,6 +323,18 @@ def test_teacher_and_student_demo_flows() -> None:
         json={"attemptId": attempt_id},
     )
     assert complete.status_code == 200
+    report_after_complete = client.get(
+        "/api/teacher/students/student_learning_fraction/report",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert report_after_complete.status_code == 200
+    assert report_after_complete.json()["data"]["reports"][0]["attemptId"] == attempt_id
+    students_after_complete = client.get("/api/teacher/students", headers={"authorization": f"Bearer {teacher_token}"})
+    assert students_after_complete.status_code == 200
+    fraction_student_after_complete = next(
+        item for item in students_after_complete.json()["data"] if item["studentId"] == "student_learning_fraction"
+    )
+    assert fraction_student_after_complete["dashboardStage"] == "feedback"
 
     review_summary = client.post("/api/contents/content_fraction_001/review-summary", headers={"authorization": f"Bearer {teacher_token}"})
     assert review_summary.status_code == 200

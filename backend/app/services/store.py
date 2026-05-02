@@ -170,7 +170,16 @@ class DemoStore:
             if q and q not in student.display_name and q not in student.primary_need:
                 continue
             school = self.get_school(student.school_code)
-            latest_content = next((content for content in self.db.mission_contents if content.student_id == student.id), None)
+            latest_content = next(
+                iter(
+                    sorted(
+                        [content for content in self.db.mission_contents if content.student_id == student.id],
+                        key=_mission_mapping_sort_key,
+                        reverse=True,
+                    )
+                ),
+                None,
+            )
             planner = next(
                 (
                     item
@@ -505,6 +514,9 @@ class DemoStore:
             return None
         mission.status = MissionStatus.PUBLISHED
         mission.published_at = _now()
+        support_case = next((case for case in self.db.support_cases if case.id == mission.case_id), None)
+        if support_case is not None:
+            support_case.dashboard_stage = "learning"
         self.persist()
         return mission
 
@@ -521,6 +533,9 @@ class DemoStore:
         if not attempts:
             return None
         attempt = attempts[0]
+        existing = next((summary for summary in self.db.review_summaries if summary.attempt_id == attempt.id), None)
+        if existing is not None:
+            return existing
         events = [event for event in self.db.activity_events if event.attempt_id == attempt.id]
         answer_events = [event for event in events if event.event_type == "answer_submitted"]
         correct_count = sum(1 for event in answer_events if event.payload_json.get("isCorrect") is True)
@@ -961,6 +976,10 @@ class DemoStore:
         attempt.current_step = 4
         attempt.completed_at = _now()
         attempt.score_json = {"completionRate": 1}
+        mission = next((content for content in self.db.mission_contents if content.id == content_id), None)
+        support_case = next((case for case in self.db.support_cases if mission is not None and case.id == mission.case_id), None)
+        if support_case is not None:
+            support_case.dashboard_stage = "feedback"
         self.persist()
         return attempt
 

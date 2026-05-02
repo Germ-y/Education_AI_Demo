@@ -119,6 +119,7 @@ export type StudentProfile = {
   profileJson: Record<string, unknown>;
   attendanceRate?: number | null;
   attendanceLabel?: string;
+  accessCode?: string | null;
   strengths?: string[];
   weaknesses?: string[];
   status: StudentStatus;
@@ -200,6 +201,7 @@ export type StudentListItem = {
   primaryNeed: string;
   attendanceRate?: number | null;
   attendanceLabel?: string;
+  accessCode?: string | null;
   strengths?: string[];
   weaknesses?: string[];
   caseStatus?: CaseStatus;
@@ -464,6 +466,23 @@ export type StageSubmitRequest = {
   attemptId: string;
   answer: Record<string, unknown>;
   clientEventId?: string;
+};
+
+export type StudentActivityEventRequest = {
+  attemptId?: string | null;
+  stageId?: string | null;
+  eventType: string;
+  payloadJson?: Record<string, unknown>;
+};
+
+export type ReflectionRequest = {
+  attemptId: string;
+  reflectionChoice: string;
+  shortText?: string | null;
+};
+
+export type ReflectionResponse = {
+  saved: boolean;
 };
 
 export type StageSubmitResponse = {

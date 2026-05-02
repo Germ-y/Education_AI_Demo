@@ -108,6 +108,7 @@ function normalizeSeedContext(seed: BackendSeedContext): SeedContext {
       profileJson: {},
       attendanceRate: student.attendanceRate,
       attendanceLabel: student.attendanceLabel,
+      accessCode: student.accessCode,
       strengths: student.strengths ?? [],
       weaknesses: student.weaknesses ?? [],
       status: "active",
