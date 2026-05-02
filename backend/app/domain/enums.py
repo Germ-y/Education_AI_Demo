@@ -66,4 +66,4 @@ class AssetRole(StrEnum):
 
 class AssetType(StrEnum):
     IMAGE = "image"
-    AUDIO_OPTIONAL = "audio_optional"
+    AUDIO = "audio"

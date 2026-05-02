@@ -390,6 +390,7 @@ AI 실행 상태/결과 조회.
       "contentType": "learning_focus",
       "totalSteps": 4,
       "heroImageUrl": "https://cdn.example.com/hero.png",
+      "heroAudioUrl": "https://cdn.example.com/hero.mp3",
       "status": "published"
     }
   ]
@@ -461,6 +462,7 @@ no active duplicate session
   "practiceSpec": {
     "practiceTitle": "별이에게 분수 설명하기",
     "imageAssetUrl": "https://cdn.example.com/stage4.png",
+    "openingAudioUrl": "https://cdn.example.com/stage4-opening.mp3",
     "openingLine": "왜 4/1이 아니라 1/4인지 알려줄래?",
     "maxTurns": 6,
     "maxDurationSec": 120

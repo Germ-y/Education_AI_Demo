@@ -67,3 +67,11 @@ def test_rejects_video_asset_roles() -> None:
 
     with pytest.raises(ValueError):
         ContentAsset.model_validate(asset)
+
+
+def test_requires_stage_images_and_audio_assets() -> None:
+    content = create_demo_database().mission_contents[0].model_dump(by_alias=True)
+    content["assets"] = [asset for asset in content["assets"] if asset["assetType"] != "audio"]
+
+    with pytest.raises(ValueError):
+        MissionContent.model_validate(content)

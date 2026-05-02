@@ -183,6 +183,23 @@ class MissionContent(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
+    @model_validator(mode="after")
+    def attach_stage_asset_bundles(self) -> "MissionContent":
+        image_by_role = {asset.asset_role: asset.id for asset in self.assets if asset.asset_type == AssetType.IMAGE}
+        audio_by_role = {asset.asset_role: asset.id for asset in self.assets if asset.asset_type == AssetType.AUDIO}
+        for stage in self.stages:
+            role = _asset_role_for_step(stage.step)
+            stage.template_json.setdefault("imageAssetId", image_by_role.get(role))
+            stage.template_json.setdefault("audioAssetId", audio_by_role.get(role))
+            stage.template_json.setdefault(
+                "assetBundle",
+                {
+                    "imageAssetId": image_by_role.get(role),
+                    "audioAssetId": audio_by_role.get(role),
+                },
+            )
+        return self
+
     @field_validator("stages")
     @classmethod
     def validate_four_stages(cls, stages: list[ContentStage]) -> list[ContentStage]:
@@ -198,7 +215,21 @@ class MissionContent(BaseModel):
         if missing:
             missing_labels = ", ".join(sorted(role.value for role in missing))
             raise ValueError(f"필수 이미지 asset role이 없습니다: {missing_labels}")
+        audio_roles = {asset.asset_role for asset in assets if asset.asset_type == AssetType.AUDIO}
+        missing_audio = REQUIRED_ASSET_ROLES - audio_roles
+        if missing_audio:
+            missing_audio_labels = ", ".join(sorted(role.value for role in missing_audio))
+            raise ValueError(f"필수 오디오 asset role이 없습니다: {missing_audio_labels}")
         return assets
+
+
+def _asset_role_for_step(step: int) -> AssetRole:
+    return {
+        1: AssetRole.STAGE_1,
+        2: AssetRole.STAGE_2,
+        3: AssetRole.STAGE_3,
+        4: AssetRole.STAGE_4_REALTIME,
+    }[step]
 
 
 class DemoLoginRequest(BaseModel):

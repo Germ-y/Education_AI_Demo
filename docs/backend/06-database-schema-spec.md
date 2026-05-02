@@ -224,7 +224,7 @@ step=4이면 template_type in ('realtime_roleplay','realtime_teach_back')
 | `mission_content_id` | uuid fk | 콘텐츠 |
 | `stage_id` | uuid fk nullable | 단계 |
 | `asset_role` | text | `hero`, `stage_1`, `stage_2`, `stage_3`, `stage_4_realtime` |
-| `asset_type` | text | `image`, `audio_optional` |
+| `asset_type` | text | `image`, `audio` |
 | `provider` | text | `openai`, `elevenlabs_optional` |
 | `model` | text | `gpt-image-2`, `elevenlabs-tts` 등 |
 | `prompt_json` | jsonb nullable | 이미지 프롬프트 또는 TTS 생성 브리프 |
@@ -235,11 +235,12 @@ step=4이면 template_type in ('realtime_roleplay','realtime_teach_back')
 | `approval_status` | text | `pending`, `approved`, `rejected` |
 | `created_at` | timestamptz | 생성일 |
 
-사전 TTS는 `asset_type=audio_optional`로 저장한다.
+사전 TTS는 `asset_type=audio`로 저장한다.
 
 ```text
-hero, stage_1, stage_2, stage_3: ElevenLabs 사전 생성 가능
-stage_4_realtime: OpenAI realtime 세션이 담당하므로 ElevenLabs 사전 TTS를 붙이지 않는다
+hero, stage_1, stage_2, stage_3: ElevenLabs 사전 생성 안내 음성
+stage_4_realtime: realtime 진입 전 상황 안내 음성
+4단계 실시간 대화와 피드백은 OpenAI realtime session이 담당한다
 ```
 
 ## 7. Student Runtime

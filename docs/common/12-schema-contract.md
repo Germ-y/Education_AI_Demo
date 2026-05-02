@@ -266,6 +266,8 @@ GET /api/student/missions/:contentId
 - 학생 플레이 중 1~3단계에서 AI가 새 분석이나 새 생성을 하면 안 된다.
 - 학생에게 보이는 콘텐츠는 `published` 상태만 허용한다.
 - 한 미션은 대표 이미지 1장과 단계별 이미지 4장을 가진다.
+- 한 미션은 대표 오디오 1개와 단계별 오디오 4개를 가진다.
+- 프론트는 각 단계 화면 진입 시 이미지와 오디오를 먼저 resolve/load한다.
 - 질문, 선택지, 피드백은 이미지 안 텍스트가 아니라 UI 텍스트로 보여준다.
 - OpenAI key, realtime provider secret, prompt 원문은 프론트로 내려보내지 않는다.
 
@@ -515,6 +517,25 @@ assets has hero, stage_1, stage_2, stage_3, stage_4_realtime
 }
 ```
 
+오디오 asset 예시:
+
+```json
+{
+  "id": "asset_content_fraction_001_stage_2_audio",
+  "missionContentId": "content_fraction_001",
+  "stageId": "stage_fraction_2",
+  "assetRole": "stage_2",
+  "assetType": "audio",
+  "provider": "elevenlabs",
+  "model": "elevenlabs-tts",
+  "sourceText": "전체 조각 수를 먼저 세어보세요.",
+  "storageUrl": "/examples/generated/fraction-mission/audio/stage-2.mp3",
+  "previewUrl": "/examples/generated/fraction-mission/audio/stage-2.mp3",
+  "qaStatus": "passed",
+  "approvalStatus": "approved"
+}
+```
+
 asset role:
 
 ```text
@@ -524,6 +545,9 @@ stage_2
 stage_3
 stage_4_realtime
 ```
+
+각 role은 `image` asset과 `audio` asset을 하나씩 가져야 한다.
+`stage_4_realtime`의 audio는 realtime 시작 전 상황 안내용이며, 실시간 대화는 realtime session에서 처리한다.
 
 ## 14. RealtimePracticeSpec 최소 스키마
 

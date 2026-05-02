@@ -25,8 +25,8 @@ ElevenLabs는 교사가 승인한 정적 콘텐츠의 안내 음성을 **사전 
 
 ```text
 AI 콘텐츠 JSON 생성
-→ 이미지 생성
-→ hero + 1~3단계 narrationText 확정
+→ hero + 단계별 이미지 생성
+→ hero + 1~4단계 narrationText 확정
 → ElevenLabs TTS MP3 사전 생성
 → 교사 검토/승인
 → 학생 화면에서 audio asset 로드
@@ -40,9 +40,14 @@ AI 콘텐츠 JSON 생성
 | `stage_1` | 상황/개념 설명 음성 | ElevenLabs optional |
 | `stage_2` | 문제 안내 음성 | ElevenLabs optional |
 | `stage_3` | 응용/심화 안내 음성 | ElevenLabs optional |
-| `stage_4_realtime` | 실시간 대화 | ElevenLabs 사용 안 함 |
+| `stage_4_realtime` | realtime 진입 전 상황 안내 음성 | ElevenLabs |
 
-프론트는 `assetType: audio_optional` asset이 있으면 재생 버튼을 보여주고, 없으면 텍스트만 보여준다. 오디오가 없다고 seed 이미지나 다른 음성으로 조용히 대체하지 않는다.
+4단계의 ElevenLabs 오디오는 realtime 대화를 대신하지 않는다.
+학생이 realtime 세션에 들어가기 전에 상황 이미지와 함께 먼저 로드/재생되는 오프닝 안내 음성이다.
+실제 실시간 대화와 피드백은 OpenAI realtime session이 담당한다.
+
+프론트는 각 화면 진입 시 해당 stage의 `assetBundle.imageAssetId`, `assetBundle.audioAssetId`를 먼저 resolve/load한다.
+오디오가 없으면 콘텐츠 패키지 검증 실패로 본다. seed 이미지나 다른 음성으로 조용히 대체하지 않는다.
 
 ## 2. 공통 MissionContent 스키마
 
@@ -73,7 +78,7 @@ AI 콘텐츠 JSON 생성
   "missionContentId": "content_001",
   "stageId": "stage_001",
   "assetRole": "stage_1",
-  "assetType": "audio_optional",
+  "assetType": "audio",
   "provider": "elevenlabs",
   "model": "elevenlabs-tts",
   "sourceText": "피자 지도를 보며 전체와 부분을 확인해요.",

@@ -82,6 +82,14 @@ def test_teacher_and_student_demo_flows() -> None:
     today = client.get("/api/student/missions/today", headers={"authorization": f"Bearer {student_token}"})
     assert today.status_code == 200
     assert today.json()["data"][0]["totalSteps"] == 4
+    assert today.json()["data"][0]["heroAudioUrl"].endswith("/hero.mp3")
+
+    mission_detail = client.get("/api/student/missions/content_fraction_001", headers={"authorization": f"Bearer {student_token}"})
+    assert mission_detail.status_code == 200
+    assets = mission_detail.json()["data"]["assets"]
+    assert len([asset for asset in assets if asset["assetType"] == "image"]) == 5
+    assert len([asset for asset in assets if asset["assetType"] == "audio"]) == 5
+    assert mission_detail.json()["data"]["stages"][0]["templateJson"]["assetBundle"]["audioAssetId"].endswith("_audio")
 
     start = client.post(
         "/api/student/missions/content_fraction_001/start",
@@ -105,6 +113,7 @@ def test_teacher_and_student_demo_flows() -> None:
     )
     assert realtime.status_code == 200
     assert realtime.json()["data"]["practiceSpec"]["maxTurns"] == 6
+    assert realtime.json()["data"]["practiceSpec"]["openingAudioUrl"].endswith("stage-4-opening.mp3")
 
 
 def test_http_errors_use_contract_envelope() -> None:

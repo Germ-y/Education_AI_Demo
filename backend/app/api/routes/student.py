@@ -23,6 +23,7 @@ def today_missions(principal: SessionPrincipal = Depends(require_student), demo_
                 "contentType": mission.content_type,
                 "totalSteps": mission.total_steps,
                 "heroImageUrl": next((asset.preview_url for asset in mission.assets if asset.asset_role == "hero"), None),
+                "heroAudioUrl": next((asset.preview_url for asset in mission.assets if asset.asset_role == "hero" and asset.asset_type == "audio"), None),
                 "status": mission.status,
             }
             for mission in missions
@@ -78,6 +79,9 @@ def create_realtime_session(
     mission = demo_store.get_published_mission_for_student(student_id, content_id)
     spec = session.spec_snapshot_json
     image_asset = next((asset for asset in mission.assets if asset.id == spec.get("imageAssetId")), None) if mission else None
+    audio_asset = (
+        next((asset for asset in mission.assets if asset.asset_role == "stage_4_realtime" and asset.asset_type == "audio"), None) if mission else None
+    )
     settings = get_settings()
     return ok(
         {
@@ -90,6 +94,7 @@ def create_realtime_session(
             "practiceSpec": {
                 "practiceTitle": spec.get("practiceTitle"),
                 "imageAssetUrl": image_asset.preview_url if image_asset else None,
+                "openingAudioUrl": audio_asset.preview_url if audio_asset else None,
                 "openingLine": spec.get("openingLine"),
                 "maxTurns": spec.get("maxTurns"),
                 "maxDurationSec": spec.get("maxDurationSec"),

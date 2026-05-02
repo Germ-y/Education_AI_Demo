@@ -215,7 +215,8 @@ seed 여러 번 실행해도 중복 생성 없음
 ```text
 학생 1명 기준으로 teacher_review 상태의 MissionContent가 생성된다.
 대표 이미지 + stage_1~stage_4_realtime asset record가 생성된다.
-hero + stage_1~stage_3에는 선택 TTS asset record를 붙일 수 있다.
+hero + stage_1~stage_4_realtime에는 TTS audio asset record를 붙인다.
+4단계 오디오는 realtime 대화 대체가 아니라 realtime 진입 전 상황 안내용이다.
 이미지 생성 실패 시 asset status와 job error가 남는다.
 ```
 
