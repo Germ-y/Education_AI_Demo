@@ -51,7 +51,7 @@ export default function Home() {
               </span>
               <h2 className="mt-5 text-3xl font-black">학생별 학습 화면으로 이동</h2>
               <p className="mt-3 text-base leading-7 text-[#666b62]">
-                학생을 선택해 각자 다른 미션 화면으로 이동합니다.
+                학생을 선택해 개별 학습 화면으로 이동합니다.
               </p>
 
               <div className="mt-5 grid gap-3">
