@@ -227,8 +227,9 @@ hero + stage_1~stage_4_realtime에는 TTS audio asset record를 붙인다.
 ```text
 부분 완료. prompt registry와 v1 prompt 파일을 추가했고, MVP 프레임워크는 자체 workflow + OpenAI Responses API adapter로 정했다.
 AgentRun repository, OpenAI Responses/Realtime adapter, ElevenLabs TTS adapter 골격을 추가했다.
+`POST /api/ai/orchestrator-runs`, `POST /api/ai/content-generations`, `GET /api/ai/agent-runs/:id`를 추가했다.
 OPENAI_API_KEY/ELEVENLABS_*가 없거나 provider 요청이 실패하면 대체 seed asset을 만들지 않고 failed + reviewRequired 상태로 남긴다.
-다음 단계는 content generation endpoint와 image/TTS job record를 MissionContent teacher_review 생성 흐름에 연결하는 것이다.
+다음 단계는 image/TTS job record를 MissionContent teacher_review 생성 흐름에 연결하는 것이다.
 ```
 
 ElevenLabs TTS는 4단계 realtime이 아니라 정적 콘텐츠 안내 음성 사전 생성에만 사용한다.

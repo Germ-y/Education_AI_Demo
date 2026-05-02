@@ -138,6 +138,18 @@ def test_teacher_and_student_demo_flows() -> None:
     assert agent_run_detail.status_code == 200
     assert agent_run_detail.json()["data"]["id"] == agent_run["id"]
 
+    content_generation = client.post(
+        "/api/ai/content-generations",
+        headers={"authorization": f"Bearer {teacher_token}"},
+        json={
+            "orchestratorRunId": agent_run["id"],
+            "studentId": "student_learning_fraction",
+            "caseId": "case_learning_fraction",
+        },
+    )
+    assert content_generation.status_code == 409
+    assert content_generation.json()["error"]["code"] == "ORCHESTRATOR_RUN_NOT_READY"
+
 
 def test_http_errors_use_contract_envelope() -> None:
     client = TestClient(create_app())

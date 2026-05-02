@@ -294,6 +294,13 @@ class DemoStore:
         self.refresh()
         return [content for content in self.db.mission_contents if content.student_id == student_id and content.status == "published"]
 
+    def save_generated_mission_content(self, mission: MissionContent) -> MissionContent:
+        self.refresh()
+        self.db.mission_contents = [content for content in self.db.mission_contents if content.id != mission.id]
+        self.db.mission_contents.append(mission)
+        self.persist()
+        return mission
+
     def get_published_mission_for_student(self, student_id: str, content_id: str) -> MissionContent | None:
         self.refresh()
         return next(

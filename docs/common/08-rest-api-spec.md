@@ -328,14 +328,45 @@ provider key 없음, HTTP 오류, JSON parse 실패 등은 fallback을 만들지
 
 ```json
 {
-  "contentId": "content_001",
-  "status": "generating",
-  "jobs": [
-    { "type": "content_json", "status": "queued" },
-    { "type": "image_package", "status": "queued" },
-    { "type": "tts_package", "status": "queued" },
-    { "type": "auto_validation", "status": "queued" }
-  ]
+  "data": {
+    "agentRun": {
+      "id": "agent_run_content_001",
+      "agentType": "content",
+      "promptVersion": "mission_content_package_v1",
+      "outputSchemaName": "MissionContentPackageV1",
+      "status": "succeeded",
+      "reviewRequired": false
+    },
+    "content": "MissionContent"
+  }
+}
+```
+
+전제:
+
+```text
+orchestratorRun.status == succeeded
+orchestratorRun.outputJson exists
+생성된 MissionContent.status == teacher_review
+생성된 MissionContent.studentId/caseId가 요청 값과 일치
+MissionContent schema validation 통과
+```
+
+성공한 orchestrator run이 아니면 `409 ORCHESTRATOR_RUN_NOT_READY`를 반환한다.
+provider 또는 schema 오류가 나면 대체 콘텐츠를 만들지 않고 content agent run을 실패로 남긴다.
+
+```json
+{
+  "data": {
+    "agentRun": {
+      "id": "agent_run_content_001",
+      "status": "failed",
+      "errorCode": "MISSION_CONTENT_SCHEMA_INVALID",
+      "errorMessage": "생성된 MissionContent.status는 teacher_review여야 합니다.",
+      "reviewRequired": true
+    },
+    "content": null
+  }
 }
 ```
 

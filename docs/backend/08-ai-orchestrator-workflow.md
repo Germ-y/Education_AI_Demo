@@ -148,8 +148,12 @@ errorMessage
 
 ```text
 POST /api/ai/orchestrator-runs
+POST /api/ai/content-generations
 GET /api/ai/agent-runs/:agentRunId
 OpenAI Responses API adapter
 OpenAI Realtime client secret adapter
 ElevenLabs TTS adapter
 ```
+
+`content-generations`는 성공한 orchestrator run만 입력으로 받는다.
+생성된 `MissionContent`는 schema validation을 통과하고 `teacher_review` 상태일 때만 저장한다.

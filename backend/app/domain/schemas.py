@@ -301,3 +301,11 @@ class OrchestratorRunRequest(BaseModel):
     content_type: Literal[StudentType.LIFE_SUPPORT, StudentType.LEARNING_FOCUS] | None = Field(default=None, alias="contentType")
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class ContentGenerationRequest(BaseModel):
+    orchestrator_run_id: str = Field(alias="orchestratorRunId")
+    student_id: str = Field(alias="studentId")
+    case_id: str = Field(alias="caseId")
+
+    model_config = ConfigDict(populate_by_name=True)
