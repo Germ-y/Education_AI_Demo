@@ -1,24 +1,64 @@
-# EduYJ 에이전트 가이드
+# EduYJ 에이전트 시작점
 
-이 문서는 Codex/Ralph식 장기 작업을 이어받는 에이전트의 시작점이다. 새 세션은 항상 이 파일을 먼저 읽고, 다음 파일을 순서대로 연다.
+이 파일은 레포에 들어온 에이전트가 처음 보는 입구다. 자세한 설명은 아래 문서로 분리되어 있으므로, 작업 유형에 맞는 문서를 반드시 따라간다.
 
-1. [GOAL.md](GOAL.md)
-2. [docs/common/00-agent-navigation.md](docs/common/00-agent-navigation.md)
-3. [docs/common/03-implementation-backlog.md](docs/common/03-implementation-backlog.md)
-4. 프론트/백엔드가 함께 바뀌는 작업이면 [docs/common/01-collaboration-contract.md](docs/common/01-collaboration-contract.md)
-5. 브랜치 간 handoff가 있으면 [docs/common/02-branch-handoff-contract.md](docs/common/02-branch-handoff-contract.md)
+## 1. 먼저 확인
 
-## 레포 구조
+```bash
+git status --short --branch
+```
 
-- `frontend/`: Next.js 학생/교사 화면
-- `backend/`: FastAPI API 서버, 도메인 스키마, seed, AI workflow 계약
-- `docs/common/`: 프론트/백엔드 공통 계약 문서
-- `docs/frontend/`: 프론트 팀원이 먼저 보는 문서
-- `docs/backend/`: 백엔드 팀원이 먼저 보는 문서
-- `.agents/`: 프로젝트 전용 Codex 스킬
-- `examples/`, `assets/`: 생성 콘텐츠 예시와 시각 자료
+현재 브랜치와 변경사항을 먼저 확인한다.
 
-## 프론트엔드 규칙
+- 프론트 작업은 `frontend` 브랜치에서 진행한다.
+- 백엔드 작업은 `backend` 브랜치에서 진행한다.
+- 통합 검증은 `dev` 브랜치에서 진행한다.
+- 이미 수정된 파일이 있으면 사용자 또는 다른 작업자의 변경으로 보고 함부로 되돌리지 않는다.
+
+## 2. 공통으로 읽을 문서
+
+1. [GOAL.md](GOAL.md) - 전체 목표
+2. [docs/README.md](docs/README.md) - 문서 폴더 구조
+3. [docs/common/00-agent-navigation.md](docs/common/00-agent-navigation.md) - 작업별 문서 지도
+4. [docs/common/01-collaboration-contract.md](docs/common/01-collaboration-contract.md) - 프론트/백엔드 협업 계약
+5. [docs/common/02-branch-handoff-contract.md](docs/common/02-branch-handoff-contract.md) - 브랜치 간 handoff 기준
+6. [docs/common/03-implementation-backlog.md](docs/common/03-implementation-backlog.md) - 현재 백로그
+
+## 3. 작업 유형별 시작 문서
+
+| 작업 유형 | 먼저 볼 문서 | 사용할 스킬 |
+| --- | --- | --- |
+| 프론트 화면/UX | [docs/frontend/00-frontend-team-guide.md](docs/frontend/00-frontend-team-guide.md) | [eduyj-monorepo-collaboration](.agents/skills/eduyj-monorepo-collaboration/SKILL.md) |
+| 백엔드 API/DB/seed | [docs/backend/00-backend-team-guide.md](docs/backend/00-backend-team-guide.md) | [eduyj-backend-contracts](.agents/skills/eduyj-backend-contracts/SKILL.md) |
+| 콘텐츠/이미지/realtime | [docs/common/05-ai-content-template-spec.md](docs/common/05-ai-content-template-spec.md) | [eduyj-content-package](.agents/skills/eduyj-content-package/SKILL.md) |
+| 프론트/백엔드 동시 변경 | [docs/common/02-branch-handoff-contract.md](docs/common/02-branch-handoff-contract.md) | [eduyj-monorepo-collaboration](.agents/skills/eduyj-monorepo-collaboration/SKILL.md) |
+| 장기 목표 이어가기 | [docs/common/03-implementation-backlog.md](docs/common/03-implementation-backlog.md) | [eduyj-agent-loop](.agents/skills/eduyj-agent-loop/SKILL.md) |
+
+## 4. 폴더 기준
+
+```text
+frontend/       프론트 구현
+backend/        백엔드 구현
+docs/common/    프론트와 백엔드가 함께 지키는 계약
+docs/frontend/  프론트 팀원이 보는 문서
+docs/backend/   백엔드 팀원이 보는 문서
+.agents/skills/ 에이전트 작업 스킬
+examples/       생성 콘텐츠 샘플
+assets/         OCR/공공데이터 시각 자료
+```
+
+## 5. 반드시 지킬 것
+
+- 커밋은 작게 나누고 메시지는 `feat : 내용`, `docs : 내용`, `fix : 내용`, `chore : 내용`처럼 한국어로 쓴다.
+- 학생 미션은 4단계다. 회고는 5단계가 아니다.
+- 4단계가 realtime이다. 1~3단계는 승인된 정적 템플릿이다.
+- 영상 생성, ffmpeg, Remotion 파이프라인을 핵심 범위에 넣지 않는다.
+- 이미지는 `gpt-image-2`로 실제 생성한다. 실패를 seed asset으로 조용히 대체하지 않는다.
+- provider key는 `frontend/`에 노출하지 않는다.
+- 학생에게 진단명이나 낙인성 표현을 노출하지 않는다.
+- 실제 `.env`, `.venv`, `node_modules`, cache는 커밋하지 않는다.
+
+## 6. Next.js 주의
 
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
@@ -28,48 +68,43 @@ This version has breaking changes — APIs, conventions, and file structure may 
 이 프로젝트의 Next.js 버전은 일반적으로 알고 있는 구조와 다를 수 있다. 프론트 코드를 수정하기 전에는 `frontend/node_modules/next/dist/docs/`의 관련 문서를 먼저 확인한다.
 <!-- END:nextjs-agent-rules -->
 
-## 반드시 지킬 것
+## 7. 검증 기준
 
-- 커밋은 작게 쪼갠다. 메시지는 `feat : 내용`, `docs : 내용`, `fix : 내용`, `chore : 내용` 형식의 한국어를 쓴다.
-- 백엔드 구현은 `backend/`, 프론트엔드 구현은 `frontend/`, 공통 기획 문서는 `docs/`에 둔다.
-- 영상 생성은 범위에서 제외한다. 영상 렌더링/믹싱 파이프라인을 핵심 설계에 넣지 않는다.
-- 콘텐츠는 4단계다. 1~3단계는 승인된 템플릿 JSON, 4단계는 승인된 `RealtimePracticeSpec` 기반 실시간 연습이다.
-- 이미지 생성은 `gpt-image-2` 기준이다. 한 미션은 대표 이미지 1장과 단계별 이미지 4장을 가진다.
-- 데모 이미지도 API로 실제 생성한다. 비용/속도 문제 때문에 seed asset으로 대체하지 않는다.
-- 학생 플레이 중 1~3단계에서 AI가 새 분석/새 생성/후처리로 콘텐츠를 바꾸면 안 된다.
-- 학생에게 노출되는 모든 AI 생성 콘텐츠는 자동 검수와 교사 승인 뒤에만 배포한다.
-- 공공데이터는 학생 개인 진단값이 아니라 교육과정, 학사일정, 지역 맥락, 통계 근거로 사용한다.
-- 데모 MVP는 seed 학생/교사/센터 데이터로 먼저 완성한다. 회원가입/아이등록은 시간이 남을 때 확장한다.
-- 프론트/백엔드 계약 변경은 문서 → 백엔드 스키마/API → seed → 프론트 소비 코드 → 검증 순서로 진행한다.
-
-## 에이전트 작업 루프
-
-1. `git status --short --branch`로 현재 브랜치와 변경사항을 확인한다.
-2. [GOAL.md](GOAL.md)의 마일스톤 중 완료되지 않은 가장 앞 작업을 고른다.
-3. 관련 문서를 [docs/common/00-agent-navigation.md](docs/common/00-agent-navigation.md)에서 찾아 읽는다.
-4. 작은 단위로 구현하거나 문서를 수정한다.
-5. 링크, 용어, 단계 수, API/DB 연결점 정합성을 검증한다.
-6. 테스트 또는 문서 검증 명령을 실행하고 결과를 기록한다.
-7. 변경 범위별로 작은 커밋을 만든다.
-8. [docs/common/03-implementation-backlog.md](docs/common/03-implementation-backlog.md)를 필요하면 갱신한다.
-
-## 검증 기준
-
-문서 작업이라도 아래는 확인한다.
+문서만 바꾼 경우:
 
 ```bash
-rg -n "5[단]계|마지막[ ]실시간|마지막[ ]realtime|R[e]motion|f[f]mpeg" README.md AGENTS.md GOAL.md docs .agents backend
-rg -n "\\]\\(([^)#]+\\.md)" README.md AGENTS.md GOAL.md docs .agents
+rg -n "5[단]계|마지막[ ]실시간|마지막[ ]realtime|R[e]motion|f[f]mpeg|f[a]llbackUsed|candidate[M]odels" README.md AGENTS.md GOAL.md docs .agents backend examples
 git diff --check
 ```
 
-구현 작업이라면 추가로 타입체크, 테스트, seed 실행, API smoke test를 수행한다.
+백엔드를 바꾼 경우:
 
-FastAPI 백엔드 검증은 루트에서 `cd backend` 후 실행한다.
+```bash
+cd backend
+.venv/bin/ruff check app tests
+.venv/bin/python -m pytest
+.venv/bin/python -m app.data.seed_demo
+```
 
-## 프로젝트 스킬
+프론트를 바꾼 경우:
 
-- [.agents/skills/eduyj-agent-loop/SKILL.md](.agents/skills/eduyj-agent-loop/SKILL.md)
-- [.agents/skills/eduyj-monorepo-collaboration/SKILL.md](.agents/skills/eduyj-monorepo-collaboration/SKILL.md)
-- [.agents/skills/eduyj-backend-contracts/SKILL.md](.agents/skills/eduyj-backend-contracts/SKILL.md)
-- [.agents/skills/eduyj-content-package/SKILL.md](.agents/skills/eduyj-content-package/SKILL.md)
+```bash
+cd frontend
+npm run lint
+```
+
+프론트와 백엔드를 같이 바꾼 경우에는 [docs/common/02-branch-handoff-contract.md](docs/common/02-branch-handoff-contract.md)의 `dev` 통합 검증 흐름을 따른다.
+
+## 8. 작업 종료 보고
+
+작업을 끝낼 때는 아래 형식으로 남긴다.
+
+```text
+목표:
+수정한 경로:
+API/데이터 계약 변경 여부:
+검증:
+남은 위험:
+다음 작업:
+커밋:
+```
