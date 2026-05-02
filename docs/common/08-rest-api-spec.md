@@ -698,7 +698,53 @@ ReviewAgent 실행 요청.
 
 반영 시 active memory card의 `recent4wResponseJson`과 `nextSessionCautions`가 업데이트된다.
 
-## 10. Public Data APIs
+## 10. Audit APIs
+
+### GET /api/audit-logs
+
+교사/센터 사용자의 민감 작업 기록을 조회한다.
+
+Query:
+
+```text
+studentId=student_learning_fraction
+action=approve_content
+limit=50
+```
+
+기록 대상:
+
+```text
+view_student_case
+view_student_history
+approve_content
+reject_content
+publish_content
+generate_asset
+generate_asset_package
+apply_review_to_memory
+```
+
+응답:
+
+```json
+{
+  "data": [
+    {
+      "id": "audit_001",
+      "actorUserId": "user_teacher_demo",
+      "studentId": "student_learning_fraction",
+      "action": "approve_content",
+      "resourceType": "mission_content",
+      "resourceId": "content_fraction_001",
+      "payloadJson": {},
+      "createdAt": "2026-05-02T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+## 11. Public Data APIs
 
 ### GET /api/public-data/sources
 
@@ -791,7 +837,7 @@ sync job 상태 조회.
 
 교육통계 조회.
 
-## 11. Admin And Seed APIs
+## 12. Admin And Seed APIs
 
 ### POST /api/admin/seed/demo
 

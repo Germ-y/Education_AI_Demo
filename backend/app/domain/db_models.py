@@ -288,3 +288,16 @@ class AgentRunRow(Base):
     review_required: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[str] = mapped_column(String)
     completed_at: Mapped[str | None] = mapped_column(String)
+
+
+class AuditLogRow(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    actor_user_id: Mapped[str | None] = mapped_column(String, index=True)
+    student_id: Mapped[str | None] = mapped_column(String, index=True)
+    action: Mapped[str] = mapped_column(String, index=True)
+    resource_type: Mapped[str] = mapped_column(String, index=True)
+    resource_id: Mapped[str | None] = mapped_column(String, index=True)
+    payload_json: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[str] = mapped_column(String)

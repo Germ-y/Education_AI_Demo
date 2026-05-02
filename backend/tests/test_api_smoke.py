@@ -99,6 +99,12 @@ def test_teacher_and_student_demo_flows() -> None:
     publish = client.post("/api/contents/content_fraction_001/publish", headers={"authorization": f"Bearer {teacher_token}"})
     assert publish.status_code == 200
     assert publish.json()["data"]["status"] == "published"
+    content_audit = client.get(
+        "/api/audit-logs?studentId=student_learning_fraction",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert content_audit.status_code == 200
+    assert {"approve_content", "publish_content"}.issubset({log["action"] for log in content_audit.json()["data"]})
 
     note = client.post(
         "/api/teacher/students/student_learning_fraction/notes",
@@ -187,6 +193,12 @@ def test_teacher_and_student_demo_flows() -> None:
     )
     assert applied_memory.status_code == 200
     assert applied_memory.json()["data"]["recent4wResponseJson"]["latestReviewSummaryId"] == review_summary.json()["data"]["id"]
+    memory_audit = client.get(
+        "/api/audit-logs?action=apply_review_to_memory",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert memory_audit.status_code == 200
+    assert memory_audit.json()["data"][0]["resourceId"] == review_summary.json()["data"]["id"]
 
     orchestrator = client.post(
         "/api/ai/orchestrator-runs",

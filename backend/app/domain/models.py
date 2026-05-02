@@ -238,6 +238,19 @@ class ReviewSummary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class AuditLog(BaseModel):
+    id: str
+    actor_user_id: str | None = Field(default=None, alias="actorUserId")
+    student_id: str | None = Field(default=None, alias="studentId")
+    action: str
+    resource_type: str = Field(alias="resourceType")
+    resource_id: str | None = Field(default=None, alias="resourceId")
+    payload_json: dict[str, Any] | None = Field(default=None, alias="payloadJson")
+    created_at: str = Field(alias="createdAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class DemoDatabase(BaseModel):
     organizations: list[Organization]
     users: list[User]
@@ -256,5 +269,6 @@ class DemoDatabase(BaseModel):
     realtime_sessions: list[RealtimePracticeSession] = Field(default_factory=list, alias="realtimeSessions")
     public_data_sources: list[PublicDataSource] = Field(alias="publicDataSources")
     review_summaries: list[ReviewSummary] = Field(default_factory=list, alias="reviewSummaries")
+    audit_logs: list[AuditLog] = Field(default_factory=list, alias="auditLogs")
 
     model_config = ConfigDict(populate_by_name=True)

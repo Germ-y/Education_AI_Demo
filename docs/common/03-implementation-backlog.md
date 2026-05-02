@@ -191,7 +191,8 @@ seed 여러 번 실행해도 중복 생성 없음
 상태:
 
 ```text
-부분 완료. demo token 기반 학생 목록/상세/memory patch API를 추가했다. 감사 로그 영속화는 DB 연결 뒤 진행한다.
+부분 완료. demo token 기반 학생 목록/상세/memory patch API를 추가했다.
+학생 상세/히스토리 조회 감사 로그를 저장한다.
 ```
 
 ## 마일스톤 6. AI 콘텐츠 생성
@@ -278,7 +279,8 @@ published 콘텐츠만 학생 API에서 조회된다.
 POST /api/contents/:id/assets/:assetId/generate로 단일 이미지/TTS asset 실제 생성을 연결했다.
 POST /api/contents/:id/assets/generate-package로 5개 이미지 + 5개 오디오 batch 생성을 연결했다.
 학생 API는 published 콘텐츠만 반환한다.
-audit log 영속화와 재생성 API는 다음 슬라이스에서 진행한다.
+승인/반려/배포/asset 생성 audit log를 저장한다.
+재생성 API는 단일 asset generate API를 재사용하며, 교사용 별도 요청 문구 저장은 다음 슬라이스에서 진행한다.
 ```
 
 ## 마일스톤 9. 학생 플레이 런타임

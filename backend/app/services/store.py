@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.core.config import get_settings
 from app.data.demo_data import create_demo_database
 from app.domain.enums import MissionStatus
-from app.domain.models import ActivityEvent, CaseNote, ContentAttempt, DemoDatabase, MemoryCard, RealtimePracticeSession, ReviewSummary
+from app.domain.models import ActivityEvent, AuditLog, CaseNote, ContentAttempt, DemoDatabase, MemoryCard, RealtimePracticeSession, ReviewSummary
 from app.domain.schemas import MissionContent
 from app.repositories.demo_repository import DemoRepository
 
@@ -103,6 +103,39 @@ class DemoStore:
                 for content in self.db.mission_contents
             ],
         }
+
+    def record_audit(
+        self,
+        *,
+        actor_user_id: str | None,
+        action: str,
+        resource_type: str,
+        resource_id: str | None = None,
+        student_id: str | None = None,
+        payload_json: dict[str, Any] | None = None,
+    ) -> AuditLog:
+        log = AuditLog(
+            id=f"audit_{uuid4()}",
+            actorUserId=actor_user_id,
+            studentId=student_id,
+            action=action,
+            resourceType=resource_type,
+            resourceId=resource_id,
+            payloadJson=payload_json or {},
+            createdAt=_now(),
+        )
+        self.db.audit_logs.append(log)
+        self.persist()
+        return log
+
+    def list_audit_logs(self, *, student_id: str | None = None, action: str | None = None, limit: int = 50) -> list[dict]:
+        self.refresh()
+        logs = self.db.audit_logs
+        if student_id:
+            logs = [log for log in logs if log.student_id == student_id]
+        if action:
+            logs = [log for log in logs if log.action == action]
+        return [log.model_dump(by_alias=True) for log in logs[-limit:]]
 
     def list_teacher_students(self, student_type: str | None = None, q: str | None = None, teacher_id: str | None = None) -> list[dict]:
         self.refresh()

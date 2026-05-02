@@ -46,6 +46,14 @@ def approve_content(
             status_code=400,
             detail={"code": "CONTENT_APPROVAL_FAILED", "message": "승인할 수 없는 콘텐츠입니다. 단계와 asset 승인 목록을 확인해 주세요."},
         )
+    demo_store.record_audit(
+        actor_user_id=principal.id,
+        student_id=content.student_id,
+        action="approve_content",
+        resource_type="mission_content",
+        resource_id=content.id,
+        payload_json={"reviewNote": payload.review_note},
+    )
     return ok(content.model_dump(by_alias=True))
 
 
@@ -59,6 +67,14 @@ def reject_content(
     content = demo_store.reject_mission_content(content_id, principal.id, payload.reason, payload.requested_changes)
     if content is None:
         raise HTTPException(status_code=404, detail={"code": "CONTENT_NOT_FOUND", "message": "콘텐츠를 찾을 수 없습니다."})
+    demo_store.record_audit(
+        actor_user_id=principal.id,
+        student_id=content.student_id,
+        action="reject_content",
+        resource_type="mission_content",
+        resource_id=content.id,
+        payload_json={"reason": payload.reason, "requestedChanges": payload.requested_changes},
+    )
     return ok(content.model_dump(by_alias=True))
 
 
@@ -79,6 +95,14 @@ def generate_content_asset(
     _generate_asset_or_raise(content_id, asset)
 
     demo_store.save_generated_mission_content(content)
+    demo_store.record_audit(
+        actor_user_id=principal.id,
+        student_id=content.student_id,
+        action="generate_asset",
+        resource_type="content_asset",
+        resource_id=asset.id,
+        payload_json={"contentId": content.id, "assetType": asset.asset_type, "assetRole": asset.asset_role},
+    )
     return ok(asset.model_dump(by_alias=True))
 
 
@@ -101,6 +125,14 @@ def generate_content_asset_package(
         generated.append(asset.model_dump(by_alias=True))
 
     demo_store.save_generated_mission_content(content)
+    demo_store.record_audit(
+        actor_user_id=principal.id,
+        student_id=content.student_id,
+        action="generate_asset_package",
+        resource_type="mission_content",
+        resource_id=content.id,
+        payload_json={"generatedCount": len(generated)},
+    )
     return ok({"contentId": content.id, "generatedCount": len(generated), "assets": generated})
 
 
@@ -143,6 +175,14 @@ def publish_content(
             status_code=400,
             detail={"code": "CONTENT_PUBLISH_FAILED", "message": "승인 완료된 콘텐츠만 배포할 수 있습니다."},
         )
+    demo_store.record_audit(
+        actor_user_id=principal.id,
+        student_id=content.student_id,
+        action="publish_content",
+        resource_type="mission_content",
+        resource_id=content.id,
+        payload_json={},
+    )
     return ok(content.model_dump(by_alias=True))
 
 

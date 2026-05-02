@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.response import ok
-from app.api.routes import ai, auth, contents, context, public_data, review, student, teacher
+from app.api.routes import ai, audit, auth, contents, context, public_data, review, student, teacher
 from app.core.config import get_settings
 
 
@@ -24,6 +24,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(context.router)
     app.include_router(ai.router)
+    app.include_router(audit.router)
     app.include_router(contents.router)
     app.include_router(review.router)
     app.include_router(teacher.router)
