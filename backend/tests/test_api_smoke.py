@@ -118,6 +118,19 @@ def test_teacher_and_student_demo_flows() -> None:
     assert start.status_code == 200
     attempt_id = start.json()["data"]["id"]
 
+    event = client.post(
+        "/api/student/missions/content_fraction_001/events",
+        headers={"authorization": f"Bearer {student_token}"},
+        json={
+            "attemptId": attempt_id,
+            "stageId": "stage_fraction_1",
+            "eventType": "stage_entered",
+            "payloadJson": {"step": 1},
+        },
+    )
+    assert event.status_code == 200
+    assert event.json()["data"]["eventType"] == "stage_entered"
+
     submit = client.post(
         "/api/student/missions/content_fraction_001/stages/stage_fraction_2/submit",
         headers={"authorization": f"Bearer {student_token}"},

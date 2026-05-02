@@ -297,6 +297,12 @@ audit log 영속화와 재생성 API는 다음 슬라이스에서 진행한다.
 정답 판정은 서버에서 승인된 JSON 기준으로 수행한다.
 ```
 
+상태:
+
+```text
+부분 완료. 오늘의 미션 조회, 콘텐츠 시작, 1~3단계 submit, 학생 활동 이벤트 저장, 회고, 완료 API를 추가했다.
+```
+
 ## 마일스톤 10. 4단계 realtime
 
 참조:
@@ -318,6 +324,13 @@ audit log 영속화와 재생성 API는 다음 슬라이스에서 진행한다.
 4단계에서만 realtime session이 열린다.
 stage.step != 4이면 session 생성 실패.
 세션 종료 후 review input으로 사용할 summary가 저장된다.
+```
+
+상태:
+
+```text
+부분 완료. OpenAI realtime client secret 발급 adapter, realtime session 생성 계약, realtime 이벤트 저장, realtime 완료 저장 API를 추가했다.
+OPENAI_API_KEY가 없으면 가짜 secret을 반환하지 않고 424 + 검수 필요 오류를 반환한다.
 ```
 
 ## 마일스톤 11. 리뷰와 메모리 업데이트

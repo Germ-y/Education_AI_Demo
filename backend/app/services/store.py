@@ -455,6 +455,95 @@ class DemoStore:
         self.persist()
         return {"saved": True}
 
+    def save_student_activity_event(
+        self,
+        student_id: str,
+        content_id: str,
+        attempt_id: str | None,
+        stage_id: str | None,
+        event_type: str,
+        payload_json: dict[str, Any],
+    ) -> ActivityEvent | None:
+        self.refresh()
+        mission = self.get_published_mission_for_student(student_id, content_id)
+        if mission is None:
+            return None
+        if attempt_id is not None:
+            attempt = self.get_attempt(attempt_id)
+            if attempt is None or attempt.student_id != student_id or attempt.mission_content_id != content_id:
+                return None
+        if stage_id is not None and not any(stage.id == stage_id for stage in mission.stages):
+            return None
+        event = ActivityEvent(
+            id=f"event_{uuid4()}",
+            attemptId=attempt_id,
+            studentId=student_id,
+            stageId=stage_id,
+            eventType=event_type,
+            payloadJson=payload_json,
+            occurredAt=_now(),
+        )
+        self.db.activity_events.append(event)
+        self.persist()
+        return event
+
+    def save_realtime_event(self, student_id: str, session_id: str, event_type: str, payload_json: dict[str, Any]) -> ActivityEvent | None:
+        self.refresh()
+        session = next((candidate for candidate in self.db.realtime_sessions if candidate.id == session_id and candidate.student_id == student_id), None)
+        if session is None:
+            return None
+        event = ActivityEvent(
+            id=f"event_{uuid4()}",
+            attemptId=session.attempt_id,
+            studentId=student_id,
+            stageId=session.stage_id,
+            eventType=event_type,
+            payloadJson={"realtimeSessionId": session.id, **payload_json},
+            occurredAt=_now(),
+        )
+        self.db.activity_events.append(event)
+        self.persist()
+        return event
+
+    def complete_realtime_session(
+        self,
+        student_id: str,
+        session_id: str,
+        turn_count: int,
+        duration_sec: int,
+        rubric_result: dict[str, Any],
+        transcript_summary: str | None,
+    ) -> RealtimePracticeSession | None:
+        self.refresh()
+        for index, session in enumerate(self.db.realtime_sessions):
+            if session.id != session_id or session.student_id != student_id:
+                continue
+            updated = session.model_copy(
+                update={
+                    "status": "completed",
+                    "ended_at": _now(),
+                    "turn_count": turn_count,
+                    "duration_sec": duration_sec,
+                    "rubric_result_json": rubric_result,
+                    "transcript_summary": transcript_summary,
+                }
+            )
+            self.db.realtime_sessions[index] = updated
+            self.db.activity_events.append(
+                ActivityEvent(
+                    id=f"event_{uuid4()}",
+                    attemptId=updated.attempt_id,
+                    studentId=student_id,
+                    stageId=updated.stage_id,
+                    eventType="realtime_session_completed",
+                    payloadJson={"realtimeSessionId": updated.id, "turnCount": turn_count, "durationSec": duration_sec},
+                    occurredAt=_now(),
+                )
+            )
+            self.persist()
+            return updated
+        return None
+
     def complete_attempt(self, student_id: str, content_id: str, attempt_id: str) -> ContentAttempt | None:
         self.refresh()
         attempt = self.get_attempt(attempt_id)

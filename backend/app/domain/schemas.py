@@ -324,3 +324,28 @@ class ContentRejectRequest(BaseModel):
     requested_changes: list[str] = Field(default_factory=list, alias="requestedChanges")
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class StudentActivityEventRequest(BaseModel):
+    attempt_id: str | None = Field(default=None, alias="attemptId")
+    stage_id: str | None = Field(default=None, alias="stageId")
+    event_type: str = Field(alias="eventType")
+    payload_json: dict[str, Any] = Field(default_factory=dict, alias="payloadJson")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class RealtimeSessionEventRequest(BaseModel):
+    event_type: str = Field(alias="eventType")
+    payload_json: dict[str, Any] = Field(default_factory=dict, alias="payloadJson")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class RealtimeSessionCompleteRequest(BaseModel):
+    turn_count: int = Field(alias="turnCount", ge=0)
+    duration_sec: int = Field(alias="durationSec", ge=0)
+    rubric_result: dict[str, Any] = Field(default_factory=dict, alias="rubricResult")
+    transcript_summary: str | None = Field(default=None, alias="transcriptSummary")
+
+    model_config = ConfigDict(populate_by_name=True)

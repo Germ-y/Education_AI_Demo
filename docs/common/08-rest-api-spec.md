@@ -511,6 +511,18 @@ all assets approvalStatus == approved
 
 힌트 사용, 화면 진입, 체류시간 등 이벤트 저장.
 
+```json
+{
+  "attemptId": "attempt_001",
+  "stageId": "stage_001",
+  "eventType": "stage_entered",
+  "payloadJson": {
+    "step": 1,
+    "durationMs": 1200
+  }
+}
+```
+
 ## 8. Realtime Stage APIs
 
 ### POST /api/student/missions/:contentId/stages/:stageId/realtime-session
@@ -551,6 +563,16 @@ no active duplicate session
 ### POST /api/student/realtime-sessions/:sessionId/events
 
 Realtime 이벤트 저장. 클라이언트 이벤트, sideband 이벤트, 서버 평가 이벤트를 같은 session에 묶는다.
+
+```json
+{
+  "eventType": "realtime_user_turn",
+  "payloadJson": {
+    "turnIndex": 1,
+    "modality": "voice"
+  }
+}
+```
 
 ### POST /api/student/realtime-sessions/:sessionId/complete
 

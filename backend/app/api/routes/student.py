@@ -7,7 +7,14 @@ from app.ai.provider_errors import AiProviderError
 from app.api.deps import get_store, require_student
 from app.api.response import ok
 from app.core.config import get_settings
-from app.domain.schemas import AttemptRequest, ReflectionRequest, StageSubmitRequest
+from app.domain.schemas import (
+    AttemptRequest,
+    RealtimeSessionCompleteRequest,
+    RealtimeSessionEventRequest,
+    ReflectionRequest,
+    StageSubmitRequest,
+    StudentActivityEventRequest,
+)
 from app.services.store import DemoStore, SessionPrincipal
 
 router = APIRouter(prefix="/api/student", tags=["student"])
@@ -140,6 +147,26 @@ def save_reflection(
     return ok(saved)
 
 
+@router.post("/missions/{content_id}/events")
+def save_student_event(
+    content_id: str,
+    payload: StudentActivityEventRequest,
+    principal: SessionPrincipal = Depends(require_student),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    event = demo_store.save_student_activity_event(
+        _student_id(principal),
+        content_id,
+        payload.attempt_id,
+        payload.stage_id,
+        payload.event_type,
+        payload.payload_json,
+    )
+    if event is None:
+        raise HTTPException(status_code=404, detail={"code": "MISSION_EVENT_NOT_ALLOWED", "message": "이벤트를 저장할 수 있는 미션/시도를 찾을 수 없습니다."})
+    return ok(event.model_dump(by_alias=True))
+
+
 @router.post("/missions/{content_id}/complete")
 def complete_mission(
     content_id: str,
@@ -151,6 +178,39 @@ def complete_mission(
     if completed is None:
         raise HTTPException(status_code=404, detail={"code": "ATTEMPT_NOT_FOUND", "message": "진행 중인 시도를 찾을 수 없습니다."})
     return ok(completed.model_dump(by_alias=True))
+
+
+@router.post("/realtime-sessions/{session_id}/events")
+def save_realtime_event(
+    session_id: str,
+    payload: RealtimeSessionEventRequest,
+    principal: SessionPrincipal = Depends(require_student),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    event = demo_store.save_realtime_event(_student_id(principal), session_id, payload.event_type, payload.payload_json)
+    if event is None:
+        raise HTTPException(status_code=404, detail={"code": "REALTIME_SESSION_NOT_FOUND", "message": "Realtime 세션을 찾을 수 없습니다."})
+    return ok(event.model_dump(by_alias=True))
+
+
+@router.post("/realtime-sessions/{session_id}/complete")
+def complete_realtime_session(
+    session_id: str,
+    payload: RealtimeSessionCompleteRequest,
+    principal: SessionPrincipal = Depends(require_student),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    session = demo_store.complete_realtime_session(
+        _student_id(principal),
+        session_id,
+        payload.turn_count,
+        payload.duration_sec,
+        payload.rubric_result,
+        payload.transcript_summary,
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail={"code": "REALTIME_SESSION_NOT_FOUND", "message": "Realtime 세션을 찾을 수 없습니다."})
+    return ok(session.model_dump(by_alias=True))
 
 
 def _student_id(principal: SessionPrincipal) -> str:
