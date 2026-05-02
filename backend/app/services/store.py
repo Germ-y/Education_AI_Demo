@@ -100,7 +100,7 @@ class DemoStore:
                     "caseId": support_case.id,
                     "caseStatus": support_case.case_status,
                     "dashboardStage": support_case.dashboard_stage,
-                    "supportStrategy": support_case.support_strategy,
+                    "supportStrategy": _teacher_facing_text(support_case.support_strategy),
                 }
                 for support_case in self.db.support_cases
                 if support_case.owner_teacher_id == teacher.id
@@ -200,10 +200,10 @@ class DemoStore:
                     "dashboardStage": open_case_by_student_id[student.id].dashboard_stage,
                     "dashboardStageLabel": stage_label,
                     "statusLabel": dashboard.get("statusLabel") or stage_label,
-                    "supportStrategy": open_case_by_student_id[student.id].support_strategy,
-                    "summaryLine": dashboard.get("summaryLine") or student.primary_need,
-                    "aiContextSummary": dashboard.get("aiContextSummary") or student.primary_need,
-                    "nextSessionSuggestion": planner.goal_text if planner else "다음 회기 목표를 설정해 주세요.",
+                    "supportStrategy": _teacher_facing_text(open_case_by_student_id[student.id].support_strategy),
+                    "summaryLine": _teacher_facing_text(dashboard.get("summaryLine") or student.primary_need),
+                    "aiContextSummary": _teacher_facing_text(dashboard.get("aiContextSummary") or student.primary_need),
+                    "nextSessionSuggestion": _teacher_facing_text(planner.goal_text if planner else "다음 회기 목표를 설정해 주세요."),
                 }
             )
         return students
@@ -303,13 +303,13 @@ class DemoStore:
                 }
             )
 
-        auto_context = [{"label": "학생 기록", "value": dashboard.get("responsePattern") or student.primary_need}]
+        auto_context = [{"label": "학생 기록", "value": _teacher_facing_text(dashboard.get("responsePattern") or student.primary_need)}]
         if previous_lessons:
-            auto_context.append({"label": "이전 수업", "value": previous_lessons[0]["summary"]})
+            auto_context.append({"label": "이전 수업", "value": _teacher_facing_text(previous_lessons[0]["summary"])})
         timetable_context = _timetable_context_text(timetable_slots)
         if timetable_context:
             auto_context.append({"label": "학교 시간표", "value": timetable_context})
-        auto_context.append({"label": "다음 목표", "value": planner.goal_text if planner else open_case.current_goal})
+        auto_context.append({"label": "다음 목표", "value": _teacher_facing_text(planner.goal_text if planner else open_case.current_goal)})
 
         return {
             "student": {
@@ -323,9 +323,9 @@ class DemoStore:
             },
             "caseSummary": {
                 "caseId": open_case.id,
-                "currentGoal": open_case.current_goal,
-                "primaryNeed": student.primary_need,
-                "supportStrategy": open_case.support_strategy,
+                "currentGoal": _teacher_facing_text(open_case.current_goal),
+                "primaryNeed": _teacher_facing_text(student.primary_need),
+                "supportStrategy": _teacher_facing_text(open_case.support_strategy),
                 "dashboardStage": open_case.dashboard_stage,
                 "dashboardStageLabel": _dashboard_stage_label(open_case.dashboard_stage),
             },
@@ -335,8 +335,8 @@ class DemoStore:
             "schoolContext": _school_context_bundle(school, calendar, timetable_slots) if school else None,
             "autoContext": auto_context,
             "aiReadyContext": {
-                "summary": dashboard.get("aiContextSummary") or student.primary_need,
-                "mustUse": dashboard.get("nextSessionFocus") or [],
+                "summary": _teacher_facing_text(dashboard.get("aiContextSummary") or student.primary_need),
+                "mustUse": _teacher_facing_list(dashboard.get("nextSessionFocus") or []),
                 "avoid": _default_ai_avoid_list(student.student_type),
                 "evidenceSources": _evidence_sources(school, calendar, timetable_slots),
             },
@@ -975,6 +975,59 @@ class DemoStore:
         )
 
 
+_TEACHER_TEXT_REPLACEMENTS = (
+    ("teach-back realtime", "말로 다시 설명하는 실시간 발화 연습"),
+    ("teach back realtime", "말로 다시 설명하는 실시간 발화 연습"),
+    ("roleplay realtime", "실시간 역할 발화 연습"),
+    ("realtime roleplay", "실시간 역할 발화 연습"),
+    ("realtime_roleplay", "실시간 역할 발화 연습"),
+    ("realtime_teach_back", "실시간으로 말로 다시 설명하기"),
+    ("realtime_practice", "실시간 발화 연습"),
+    ("realtime 역할극", "실시간 역할 발화 연습"),
+    ("realtime 역할 연습", "실시간 역할 발화 연습"),
+    ("realtime 말하기", "실시간 발화"),
+    ("realtime-session API", "실시간 연습 API"),
+    ("realtime 스펙", "실시간 연습 구성"),
+    ("realtime 연습", "실시간 발화 연습"),
+    ("teach-back", "말로 다시 설명하기"),
+    ("teach_back", "말로 다시 설명하기"),
+    ("mascot_teach_back", "마스코트와 말로 정리하기"),
+    ("roleplay", "역할 연습"),
+    ("Realtime", "실시간"),
+    ("realtime", "실시간"),
+)
+
+
+def _teacher_facing_text(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    text = value
+    for source, replacement in _TEACHER_TEXT_REPLACEMENTS:
+        text = text.replace(source, replacement)
+    return text
+
+
+def _teacher_facing_list(values: Any) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    return [_teacher_facing_text(item) for item in values if isinstance(item, str)]
+
+
+def _teacher_facing_context_items(items: Any) -> list[dict[str, str]]:
+    if not isinstance(items, list):
+        return []
+    localized_items = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        label = item.get("label")
+        value = item.get("value")
+        if not isinstance(label, str) or not isinstance(value, str):
+            continue
+        localized_items.append({"label": _teacher_facing_text(label), "value": _teacher_facing_text(value)})
+    return localized_items
+
+
 def _student_dashboard(profile_json: dict[str, Any]) -> dict[str, Any]:
     dashboard = profile_json.get("dashboard")
     return dashboard if isinstance(dashboard, dict) else {}
@@ -1023,26 +1076,26 @@ def _attendance_label(value: Any) -> str:
 
 def _dashboard_profile(student, open_case, school, memory_card, context_bundle: dict | None) -> dict[str, Any]:
     dashboard = _student_dashboard(student.profile_json)
-    auto_context = context_bundle.get("autoContext", []) if context_bundle else []
+    auto_context = _teacher_facing_context_items(context_bundle.get("autoContext", []) if context_bundle else [])
     school_name = school.school_name if school else "학교 정보 확인 중"
-    grade_label = dashboard.get("gradeLabel") or _grade_label(student.grade)
-    track_label = dashboard.get("trackLabel") or _student_type_label(student.student_type)
+    grade_label = _teacher_facing_text(dashboard.get("gradeLabel") or _grade_label(student.grade))
+    track_label = _teacher_facing_text(dashboard.get("trackLabel") or _student_type_label(student.student_type))
     return {
         "headline": f"{student.display_name} · {school_name} · {grade_label} · {track_label}",
         "currentStageLabel": _dashboard_stage_label(open_case.dashboard_stage),
-        "attendanceLabel": dashboard.get("attendanceLabel") or _attendance_label(dashboard.get("attendanceRate")),
-        "primaryNeedTitle": dashboard.get("primaryNeedTitle") or student.primary_need,
-        "primaryNeedDetail": dashboard.get("primaryNeedDetail") or student.primary_need,
-        "supportStrategyTitle": dashboard.get("supportStrategyTitle") or "지원 전략",
-        "supportStrategyDetail": dashboard.get("supportStrategyDetail") or open_case.support_strategy,
-        "strengths": dashboard.get("strengths") or [],
-        "weaknesses": dashboard.get("weaknesses") or [],
-        "emotionalNote": dashboard.get("emotionalNote") or (memory_card.emotional_state_note if memory_card else None),
-        "responsePattern": dashboard.get("responsePattern"),
-        "guardianCooperation": dashboard.get("guardianCooperation") or (memory_card.guardian_cooperation_status if memory_card else None),
-        "schoolContextNote": dashboard.get("schoolContextNote"),
-        "nextSessionFocus": dashboard.get("nextSessionFocus") or [],
-        "aiContextSummary": dashboard.get("aiContextSummary") or student.primary_need,
+        "attendanceLabel": _teacher_facing_text(dashboard.get("attendanceLabel") or _attendance_label(dashboard.get("attendanceRate"))),
+        "primaryNeedTitle": _teacher_facing_text(dashboard.get("primaryNeedTitle") or student.primary_need),
+        "primaryNeedDetail": _teacher_facing_text(dashboard.get("primaryNeedDetail") or student.primary_need),
+        "supportStrategyTitle": _teacher_facing_text(dashboard.get("supportStrategyTitle") or "지원 전략"),
+        "supportStrategyDetail": _teacher_facing_text(dashboard.get("supportStrategyDetail") or open_case.support_strategy),
+        "strengths": _teacher_facing_list(dashboard.get("strengths") or []),
+        "weaknesses": _teacher_facing_list(dashboard.get("weaknesses") or []),
+        "emotionalNote": _teacher_facing_text(dashboard.get("emotionalNote") or (memory_card.emotional_state_note if memory_card else None)),
+        "responsePattern": _teacher_facing_text(dashboard.get("responsePattern")),
+        "guardianCooperation": _teacher_facing_text(dashboard.get("guardianCooperation") or (memory_card.guardian_cooperation_status if memory_card else None)),
+        "schoolContextNote": _teacher_facing_text(dashboard.get("schoolContextNote")),
+        "nextSessionFocus": _teacher_facing_list(dashboard.get("nextSessionFocus") or []),
+        "aiContextSummary": _teacher_facing_text(dashboard.get("aiContextSummary") or student.primary_need),
         "autoContext": auto_context,
     }
 
@@ -1180,7 +1233,7 @@ def _student_dashboard_list(profile_json: dict[str, Any], key: str) -> list[str]
     value = _student_dashboard_value(profile_json, key)
     if not isinstance(value, list):
         return []
-    return [item for item in value if isinstance(item, str)]
+    return [_teacher_facing_text(item) for item in value if isinstance(item, str)]
 
 
 def _evaluate_answer(template_json: dict[str, Any], answer: dict[str, Any]) -> dict:

@@ -1565,7 +1565,7 @@ export function StudentStageExperience({
                       {isFinished
                         ? "다시 해보거나 학습 길로 돌아갈 수 있어요."
                         : isRealtimeStage
-                          ? "4단계에서만 열리는 realtime 말하기 연습입니다."
+                          ? "4단계에서만 열리는 실시간 발화 연습입니다."
                           : activeQuestion.hint}
                     </p>
                   </div>

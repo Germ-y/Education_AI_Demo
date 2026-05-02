@@ -197,12 +197,23 @@ function toSupportCaseFromCaseFile(caseFile: StudentCaseFile, listItem?: Student
 }
 
 const memoryLabelMap: Record<string, string> = {
+  scenario_image: "상황 그림",
+  two_choice: "2개 선택지",
+  short_audio: "짧은 음성 안내",
   visual_example: "그림 예시",
   short_steps: "짧은 단계 설명",
+  mascot_teach_back: "마스코트와 말로 정리하기",
+  roleplay: "역할 연습",
   concept_misunderstanding: "개념 이해 보완",
+  numerator_denominator_confusion: "분모·분자 위치 확인",
   sequence_planning: "순서 계획 연습",
+  help_request_avoidance: "도움 요청 말하기 연습",
   fractions: "분수",
   daily_route: "일상 이동",
+  clock_hour_hand: "짧은 바늘 찾기",
+  reading_order: "읽는 순서 확인",
+  word_problem_conditions: "문장 조건 확인",
+  asking_help: "도움 요청하기",
 };
 
 function toDisplayLabels(values: string[] | undefined, fallback: string[] = []) {

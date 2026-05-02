@@ -69,7 +69,7 @@ def submit_stage(
     if result is None:
         raise HTTPException(status_code=404, detail={"code": "STAGE_NOT_FOUND", "message": "제출할 단계를 찾을 수 없습니다."})
     if result.get("isRealtimeStage"):
-        raise HTTPException(status_code=400, detail={"code": "REALTIME_STAGE_SUBMIT_BLOCKED", "message": "4단계는 realtime-session API를 사용해야 합니다."})
+        raise HTTPException(status_code=400, detail={"code": "REALTIME_STAGE_SUBMIT_BLOCKED", "message": "4단계는 실시간 연습 API를 사용해야 합니다."})
     return ok(result)
 
 
@@ -86,7 +86,7 @@ def create_realtime_session(
     attempt = demo_store.get_attempt(payload.attempt_id)
     stage = next((candidate for candidate in mission.stages if candidate.id == stage_id), None) if mission else None
     if mission is None or attempt is None or attempt.student_id != student_id or stage is None or stage.step != 4 or stage.realtime_spec is None:
-        raise HTTPException(status_code=400, detail={"code": "REALTIME_SESSION_NOT_ALLOWED", "message": "승인된 4단계 realtime 스펙이 필요합니다."})
+        raise HTTPException(status_code=400, detail={"code": "REALTIME_SESSION_NOT_ALLOWED", "message": "승인된 4단계 실시간 연습 구성이 필요합니다."})
 
     settings = get_settings()
     try:
@@ -106,7 +106,7 @@ def create_realtime_session(
 
     session = demo_store.create_realtime_session(student_id, content_id, stage_id, payload.attempt_id)
     if session is None:
-        raise HTTPException(status_code=400, detail={"code": "REALTIME_SESSION_NOT_ALLOWED", "message": "승인된 4단계 realtime 스펙이 필요합니다."})
+        raise HTTPException(status_code=400, detail={"code": "REALTIME_SESSION_NOT_ALLOWED", "message": "승인된 4단계 실시간 연습 구성이 필요합니다."})
     spec = session.spec_snapshot_json
     image_asset = next((asset for asset in mission.assets if asset.id == spec.get("imageAssetId")), None) if mission else None
     audio_asset = (
@@ -189,7 +189,7 @@ def save_realtime_event(
 ) -> dict:
     event = demo_store.save_realtime_event(_student_id(principal), session_id, payload.event_type, payload.payload_json)
     if event is None:
-        raise HTTPException(status_code=404, detail={"code": "REALTIME_SESSION_NOT_FOUND", "message": "Realtime 세션을 찾을 수 없습니다."})
+        raise HTTPException(status_code=404, detail={"code": "REALTIME_SESSION_NOT_FOUND", "message": "실시간 연습 세션을 찾을 수 없습니다."})
     return ok(event.model_dump(by_alias=True))
 
 
@@ -209,7 +209,7 @@ def complete_realtime_session(
         payload.transcript_summary,
     )
     if session is None:
-        raise HTTPException(status_code=404, detail={"code": "REALTIME_SESSION_NOT_FOUND", "message": "Realtime 세션을 찾을 수 없습니다."})
+        raise HTTPException(status_code=404, detail={"code": "REALTIME_SESSION_NOT_FOUND", "message": "실시간 연습 세션을 찾을 수 없습니다."})
     return ok(session.model_dump(by_alias=True))
 
 

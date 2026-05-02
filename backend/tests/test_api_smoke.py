@@ -31,6 +31,21 @@ def use_sqlite_demo_db(tmp_path) -> None:
     get_settings.cache_clear()
 
 
+def assert_no_teacher_raw_terms(payload: object) -> None:
+    forbidden_terms = ("teach-back", "teach_back", "teach back", "realtime", "Realtime", "roleplay", "role-play")
+    if isinstance(payload, str):
+        for term in forbidden_terms:
+            assert term not in payload
+        return
+    if isinstance(payload, list):
+        for item in payload:
+            assert_no_teacher_raw_terms(item)
+        return
+    if isinstance(payload, dict):
+        for value in payload.values():
+            assert_no_teacher_raw_terms(value)
+
+
 def test_teacher_and_student_demo_flows() -> None:
     client = TestClient(create_app())
 
@@ -61,6 +76,17 @@ def test_teacher_and_student_demo_flows() -> None:
     assert clock_student["dashboardStageLabel"] == "자료 생성"
     assert clock_student["attendanceLabel"] == "기록 전"
     assert "그림 단서" in clock_student["summaryLine"]
+    assert_no_teacher_raw_terms(
+        [
+            [
+                student["supportStrategy"],
+                student["summaryLine"],
+                student["aiContextSummary"],
+                student["nextSessionSuggestion"],
+            ]
+            for student in students.json()["data"]
+        ]
+    )
 
     no_token_students = client.get("/api/teacher/students")
     assert no_token_students.status_code == 200
@@ -116,6 +142,14 @@ def test_teacher_and_student_demo_flows() -> None:
     history = client.get("/api/teacher/students/student_learning_fraction/history", headers={"authorization": f"Bearer {teacher_token}"})
     assert history.status_code == 200
     assert history.json()["data"]["missionContents"][0]["studentId"] == "student_learning_fraction"
+    fraction_case = client.get("/api/teacher/students/student_learning_fraction", headers={"authorization": f"Bearer {teacher_token}"})
+    assert fraction_case.status_code == 200
+    assert "말로 다시 설명" in fraction_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
+    assert_no_teacher_raw_terms(fraction_case.json()["data"]["dashboardProfile"])
+    life_case = client.get("/api/teacher/students/student_life_bus", headers={"authorization": f"Bearer {teacher_token}"})
+    assert life_case.status_code == 200
+    assert "실시간 역할 발화 연습" in life_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
+    assert_no_teacher_raw_terms(life_case.json()["data"]["dashboardProfile"])
     context_bundle = client.get(
         "/api/teacher/students/student_learning_fraction/context-bundle",
         headers={"authorization": f"Bearer {teacher_token}"},
@@ -126,6 +160,14 @@ def test_teacher_and_student_demo_flows() -> None:
     assert bundle["schoolContext"]["timetableSummary"]["todaySubjects"] == ["역사", "동아리활동", "진로와 직업", "국어", "과학", "도덕"]
     assert [item["label"] for item in bundle["autoContext"]] == ["학생 기록", "이전 수업", "학교 시간표", "다음 목표"]
     assert bundle["aiReadyContext"]["evidenceSources"]
+    assert_no_teacher_raw_terms(
+        [
+            bundle["caseSummary"],
+            bundle["autoContext"],
+            bundle["aiReadyContext"]["summary"],
+            bundle["aiReadyContext"]["mustUse"],
+        ]
+    )
     clock_bundle = client.get(
         "/api/teacher/students/student_learning_clock/context-bundle",
         headers={"authorization": f"Bearer {teacher_token}"},

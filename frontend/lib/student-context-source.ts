@@ -80,7 +80,7 @@ export async function getStudentContextForRoute({ caseId, contentId }: StudentRo
       caseType: student.studentType === "learning_focus" ? "학습 집중" : "생활 연습",
       primaryNeed: student.primaryNeed,
       sessionGoal: mission.sessionGoal,
-      supportStrategy: "승인된 정적 콘텐츠와 4단계 realtime 연습",
+      supportStrategy: "승인된 정적 콘텐츠와 4단계 실시간 발화 연습",
       nextAction: "오늘 미션 진행",
       riskNote: "학생에게 진단 표현을 노출하지 않음",
       challengeTags: [],
