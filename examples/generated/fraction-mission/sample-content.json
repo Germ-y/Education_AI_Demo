@@ -4,9 +4,7 @@
   "status": "teacher_review",
   "generatedAt": "2026-04-28T11:08:13.334Z",
   "generation": {
-    "requestedImageModel": "gpt-image-2",
-    "usedImageModel": "gpt-image-2",
-    "fallbackUsed": false,
+    "imageModel": "gpt-image-2",
     "promptVersion": "creative-mission-card-v2",
     "imagePrompt": "Create a premium Korean edtech mission-card illustration for a middle school student learning fractions. Visual concept: a round pizza becomes a small top-down adventure map on a clean study desk, like a friendly math quest board. The pizza must be divided by clear cross-shaped gaps into exactly four equal quarter regions. Exactly one quarter region is lifted slightly and glowing with warm golden light, while the other three equal regions stay visible and calm. Add subtle mission-scene details around the pizza: a tiny compass token, four small round counters near the plate with exactly one counter glowing, soft paper-cut or clay-like 3D texture, gentle shadows. Make it feel imaginative and useful for explaining 'one out of four equal parts', not like a plain food illustration. Use cheerful but not childish colors, clean composition, enough empty margin for UI overlay, no clutter. Do not include any text, letters, numbers, labels, watermark, logo, or speech bubbles anywhere in the image."
   },
