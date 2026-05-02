@@ -19,6 +19,7 @@ docs/backend/   백엔드 팀원이 작업 전에 보는 문서
 - 프론트 팀원 가이드: [frontend/00-frontend-team-guide.md](frontend/00-frontend-team-guide.md)
 - 백엔드 팀원 가이드: [backend/00-backend-team-guide.md](backend/00-backend-team-guide.md)
 - NEIS 데이터 수집/조회 계획: [backend/07-neis-data-collection-plan.md](backend/07-neis-data-collection-plan.md)
+- AI 오케스트레이터 workflow: [backend/08-ai-orchestrator-workflow.md](backend/08-ai-orchestrator-workflow.md)
 
 ## 문서 수정 기준
 
