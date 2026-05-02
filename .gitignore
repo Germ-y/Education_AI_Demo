@@ -50,3 +50,5 @@ backend/.ruff_cache/
 __pycache__/
 *.py[cod]
 backend/*.db
+backend/data/*.db
+backend/generated/assets/

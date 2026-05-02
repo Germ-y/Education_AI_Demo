@@ -116,6 +116,8 @@ class ContentStage(BaseModel):
             raise ValueError("Realtime 템플릿은 4단계에서만 사용할 수 있습니다.")
         if self.step == 4 and self.realtime_spec is None:
             raise ValueError("4단계에는 승인 대상 RealtimePracticeSpec이 필요합니다.")
+        if self.step != 4 and self.realtime_spec is not None:
+            raise ValueError("1~3단계에는 realtimeSpec을 넣을 수 없습니다.")
         if self.step != 4 and self.template_type not in STATIC_STAGE_TEMPLATE_TYPES.get(self.stage_role, set()):
             raise ValueError("stageRole과 templateType 조합이 허용되지 않습니다.")
         _validate_template_json(self.template_type, self.template_json)
@@ -221,10 +223,10 @@ class MissionContent(BaseModel):
     @field_validator("assets")
     @classmethod
     def validate_required_assets(cls, assets: list[ContentAsset]) -> list[ContentAsset]:
-        roles = {asset.asset_role for asset in assets}
-        missing = REQUIRED_ASSET_ROLES - roles
-        if missing:
-            missing_labels = ", ".join(sorted(role.value for role in missing))
+        image_roles = {asset.asset_role for asset in assets if asset.asset_type == AssetType.IMAGE}
+        missing_images = REQUIRED_ASSET_ROLES - image_roles
+        if missing_images:
+            missing_labels = ", ".join(sorted(role.value for role in missing_images))
             raise ValueError(f"필수 이미지 asset role이 없습니다: {missing_labels}")
         audio_roles = {asset.asset_role for asset in assets if asset.asset_type == AssetType.AUDIO}
         missing_audio = REQUIRED_ASSET_ROLES - audio_roles

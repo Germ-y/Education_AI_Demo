@@ -17,5 +17,8 @@ def test_prompts_keep_image_text_and_ui_text_separate() -> None:
     image_prompt = load_prompt("image_brief")
 
     assert "All problem text lines must live in `templateJson`" in content_prompt
+    assert '"assets"' in content_prompt
+    assert "assetPlaceholders" not in content_prompt
+    assert '"contentId"' not in content_prompt
     assert "The frontend renders all text from `templateJson`" in image_prompt
     assert "Do not ask the image model to render" in image_prompt
