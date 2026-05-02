@@ -229,6 +229,18 @@ function toProposalLabel(label: string) {
   return label;
 }
 
+function toPercentScore(value: number | null | undefined) {
+  if (typeof value !== "number" || Number.isNaN(value)) return 0;
+  const percent = value <= 1 ? value * 100 : value;
+  return Math.min(100, Math.max(0, Math.round(percent)));
+}
+
+function toRecordLevel(percent: number): "상" | "중" | "하" {
+  if (percent >= 80) return "상";
+  if (percent >= 50) return "중";
+  return "하";
+}
+
 function describeContentType(content: MissionContent) {
   return content.contentType === "life_support" ? "일상생활 지원형" : "학습집중형";
 }
@@ -434,9 +446,14 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (teacherStudentItems.length === 0) return;
+    if (teacherStudentItems.length === 0 || !selectedStudentId) return;
 
     let ignore = false;
+    setSelectedCaseFile(null);
+    setSelectedReport(null);
+    setSelectedFeedbackId(null);
+    setOpenReportId(null);
+    setOpenReviewId(null);
 
     Promise.all([getTeacherStudent(selectedStudentId), getTeacherStudentReport(selectedStudentId)])
       .then(([caseFile, report]) => {
@@ -492,6 +509,7 @@ export default function DashboardPage() {
   };
   const selectedApiStudent = teacherStudentItems.find((student) => student.studentId === selectedStudent.id);
   const activeCaseFile = selectedCaseFile?.profile.id === selectedStudent.id ? selectedCaseFile : null;
+  const activeReport = selectedReport?.student.id === selectedStudent.id ? selectedReport : null;
   const dashboardProfile = activeCaseFile?.dashboardProfile;
   const autoContextItems = dashboardProfile?.autoContext ?? activeCaseFile?.contextBundle?.autoContext ?? [];
   const selectedCase: SupportCase = activeCaseFile
@@ -515,10 +533,12 @@ export default function DashboardPage() {
   const selectedReviewItems = (activeCaseFile?.recentContents ?? []).map((content) =>
     mapContentToReviewItem(content, dashboardProfile?.primaryNeedTitle),
   );
-  const selectedRecords: SessionLog[] = (selectedReport?.reports ?? []).map((record) => {
+  const selectedRecords: SessionLog[] = (activeReport?.reports ?? []).map((record) => {
     const durationMinutes = Math.max(1, Math.round((record.durationSec ?? 0) / 60));
     const attemptCount = Math.max(1, record.answerCount);
     const averageResponseSeconds = Math.round((record.durationSec ?? 0) / attemptCount);
+    const completionRate = toPercentScore(record.completionRate);
+    const accuracyRate = toPercentScore(record.accuracyRate);
 
     return {
       id: record.id,
@@ -527,15 +547,15 @@ export default function DashboardPage() {
       session: record.contentTitle ?? "학습 콘텐츠",
       date: record.completedAt?.slice(0, 10) ?? record.startedAt.slice(0, 10),
       durationMinutes,
-      understanding: record.accuracyRate >= 80 ? "상" : record.accuracyRate >= 50 ? "중" : "하",
-      focus: record.completionRate >= 80 ? "상" : record.completionRate >= 50 ? "중" : "하",
+      understanding: toRecordLevel(accuracyRate),
+      focus: toRecordLevel(completionRate),
       note: record.shortSummary,
       attemptCount,
       wrongCount: record.wrongCount,
       averageResponseSeconds,
-      completionRate: record.completionRate,
+      completionRate,
       secondsPerQuestion: averageResponseSeconds,
-      accuracyRate: record.accuracyRate,
+      accuracyRate,
     };
   });
   const currentWorkflowStep =
@@ -1188,7 +1208,12 @@ export default function DashboardPage() {
                       </span>
                     </div>
                     <div className="mt-5 space-y-4">
-                      {pendingFeedbackQueue.length === 0 && (
+                      {sessionLogs.length === 0 && (
+                        <div className="rounded-lg border border-[#dbe3ef] bg-[#f8fafc] p-4 text-sm font-bold text-[#475569]">
+                          아직 완료된 학습 기록이 없습니다. 학생이 미션을 마치고 회고가 저장되면 이곳에서 피드백을 작성할 수 있습니다.
+                        </div>
+                      )}
+                      {sessionLogs.length > 0 && pendingFeedbackQueue.length === 0 && (
                         <div className="rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] p-4 text-sm font-bold text-[#15803d]">
                           모든 차시 피드백이 최근 기록에 저장되었습니다.
                         </div>
@@ -1260,6 +1285,11 @@ export default function DashboardPage() {
 
                   <div className="space-y-4 rounded-lg border border-[#e5e9f0] bg-white p-5 xl:order-2">
                     <h3 className="text-xl font-black">최근 기록</h3>
+                    {sessionLogs.length === 0 && savedFeedbackRecords.length === 0 && (
+                      <div className="rounded-md bg-[#f8fafc] p-4 text-sm font-bold leading-6 text-[#64748b]">
+                        표시할 학습 리포트가 아직 없습니다.
+                      </div>
+                    )}
                     {savedFeedbackRecords.map((feedbackRecord) => {
                       const sourceRecord = sessionLogs.find((record) => record.id === feedbackRecord.recordId);
                       if (!sourceRecord) return null;
