@@ -78,6 +78,13 @@ def test_teacher_and_student_demo_flows() -> None:
     )
     assert asset_generation.status_code == 424
     assert asset_generation.json()["error"]["code"] == "ELEVENLABS_API_KEY_MISSING"
+    package_generation = client.post(
+        "/api/contents/content_fraction_001/assets/generate-package",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert package_generation.status_code == 424
+    assert package_generation.json()["error"]["code"] == "OPENAI_API_KEY_MISSING"
+    assert package_generation.json()["error"]["details"] == {"reviewRequired": True, "fallbackPolicy": "disabled"}
     approve = client.post(
         "/api/contents/content_fraction_001/approve",
         headers={"authorization": f"Bearer {teacher_token}"},

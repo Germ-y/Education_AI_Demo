@@ -436,6 +436,37 @@ provider key 없음, HTTP 오류, 빈 파일, b64 parse 실패는 대체 파일�
 }
 ```
 
+### POST /api/contents/:contentId/assets/generate-package
+
+콘텐츠에 포함된 전체 asset 패키지를 실제 provider로 생성한다.
+
+전제:
+
+```text
+image asset role: hero, stage_1, stage_2, stage_3, stage_4_realtime 모두 존재
+audio asset role: hero, stage_1, stage_2, stage_3, stage_4_realtime 모두 존재
+OPENAI_API_KEY exists
+ELEVENLABS_API_KEY exists
+ELEVENLABS_VOICE_ID exists
+image asset promptJson has prompt/imagePrompt/visualPrompt
+audio asset sourceText exists
+```
+
+성공 응답:
+
+```json
+{
+  "data": {
+    "contentId": "content_fraction_001",
+    "generatedCount": 10,
+    "assets": ["ContentAsset"]
+  }
+}
+```
+
+provider key 또는 필수 asset이 없으면 생성을 시작하지 않고 오류를 반환한다.
+provider 호출 중 오류가 나면 해당 asset id와 함께 `424`를 반환하며 대체 asset은 만들지 않는다.
+
 ### POST /api/contents/:contentId/approve
 
 교사 승인.

@@ -8,7 +8,7 @@ from app.ai.provider_errors import AiProviderError
 from app.api.deps import get_store, require_teacher
 from app.api.response import ok
 from app.core.config import get_settings
-from app.domain.enums import AssetType
+from app.domain.enums import AssetRole, AssetType
 from app.domain.schemas import ContentApprovalRequest, ContentRejectRequest
 from app.services.store import DemoStore, SessionPrincipal
 
@@ -76,6 +76,50 @@ def generate_content_asset(
     if asset is None:
         raise HTTPException(status_code=404, detail={"code": "ASSET_NOT_FOUND", "message": "생성할 asset을 찾을 수 없습니다."})
 
+    _generate_asset_or_raise(content_id, asset)
+
+    demo_store.save_generated_mission_content(content)
+    return ok(asset.model_dump(by_alias=True))
+
+
+@router.post("/{content_id}/assets/generate-package")
+def generate_content_asset_package(
+    content_id: str,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    content = demo_store.get_mission_for_teacher(content_id, teacher_id=principal.id if principal.role == "teacher" else None)
+    if content is None:
+        raise HTTPException(status_code=404, detail={"code": "CONTENT_NOT_FOUND", "message": "콘텐츠를 찾을 수 없습니다."})
+
+    _validate_required_asset_package(content)
+    _preflight_provider_keys(content)
+
+    generated = []
+    for asset in sorted(content.assets, key=lambda item: (item.asset_type, item.asset_role, item.id)):
+        _generate_asset_or_raise(content_id, asset)
+        generated.append(asset.model_dump(by_alias=True))
+
+    demo_store.save_generated_mission_content(content)
+    return ok({"contentId": content.id, "generatedCount": len(generated), "assets": generated})
+
+
+@router.post("/{content_id}/publish")
+def publish_content(
+    content_id: str,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    content = demo_store.publish_mission_content(content_id, principal.id)
+    if content is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "CONTENT_PUBLISH_FAILED", "message": "승인 완료된 콘텐츠만 배포할 수 있습니다."},
+        )
+    return ok(content.model_dump(by_alias=True))
+
+
+def _generate_asset_or_raise(content_id: str, asset) -> None:
     settings = get_settings()
     try:
         if asset.asset_type == AssetType.IMAGE:
@@ -103,7 +147,7 @@ def generate_content_asset(
             detail={
                 "code": exc.code,
                 "message": exc.message,
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+                "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "assetId": asset.id},
             },
         ) from exc
 
@@ -111,23 +155,56 @@ def generate_content_asset(
     asset.preview_url = asset.storage_url
     asset.qa_status = "pending"
     asset.approval_status = "pending"
-    demo_store.save_generated_mission_content(content)
-    return ok(asset.model_dump(by_alias=True))
 
 
-@router.post("/{content_id}/publish")
-def publish_content(
-    content_id: str,
-    principal: SessionPrincipal = Depends(require_teacher),
-    demo_store: DemoStore = Depends(get_store),
-) -> dict:
-    content = demo_store.publish_mission_content(content_id, principal.id)
-    if content is None:
+def _validate_required_asset_package(content) -> None:
+    required_roles = {role.value for role in AssetRole}
+    image_roles = {asset.asset_role for asset in content.assets if asset.asset_type == AssetType.IMAGE}
+    audio_roles = {asset.asset_role for asset in content.assets if asset.asset_type == AssetType.AUDIO}
+    missing_images = sorted(required_roles - set(image_roles))
+    missing_audio = sorted(required_roles - set(audio_roles))
+    if missing_images or missing_audio:
         raise HTTPException(
             status_code=400,
-            detail={"code": "CONTENT_PUBLISH_FAILED", "message": "승인 완료된 콘텐츠만 배포할 수 있습니다."},
+            detail={
+                "code": "ASSET_PACKAGE_INCOMPLETE",
+                "message": "콘텐츠 패키지는 5개 이미지와 5개 오디오 asset이 모두 필요합니다.",
+                "details": {"missingImages": missing_images, "missingAudio": missing_audio},
+            },
         )
-    return ok(content.model_dump(by_alias=True))
+
+
+def _preflight_provider_keys(content) -> None:
+    settings = get_settings()
+    has_images = any(asset.asset_type == AssetType.IMAGE for asset in content.assets)
+    has_audio = any(asset.asset_type == AssetType.AUDIO for asset in content.assets)
+    if has_images and not settings.openai_api_key:
+        raise HTTPException(
+            status_code=424,
+            detail={
+                "code": "OPENAI_API_KEY_MISSING",
+                "message": "OPENAI_API_KEY가 없어 이미지 패키지 생성을 실행할 수 없습니다.",
+                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+            },
+        )
+    if has_audio and not settings.elevenlabs_api_key:
+        raise HTTPException(
+            status_code=424,
+            detail={
+                "code": "ELEVENLABS_API_KEY_MISSING",
+                "message": "ELEVENLABS_API_KEY가 없어 오디오 패키지 생성을 실행할 수 없습니다.",
+                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+            },
+        )
+    if has_audio and not settings.elevenlabs_voice_id:
+        raise HTTPException(
+            status_code=424,
+            detail={
+                "code": "ELEVENLABS_VOICE_ID_MISSING",
+                "message": "ELEVENLABS_VOICE_ID가 없어 오디오 패키지 생성을 실행할 수 없습니다.",
+                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+            },
+        )
 
 
 def _extract_image_prompt(prompt_json: dict | None) -> str:

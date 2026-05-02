@@ -276,6 +276,7 @@ published 콘텐츠만 학생 API에서 조회된다.
 ```text
 부분 완료. GET /api/contents/:id, approve, reject, publish API를 추가했다.
 POST /api/contents/:id/assets/:assetId/generate로 단일 이미지/TTS asset 실제 생성을 연결했다.
+POST /api/contents/:id/assets/generate-package로 5개 이미지 + 5개 오디오 batch 생성을 연결했다.
 학생 API는 published 콘텐츠만 반환한다.
 audit log 영속화와 재생성 API는 다음 슬라이스에서 진행한다.
 ```
