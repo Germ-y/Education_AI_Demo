@@ -17,12 +17,14 @@
 - [x] 프론트/백엔드 협업 계약 문서와 모노레포 스킬 추가
 - [x] docs를 `common`, `frontend`, `backend` 폴더로 분리
 - [x] 프론트 팀원 시작 가이드와 브랜치 handoff 계약 추가
+- [x] 기능 단위 PR 검수 계약 추가
+- [x] 기능 시작 체크리스트 추가
 - [ ] AI provider 연동
 - [ ] 학생 플레이 런타임 구현
 
 ## 협업 기준
 
-프론트와 백엔드가 함께 바뀌는 작업은 먼저 [01-collaboration-contract.md](01-collaboration-contract.md)와 [02-branch-handoff-contract.md](02-branch-handoff-contract.md)를 따른다.
+프론트와 백엔드가 함께 바뀌는 작업은 먼저 [11-feature-start-checklist.md](11-feature-start-checklist.md), [01-collaboration-contract.md](01-collaboration-contract.md), [02-branch-handoff-contract.md](02-branch-handoff-contract.md), [10-pr-feature-review-contract.md](10-pr-feature-review-contract.md)를 따른다.
 
 계약 변경 순서:
 
