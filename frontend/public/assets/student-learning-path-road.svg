@@ -1,0 +1,159 @@
+<svg width="760" height="500" viewBox="0 0 760 500" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">학생 학습 단계 별가루 길</title>
+  <desc id="desc">배경 없이 별가루와 반짝임만으로 각 스테이지를 부드럽게 잇는 S자 학습 길 에셋</desc>
+  <defs>
+    <filter id="glow" x="-130%" y="-130%" width="360%" height="360%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="2" stdDeviation="1.8" flood-color="#B8751E" flood-opacity=".3"/>
+      <feGaussianBlur stdDeviation="2.6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softTrail" x="-20%" y="-35%" width="140%" height="170%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+    <linearGradient id="trailWash" x1="96" y1="84" x2="630" y2="422" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F4B92F" stop-opacity=".28"/>
+      <stop offset=".46" stop-color="#FFE88A" stop-opacity=".2"/>
+      <stop offset="1" stop-color="#F08F68" stop-opacity=".24"/>
+    </linearGradient>
+    <linearGradient id="spark" x1="107" y1="78" x2="610" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D99512"/>
+      <stop offset=".48" stop-color="#FFD84D"/>
+      <stop offset="1" stop-color="#E87F5E"/>
+    </linearGradient>
+    <path id="wanderPathA" d="M178 72C252 34 382 69 456 139C399 179 268 140 178 72Z"/>
+    <path id="wanderPathB" d="M300 364C382 332 514 360 582 414C505 453 372 427 300 364Z"/>
+  </defs>
+
+  <path
+    d="M104 92C224 44 372 75 476 151C556 210 458 269 324 278C218 285 184 347 284 390C384 433 502 383 626 424"
+    stroke="url(#trailWash)"
+    stroke-width="108"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    filter="url(#softTrail)"
+  />
+
+  <g filter="url(#glow)">
+    <g fill="#FFD84D">
+      <path d="M126 83L132 99L148 105L132 111L126 127L120 111L104 105L120 99L126 83Z">
+        <animateTransform attributeName="transform" type="rotate" from="0 126 105" to="360 126 105" dur="17s" begin="-1.2s" repeatCount="indefinite"/>
+      </path>
+      <path d="M468 145L475 163L493 170L475 177L468 195L461 177L443 170L461 163L468 145Z">
+        <animateTransform attributeName="transform" type="rotate" from="360 468 170" to="0 468 170" dur="26s" begin="-4s" repeatCount="indefinite"/>
+      </path>
+      <path d="M285 269L292 286L310 293L292 300L285 318L278 300L260 293L278 286L285 269Z">
+        <animateTransform attributeName="transform" type="rotate" from="0 285 293" to="360 285 293" dur="31s" begin="-7s" repeatCount="indefinite"/>
+      </path>
+      <path d="M610 407L616 423L632 429L616 435L610 451L604 435L588 429L604 423L610 407Z">
+        <animateTransform attributeName="transform" type="rotate" from="360 610 429" to="0 610 429" dur="21s" begin="-2.8s" repeatCount="indefinite"/>
+      </path>
+    </g>
+    <g stroke="#FFF6C7" stroke-width="2.4" stroke-linecap="round" opacity=".96">
+      <path d="M188 64V92M174 78H202">
+        <animateTransform attributeName="transform" type="rotate" from="0 188 78" to="360 188 78" dur="12s" begin="-3.5s" repeatCount="indefinite"/>
+      </path>
+      <path d="M370 94V120M357 107H383"/>
+      <path d="M416 220V246M403 233H429">
+        <animateTransform attributeName="transform" type="rotate" from="360 416 233" to="0 416 233" dur="28s" begin="-5.5s" repeatCount="indefinite"/>
+      </path>
+      <path d="M220 343V371M206 357H234"/>
+      <path d="M510 388V418M495 403H525">
+        <animateTransform attributeName="transform" type="rotate" from="0 510 403" to="360 510 403" dur="34s" begin="-9s" repeatCount="indefinite"/>
+      </path>
+      <path d="M561 210V232M550 221H572"/>
+      <path d="M152 273V295M141 284H163"/>
+      <path d="M386 430V452M375 441H397"/>
+    </g>
+    <g fill="url(#spark)">
+      <circle cx="104" cy="92" r="5.8"/>
+      <circle cx="150" cy="68" r="2.2"/>
+      <circle cx="180" cy="84" r="1.4"/>
+      <circle cx="224" cy="60" r="4.1"/>
+      <circle cx="251" cy="80" r="1.5"/>
+      <circle cx="286" cy="72" r="2.4"/>
+      <circle cx="339" cy="86" r="4.7"/>
+      <circle cx="362" cy="119" r="1.5"/>
+      <circle cx="395" cy="105" r="2.1"/>
+      <circle cx="414" cy="139" r="1.6"/>
+      <circle cx="476" cy="151" r="5.2"/>
+      <circle cx="514" cy="159" r="1.7"/>
+      <circle cx="493" cy="191" r="2.5"/>
+      <circle cx="455" cy="222" r="2.4"/>
+      <circle cx="432" cy="253" r="1.6"/>
+      <circle cx="388" cy="249" r="4.4"/>
+      <circle cx="363" cy="278" r="1.4"/>
+      <circle cx="324" cy="278" r="5.1"/>
+      <circle cx="296" cy="269" r="1.7"/>
+      <circle cx="260" cy="306" r="2.3"/>
+      <circle cx="228" cy="301" r="1.5"/>
+      <circle cx="206" cy="328" r="4.8"/>
+      <circle cx="196" cy="353" r="1.5"/>
+      <circle cx="242" cy="357" r="2.1"/>
+      <circle cx="255" cy="385" r="1.6"/>
+      <circle cx="284" cy="390" r="5.2"/>
+      <circle cx="325" cy="394" r="1.5"/>
+      <circle cx="358" cy="418" r="2.5"/>
+      <circle cx="404" cy="397" r="1.5"/>
+      <circle cx="445" cy="399" r="4.3"/>
+      <circle cx="491" cy="407" r="1.5"/>
+      <circle cx="536" cy="394" r="2.2"/>
+      <circle cx="578" cy="421" r="1.6"/>
+      <circle cx="626" cy="424" r="5.5"/>
+    </g>
+    <g fill="#FFF8D8" stroke="#D59C2B" stroke-width=".55" opacity=".9">
+      <circle cx="176" cy="101" r="2.4"/>
+      <circle cx="250" cy="103" r="1.3"/>
+      <circle cx="313" cy="61" r="1.2"/>
+      <circle cx="398" cy="151" r="2.2"/>
+      <circle cx="532" cy="168" r="1.4"/>
+      <circle cx="535" cy="204" r="1.1"/>
+      <circle cx="476" cy="263" r="2.1"/>
+      <circle cx="360" cy="227" r="2.3"/>
+      <circle cx="295" cy="325" r="1.2"/>
+      <circle cx="184" cy="381" r="2.2"/>
+      <circle cx="330" cy="437" r="1.2"/>
+      <circle cx="426" cy="358" r="2"/>
+      <circle cx="584" cy="384" r="2.2"/>
+    </g>
+    <g fill="#F4B82F" opacity=".82">
+      <circle cx="205" cy="42" r="1.8"/>
+      <circle cx="318" cy="125" r="1.2"/>
+      <circle cx="430" cy="184" r="1.1"/>
+      <circle cx="548" cy="218" r="1.2"/>
+      <circle cx="401" cy="292" r="2"/>
+      <circle cx="247" cy="243" r="1.1"/>
+      <circle cx="252" cy="423" r="1.2"/>
+      <circle cx="358" cy="384" r="1.1"/>
+      <circle cx="482" cy="438" r="1.2"/>
+    </g>
+    <g fill="#F08A6A" opacity=".72">
+      <circle cx="520" cy="181" r="2.2"/>
+      <circle cx="334" cy="302" r="2"/>
+      <circle cx="530" cy="432" r="2.1"/>
+    </g>
+  </g>
+
+  <g filter="url(#glow)">
+    <g>
+      <animateMotion dur="13.5s" repeatCount="indefinite" rotate="auto">
+        <mpath href="#wanderPathA"/>
+      </animateMotion>
+      <animateTransform attributeName="transform" type="scale" values=".72;.82;.72" dur="3.2s" repeatCount="indefinite" additive="sum"/>
+      <g transform="translate(-12 -12)">
+        <path d="M12 1.5L15.2 8.7L23 9.4L17.1 14.6L18.9 22.3L12 18.2L5.1 22.3L6.9 14.6L1 9.4L8.8 8.7L12 1.5Z" fill="#FFD84D" stroke="#B9791B" stroke-width="1.2" stroke-linejoin="round"/>
+      </g>
+    </g>
+    <g opacity=".9">
+      <animateMotion dur="15.8s" begin="-4.4s" repeatCount="indefinite" rotate="auto">
+        <mpath href="#wanderPathB"/>
+      </animateMotion>
+      <animateTransform attributeName="transform" type="scale" values=".62;.72;.62" dur="3.8s" repeatCount="indefinite" additive="sum"/>
+      <g transform="translate(-10 -10) rotate(14 10 10)">
+        <path d="M10 1.4L12.7 7.3L19.1 7.9L14.3 12.2L15.7 18.6L10 15.2L4.3 18.6L5.7 12.2L.9 7.9L7.3 7.3L10 1.4Z" fill="#FFE37B" stroke="#B9791B" stroke-width="1.1" stroke-linejoin="round"/>
+      </g>
+    </g>
+  </g>
+</svg>
