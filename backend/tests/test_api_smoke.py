@@ -14,6 +14,8 @@ def use_sqlite_demo_db(tmp_path) -> None:
     os.environ["DATABASE_URL"] = f"sqlite+pysqlite:///{tmp_path / 'eduyj-test.db'}"
     os.environ["DEMO_SEED_MODE"] = "true"
     os.environ["DEMO_SEED_RESET"] = "true"
+    os.environ["OPENAI_API_KEY"] = ""
+    os.environ["ELEVENLABS_API_KEY"] = ""
     get_settings.cache_clear()
     get_engine.cache_clear()
     get_session_maker.cache_clear()
@@ -111,9 +113,30 @@ def test_teacher_and_student_demo_flows() -> None:
         headers={"authorization": f"Bearer {student_token}"},
         json={"attemptId": attempt_id},
     )
-    assert realtime.status_code == 200
-    assert realtime.json()["data"]["practiceSpec"]["maxTurns"] == 6
-    assert realtime.json()["data"]["practiceSpec"]["openingAudioUrl"].endswith("stage-4-opening.mp3")
+    assert realtime.status_code == 424
+    assert realtime.json()["error"]["code"] == "OPENAI_API_KEY_MISSING"
+    assert realtime.json()["error"]["details"] == {"reviewRequired": True, "fallbackPolicy": "disabled"}
+
+    orchestrator = client.post(
+        "/api/ai/orchestrator-runs",
+        headers={"authorization": f"Bearer {teacher_token}"},
+        json={
+            "studentId": "student_learning_fraction",
+            "caseId": "case_learning_fraction",
+            "requestedGoal": "분수의 전체-부분 관계를 이해한다.",
+            "contentType": "learning_focus",
+        },
+    )
+    assert orchestrator.status_code == 200
+    agent_run = orchestrator.json()["data"]["agentRun"]
+    assert agent_run["status"] == "failed"
+    assert agent_run["errorCode"] == "OPENAI_API_KEY_MISSING"
+    assert agent_run["reviewRequired"] is True
+    assert agent_run["outputJson"] is None
+
+    agent_run_detail = client.get(f"/api/ai/agent-runs/{agent_run['id']}", headers={"authorization": f"Bearer {teacher_token}"})
+    assert agent_run_detail.status_code == 200
+    assert agent_run_detail.json()["data"]["id"] == agent_run["id"]
 
 
 def test_http_errors_use_contract_envelope() -> None:

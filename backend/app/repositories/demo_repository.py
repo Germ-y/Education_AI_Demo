@@ -77,6 +77,7 @@ class DemoRepository:
 
 def _delete_all(session: Session) -> None:
     for model in [
+        rows.AgentRunRow,
         rows.ReviewSummaryRow,
         rows.RealtimePracticeSessionRow,
         rows.ActivityEventRow,

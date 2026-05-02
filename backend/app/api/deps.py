@@ -6,6 +6,7 @@ from fastapi import Depends, Header, HTTPException
 from app.core.config import get_settings
 from app.data.demo_data import create_demo_database
 from app.db.session import create_schema, get_session_maker
+from app.repositories.agent_run_repository import AgentRunRepository
 from app.repositories.demo_repository import DemoRepository
 from app.services.store import DemoStore, SessionPrincipal
 
@@ -22,6 +23,11 @@ def get_store_instance() -> DemoStore:
 
 def get_store() -> DemoStore:
     return get_store_instance()
+
+
+def get_agent_run_repository() -> AgentRunRepository:
+    create_schema()
+    return AgentRunRepository(get_session_maker())
 
 
 def _extract_token(authorization: str | None) -> str | None:

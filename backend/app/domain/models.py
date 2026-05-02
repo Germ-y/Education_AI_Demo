@@ -206,6 +206,25 @@ class PublicDataSource(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class AgentRun(BaseModel):
+    id: str
+    agent_type: str = Field(alias="agentType")
+    prompt_version: str = Field(alias="promptVersion")
+    output_schema_name: str = Field(alias="outputSchemaName")
+    input_snapshot_json: dict[str, Any] = Field(default_factory=dict, alias="inputSnapshotJson")
+    output_json: dict[str, Any] | None = Field(default=None, alias="outputJson")
+    model: str
+    status: Literal["running", "succeeded", "failed"] = "running"
+    token_usage_json: dict[str, Any] | None = Field(default=None, alias="tokenUsageJson")
+    error_code: str | None = Field(default=None, alias="errorCode")
+    error_message: str | None = Field(default=None, alias="errorMessage")
+    review_required: bool = Field(default=False, alias="reviewRequired")
+    created_at: str = Field(alias="createdAt")
+    completed_at: str | None = Field(default=None, alias="completedAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class DemoDatabase(BaseModel):
     organizations: list[Organization]
     users: list[User]

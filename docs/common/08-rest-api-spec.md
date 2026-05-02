@@ -271,15 +271,44 @@ publicContextSummary
 
 ```json
 {
-  "orchestratorRunId": "agent_run_orch_001",
-  "sessionGoal": "전체 4개 중 1개를 1/4로 표현한다",
-  "selectedFlow": [
-    "concept_intro",
-    "basic_problem",
-    "applied_problem",
-    "realtime_teach_back"
-  ],
-  "teacherSummary": "최근 분모/분자 위치 혼동이 있어 시각 자료와 말로 설명하기를 사용합니다."
+  "data": {
+    "agentRun": {
+      "id": "agent_run_orch_001",
+      "agentType": "orchestrator",
+      "promptVersion": "orchestrator_plan_v1",
+      "outputSchemaName": "OrchestratorPlanV1",
+      "model": "gpt-5.1",
+      "status": "succeeded",
+      "outputJson": {
+        "sessionGoal": "전체 4개 중 1개를 1/4로 표현한다",
+        "selectedFlow": [
+          "concept_intro",
+          "basic_problem",
+          "applied_problem",
+          "realtime_teach_back"
+        ],
+        "teacherSummary": "최근 분모/분자 위치 혼동이 있어 시각 자료와 말로 설명하기를 사용합니다."
+      },
+      "reviewRequired": false
+    }
+  }
+}
+```
+
+provider key 없음, HTTP 오류, JSON parse 실패 등은 fallback을 만들지 않고 같은 endpoint에서 실패 실행 기록으로 반환한다.
+
+```json
+{
+  "data": {
+    "agentRun": {
+      "id": "agent_run_orch_001",
+      "status": "failed",
+      "outputJson": null,
+      "errorCode": "OPENAI_API_KEY_MISSING",
+      "errorMessage": "OPENAI_API_KEY가 없어 실제 AI 생성을 실행할 수 없습니다.",
+      "reviewRequired": true
+    }
+  }
 }
 ```
 
@@ -313,6 +342,8 @@ publicContextSummary
 ### GET /api/ai/agent-runs/:agentRunId
 
 AI 실행 상태/결과 조회.
+
+실패한 실행은 검수 화면에서 `errorCode`, `errorMessage`, `reviewRequired`를 확인한 뒤 재시도 여부를 결정한다.
 
 ## 6. Content Review APIs
 
