@@ -49,6 +49,8 @@ class TemplateType(StrEnum):
     PARTITION_PICKER = "partition_picker"
     APPLIED_QUESTION = "applied_question"
     MINI_SIMULATION = "mini_simulation"
+    EXPLANATION_CHOICE = "explanation_choice"
+    WRONG_EXPLANATION_FIX = "wrong_explanation_fix"
     REALTIME_ROLEPLAY = "realtime_roleplay"
     REALTIME_TEACH_BACK = "realtime_teach_back"
 
