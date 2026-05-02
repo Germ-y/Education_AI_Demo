@@ -41,7 +41,7 @@ function StarMascot() {
 
 const STAGE_LAYOUT = [
   { x: "10%", y: "18%", side: "right" },
-  { x: "45%", y: "34%", side: "left" },
+  { x: "45%", y: "38%", side: "left" },
   { x: "17%", y: "61%", side: "right" },
   { x: "55%", y: "80%", side: "left" },
 ] as const;
