@@ -713,8 +713,8 @@ export default function DashboardPage() {
             {activeTab === "info" && (
               <section className="space-y-6 p-6">
                 <section className="grid gap-5 lg:grid-cols-3">
-                  <InfoBlock label="핵심 어려움" value={dashboardProfile?.primaryNeedDetail ?? selectedCase.primaryNeed} />
-                  <InfoBlock label="지원 전략" value={dashboardProfile?.supportStrategyDetail ?? selectedCase.supportStrategy} />
+                  <InfoBlock label="필요한 수업" value={dashboardProfile?.primaryNeedDetail ?? selectedCase.primaryNeed} />
+                  <InfoBlock label="추천 수업 방식" value={dashboardProfile?.supportStrategyDetail ?? selectedCase.supportStrategy} />
                   <InfoBlock label="수업 유의점" value={selectedCase.riskNote} />
                 </section>
 

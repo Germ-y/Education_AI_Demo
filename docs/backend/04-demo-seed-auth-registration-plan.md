@@ -105,8 +105,8 @@ seed 계정 자동 생성 없음
 | --- | --- | --- |
 | 교사 | `teacher.demo@eduyj.local` | 학생 케이스 관리, 콘텐츠 승인 |
 | 학생 1 | `STAR-003` | 저연령 학습지원형 시계 읽기 미션 플레이 |
-| 학생 2 | `STAR-001` | 고연령 학습지원형 분수 미션 플레이 |
-| 학생 3 | `STAR-002` | 일상생활 지원형 버스/센터 시나리오 플레이 |
+| 학생 2 | `STAR-001` | 고연령 학습지원형 분수 개념 보완 수업 |
+| 학생 3 | `STAR-002` | 일상생활 지원형 의사소통 수업 |
 
 데모 접근 코드는 운영 비밀번호가 아니라 공모전용 seed 식별자다. 실제 학생 개인정보와 연결하지 않는다.
 
@@ -128,7 +128,7 @@ seed 계정 자동 생성 없음
   "displayName": "김지우",
   "grade": "초3",
   "studentType": "learning_focus",
-  "primaryNeed": "저연령 학습지원형 초기 데이터 수집 대상",
+  "primaryNeed": "시간 읽기 기초를 짧은 시각 단서와 2개 선택지로 익히는 수업",
   "effectiveStyles": [],
   "frequentBlockingUnits": []
 }
@@ -142,7 +142,7 @@ seed 계정 자동 생성 없음
   "displayName": "이민준",
   "grade": "중2",
   "studentType": "learning_focus",
-  "primaryNeed": "분수의 전체-부분 관계 이해",
+  "primaryNeed": "분수의 전체-부분 관계를 단계적으로 익히는 개념 보완 수업",
   "effectiveStyles": ["시각 자료", "단계 카드", "짧은 문장"],
   "frequentBlockingUnits": ["분수", "문장제 조건 찾기"]
 }
@@ -156,7 +156,7 @@ seed 계정 자동 생성 없음
   "displayName": "박수민",
   "grade": "초6",
   "studentType": "life_support",
-  "primaryNeed": "센터 이동 순서와 도움 요청 연습",
+  "primaryNeed": "생활 상황에서 순서 확인과 도움 요청 표현을 연습하는 의사소통 수업",
   "effectiveStyles": ["상황 그림", "선택지 2개", "역할극"],
   "lifeSupportNeeds": ["순서 이해", "도움 요청", "감정 표현"]
 }

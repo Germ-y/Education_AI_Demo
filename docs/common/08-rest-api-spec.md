@@ -162,7 +162,7 @@ caseStatus=open
       "displayName": "이민준",
       "grade": "middle_2",
       "studentType": "learning_focus",
-      "primaryNeed": "분수의 전체-부분 관계 이해",
+      "primaryNeed": "분수의 전체-부분 관계를 단계적으로 익히는 개념 보완 수업",
       "latestContentStatus": "completed",
       "nextSessionSuggestion": "분모/분자 위치를 짧게 재확인"
     }
@@ -298,7 +298,7 @@ publicContextSummary
 {
   "studentId": "student_001",
   "caseId": "case_001",
-  "requestedGoal": "분수에서 전체와 부분의 관계를 이해한다",
+  "requestedGoal": "분수의 전체-부분 관계를 단계 카드로 안정화한다",
   "contentType": "learning_focus"
 }
 ```
