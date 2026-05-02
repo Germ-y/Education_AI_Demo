@@ -7,7 +7,19 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.core.config import get_settings
 from app.data.demo_data import create_demo_database
 from app.domain.enums import MissionStatus
-from app.domain.models import ActivityEvent, AuditLog, CaseNote, ContentAttempt, DemoDatabase, MemoryCard, RealtimePracticeSession, ReviewSummary
+from app.domain.models import (
+    ActivityEvent,
+    AuditLog,
+    CaseNote,
+    ContentAttempt,
+    DemoDatabase,
+    MemoryCard,
+    RealtimePracticeSession,
+    ReviewSummary,
+    SchoolCalendarEvent,
+    SchoolProfile,
+    SchoolTimetableSlot,
+)
 from app.domain.schemas import MissionContent
 from app.repositories.demo_repository import DemoRepository
 
@@ -457,6 +469,28 @@ class DemoStore:
                 continue
             slots.append(slot.model_dump(by_alias=True))
         return sorted(slots, key=lambda item: (item["timetableDate"], item["grade"], item["className"], item["period"]))
+
+    def upsert_public_school_context(
+        self,
+        *,
+        schools: list[dict[str, Any]],
+        calendar: list[dict[str, Any]],
+        timetable: list[dict[str, Any]],
+    ) -> dict[str, int]:
+        self.refresh()
+        school_models = [SchoolProfile.model_validate(item) for item in schools]
+        calendar_models = [SchoolCalendarEvent.model_validate(item) for item in calendar]
+        timetable_models = [SchoolTimetableSlot.model_validate(item) for item in timetable]
+
+        school_codes = {item.school_code for item in school_models}
+        event_ids = {item.id for item in calendar_models}
+        timetable_ids = {item.id for item in timetable_models}
+
+        self.db.schools = [item for item in self.db.schools if item.school_code not in school_codes] + school_models
+        self.db.school_calendar_events = [item for item in self.db.school_calendar_events if item.id not in event_ids] + calendar_models
+        self.db.school_timetable_slots = [item for item in self.db.school_timetable_slots if item.id not in timetable_ids] + timetable_models
+        self.persist()
+        return {"schools": len(school_models), "calendar": len(calendar_models), "timetable": len(timetable_models)}
 
     def patch_memory_card(self, student_id: str, patch: dict[str, Any]) -> MemoryCard | None:
         for index, card in enumerate(self.db.memory_cards):

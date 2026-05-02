@@ -819,9 +819,39 @@ className=1
 ```json
 {
   "regionCode": "47210",
-  "schoolCode": "sample_school",
+  "officeCode": "R10",
+  "schoolCode": "8811058",
   "fromDate": "2026-05-01",
-  "toDate": "2026-05-31"
+  "toDate": "2026-05-31",
+  "timetableDate": "2026-05-01",
+  "grade": "2",
+  "className": "1"
+}
+```
+
+현재 지원 source:
+
+```text
+neis_open_api
+```
+
+`NEIS_API_KEY`가 없으면 seed snapshot으로 대체 동기화를 하지 않고 `424 NEIS_API_KEY_MISSING`을 반환한다.
+키가 있으면 NEIS `schoolInfo`, `SchoolSchedule`, 시간표 endpoint를 호출하고 정규화 snapshot을 DB에 upsert한다.
+
+응답:
+
+```json
+{
+  "data": {
+    "jobId": "sync_neis_open_api",
+    "status": "completed",
+    "sourceCode": "neis_open_api",
+    "counts": {
+      "schools": 1,
+      "calendar": 4,
+      "timetable": 6
+    }
+  }
 }
 ```
 

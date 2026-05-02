@@ -349,3 +349,16 @@ class RealtimeSessionCompleteRequest(BaseModel):
     transcript_summary: str | None = Field(default=None, alias="transcriptSummary")
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class PublicDataSyncRequest(BaseModel):
+    region_code: str | None = Field(default=None, alias="regionCode")
+    office_code: str = Field(default="R10", alias="officeCode")
+    school_code: str | None = Field(default=None, alias="schoolCode")
+    from_date: str | None = Field(default=None, alias="fromDate")
+    to_date: str | None = Field(default=None, alias="toDate")
+    timetable_date: str | None = Field(default=None, alias="timetableDate")
+    grade: str | None = None
+    class_name: str | None = Field(default=None, alias="className")
+
+    model_config = ConfigDict(populate_by_name=True)

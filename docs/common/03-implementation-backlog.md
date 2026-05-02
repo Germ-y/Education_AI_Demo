@@ -382,6 +382,15 @@ API key 없이도 snapshot으로 데모 가능.
 API key가 있으면 수동 sync job 실행 가능.
 ```
 
+상태:
+
+```text
+부분 완료. seed snapshot 조회 API와 NEIS 수동 sync endpoint를 추가했다.
+NEIS_API_KEY가 없으면 snapshot fallback sync를 하지 않고 424 오류를 반환한다.
+키가 있으면 schoolInfo, SchoolSchedule, timetable endpoint를 호출해 정규화 snapshot을 upsert한다.
+sync job 이력 테이블은 이후 운영 고도화 단계에서 진행한다.
+```
+
 ## 마일스톤 13. 선택 기능: 회원가입과 아이 등록
 
 작업:

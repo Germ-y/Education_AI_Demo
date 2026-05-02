@@ -64,6 +64,14 @@ def test_teacher_and_student_demo_flows() -> None:
     assert timetable_context.status_code == 200
     timetable = timetable_context.json()["data"]["timetableSummary"]
     assert [slot["subjectName"] for slot in timetable] == ["역사", "동아리활동", "진로와 직업", "국어", "과학", "도덕"]
+    public_sync = client.post(
+        "/api/public-data/sources/neis_open_api/sync",
+        headers={"authorization": f"Bearer {teacher_token}"},
+        json={"officeCode": "R10", "schoolCode": "8811058", "fromDate": "2026-05-01", "toDate": "2026-05-15"},
+    )
+    assert public_sync.status_code == 424
+    assert public_sync.json()["error"]["code"] == "NEIS_API_KEY_MISSING"
+    assert public_sync.json()["error"]["details"] == {"reviewRequired": True, "fallbackPolicy": "disabled"}
 
     history = client.get("/api/teacher/students/student_learning_fraction/history", headers={"authorization": f"Bearer {teacher_token}"})
     assert history.status_code == 200

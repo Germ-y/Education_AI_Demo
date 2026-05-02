@@ -257,6 +257,19 @@ className=1
 학사일정 seed snapshot: 완료
 중학교 시간표 seed snapshot: 완료
 조회 API: 완료
-실제 DB import job: 이후 단계
+실제 DB import job: 부분 완료
 프론트 fetching 연결: 이후 단계
+```
+
+수동 sync endpoint:
+
+```text
+POST /api/public-data/sources/neis_open_api/sync
+```
+
+동작:
+
+```text
+NEIS_API_KEY 없음: 424 NEIS_API_KEY_MISSING, snapshot fallback 동기화 없음
+NEIS_API_KEY 있음: schoolInfo / SchoolSchedule / timetable endpoint 호출 후 정규화 snapshot upsert
 ```
