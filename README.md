@@ -5,21 +5,26 @@
 ## 폴더 구조
 
 ```text
-frontend/   Next.js 학생/교사 화면
-backend/    FastAPI API 서버와 AI workflow 계약
-docs/       기획, 오케스트레이터, DB, API, 공공데이터 명세
-.agents/    Codex/Ralph식 장기 작업용 프로젝트 스킬
-examples/   생성 콘텐츠 샘플
-assets/     OCR/공공데이터 시각 자료
+frontend/       Next.js 학생/교사 화면
+backend/        FastAPI API 서버와 AI workflow 계약
+docs/common/    프론트/백엔드 공통 계약 문서
+docs/frontend/  프론트 팀원 작업 문서
+docs/backend/   백엔드 팀원 작업 문서
+.agents/        Codex/Ralph식 장기 작업용 프로젝트 스킬
+examples/       생성 콘텐츠 샘플
+assets/         OCR/공공데이터 시각 자료
 ```
 
 ## 처음 볼 문서
 
 1. [AGENTS.md](AGENTS.md) - 레포 작업 규칙과 프론트/백엔드 주의사항
 2. [GOAL.md](GOAL.md) - `/goal` 장기 실행 기준
-3. [문서 내비게이션](docs/00-agent-navigation.md) - 기능별 참조 문서 라우팅
-4. [구현 백로그](docs/13-implementation-backlog.md) - 다음 구현 순서
-5. [협업 계약](docs/14-collaboration-contract.md) - 프론트/백엔드 동시 작업 기준
+3. [문서 내비게이션](docs/common/00-agent-navigation.md) - 기능별 참조 문서 라우팅
+4. [구현 백로그](docs/common/03-implementation-backlog.md) - 다음 구현 순서
+5. [협업 계약](docs/common/01-collaboration-contract.md) - 프론트/백엔드 동시 작업 기준
+6. [프론트 팀원 가이드](docs/frontend/00-frontend-team-guide.md) - 프론트 작업자가 먼저 볼 문서
+7. [백엔드 팀원 가이드](docs/backend/00-backend-team-guide.md) - 백엔드 작업자가 먼저 볼 문서
+8. [문서 구조](docs/README.md) - docs 폴더 관리 기준
 
 ## 핵심 결정사항
 
@@ -74,5 +79,6 @@ curl -s -X POST http://localhost:4000/api/auth/student-access \
 
 ## 협업 기준
 
-- 협업 기준: [docs/14-collaboration-contract.md](docs/14-collaboration-contract.md)
+- 협업 기준: [docs/common/01-collaboration-contract.md](docs/common/01-collaboration-contract.md)
+- 브랜치 handoff 기준: [docs/common/02-branch-handoff-contract.md](docs/common/02-branch-handoff-contract.md)
 - 에이전트 스킬: [.agents/skills/eduyj-monorepo-collaboration/SKILL.md](.agents/skills/eduyj-monorepo-collaboration/SKILL.md)

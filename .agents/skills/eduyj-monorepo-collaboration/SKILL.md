@@ -8,9 +8,10 @@ description: EduYJ 레포에서 프론트엔드와 백엔드가 함께 바뀌는
 먼저 읽을 문서:
 
 1. `AGENTS.md`
-2. `docs/14-collaboration-contract.md`
-3. `docs/00-agent-navigation.md`
-4. 지금 작업과 관련된 상세 문서
+2. `docs/common/01-collaboration-contract.md`
+3. `docs/common/02-branch-handoff-contract.md`
+4. `docs/common/00-agent-navigation.md`
+5. 지금 작업과 관련된 상세 문서
 
 ## 1. 작업 영역 먼저 정하기
 
@@ -18,9 +19,9 @@ description: EduYJ 레포에서 프론트엔드와 백엔드가 함께 바뀌는
 
 - 프론트 작업: `frontend/`
 - 백엔드 작업: `backend/`
-- API 계약 작업: `docs/12-rest-api-spec.md`, `backend/app/domain/schemas.py`, `frontend/lib/demo-data.ts`
-- AI 콘텐츠 작업: `docs/04-*`, `docs/07-*`, `docs/09-*`, `backend/scripts/`
-- 작업 규칙/문서 작업: `AGENTS.md`, `GOAL.md`, `.agents/skills/`, `docs/00-*`, `docs/13-*`
+- API 계약 작업: `docs/common/08-rest-api-spec.md`, `backend/app/domain/schemas.py`, `frontend/lib/demo-data.ts`
+- AI 콘텐츠 작업: `docs/common/05-*`, `docs/common/06-*`, `docs/common/07-*`, `backend/scripts/`
+- 작업 규칙/문서 작업: `AGENTS.md`, `GOAL.md`, `.agents/skills/`, `docs/common/00-*`, `docs/common/03-*`
 
 프론트와 백엔드가 같이 바뀌면 코드보다 문서를 먼저 고친다.
 
@@ -35,6 +36,7 @@ API 응답, 콘텐츠 JSON, seed 데이터, 프론트 mock 데이터가 같이 �
 프론트 소비 코드 수정
 테스트/lint 실행
 백로그 상태 갱신
+handoff 문서 확인
 커밋
 ```
 

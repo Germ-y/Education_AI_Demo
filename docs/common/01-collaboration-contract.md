@@ -18,10 +18,10 @@
 | --- | --- | --- |
 | 프론트엔드 | `frontend/` | Next.js 화면, 라우팅, UI 상태, 프론트용 데모 데이터 |
 | 백엔드 | `backend/` | FastAPI API, Pydantic/SQLAlchemy 스키마, seed, AI 연동 |
-| API 계약 | `docs/12-rest-api-spec.md`, `backend/app/domain/schemas.py`, `frontend/lib/demo-data.ts` | API 응답 형태, enum, 단계/템플릿 데이터 모양 |
-| AI 콘텐츠 | `docs/04-ai-content-template-spec.md`, `docs/07-realtime-practice-spec.md`, `docs/09-image-content-package-spec.md`, `backend/scripts/` | 4단계 콘텐츠, 이미지 패키지, realtime 스펙 |
-| 공공데이터 | `docs/06-public-data-strategy.md`, `docs/10-data-api-requirements.md`, `backend/app/api/routes/public_data.py` | 공공데이터 출처, 동기화, snapshot |
-| 작업 하네스 | `AGENTS.md`, `GOAL.md`, `.agents/skills/`, `docs/00-agent-navigation.md`, `docs/13-implementation-backlog.md` | 에이전트 작업 규칙, 스킬, 문서 지도, 백로그 |
+| API 계약 | `docs/common/08-rest-api-spec.md`, `backend/app/domain/schemas.py`, `frontend/lib/demo-data.ts` | API 응답 형태, enum, 단계/템플릿 데이터 모양 |
+| AI 콘텐츠 | `docs/common/05-ai-content-template-spec.md`, `docs/common/06-realtime-practice-spec.md`, `docs/common/07-image-content-package-spec.md`, `backend/scripts/` | 4단계 콘텐츠, 이미지 패키지, realtime 스펙 |
+| 공공데이터 | `docs/common/09-public-data-strategy.md`, `docs/backend/05-data-api-requirements.md`, `backend/app/api/routes/public_data.py` | 공공데이터 출처, 동기화, snapshot |
+| 작업 하네스 | `AGENTS.md`, `GOAL.md`, `.agents/skills/`, `docs/common/00-agent-navigation.md`, `docs/common/03-implementation-backlog.md` | 에이전트 작업 규칙, 스킬, 문서 지도, 백로그 |
 
 ## 3. API나 데이터 모양이 바뀔 때
 
@@ -29,7 +29,7 @@ API 응답 필드, 콘텐츠 JSON, 학생/교사 seed 데이터, 프론트 mock 
 
 ```text
 1. 관련 문서를 먼저 수정한다.
-   예: docs/12-rest-api-spec.md, docs/04-ai-content-template-spec.md
+   예: docs/common/08-rest-api-spec.md, docs/common/05-ai-content-template-spec.md
 
 2. 백엔드 스키마/API를 수정한다.
    예: backend/app/domain/schemas.py, backend/app/api/routes/*
@@ -42,7 +42,7 @@ API 응답 필드, 콘텐츠 JSON, 학생/교사 seed 데이터, 프론트 mock 
 
 5. 백엔드 테스트와 프론트 lint를 돌린다.
 
-6. docs/13-implementation-backlog.md에 상태를 남긴다.
+6. docs/common/03-implementation-backlog.md에 상태를 남긴다.
 ```
 
 예외:

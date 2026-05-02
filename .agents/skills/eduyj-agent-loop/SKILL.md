@@ -9,8 +9,8 @@ description: EduYJ 레포에서 Codex/Ralph식 장기 작업을 이어갈 때 �
 
 1. `AGENTS.md`
 2. `GOAL.md`
-3. `docs/00-agent-navigation.md`
-4. `docs/13-implementation-backlog.md`
+3. `docs/common/00-agent-navigation.md`
+4. `docs/common/03-implementation-backlog.md`
 
 ## 기본 규칙
 
@@ -20,7 +20,7 @@ description: EduYJ 레포에서 Codex/Ralph식 장기 작업을 이어갈 때 �
 - 학생 콘텐츠는 4단계다.
 - 4단계가 realtime이다.
 - 영상 생성 범위를 다시 넣지 않는다.
-- 새 문서를 만들면 `README.md`와 `docs/00-agent-navigation.md`에 링크를 추가한다.
+- 새 문서를 만들면 `README.md`와 `docs/common/00-agent-navigation.md`에 링크를 추가한다.
 
 ## 반복 순서
 

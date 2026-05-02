@@ -7,11 +7,12 @@ description: EduYJ 백엔드 API, DB 스키마, seed 데이터, 공공데이터 
 
 먼저 볼 문서:
 
-- `docs/05-backend-feature-spec.md`
-- `docs/10-data-api-requirements.md`
-- `docs/11-database-schema-spec.md`
-- `docs/12-rest-api-spec.md`
-- `docs/13-implementation-backlog.md`
+- `docs/backend/03-backend-feature-spec.md`
+- `docs/backend/05-data-api-requirements.md`
+- `docs/backend/06-database-schema-spec.md`
+- `docs/common/08-rest-api-spec.md`
+- `docs/common/03-implementation-backlog.md`
+- `docs/common/02-branch-handoff-contract.md`
 
 ## 구현 순서
 

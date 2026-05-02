@@ -3,15 +3,18 @@
 이 문서는 Codex/Ralph식 장기 작업을 이어받는 에이전트의 시작점이다. 새 세션은 항상 이 파일을 먼저 읽고, 다음 파일을 순서대로 연다.
 
 1. [GOAL.md](GOAL.md)
-2. [docs/00-agent-navigation.md](docs/00-agent-navigation.md)
-3. [docs/13-implementation-backlog.md](docs/13-implementation-backlog.md)
-4. 프론트/백엔드가 함께 바뀌는 작업이면 [docs/14-collaboration-contract.md](docs/14-collaboration-contract.md)
+2. [docs/common/00-agent-navigation.md](docs/common/00-agent-navigation.md)
+3. [docs/common/03-implementation-backlog.md](docs/common/03-implementation-backlog.md)
+4. 프론트/백엔드가 함께 바뀌는 작업이면 [docs/common/01-collaboration-contract.md](docs/common/01-collaboration-contract.md)
+5. 브랜치 간 handoff가 있으면 [docs/common/02-branch-handoff-contract.md](docs/common/02-branch-handoff-contract.md)
 
 ## 레포 구조
 
 - `frontend/`: Next.js 학생/교사 화면
 - `backend/`: FastAPI API 서버, 도메인 스키마, seed, AI workflow 계약
-- `docs/`: 공통 기획/DB/API/공공데이터/오케스트레이터 문서
+- `docs/common/`: 프론트/백엔드 공통 계약 문서
+- `docs/frontend/`: 프론트 팀원이 먼저 보는 문서
+- `docs/backend/`: 백엔드 팀원이 먼저 보는 문서
 - `.agents/`: 프로젝트 전용 Codex 스킬
 - `examples/`, `assets/`: 생성 콘텐츠 예시와 시각 자료
 
@@ -43,12 +46,12 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 1. `git status --short --branch`로 현재 브랜치와 변경사항을 확인한다.
 2. [GOAL.md](GOAL.md)의 마일스톤 중 완료되지 않은 가장 앞 작업을 고른다.
-3. 관련 문서를 [docs/00-agent-navigation.md](docs/00-agent-navigation.md)에서 찾아 읽는다.
+3. 관련 문서를 [docs/common/00-agent-navigation.md](docs/common/00-agent-navigation.md)에서 찾아 읽는다.
 4. 작은 단위로 구현하거나 문서를 수정한다.
 5. 링크, 용어, 단계 수, API/DB 연결점 정합성을 검증한다.
 6. 테스트 또는 문서 검증 명령을 실행하고 결과를 기록한다.
 7. 변경 범위별로 작은 커밋을 만든다.
-8. [docs/13-implementation-backlog.md](docs/13-implementation-backlog.md)를 필요하면 갱신한다.
+8. [docs/common/03-implementation-backlog.md](docs/common/03-implementation-backlog.md)를 필요하면 갱신한다.
 
 ## 검증 기준
 

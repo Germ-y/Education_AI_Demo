@@ -15,12 +15,14 @@
 - [x] seed 데이터 구현
 - [x] 기본 API 구현
 - [x] 프론트/백엔드 협업 계약 문서와 모노레포 스킬 추가
+- [x] docs를 `common`, `frontend`, `backend` 폴더로 분리
+- [x] 프론트 팀원 시작 가이드와 브랜치 handoff 계약 추가
 - [ ] AI provider 연동
 - [ ] 학생 플레이 런타임 구현
 
 ## 협업 기준
 
-프론트와 백엔드가 함께 바뀌는 작업은 먼저 [14-collaboration-contract.md](14-collaboration-contract.md)를 따른다.
+프론트와 백엔드가 함께 바뀌는 작업은 먼저 [01-collaboration-contract.md](01-collaboration-contract.md)와 [02-branch-handoff-contract.md](02-branch-handoff-contract.md)를 따른다.
 
 계약 변경 순서:
 
@@ -92,7 +94,7 @@ step=5 또는 video asset 역할은 검증에서 실패한다.
 
 참조:
 
-- [11-database-schema-spec.md](11-database-schema-spec.md)
+- [../backend/06-database-schema-spec.md](../backend/06-database-schema-spec.md)
 
 작업:
 
@@ -123,7 +125,7 @@ DB reset 후 스키마 생성
 
 참조:
 
-- [08-demo-seed-auth-registration-plan.md](08-demo-seed-auth-registration-plan.md)
+- [../backend/04-demo-seed-auth-registration-plan.md](../backend/04-demo-seed-auth-registration-plan.md)
 
 작업:
 
@@ -152,7 +154,7 @@ seed 여러 번 실행해도 중복 생성 없음
 
 참조:
 
-- [12-rest-api-spec.md](12-rest-api-spec.md)
+- [08-rest-api-spec.md](08-rest-api-spec.md)
 
 작업:
 
@@ -180,9 +182,9 @@ seed 여러 번 실행해도 중복 생성 없음
 
 참조:
 
-- [02-orchestrator-memory.md](02-orchestrator-memory.md)
-- [03-ai-backend-system-design.md](03-ai-backend-system-design.md)
-- [09-image-content-package-spec.md](09-image-content-package-spec.md)
+- [../backend/01-orchestrator-memory.md](../backend/01-orchestrator-memory.md)
+- [../backend/02-ai-backend-system-design.md](../backend/02-ai-backend-system-design.md)
+- [07-image-content-package-spec.md](07-image-content-package-spec.md)
 
 작업:
 
@@ -259,7 +261,7 @@ published 콘텐츠만 학생 API에서 조회된다.
 
 참조:
 
-- [07-realtime-practice-spec.md](07-realtime-practice-spec.md)
+- [06-realtime-practice-spec.md](06-realtime-practice-spec.md)
 
 작업:
 
@@ -298,7 +300,7 @@ stage.step != 4이면 session 생성 실패.
 
 참조:
 
-- [10-data-api-requirements.md](10-data-api-requirements.md)
+- [../backend/05-data-api-requirements.md](../backend/05-data-api-requirements.md)
 
 작업:
 

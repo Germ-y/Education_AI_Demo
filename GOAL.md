@@ -1,12 +1,12 @@
-# EduYJ Backend Goal Plan
+# EduYJ 백엔드 목표 계획
 
-## Summary
+## 요약
 
 최종 목표는 영주 공공데이터 공모전용 AI 교육 지원 백엔드를 `교사 대시보드 → 학생 메모리 → AI 콘텐츠 생성 → 교사 승인 → 학생 4단계 플레이 → 4단계 realtime 연습 → 리뷰/메모리 업데이트`까지 데모 가능한 상태로 만드는 것이다.
 
-이 레포의 장기 실행 기준은 `/goal`에 입력할 수 있는 이 문서다. Codex goal 기능이 켜져 있으면 이 문서를 목표 원문으로 삼고, 세션이 끊겨도 [docs/13-implementation-backlog.md](docs/13-implementation-backlog.md)의 다음 항목부터 이어간다.
+이 레포의 장기 실행 기준은 `/goal`에 입력할 수 있는 이 문서다. Codex goal 기능이 켜져 있으면 이 문서를 목표 원문으로 삼고, 세션이 끊겨도 [docs/common/03-implementation-backlog.md](docs/common/03-implementation-backlog.md)의 다음 항목부터 이어간다.
 
-## Key Decisions
+## 핵심 결정사항
 
 - 콘텐츠 유형은 `생활지원형`과 `학습집중형` 두 갈래다.
 - 학생 플레이는 4단계다. 4단계가 realtime이다.
@@ -15,17 +15,18 @@
 - 공공데이터는 교육과정, 학교 일정, 통계, 지역 자원 맥락을 연결하는 근거 데이터다.
 - MVP는 seed 계정과 seed 학생 데이터로 먼저 돌아가야 한다.
 
-## Milestones
+## 마일스톤
 
 ### M0. Harness Foundation
 
-- [AGENTS.md](AGENTS.md), [docs/00-agent-navigation.md](docs/00-agent-navigation.md), [docs/13-implementation-backlog.md](docs/13-implementation-backlog.md)를 정비한다.
+- [AGENTS.md](AGENTS.md), [docs/common/00-agent-navigation.md](docs/common/00-agent-navigation.md), [docs/common/03-implementation-backlog.md](docs/common/03-implementation-backlog.md)를 정비한다.
+- 문서 구조는 `docs/common`, `docs/frontend`, `docs/backend` 기준으로 관리한다.
 - README 링크가 모두 클릭 가능한 상대 링크인지 확인한다.
 - Codex `goals = true` 설정 여부를 확인한다.
 
 ### M1. Domain Contract
 
-- DB 스키마를 [docs/11-database-schema-spec.md](docs/11-database-schema-spec.md)에 맞춰 SQLAlchemy ORM 모델로 옮긴다.
+- DB 스키마를 [docs/backend/06-database-schema-spec.md](docs/backend/06-database-schema-spec.md)에 맞춰 SQLAlchemy ORM 모델로 옮긴다.
 - 공통 enum, 상태값, JSON 스키마를 `packages/shared` 또는 백엔드 공통 모듈로 정의한다.
 - `MissionContent`, `ContentStage`, `RealtimePracticeSpec`, `MemoryCard` 타입을 먼저 고정한다.
 
@@ -83,7 +84,7 @@
 
 - 핵심 데모가 돌아간 뒤 교사 회원가입, 초대 코드, 아이등록, 보호자 동의 입력을 추가한다.
 
-## Verification
+## 검증 기준
 
 - `git status --short --branch`가 의도한 브랜치와 변경 범위를 보여야 한다.
 - 문서 링크가 깨지지 않아야 한다.
@@ -91,7 +92,7 @@
 - API/DB/AI workflow 문서의 엔티티 이름이 서로 맞아야 한다.
 - 구현 단계에서는 타입체크, 테스트, seed 실행, 주요 API smoke test를 통과해야 한다.
 
-## Completion Criteria
+## 완료 기준
 
 - 교사 seed 계정으로 로그인해 학생 케이스를 조회할 수 있다.
 - 학생별 메모리 카드와 최근 기록을 볼 수 있다.
@@ -100,7 +101,7 @@
 - 4단계 realtime 연습을 시작하고 완료 결과가 저장된다.
 - 리뷰 요약과 메모리 업데이트 후보가 다음 회기 추천에 반영된다.
 
-## Assumptions
+## 전제
 
 - 실제 운영 보안/개인정보 정책은 공모전 데모 이후 강화한다.
 - 데모 이미지도 `gpt-image-2` API로 실제 생성한다. 비용/속도 문제 때문에 seed asset으로 대체하지 않는다.

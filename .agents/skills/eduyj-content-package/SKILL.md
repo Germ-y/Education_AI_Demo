@@ -7,10 +7,11 @@ description: EduYJ 학생 미션 콘텐츠, 이미지 패키지, 1~3단계 템�
 
 먼저 볼 문서:
 
-- `docs/01-child-content-experience.md`
-- `docs/04-ai-content-template-spec.md`
-- `docs/07-realtime-practice-spec.md`
-- `docs/09-image-content-package-spec.md`
+- `docs/common/04-child-content-experience.md`
+- `docs/common/05-ai-content-template-spec.md`
+- `docs/common/06-realtime-practice-spec.md`
+- `docs/common/07-image-content-package-spec.md`
+- `docs/common/02-branch-handoff-contract.md`
 
 ## 반드시 지킬 것
 
