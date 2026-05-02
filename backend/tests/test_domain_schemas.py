@@ -1,0 +1,38 @@
+import pytest
+
+from app.data.demo_data import create_demo_database
+from app.domain.schemas import ContentAsset, ContentStage, MissionContent
+
+
+def test_accepts_demo_4_stage_missions() -> None:
+    db = create_demo_database()
+
+    for content in db.mission_contents:
+        MissionContent.model_validate(content.model_dump(by_alias=True))
+        assert content.total_steps == 4
+        assert sorted(stage.step for stage in content.stages) == [1, 2, 3, 4]
+
+
+def test_rejects_fifth_stage() -> None:
+    content = create_demo_database().mission_contents[0].model_dump(by_alias=True)
+    content["totalSteps"] = 5
+    content["stages"].append({**content["stages"][0], "id": "stage_bad_5", "step": 5, "sortOrder": 5})
+
+    with pytest.raises(ValueError):
+        MissionContent.model_validate(content)
+
+
+def test_allows_realtime_templates_only_at_stage_4() -> None:
+    stage = create_demo_database().mission_contents[0].stages[0].model_dump(by_alias=True)
+    stage["templateType"] = "realtime_teach_back"
+
+    with pytest.raises(ValueError):
+        ContentStage.model_validate(stage)
+
+
+def test_rejects_video_asset_roles() -> None:
+    asset = create_demo_database().mission_contents[0].assets[0].model_dump(by_alias=True)
+    asset["assetRole"] = "video"
+
+    with pytest.raises(ValueError):
+        ContentAsset.model_validate(asset)

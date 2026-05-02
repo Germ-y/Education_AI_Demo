@@ -1,0 +1,47 @@
+---
+name: eduyj-content-package
+description: EduYJ 학생 미션 콘텐츠, 이미지 패키지, 1~3단계 템플릿, gpt-image-2 프롬프트, 교사 승인, 4단계 realtime 연습을 설계하거나 구현할 때 사용한다.
+---
+
+# EduYJ 콘텐츠 패키지 스킬
+
+먼저 볼 문서:
+
+- `docs/common/04-child-content-experience.md`
+- `docs/common/05-ai-content-template-spec.md`
+- `docs/common/06-realtime-practice-spec.md`
+- `docs/common/07-image-content-package-spec.md`
+- `docs/common/02-branch-handoff-contract.md`
+
+## 반드시 지킬 것
+
+- 학생 미션은 화면 기준 4단계다.
+- 1~3단계는 교사가 승인한 정적 템플릿 JSON이다.
+- 4단계는 `RealtimePracticeSpec`을 사용하는 realtime 연습이다.
+- 회고는 4단계 이후에 붙는 후속 활동이며 5단계가 아니다.
+- 한 미션은 `hero`, `stage_1`, `stage_2`, `stage_3`, `stage_4_realtime` 이미지 asset을 가진다.
+- 이미지는 `gpt-image-2`로 생성한다.
+- 이미지 안 텍스트는 최소화한다. 질문, 선택지, 피드백은 UI 텍스트가 맡는다.
+- 학생에게 보이기 전 교사 승인이 필요하다.
+
+## 이미지 프롬프트 구성
+
+프롬프트에는 아래 요소를 넣는다.
+
+```text
+시각 스타일
+상황 장면
+교육 목표
+구도 제약
+접근성 제약
+OCR/텍스트 제약
+품질 기준
+피해야 할 것
+```
+
+## 거절할 설계
+
+- 영상 생성 파이프라인 추가
+- 자유 HTML/JS를 학생 콘텐츠로 직접 생성
+- 학생에게 진단명이나 낙인성 라벨 노출
+- 이미지 생성 실패를 seed asset으로 조용히 대체

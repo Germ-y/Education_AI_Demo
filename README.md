@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EduYJ AI Education Demo
 
-## Getting Started
+Integrated workspace for the EduYJ AI education demo.
 
-First, run the development server:
+## Branches
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- `frontend`: Next.js student and teacher screens.
+- `backend`: FastAPI API, schema, seed data, and collaboration documents.
+- `dev`: integration branch for frontend/backend verification.
+
+## Project Structure
+
+```text
+frontend/       Next.js frontend
+backend/        FastAPI backend
+docs/common/    shared frontend/backend contracts
+docs/frontend/  frontend working guide
+docs/backend/   backend working guide
+.agents/        Codex/Ralph working skills
+examples/       generated content samples
+assets/         source/reference assets
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## First Documents
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. [AGENTS.md](AGENTS.md)
+2. [GOAL.md](GOAL.md)
+3. [docs/README.md](docs/README.md)
+4. [docs/common/00-agent-navigation.md](docs/common/00-agent-navigation.md)
+5. [docs/common/01-collaboration-contract.md](docs/common/01-collaboration-contract.md)
+6. [docs/common/02-branch-handoff-contract.md](docs/common/02-branch-handoff-contract.md)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Frontend
 
-## Learn More
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+The frontend runs at `http://localhost:3000`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Verification:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+cd frontend
+npm run lint
+```
 
-## Deploy on Vercel
+## Backend
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+cd backend
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 4000
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The API runs at `http://localhost:4000`.
+
+Verification:
+
+```bash
+cd backend
+.venv/bin/ruff check app tests
+.venv/bin/python -m pytest
+.venv/bin/python -m app.data.seed_demo
+```
+
+## Contract Notes
+
+- Student missions are 4 stages.
+- Reflection is not stage 5.
+- Stages 1-3 are approved static content.
+- Stage 4 is realtime practice.
+- Frontend/backend contract changes should be reflected in `docs/common/`.
