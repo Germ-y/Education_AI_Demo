@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { backendAdapter } from "@/lib/api/backend-adapter";
+import type { StudentCaseFile, StudentListItem } from "@/lib/api/contracts";
 import {
   reviewItems,
   sessionRecords,
-  students,
+  students as mockStudents,
   supportCases,
   type CaseStatus,
+  type StudentProfile,
   type SupportCase,
 } from "@/lib/demo-data";
 
@@ -135,8 +138,68 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
+function mapDashboardStudent(caseFile: StudentCaseFile): StudentProfile {
+  const interests = Array.isArray(caseFile.profile.profileJson.interests)
+    ? caseFile.profile.profileJson.interests.filter((item): item is string => typeof item === "string")
+    : [];
+
+  return {
+    id: caseFile.profile.id,
+    name: caseFile.profile.displayName,
+    displayName: caseFile.profile.displayName,
+    grade: formatGrade(caseFile.profile.grade),
+    school: caseFile.schoolContext?.school.name ?? schoolNameFromCode(caseFile.profile.schoolCode),
+    guardianName: "보호자",
+    phone: "-",
+    level: caseFile.profile.studentType === "life_support" ? 2 : 3,
+    rewardTokens: caseFile.profile.studentType === "life_support" ? 96 : 120,
+    nextRewardTokens: 30,
+    attendanceRate: 92,
+    understandingRate: caseFile.profile.studentType === "life_support" ? 68 : 76,
+    interests,
+    strengths: caseFile.memoryCard?.effectiveExplanationStyles ?? ["시각 자료", "짧은 단계"],
+  };
+}
+
+function mapDashboardCase(caseFile: StudentCaseFile, summary?: StudentListItem): SupportCase {
+  const hasContent = caseFile.recentContents.some((content) => content.status === "published");
+
+  return {
+    id: caseFile.openCase.id,
+    studentId: caseFile.profile.id,
+    status: hasContent ? "scene_review" : "structured",
+    statusLabel: hasContent ? "자료 검토" : "자료 생성 필요",
+    caseType: caseFile.profile.studentType === "life_support" ? "일상생활 지원형" : "학습집중형",
+    primaryNeed: caseFile.profile.primaryNeed,
+    sessionGoal: caseFile.recentContents[0]?.sessionGoal ?? caseFile.openCase.currentGoal,
+    supportStrategy: caseFile.memoryCard?.effectiveExplanationStyles.join(", ") ?? "학생 반응을 보고 짧은 단계로 진행",
+    nextAction: summary?.nextSessionSuggestion ?? caseFile.plannerItems[0]?.goalText ?? "다음 회기 목표 확인",
+    riskNote: caseFile.memoryCard?.emotionalStateNote ?? "초기 데이터 수집 중입니다.",
+    challengeTags: caseFile.memoryCard?.learningProblemTypes ?? [caseFile.profile.primaryNeed],
+    planTags: caseFile.plannerItems.map((item) => item.goalText).slice(0, 3),
+  };
+}
+
+function formatGrade(grade: string): string {
+  const match = /^(elementary|middle|high)_(\d+)$/.exec(grade);
+  if (!match) return grade;
+  const label = match[1] === "elementary" ? "초" : match[1] === "middle" ? "중" : "고";
+  return `${label}${match[2]}`;
+}
+
+function schoolNameFromCode(schoolCode: string | null | undefined): string {
+  if (schoolCode === "8811046") return "영주중앙초등학교";
+  if (schoolCode === "8811058") return "영주중학교";
+  if (schoolCode === "8811067") return "영주가흥초등학교";
+  return "학교 정보 확인 중";
+}
+
 export default function DashboardPage() {
-  const [selectedStudentId, setSelectedStudentId] = useState(students[0].id);
+  const [dashboardStudents, setDashboardStudents] = useState<StudentProfile[]>(mockStudents);
+  const [dashboardCases, setDashboardCases] = useState<SupportCase[]>(supportCases);
+  const [apiState, setApiState] = useState<"loading" | "ready" | "error">("loading");
+  const [apiMessage, setApiMessage] = useState("백엔드 학생 데이터를 불러오는 중입니다.");
+  const [selectedStudentId, setSelectedStudentId] = useState(mockStudents[0].id);
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<DashboardTab>("info");
   const [openReportId, setOpenReportId] = useState<string | null>(null);
@@ -163,20 +226,34 @@ export default function DashboardPage() {
 
   const filteredStudents = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return students;
+    if (!normalized) return dashboardStudents;
 
-    return students.filter((student) => {
-      const supportCase = supportCases.find((item) => item.studentId === student.id);
+    return dashboardStudents.filter((student) => {
+      const supportCase = dashboardCases.find((item) => item.studentId === student.id);
       return [student.name, student.school, student.grade, supportCase?.primaryNeed, supportCase?.caseType]
         .filter(Boolean)
         .some((value) => value?.toLowerCase().includes(normalized));
     });
-  }, [query]);
+  }, [dashboardCases, dashboardStudents, query]);
 
-  const selectedStudent = students.find((student) => student.id === selectedStudentId) ?? students[0];
+  const selectedStudent = dashboardStudents.find((student) => student.id === selectedStudentId) ?? dashboardStudents[0] ?? mockStudents[0];
   const selectedCase =
-    supportCases.find((supportCase) => supportCase.studentId === selectedStudent.id) ?? supportCases[0];
-  const selectedReviewItems = reviewItems.filter((item) => item.caseId === selectedCase.id);
+    dashboardCases.find((supportCase) => supportCase.studentId === selectedStudent.id) ?? dashboardCases[0] ?? supportCases[0];
+  const caseReviewItems = reviewItems.filter((item) => item.caseId === selectedCase.id);
+  const selectedReviewItems =
+    caseReviewItems.length > 0
+      ? caseReviewItems
+      : selectedCase.status === "scene_review"
+        ? [
+            {
+              id: `review-${selectedCase.id}`,
+              caseId: selectedCase.id,
+              title: selectedCase.sessionGoal,
+              type: "백엔드 배포 미션",
+              state: "검토 대기",
+            },
+          ]
+        : [];
   const selectedRecords = sessionRecords.filter((record) => record.caseId === selectedCase.id);
   const currentWorkflowStep = selectedCase.status === "follow_up" ? 4 : selectedCase.status === "scene_review" ? 2 : 3;
   const sessionLogs = selectedRecords.map((record, index) => {
@@ -211,6 +288,42 @@ export default function DashboardPage() {
   const savedMemo = savedMemos[selectedCase.id] ?? selectedCase.riskNote;
   const memoValue = memoDrafts[selectedCase.id] ?? savedMemo;
   const isMemoDirty = memoValue !== savedMemo;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTeacherData() {
+      try {
+        const login = await backendAdapter.demoLogin({ role: "teacher", email: "teacher.demo@eduyj.local" });
+        const list = await backendAdapter.getTeacherStudents({ token: login.session.accessToken });
+        const caseFiles = await Promise.all(
+          list.map((student) => backendAdapter.getTeacherStudent(student.studentId, { token: login.session.accessToken })),
+        );
+
+        if (cancelled) return;
+
+        const nextStudents = caseFiles.map((caseFile) => mapDashboardStudent(caseFile));
+        const nextCases = caseFiles.map((caseFile) =>
+          mapDashboardCase(caseFile, list.find((item) => item.studentId === caseFile.profile.id)),
+        );
+
+        setDashboardStudents(nextStudents);
+        setDashboardCases(nextCases);
+        setSelectedStudentId((current) => (nextStudents.some((student) => student.id === current) ? current : nextStudents[0]?.id ?? current));
+        setApiState("ready");
+        setApiMessage(`백엔드에서 학생 ${nextStudents.length}명과 케이스 파일을 불러왔습니다.`);
+      } catch (error) {
+        if (cancelled) return;
+        setApiState("error");
+        setApiMessage(error instanceof Error ? error.message : "백엔드 학생 데이터를 불러오지 못했습니다.");
+      }
+    }
+
+    loadTeacherData();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const updateReviewStageDraft = (
     reviewId: string,
@@ -274,6 +387,17 @@ export default function DashboardPage() {
             <p className="mt-2 text-sm font-semibold leading-6 text-[#64748b]">
               학생을 검색하고, 오늘 수업에 필요한 상태와 자료를 확인합니다.
             </p>
+            <div
+              className={`mt-4 rounded-md border px-3 py-2 text-xs font-bold leading-5 ${
+                apiState === "ready"
+                  ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
+                  : apiState === "error"
+                    ? "border-[#fecaca] bg-[#fef2f2] text-[#991b1b]"
+                    : "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
+              }`}
+            >
+              {apiMessage}
+            </div>
           </div>
 
           <div className="space-y-3 border-b border-[#e5e9f0] p-4">
@@ -293,7 +417,7 @@ export default function DashboardPage() {
 
           <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-[#e5e9f0]">
             {filteredStudents.map((student) => {
-              const supportCase = supportCases.find((item) => item.studentId === student.id) ?? supportCases[0];
+              const supportCase = dashboardCases.find((item) => item.studentId === student.id) ?? dashboardCases[0] ?? supportCases[0];
 
               return (
                 <button
@@ -486,8 +610,9 @@ export default function DashboardPage() {
                       <label className="block">
                         <span className="text-sm font-bold text-[#64748b]">수업 내용</span>
                         <textarea
+                          key={`lesson-${selectedCase.id}`}
                           className="mt-2 h-36 w-full resize-none rounded-md border border-[#cbd5e1] bg-[#fbfcfe] p-4 text-sm font-semibold outline-none focus:border-[#1f3a5f]"
-                          defaultValue="분수의 전체-부분 관계를 시각 자료로 설명하고 1/4을 표현한다."
+                          defaultValue={selectedCase.sessionGoal}
                         />
                       </label>
 
@@ -503,7 +628,7 @@ export default function DashboardPage() {
                       <div className="rounded-md bg-[#f8fafc] p-3">
                         <p className="text-sm font-bold text-[#64748b]">자동 반영 정보</p>
                         <p className="mt-1 text-sm font-semibold leading-6 text-[#334155]">
-                          핵심 어려움, 강점, 약점, 최근 학습 기록
+                          {selectedStudent.name} · {selectedStudent.school} · {selectedCase.primaryNeed}
                         </p>
                       </div>
 
@@ -659,7 +784,7 @@ export default function DashboardPage() {
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                               <Link
-                                href="/student/stage?preview=1"
+                                href={`/student/stage?studentId=${encodeURIComponent(selectedStudent.id)}&preview=1`}
                                 target="_blank"
                                 className="rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-xs font-black text-[#334155]"
                               >
@@ -793,7 +918,7 @@ export default function DashboardPage() {
                 >
                   <iframe
                     title={`학습 리포트 자료 스테이지 ${openReportStageStep}`}
-                    src={`/student/stage?step=${openReportStageStep}&preview=1`}
+                    src={`/student/stage?studentId=${encodeURIComponent(selectedStudent.id)}&step=${openReportStageStep}&preview=1`}
                     className="absolute left-1/2 top-1/2 h-[768px] w-[1024px] origin-center border-0"
                     style={{ transform: `translate(-50%, -50%) scale(${reportPreviewScale})` }}
                   />
@@ -868,7 +993,7 @@ export default function DashboardPage() {
                   <iframe
                     key={`${openReview.id}-${reviewPreviewStep}`}
                     title={`학생 화면 스테이지 ${reviewPreviewStep}`}
-                    src={`/student/stage?step=${reviewPreviewStep}&preview=1`}
+                    src={`/student/stage?studentId=${encodeURIComponent(selectedStudent.id)}&step=${reviewPreviewStep}&preview=1`}
                     className="absolute left-1/2 top-1/2 h-[768px] w-[1024px] origin-center border-0"
                     style={{ transform: `translate(-50%, -50%) scale(${reviewPreviewScale})` }}
                   />
@@ -906,7 +1031,7 @@ export default function DashboardPage() {
                             </button>
                             <iframe
                               title={`학생 화면 스테이지 ${stage.step}`}
-                              src={`/student/stage?step=${stage.step}&preview=1`}
+                              src={`/student/stage?studentId=${encodeURIComponent(selectedStudent.id)}&step=${stage.step}&preview=1`}
                               className="absolute left-0 top-0 h-[768px] w-[1024px] origin-top-left scale-[0.205] border-0"
                             />
                           </div>

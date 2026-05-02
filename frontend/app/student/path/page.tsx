@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import { getStudentContext, type SceneTheme } from "@/lib/demo-data";
+import type { SceneTheme } from "@/lib/demo-data";
+import { getBackendStudentScenario } from "@/lib/scenario-data";
 
 function StarMascot() {
   return (
@@ -81,12 +82,29 @@ export default async function StudentHomePage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const params = await searchParams;
-  const caseIdParam = Array.isArray(params.caseId) ? params.caseId[0] : params.caseId;
-  const { student, scene } = getStudentContext(caseIdParam);
+  const studentIdParam = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
+  const result = await getBackendStudentScenario(studentIdParam);
+
+  if (result.kind === "empty") {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#e7edf4] px-6 text-[#1f211d]">
+        <section className="max-w-xl rounded-[28px] border border-[#d8dee8] bg-white p-8 shadow-[0_24px_70px_rgba(57,78,97,0.14)]">
+          <p className="text-sm font-black text-[#1f3a5f]">{result.student.displayName} · {result.student.grade}</p>
+          <h1 className="mt-3 text-3xl font-black">학습 길을 만들 자료가 아직 없어요</h1>
+          <p className="mt-4 text-base font-bold leading-7 text-[#596157]">{result.message}</p>
+          <Link href="/dashboard" className="mt-6 inline-flex rounded-[18px] bg-[#1f3a5f] px-5 py-3 text-sm font-black text-white">
+            교사용 자료 만들기로 이동
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
+  const { student, scene } = result.context;
   const completeParam = Array.isArray(params.complete) ? params.complete[0] : params.complete;
   const isComplete = completeParam === "1";
   const theme = scene.theme;
-  const caseQuery = `caseId=${encodeURIComponent(scene.caseId)}`;
+  const studentQuery = `studentId=${encodeURIComponent(result.studentId)}`;
 
   return (
     <main className="relative flex h-screen overflow-hidden bg-[#e7edf4] p-4 text-[#1f211d]">
@@ -104,7 +122,7 @@ export default async function StudentHomePage({
             <header className="flex h-[92px] items-center justify-between gap-5 border-b border-[#efe7d7] bg-[#fbfaf4]/95 px-10">
               <div className="flex min-w-0 items-center gap-4">
                 <Link
-                  href={`/student?${caseQuery}`}
+                    href={`/student?${studentQuery}`}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-xl font-black shadow-sm transition duration-200 hover:-translate-y-0.5 hover:scale-105 hover:shadow-[0_12px_26px_rgba(57,78,97,0.16)]"
                   style={{ borderColor: theme.border, backgroundColor: theme.accentPale, color: theme.accent }}
                   aria-label="학생 시작 화면으로 돌아가기"
@@ -215,8 +233,8 @@ export default async function StudentHomePage({
                       key={mission.step}
                       href={
                         mission.state === "locked" && !isComplete
-                          ? `/student/path?${caseQuery}`
-                          : `/student/stage?${caseQuery}&step=${mission.step}`
+                          ? `/student/path?${studentQuery}`
+                          : `/student/stage?${studentQuery}&step=${mission.step}`
                       }
                       className="group absolute z-10 flex -translate-y-1/2 items-center gap-3 transition duration-300 hover:z-30"
                       style={{ left: point.x, top: point.y }}

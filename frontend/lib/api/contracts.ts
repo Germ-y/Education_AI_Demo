@@ -274,10 +274,11 @@ export type ContentAsset = {
   missionContentId: string;
   stageId?: string | null;
   assetRole: AssetRole;
-  assetType: "image";
+  assetType: "image" | "audio";
   provider: string;
   model: string;
   promptJson?: Record<string, unknown> | null;
+  sourceText?: string | null;
   storageUrl: string;
   previewUrl?: string | null;
   qaStatus: "pending" | "passed" | "failed";
@@ -308,6 +309,7 @@ export type StudentMissionSummary = {
   contentType: ContentType;
   totalSteps: 4;
   heroImageUrl?: string | null;
+  heroAudioUrl?: string | null;
   status: "published";
 };
 
@@ -349,6 +351,7 @@ export type RealtimeSessionResponse = {
   practiceSpec: {
     practiceTitle: string;
     imageAssetUrl?: string | null;
+    openingAudioUrl?: string | null;
     openingLine: string;
     maxTurns: number;
     maxDurationSec: number;

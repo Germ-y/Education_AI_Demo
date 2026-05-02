@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getStudentCaseSummaries } from "@/lib/demo-data";
+import { getBackendStudentCaseSummaries, type StudentScenarioCard } from "@/lib/scenario-data";
 
 const teacherRole = {
   href: "/dashboard",
@@ -9,8 +9,15 @@ const teacherRole = {
   accent: "bg-[#1f3a5f]",
 };
 
-export default function Home() {
-  const studentCases = getStudentCaseSummaries();
+export default async function Home() {
+  let studentCases: StudentScenarioCard[] = [];
+  let apiError: string | null = null;
+
+  try {
+    studentCases = await getBackendStudentCaseSummaries();
+  } catch (error) {
+    apiError = error instanceof Error ? error.message : "백엔드 학생 데이터를 불러오지 못했습니다.";
+  }
 
   return (
     <main className="min-h-screen bg-[#f6f3ea] text-[#1f211d]">
@@ -54,18 +61,24 @@ export default function Home() {
                 학생을 선택해 개별 학습 화면으로 이동합니다.
               </p>
 
+              {apiError && (
+                <div className="mt-5 rounded-[18px] border border-[#fecaca] bg-[#fef2f2] px-4 py-4 text-sm font-bold leading-6 text-[#991b1b]">
+                  백엔드 데이터 연결 실패: {apiError}
+                </div>
+              )}
+
               <div className="mt-5 grid gap-3">
                 {studentCases.map((studentCase) => (
                   <Link
-                    key={studentCase.caseId}
-                    href={`/student?caseId=${encodeURIComponent(studentCase.caseId)}`}
+                    key={studentCase.studentId}
+                    href={`/student?studentId=${encodeURIComponent(studentCase.studentId)}`}
                     className="group rounded-[18px] border border-[#dfe7d8] bg-[#f7fbf2] px-4 py-4 transition hover:-translate-y-0.5 hover:border-[#9ec391] hover:bg-white"
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div className="min-w-0">
                         <p className="truncate text-lg font-black">{studentCase.studentName}</p>
                         <p className="mt-1 text-sm font-bold text-[#66705f]">
-                          {studentCase.grade} · {studentCase.label}
+                          {studentCase.grade} · {studentCase.schoolName} · {studentCase.label}
                         </p>
                       </div>
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-xl transition group-hover:bg-[#27ae60] group-hover:text-white">

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { getStudentContext } from "@/lib/demo-data";
+import { getBackendStudentScenario } from "@/lib/scenario-data";
 
 function StarterStar() {
   return (
@@ -45,11 +45,28 @@ export default async function StudentStartPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const params = await searchParams;
-  const caseIdParam = Array.isArray(params.caseId) ? params.caseId[0] : params.caseId;
-  const { student, scene } = getStudentContext(caseIdParam);
+  const studentIdParam = Array.isArray(params.studentId) ? params.studentId[0] : params.studentId;
+  const result = await getBackendStudentScenario(studentIdParam);
+
+  if (result.kind === "empty") {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#e7edf4] px-6 text-[#1f211d]">
+        <section className="max-w-xl rounded-[28px] border border-[#d8dee8] bg-white p-8 shadow-[0_24px_70px_rgba(57,78,97,0.14)]">
+          <p className="text-sm font-black text-[#1f3a5f]">{result.student.displayName} · {result.student.grade}</p>
+          <h1 className="mt-3 text-3xl font-black">오늘 배포된 미션이 없어요</h1>
+          <p className="mt-4 text-base font-bold leading-7 text-[#596157]">{result.message}</p>
+          <Link href="/dashboard" className="mt-6 inline-flex rounded-[18px] bg-[#1f3a5f] px-5 py-3 text-sm font-black text-white">
+            교사용 자료 만들기로 이동
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
+  const { student, scene } = result.context;
   const theme = scene.theme;
   const nextStage = scene.stages[scene.currentStep - 1] ?? scene.stages[0];
-  const pathHref = `/student/path?caseId=${encodeURIComponent(scene.caseId)}`;
+  const pathHref = `/student/path?studentId=${encodeURIComponent(result.studentId)}`;
 
   return (
     <main className="relative flex h-screen overflow-hidden bg-[#e7edf4] p-4 text-[#1f211d]">

@@ -72,10 +72,15 @@ export type StageQuestion = {
     | "partition_picker"
     | "applied_question"
     | "mini_simulation"
+    | "explanation_choice"
+    | "wrong_explanation_fix"
     | "card_match"
     | "realtime_roleplay"
     | "realtime_teach_back";
   assetRole?: "hero" | "stage_1" | "stage_2" | "stage_3" | "stage_4_realtime";
+  imageUrl?: string | null;
+  audioUrl?: string | null;
+  audioSourceText?: string | null;
   kind: "concept" | "quiz" | "scenario" | "summary" | "ox" | "sequence" | "cardMatching" | "fillBlank" | "realtimeTeachBack";
   prompt: string;
   body?: string;
@@ -161,7 +166,10 @@ export type CoachingScene = {
   assets?: Array<{
     assetId: string;
     assetRole: "hero" | "stage_1" | "stage_2" | "stage_3" | "stage_4_realtime";
+    assetType?: "image" | "audio";
     alt: string;
+    url?: string | null;
+    sourceText?: string | null;
   }>;
   theme: SceneTheme;
   stages: Array<{

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import type { DragEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -162,6 +163,67 @@ function LearningVisual({ visual, compact = false }: { visual: SceneVisual; comp
   if (visual.kind === "emotion") return <EmotionVisual visual={visual} />;
   if (visual.kind === "planner") return <PlannerVisual visual={visual} />;
   return <FractionVisual visual={visual} compact={compact} />;
+}
+
+function StageMedia({
+  question,
+  theme,
+  compact = false,
+}: {
+  question: StageQuestion;
+  theme: SceneTheme;
+  compact?: boolean;
+}) {
+  if (!question.imageUrl && !question.audioSourceText) return null;
+
+  return (
+    <div
+      className={`overflow-hidden rounded-[20px] border bg-white shadow-sm ${compact ? "p-2" : "p-3"}`}
+      style={{ borderColor: theme.border }}
+    >
+      {question.imageUrl && (
+        <Image
+          src={question.imageUrl}
+          alt={question.prompt}
+          width={720}
+          height={360}
+          className={`w-full rounded-[16px] object-cover ${compact ? "h-28" : "h-48"}`}
+          unoptimized
+        />
+      )}
+      {question.audioSourceText && (
+        <div className={question.imageUrl ? "mt-2" : ""}>
+          <p className="mb-1 text-[11px] font-black" style={{ color: theme.accentStrong }}>
+            음성 안내 원문
+          </p>
+          <p className="rounded-[12px] bg-[#f8fafc] px-3 py-2 text-xs font-bold leading-5 text-[#475569]">
+            {question.audioSourceText}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StageVisualBoard({
+  visual,
+  question,
+  theme,
+  compact = false,
+}: {
+  visual: SceneVisual;
+  question: StageQuestion;
+  theme: SceneTheme;
+  compact?: boolean;
+}) {
+  return (
+    <div className={`grid h-full min-h-[300px] gap-3 ${question.imageUrl || question.audioSourceText ? "grid-rows-[auto_1fr]" : "grid-rows-1"}`}>
+      <StageMedia question={question} theme={theme} compact={compact} />
+      <div className="min-h-0 overflow-hidden">
+        <LearningVisual visual={visual} compact={compact} />
+      </div>
+    </div>
+  );
 }
 
 function StageInlineNotice({
@@ -500,7 +562,7 @@ function SequenceStageBoard({
   return (
     <div className="grid h-full min-h-[300px] grid-rows-[minmax(112px,0.32fr)_minmax(330px,1fr)] gap-3">
       <div className="min-h-0 overflow-hidden">
-        <LearningVisual visual={visual} compact />
+        <StageVisualBoard visual={visual} question={question} theme={theme} compact />
       </div>
       <div className="min-h-0 overflow-hidden">
         <SequenceTemplate question={question} selected={selected} theme={theme} onPick={onPick} onPlace={onPlace} onReset={onReset} />
@@ -854,6 +916,9 @@ function RealtimePracticeRoom({
           </p>
           <h3 className="mt-2 text-[2.6rem] font-black leading-tight break-keep text-[#172033]">{practice.title}</h3>
           <p className="mt-3 text-base font-bold leading-7 break-keep text-[#596157]">{practice.sceneLine}</p>
+          <div className="mt-4">
+            <StageMedia question={question} theme={theme} compact />
+          </div>
         </div>
 
         <div className="relative z-10 grid min-h-0 grid-cols-[minmax(0,1fr)_160px] items-center gap-4 pt-5">
@@ -1428,7 +1493,7 @@ export function StudentStageExperience({
                         onFinish={goToNextStage}
                       />
                     ) : (
-                      <LearningVisual visual={activeVisual} />
+                      <StageVisualBoard visual={activeVisual} question={activeQuestion} theme={theme} />
                     )
                   )}
                 </div>
