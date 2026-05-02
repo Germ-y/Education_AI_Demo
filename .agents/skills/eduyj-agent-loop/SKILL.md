@@ -1,38 +1,40 @@
 ---
 name: eduyj-agent-loop
-description: Use when working inside the EduYJ backend repo to continue the Ralph-like goal loop, choose the next milestone, validate links, and commit small Korean-convention changes.
+description: EduYJ 레포에서 Codex/Ralph식 장기 작업을 이어갈 때 사용한다. 다음 마일스톤 선택, 문서 링크 확인, 검증, 작은 한국어 커밋까지 반복하는 기본 작업 루프다.
 ---
 
-# EduYJ Agent Loop
+# EduYJ 에이전트 작업 루프
 
-Start every session by reading:
+새 세션은 항상 아래 순서로 읽는다.
 
 1. `AGENTS.md`
 2. `GOAL.md`
 3. `docs/00-agent-navigation.md`
 4. `docs/13-implementation-backlog.md`
 
-Rules:
+## 기본 규칙
 
-- Work on the `backend` branch/worktree.
-- Keep commits small and use Korean messages like `docs : 내용` or `feat : 내용`.
-- Preserve the 4-stage content decision: stage 4 is realtime.
-- Do not reintroduce video generation.
-- Update README and `docs/00-agent-navigation.md` when adding docs.
+- 통합 작업 기준 브랜치는 `backend`다.
+- 커밋은 작게 나눈다.
+- 커밋 메시지는 `docs : 내용`, `feat : 내용`, `fix : 내용`, `chore : 내용`처럼 한국어로 쓴다.
+- 학생 콘텐츠는 4단계다.
+- 4단계가 realtime이다.
+- 영상 생성 범위를 다시 넣지 않는다.
+- 새 문서를 만들면 `README.md`와 `docs/00-agent-navigation.md`에 링크를 추가한다.
 
-Loop:
+## 반복 순서
 
 ```text
-check git status
-pick first unfinished backlog milestone
-read linked specs
-make scoped change
-run validation
-commit
-update backlog if needed
+git status 확인
+백로그에서 가장 앞의 미완료 작업 선택
+관련 문서 읽기
+작게 수정
+검증 실행
+필요하면 백로그 갱신
+작게 커밋
 ```
 
-Minimum validation:
+## 최소 검증
 
 ```bash
 git status --short --branch

@@ -1,4 +1,4 @@
-# EduYJ Agent Guide
+# EduYJ 에이전트 가이드
 
 이 문서는 Codex/Ralph식 장기 작업을 이어받는 에이전트의 시작점이다. 새 세션은 항상 이 파일을 먼저 읽고, 다음 파일을 순서대로 연다.
 
@@ -7,7 +7,7 @@
 3. [docs/13-implementation-backlog.md](docs/13-implementation-backlog.md)
 4. 프론트/백엔드가 함께 바뀌는 작업이면 [docs/14-collaboration-contract.md](docs/14-collaboration-contract.md)
 
-## Repository Layout
+## 레포 구조
 
 - `frontend/`: Next.js 학생/교사 화면
 - `backend/`: FastAPI API 서버, 도메인 스키마, seed, AI workflow 계약
@@ -15,15 +15,17 @@
 - `.agents/`: 프로젝트 전용 Codex 스킬
 - `examples/`, `assets/`: 생성 콘텐츠 예시와 시각 자료
 
-## Frontend Rule
+## 프론트엔드 규칙
 
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `frontend/node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+
+이 프로젝트의 Next.js 버전은 일반적으로 알고 있는 구조와 다를 수 있다. 프론트 코드를 수정하기 전에는 `frontend/node_modules/next/dist/docs/`의 관련 문서를 먼저 확인한다.
 <!-- END:nextjs-agent-rules -->
 
-## Non-Negotiables
+## 반드시 지킬 것
 
 - 커밋은 작게 쪼갠다. 메시지는 `feat : 내용`, `docs : 내용`, `fix : 내용`, `chore : 내용` 형식의 한국어를 쓴다.
 - 백엔드 구현은 `backend/`, 프론트엔드 구현은 `frontend/`, 공통 기획 문서는 `docs/`에 둔다.
@@ -37,7 +39,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - 데모 MVP는 seed 학생/교사/센터 데이터로 먼저 완성한다. 회원가입/아이등록은 시간이 남을 때 확장한다.
 - 프론트/백엔드 계약 변경은 문서 → 백엔드 스키마/API → seed → 프론트 소비 코드 → 검증 순서로 진행한다.
 
-## Agent Loop
+## 에이전트 작업 루프
 
 1. `git status --short --branch`로 현재 브랜치와 변경사항을 확인한다.
 2. [GOAL.md](GOAL.md)의 마일스톤 중 완료되지 않은 가장 앞 작업을 고른다.
@@ -48,7 +50,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 7. 변경 범위별로 작은 커밋을 만든다.
 8. [docs/13-implementation-backlog.md](docs/13-implementation-backlog.md)를 필요하면 갱신한다.
 
-## Verification Gate
+## 검증 기준
 
 문서 작업이라도 아래는 확인한다.
 
@@ -62,7 +64,7 @@ git diff --check
 
 FastAPI 백엔드 검증은 루트에서 `cd backend` 후 실행한다.
 
-## Project Skills
+## 프로젝트 스킬
 
 - [.agents/skills/eduyj-agent-loop/SKILL.md](.agents/skills/eduyj-agent-loop/SKILL.md)
 - [.agents/skills/eduyj-monorepo-collaboration/SKILL.md](.agents/skills/eduyj-monorepo-collaboration/SKILL.md)

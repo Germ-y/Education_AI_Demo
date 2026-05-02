@@ -1,15 +1,15 @@
-# Agent Navigation
+# 에이전트 문서 지도
 
 이 문서는 레포를 처음 여는 에이전트가 길을 잃지 않도록 만든 문서 지도다.
 
-## Reading Order
+## 읽는 순서
 
 1. [../AGENTS.md](../AGENTS.md) - 작업 규칙
 2. [../GOAL.md](../GOAL.md) - 장기 목표와 마일스톤
 3. [13-implementation-backlog.md](13-implementation-backlog.md) - 지금 할 일
 4. 현재 작업과 관련된 상세 문서
 
-## Task Router
+## 작업별로 볼 문서
 
 | 작업 주제 | 먼저 볼 문서 | 같이 볼 문서 |
 | --- | --- | --- |
@@ -24,7 +24,7 @@
 | REST API 구현 | [12-rest-api-spec.md](12-rest-api-spec.md) | [11-database-schema-spec.md](11-database-schema-spec.md) |
 | 프론트/백엔드 협업 | [14-collaboration-contract.md](14-collaboration-contract.md) | [12-rest-api-spec.md](12-rest-api-spec.md), [13-implementation-backlog.md](13-implementation-backlog.md) |
 
-## Canonical Vocabulary
+## 공통 용어
 
 | 용어 | 의미 |
 | --- | --- |
@@ -37,7 +37,7 @@
 | `AgentRun` | AI 실행 입력/출력/상태 로그 |
 | `ReviewSummary` | 플레이 종료 후 다음 회기에 넘기는 요약 |
 
-## Flow Map
+## 전체 흐름
 
 ```mermaid
 flowchart TD
@@ -57,14 +57,14 @@ flowchart TD
   M --> D
 ```
 
-## Link Integrity Rules
+## 링크 관리 규칙
 
 - 문서 링크는 가능하면 상대 경로로 둔다.
 - README에는 핵심 문서 전체가 노출되어야 한다.
 - 새 문서를 만들면 README와 이 파일에 모두 링크를 추가한다.
 - 파일명 변경 시 `rg -n "old-file-name"`으로 역참조를 찾는다.
 
-## Quick Checks
+## 빠른 확인 명령
 
 ```bash
 git status --short --branch

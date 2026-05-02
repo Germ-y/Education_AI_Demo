@@ -1,39 +1,46 @@
 ---
 name: eduyj-content-package
-description: Use when designing or implementing EduYJ student mission contents, image packages, template stages, gpt-image-2 prompts, teacher approval, or stage-4 realtime practice.
+description: EduYJ 학생 미션 콘텐츠, 이미지 패키지, 1~3단계 템플릿, gpt-image-2 프롬프트, 교사 승인, 4단계 realtime 연습을 설계하거나 구현할 때 사용한다.
 ---
 
-# EduYJ Content Package
+# EduYJ 콘텐츠 패키지 스킬
 
-Canonical docs:
+먼저 볼 문서:
 
 - `docs/01-child-content-experience.md`
 - `docs/04-ai-content-template-spec.md`
 - `docs/07-realtime-practice-spec.md`
 - `docs/09-image-content-package-spec.md`
 
-Non-negotiables:
+## 반드시 지킬 것
 
-- Mission content has 4 student-facing stages.
-- Stages 1~3 are approved static template JSON.
-- Stage 4 is approved realtime practice using `RealtimePracticeSpec`.
-- Reflection happens after stage 4 and is not counted as stage 5.
-- Each mission has `hero`, `stage_1`, `stage_2`, `stage_3`, `stage_4_realtime` image assets.
-- Use `gpt-image-2` for generated images.
-- Image text should be minimal; UI text owns questions, choices, and feedback.
-- Teacher approval is required before student exposure.
+- 학생 미션은 화면 기준 4단계다.
+- 1~3단계는 교사가 승인한 정적 템플릿 JSON이다.
+- 4단계는 `RealtimePracticeSpec`을 사용하는 realtime 연습이다.
+- 회고는 4단계 이후에 붙는 후속 활동이며 5단계가 아니다.
+- 한 미션은 `hero`, `stage_1`, `stage_2`, `stage_3`, `stage_4_realtime` 이미지 asset을 가진다.
+- 이미지는 `gpt-image-2`로 생성한다.
+- 이미지 안 텍스트는 최소화한다. 질문, 선택지, 피드백은 UI 텍스트가 맡는다.
+- 학생에게 보이기 전 교사 승인이 필요하다.
 
-When generating prompts:
+## 이미지 프롬프트 구성
+
+프롬프트에는 아래 요소를 넣는다.
 
 ```text
-visual style
-scene
-educational focus
-composition constraints
-accessibility constraints
-OCR/text constraints
-quality bar
-avoid list
+시각 스타일
+상황 장면
+교육 목표
+구도 제약
+접근성 제약
+OCR/텍스트 제약
+품질 기준
+피해야 할 것
 ```
 
-Reject designs that add video pipelines, free HTML/JS generation, or student-visible AI diagnosis labels.
+## 거절할 설계
+
+- 영상 생성 파이프라인 추가
+- 자유 HTML/JS를 학생 콘텐츠로 직접 생성
+- 학생에게 진단명이나 낙인성 라벨 노출
+- 이미지 생성 실패를 seed asset으로 조용히 대체

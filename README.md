@@ -1,8 +1,8 @@
-# EduYJ AI Education Demo
+# EduYJ AI 교육 데모
 
 영주 공공데이터 공모전용 AI 맞춤형 교육 지원 서비스의 통합 작업 폴더입니다.
 
-## Structure
+## 폴더 구조
 
 ```text
 frontend/   Next.js 학생/교사 화면
@@ -13,7 +13,7 @@ examples/   생성 콘텐츠 샘플
 assets/     OCR/공공데이터 시각 자료
 ```
 
-## Start Here
+## 처음 볼 문서
 
 1. [AGENTS.md](AGENTS.md) - 레포 작업 규칙과 프론트/백엔드 주의사항
 2. [GOAL.md](GOAL.md) - `/goal` 장기 실행 기준
@@ -21,7 +21,7 @@ assets/     OCR/공공데이터 시각 자료
 4. [구현 백로그](docs/13-implementation-backlog.md) - 다음 구현 순서
 5. [협업 계약](docs/14-collaboration-contract.md) - 프론트/백엔드 동시 작업 기준
 
-## Core Decisions
+## 핵심 결정사항
 
 - 학생 콘텐츠는 `생활지원형`과 `학습집중형` 두 유형으로 나눈다.
 - 학생 화면은 4단계 미션이다. 1~3단계는 승인된 템플릿 JSON, 4단계는 승인된 `RealtimePracticeSpec` 기반 실시간 연습이다.
@@ -30,7 +30,7 @@ assets/     OCR/공공데이터 시각 자료
 - 공공데이터는 학생 개인 진단이 아니라 교육과정, 학사일정, 통계, 지역 맥락 연결 근거로 사용한다.
 - 프론트/백엔드 계약 변경은 문서, 백엔드 스키마/API, seed, 프론트 소비 코드 순서로 맞춘다.
 
-## Frontend
+## 프론트엔드 실행
 
 ```bash
 cd frontend
@@ -40,7 +40,7 @@ npm run dev
 
 기본 화면은 `http://localhost:3000`에서 실행됩니다.
 
-## Backend
+## 백엔드 실행
 
 ```bash
 cd backend
@@ -72,7 +72,7 @@ curl -s -X POST http://localhost:4000/api/auth/student-access \
   -d '{"accessCode":"STAR-001"}'
 ```
 
-## Collaboration
+## 협업 기준
 
 - 협업 기준: [docs/14-collaboration-contract.md](docs/14-collaboration-contract.md)
 - 에이전트 스킬: [.agents/skills/eduyj-monorepo-collaboration/SKILL.md](.agents/skills/eduyj-monorepo-collaboration/SKILL.md)

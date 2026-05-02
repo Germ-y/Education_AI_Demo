@@ -1,59 +1,61 @@
 ---
 name: eduyj-monorepo-collaboration
-description: Use when working across the EduYJ frontend/backend monorepo, coordinating API contracts, shared docs, branch ownership, handoffs, or multi-agent collaboration between Next.js, FastAPI, AI content, and public-data work.
+description: EduYJ 레포에서 프론트엔드와 백엔드가 함께 바뀌는 작업을 할 때 사용한다. API 계약, 문서, 브랜치 기준, 파일 소유권, 작업 인수인계, Next.js/FastAPI/AI 콘텐츠/공공데이터 협업 순서를 맞춘다.
 ---
 
-# EduYJ Monorepo Collaboration
+# EduYJ 모노레포 협업 스킬
 
-Read first:
+먼저 읽을 문서:
 
 1. `AGENTS.md`
 2. `docs/14-collaboration-contract.md`
 3. `docs/00-agent-navigation.md`
-4. The task-specific spec selected from the navigation table
+4. 지금 작업과 관련된 상세 문서
 
-## Decide Ownership
+## 1. 작업 영역 먼저 정하기
 
-Before editing, classify the task:
+작업 시작 전에 어느 영역을 고칠지 정한다.
 
-- Frontend: `frontend/`
-- Backend: `backend/`
-- Contract: `docs/12-rest-api-spec.md`, `backend/app/domain/schemas.py`, `frontend/lib/demo-data.ts`
-- AI Content: `docs/04-*`, `docs/07-*`, `docs/09-*`, `backend/scripts/`
-- Harness: `AGENTS.md`, `GOAL.md`, `.agents/skills/`, `docs/00-*`, `docs/13-*`
+- 프론트 작업: `frontend/`
+- 백엔드 작업: `backend/`
+- API 계약 작업: `docs/12-rest-api-spec.md`, `backend/app/domain/schemas.py`, `frontend/lib/demo-data.ts`
+- AI 콘텐츠 작업: `docs/04-*`, `docs/07-*`, `docs/09-*`, `backend/scripts/`
+- 작업 규칙/문서 작업: `AGENTS.md`, `GOAL.md`, `.agents/skills/`, `docs/00-*`, `docs/13-*`
 
-If a task crosses areas, update the contract docs before code.
+프론트와 백엔드가 같이 바뀌면 코드보다 문서를 먼저 고친다.
 
-## Contract Change Order
+## 2. 계약 변경 순서
+
+API 응답, 콘텐츠 JSON, seed 데이터, 프론트 mock 데이터가 같이 바뀌면 아래 순서로 작업한다.
 
 ```text
-docs spec
-backend schema/API
-backend seed
-frontend consumer/mock
-tests/lint
-backlog update
-commit
+문서 스펙 수정
+백엔드 스키마/API 수정
+백엔드 seed 수정
+프론트 소비 코드 수정
+테스트/lint 실행
+백로그 상태 갱신
+커밋
 ```
 
-## Guardrails
+## 3. 지켜야 할 것
 
-- Do not expose provider keys in `frontend/`.
-- Keep mission stages at 4; reflection is not stage 5.
-- Stage 4 is realtime; stages 1~3 stay approved static templates.
-- Do not add video pipelines.
-- Do not replace failed image generation with seed assets; `gpt-image-2` generation failure should fail visibly.
-- Do not commit `.env`, `.venv`, `node_modules`, or caches.
+- provider key는 `frontend/`에 노출하지 않는다.
+- 학생 미션은 4단계다. 회고는 5단계가 아니다.
+- 4단계가 realtime이다. 1~3단계는 승인된 정적 템플릿이다.
+- 영상 파이프라인을 추가하지 않는다.
+- 이미지 생성 실패를 seed asset으로 대체하지 않는다.
+- `.env`, `.venv`, `node_modules`, cache는 커밋하지 않는다.
 
-## Validation
+## 4. 검증
 
-For docs/harness:
+문서/스킬만 바꾼 경우:
 
 ```bash
 git diff --check
 ```
 
-For backend:
+백엔드를 바꾼 경우:
 
 ```bash
 cd backend
@@ -62,21 +64,19 @@ cd backend
 .venv/bin/python -m app.data.seed_demo
 ```
 
-For frontend:
+프론트를 바꾼 경우:
 
 ```bash
 cd frontend
 npm run lint
 ```
 
-## Handoff
-
-End with:
+## 5. 작업 끝날 때 남길 내용
 
 ```text
 목표:
-수정 경로:
-계약 변경:
+수정한 경로:
+API/데이터 계약 변경 여부:
 검증:
 남은 위험:
 다음 작업:

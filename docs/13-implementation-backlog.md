@@ -1,24 +1,24 @@
-# Implementation Backlog
+# 구현 백로그
 
 확인 기준일: 2026-05-02
 
 이 파일은 `/goal` 또는 장기 에이전트 작업에서 다음 행동을 고르는 실행 목록이다.
 
-## Current Status
+## 현재 상태
 
 - [x] 콘텐츠 방향: 4단계, 4단계 realtime, 영상 제외
 - [x] 교사 승인 구조: AI 생성 후 검수/승인/배포
 - [x] 공공데이터 방향: 교육과정/학사일정/통계/지역 맥락
-- [x] 문서 하네스: AGENTS/GOAL/navigation/spec docs
+- [x] 문서 하네스: AGENTS/GOAL/문서 지도/상세 명세
 - [x] 실제 백엔드 프로젝트 구조 확인
-- [x] DB schema 구현
+- [x] DB 스키마 구현
 - [x] seed 데이터 구현
 - [x] 기본 API 구현
-- [x] 프론트/백엔드 협업 계약 문서와 monorepo skill 추가
+- [x] 프론트/백엔드 협업 계약 문서와 모노레포 스킬 추가
 - [ ] AI provider 연동
-- [ ] 학생 플레이 runtime 구현
+- [ ] 학생 플레이 런타임 구현
 
-## Collaboration Gate
+## 협업 기준
 
 프론트와 백엔드가 함께 바뀌는 작업은 먼저 [14-collaboration-contract.md](14-collaboration-contract.md)를 따른다.
 
@@ -28,7 +28,7 @@
 문서 스펙 -> 백엔드 스키마/API -> seed -> 프론트 소비 코드 -> 검증 -> backlog 갱신
 ```
 
-## Milestone 1. Repo And App Structure
+## 마일스톤 1. 레포와 앱 구조
 
 목표:
 
@@ -60,7 +60,7 @@ python3 -m venv .venv
 완료. FastAPI + Pydantic + SQLAlchemy 모델 기반 첫 서버 구조를 추가했다.
 ```
 
-## Milestone 2. Domain Types And Schemas
+## 마일스톤 2. 도메인 타입과 스키마
 
 목표:
 
@@ -73,22 +73,22 @@ MissionContent, ContentStage, RealtimePracticeSpec, MemoryCard를 코드 타입�
 - `StudentType`, `StageRole`, `TemplateType`, `MissionStatus` enum 정의
 - 4단계 스키마 검증 추가
 - `totalSteps=4` 제약 추가
-- image asset role enum 추가
+- 이미지 asset 역할 enum 추가
 
 완료 기준:
 
 ```text
-1~3단계 템플릿과 4단계 realtime spec이 schema validation을 통과한다.
-step=5 또는 video asset role은 validation에서 실패한다.
+1~3단계 템플릿과 4단계 realtime 스펙이 스키마 검증을 통과한다.
+step=5 또는 video asset 역할은 검증에서 실패한다.
 ```
 
 상태:
 
 ```text
-완료. backend/tests/test_domain_schemas.py에서 4단계/asset role/realtime stage 제약을 검증한다.
+완료. backend/tests/test_domain_schemas.py에서 4단계/asset 역할/realtime 단계 제약을 검증한다.
 ```
 
-## Milestone 3. Database Migration
+## 마일스톤 3. 데이터베이스 마이그레이션
 
 참조:
 
@@ -96,30 +96,30 @@ step=5 또는 video asset role은 validation에서 실패한다.
 
 작업:
 
-- organization/user/student/support case
-- memory card/case note
-- mission content/content stage/content asset
-- content attempt/activity event
-- realtime session/event
-- review summary/planner
-- public data source/import/raw/normalized
-- agent run/audit/consent
+- 조직/사용자/학생/지원 사례
+- 메모리 카드/사례 메모
+- 미션 콘텐츠/콘텐츠 단계/콘텐츠 asset
+- 콘텐츠 시도/활동 이벤트
+- realtime 세션/이벤트
+- 리뷰 요약/플래너
+- 공공데이터 출처/수집/원본/정규화 데이터
+- 에이전트 실행/감사 로그/동의
 
 완료 기준:
 
 ```text
-migration 적용
-DB reset 후 schema 생성
-기본 relation query 통과
+마이그레이션 적용
+DB reset 후 스키마 생성
+기본 관계 조회 통과
 ```
 
 상태:
 
 ```text
-부분 완료. SQLAlchemy model 계약과 Pydantic 검증은 완료했다. 실제 PostgreSQL migration 적용은 다음 DB 연결 슬라이스에서 진행한다.
+부분 완료. SQLAlchemy 모델 계약과 Pydantic 검증은 완료했다. 실제 PostgreSQL 마이그레이션 적용은 다음 DB 연결 슬라이스에서 진행한다.
 ```
 
-## Milestone 4. Demo Seed
+## 마일스톤 4. 데모 seed
 
 참조:
 
@@ -138,17 +138,17 @@ DB reset 후 schema 생성
 
 ```text
 seed 여러 번 실행해도 중복 생성 없음
-teacher demo login 가능
-student access code login 가능
+교사 데모 로그인 가능
+학생 access code 로그인 가능
 ```
 
 상태:
 
 ```text
-부분 완료. in-memory demo seed와 seed smoke 명령을 추가했다. DB upsert seed는 PostgreSQL 연결 뒤 진행한다.
+부분 완료. in-memory 데모 seed와 seed smoke 명령을 추가했다. DB upsert seed는 PostgreSQL 연결 뒤 진행한다.
 ```
 
-## Milestone 5. Teacher Dashboard API
+## 마일스톤 5. 교사 대시보드 API
 
 참조:
 
@@ -158,8 +158,8 @@ student access code login 가능
 
 - `GET /api/teacher/students`
 - `GET /api/teacher/students/:studentId`
-- memory card patch
-- case notes CRUD
+- 메모리 카드 수정
+- 사례 메모 CRUD
 - planner 조회/수정
 
 완료 기준:
@@ -176,7 +176,7 @@ student access code login 가능
 부분 완료. demo token 기반 학생 목록/상세/memory patch API를 추가했다. 감사 로그 영속화는 DB 연결 뒤 진행한다.
 ```
 
-## Milestone 6. AI Content Generation
+## 마일스톤 6. AI 콘텐츠 생성
 
 참조:
 
@@ -186,8 +186,8 @@ student access code login 가능
 
 작업:
 
-- OrchestratorContext 생성
-- ContentBrief 생성
+- 오케스트레이터 컨텍스트 생성
+- 콘텐츠 브리프 생성
 - 4단계 ContentStage JSON 생성
 - RealtimePracticeSpec 생성
 - ImageBrief 5개 생성
@@ -201,14 +201,14 @@ student access code login 가능
 이미지 생성 실패 시 asset status와 job error가 남는다.
 ```
 
-## Milestone 7. gpt-image-2 Asset Pipeline
+## 마일스톤 7. gpt-image-2 이미지 asset 파이프라인
 
 작업:
 
-- OpenAI image generation adapter
-- prompt safety check
-- OCR required flag
-- generated file storage
+- OpenAI 이미지 생성 adapter
+- 프롬프트 안전성 검사
+- OCR 필요 여부 flag
+- 생성 파일 저장
 - QA result 저장
 - teacher preview URL 연결
 
@@ -220,13 +220,13 @@ OPENAI_API_KEY가 없거나 생성 실패 시 job failed 상태와 error reason 
 QA 실패 시 재생성 요청 가능
 ```
 
-## Milestone 8. Approval And Publish
+## 마일스톤 8. 승인과 배포
 
 작업:
 
-- teacher review detail API
-- approve/reject/regenerate API
-- publish API
+- 교사 검토 상세 API
+- 승인/반려/재생성 API
+- 배포 API
 - approved content immutability 정책
 
 완료 기준:
@@ -237,16 +237,16 @@ published 콘텐츠만 학생 API에서 조회된다.
 승인/반려/배포가 audit log에 남는다.
 ```
 
-## Milestone 9. Student Runtime
+## 마일스톤 9. 학생 플레이 런타임
 
 작업:
 
 - 오늘의 미션 조회
 - 콘텐츠 시작/진행
 - 1~3단계 submit
-- hint/event 저장
-- post-practice reflection 저장
-- complete 처리
+- 힌트/이벤트 저장
+- 연습 후 회고 저장
+- 완료 처리
 
 완료 기준:
 
@@ -255,7 +255,7 @@ published 콘텐츠만 학생 API에서 조회된다.
 정답 판정은 서버에서 승인된 JSON 기준으로 수행한다.
 ```
 
-## Milestone 10. Realtime Stage 4
+## 마일스톤 10. 4단계 realtime
 
 참조:
 
@@ -264,11 +264,11 @@ published 콘텐츠만 학생 API에서 조회된다.
 작업:
 
 - realtime session 생성 API
-- 승인된 spec validation
+- 승인된 스펙 검증
 - OpenAI Realtime client secret 발급
 - WebRTC 연결용 응답
-- realtime events 저장
-- complete 후 루브릭 결과 저장
+- realtime 이벤트 저장
+- 완료 후 루브릭 결과 저장
 
 완료 기준:
 
@@ -278,13 +278,13 @@ stage.step != 4이면 session 생성 실패.
 세션 종료 후 review input으로 사용할 summary가 저장된다.
 ```
 
-## Milestone 11. Review And Memory Update
+## 마일스톤 11. 리뷰와 메모리 업데이트
 
 작업:
 
-- ReviewAgent summary
-- Memory update candidate
-- Planner update candidate
+- ReviewAgent 요약
+- 메모리 업데이트 후보
+- 플래너 업데이트 후보
 - 교사 반영 API
 
 완료 기준:
@@ -294,7 +294,7 @@ stage.step != 4이면 session 생성 실패.
 교사가 승인하면 memory_cards 새 버전 또는 업데이트 후보가 저장된다.
 ```
 
-## Milestone 12. Public Data Sync
+## 마일스톤 12. 공공데이터 동기화
 
 참조:
 
@@ -302,11 +302,11 @@ stage.step != 4이면 session 생성 실패.
 
 작업:
 
-- source registry
+- 출처 registry
 - seed snapshot loader
 - NEIS adapter skeleton
-- school/curriculum/stats query API
-- sync job status API
+- 학교/교육과정/통계 조회 API
+- sync job 상태 API
 
 완료 기준:
 
@@ -315,14 +315,14 @@ API key 없이도 snapshot으로 데모 가능.
 API key가 있으면 수동 sync job 실행 가능.
 ```
 
-## Milestone 13. Optional Signup And Child Registration
+## 마일스톤 13. 선택 기능: 회원가입과 아이 등록
 
 작업:
 
-- teacher invite/signup
-- child registration
-- guardian consent input
-- student access code issue
+- 교사 초대/회원가입
+- 아이 등록
+- 보호자 동의 입력
+- 학생 access code 발급
 
 완료 기준:
 
@@ -331,7 +331,7 @@ seed 없이도 신규 학생 케이스를 생성할 수 있다.
 단, 공모전 핵심 데모 완료 이후 진행한다.
 ```
 
-## Validation Commands
+## 검증 명령
 
 구현 후 실제 명령은 프로젝트 스택에 맞춰 조정한다.
 
@@ -344,7 +344,7 @@ cd backend
 .venv/bin/python -m app.data.seed_demo
 ```
 
-## Commit Plan
+## 커밋 계획
 
 커밋은 아래 단위보다 크게 묶지 않는다.
 
