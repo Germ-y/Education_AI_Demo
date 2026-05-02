@@ -1,28 +1,55 @@
 import Link from "next/link";
-import { getPrimaryStudentContext } from "@/lib/demo-data";
+import Image from "next/image";
+import { getStudentContext } from "@/lib/demo-data";
 
 function StarterStar() {
   return (
-    <div className="relative h-[230px] w-[230px]" aria-hidden="true">
-      <div
-        className="absolute left-8 top-4 h-40 w-40 bg-[#ffd84d] shadow-[inset_0_-12px_0_rgba(184,122,0,0.16),0_22px_42px_rgba(184,122,0,0.18)]"
-        style={{
-          clipPath:
-            "polygon(50% 0%, 61% 34%, 97% 35%, 68% 55%, 79% 91%, 50% 69%, 21% 91%, 32% 55%, 3% 35%, 39% 34%)",
-        }}
-      />
-      <span className="absolute left-[82px] top-[78px] h-4 w-4 rounded-full bg-[#25312a]" />
-      <span className="absolute left-[128px] top-[78px] h-4 w-4 rounded-full bg-[#25312a]" />
-      <span className="absolute left-[99px] top-[105px] h-6 w-12 rounded-b-full bg-[#25312a]" />
-      <div className="absolute bottom-7 left-9 h-5 w-36 rounded-full bg-black/10 blur-sm" />
+    <div className="relative h-[250px] w-[278px]" aria-hidden="true">
+      <div className="absolute bottom-5 left-1/2 h-7 w-40 -translate-x-1/2 rounded-full bg-black/10 blur-md" />
+      <div className="absolute inset-0 animate-[starMascotFloat_4.8s_ease-in-out_infinite]">
+        <Image
+          src="/assets/star-mascot/without-arm-eyes.svg"
+          alt=""
+          fill
+          sizes="278px"
+          className="object-contain"
+          draggable={false}
+          priority
+        />
+        <div className="absolute inset-0 animate-[starMascotWave_2.6s_ease-in-out_infinite]">
+          <Image
+            src="/assets/star-mascot/arm.svg"
+            alt=""
+            fill
+            sizes="278px"
+            className="object-contain"
+            draggable={false}
+          />
+        </div>
+        <Image
+          src="/assets/star-mascot/eyes.svg"
+          alt=""
+          fill
+          sizes="278px"
+          className="animate-[starMascotBlink_4.2s_ease-in-out_infinite] object-contain"
+          draggable={false}
+        />
+      </div>
     </div>
   );
 }
 
-export default function StudentStartPage() {
-  const { student, scene } = getPrimaryStudentContext();
+export default async function StudentStartPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const params = await searchParams;
+  const caseIdParam = Array.isArray(params.caseId) ? params.caseId[0] : params.caseId;
+  const { student, scene } = getStudentContext(caseIdParam);
   const theme = scene.theme;
   const nextStage = scene.stages[scene.currentStep - 1] ?? scene.stages[0];
+  const pathHref = `/student/path?caseId=${encodeURIComponent(scene.caseId)}`;
 
   return (
     <main className="relative flex h-screen overflow-hidden bg-[#e7edf4] p-4 text-[#1f211d]">
@@ -65,7 +92,7 @@ export default function StudentStartPage() {
 
                 <div className="mt-9 flex items-center gap-4">
                   <Link
-                    href="/student/path"
+                    href={pathHref}
                     className="rounded-[22px] px-8 py-5 text-xl font-black text-white shadow-[0_18px_40px_rgba(39,174,96,0.30)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105"
                     style={{ backgroundColor: theme.accent }}
                   >

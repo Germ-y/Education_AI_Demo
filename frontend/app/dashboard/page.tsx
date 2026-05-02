@@ -65,6 +65,9 @@ const workflowSteps = ["자료 생성", "자료 검토", "학습", "학습 피�
 const reviewStagePreviews = [
   {
     step: 1,
+    stageRole: "concept_intro",
+    templateType: "concept_intro",
+    assetRole: "stage_1",
     title: "전체 구역 세기",
     description: "피자 지도가 몇 개의 같은 크기 구역으로 나뉘었는지 먼저 확인합니다.",
     question: "피자 지도는 전체 몇 구역으로 나뉘어 있나요?",
@@ -73,6 +76,9 @@ const reviewStagePreviews = [
   },
   {
     step: 2,
+    stageRole: "basic_problem",
+    templateType: "sequence_ordering",
+    assetRole: "stage_2",
     title: "빛나는 구역 찾기",
     description: "전체 중에서 빛나는 한 조각만 찾아 세어봅니다.",
     question: "빛나는 구역은 몇 개인가요?",
@@ -81,6 +87,9 @@ const reviewStagePreviews = [
   },
   {
     step: 3,
+    stageRole: "applied_problem",
+    templateType: "card_match",
+    assetRole: "stage_3",
     title: "분수로 문 열기",
     description: "전체 4구역 중 1구역을 분수로 표현합니다.",
     question: "4구역 중 1구역은 몇 분의 몇일까요?",
@@ -89,11 +98,14 @@ const reviewStagePreviews = [
   },
   {
     step: 4,
-    title: "생활 속 분수",
-    description: "오늘 배운 표현을 일상 예시와 연결합니다.",
-    question: "같은 크기 4조각 중 1조각을 먹었다면 어떻게 표현할까요?",
-    choices: ["1/4", "3/4", "4/4"],
-    imagePrompt: "생활 속 피자 한 조각 예시를 따뜻하고 단순한 그림으로 표현",
+    stageRole: "realtime_practice",
+    templateType: "realtime_teach_back",
+    assetRole: "stage_4_realtime",
+    title: "AI에게 말해보기",
+    description: "오늘 배운 1/4 표현을 상황 이미지와 함께 AI에게 직접 설명합니다.",
+    question: "전체 4조각 중 1조각이 왜 1/4인지 말로 설명해볼까요?",
+    choices: ["전체 조각 수 말하기", "고른 조각 수 말하기", "1/4 표현과 연결하기"],
+    imagePrompt: "4조각 피자 중 1조각을 가리키며 학생이 AI에게 설명하는 realtime 연습 상황",
   },
 ];
 
