@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  createAgentRun,
+  createContentGeneration,
   getTeacherStudent,
   getTeacherStudentReport,
   getTeacherStudents,
+  type AgentRun,
   type MissionContent,
   type StudentCaseFile,
   type StudentListItem,
@@ -38,6 +41,11 @@ type MaterialReviewItem = {
   state: string;
   contentId: string;
   content: MissionContent;
+};
+
+type GenerationStatus = {
+  state: "running" | "succeeded" | "failed";
+  message: string;
 };
 
 type ReviewStageDraft = {
@@ -241,6 +249,31 @@ function getReviewStageReason(stage: ReviewStageDraft) {
   return "앞 단계에서 고른 단서를 문장이나 기호와 연결해 수업 목표로 정리하면 좋겠어요.";
 }
 
+function getAiGenerationFailureMessage(agentRun?: AgentRun | null) {
+  if (agentRun?.errorCode === "OPENAI_API_KEY_MISSING") {
+    return "서버에 AI 생성 설정이 없어 실제 자료 생성은 아직 실행되지 않았습니다. 설정을 연결하면 같은 버튼으로 생성됩니다.";
+  }
+
+  if (agentRun?.errorMessage) {
+    return agentRun.errorMessage;
+  }
+
+  return "자료 제안을 만들지 못했습니다. 잠시 뒤 다시 시도해 주세요.";
+}
+
+function getClientGenerationErrorMessage(error: unknown) {
+  const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+  if (code === "OPENAI_API_KEY_MISSING") {
+    return "서버에 AI 생성 설정이 없어 실제 자료 생성은 아직 실행되지 않았습니다. 설정을 연결하면 같은 버튼으로 생성됩니다.";
+  }
+
+  if (error instanceof Error && error.message && !error.message.includes("OPENAI_API_KEY")) {
+    return error.message;
+  }
+
+  return "자료 제안 요청 중 문제가 생겼습니다. 잠시 뒤 다시 시도해 주세요.";
+}
+
 function mapContentToReviewItem(content: MissionContent, lessonProposalTitle?: string): MaterialReviewItem {
   const title = lessonProposalTitle?.trim()
     ? `${lessonProposalTitle.trim()} 자료 제안`
@@ -370,6 +403,8 @@ export default function DashboardPage() {
   const [reviewStageDrafts, setReviewStageDrafts] = useState<Record<string, ReviewStageDraft[]>>({});
   const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({});
   const [savedMemos, setSavedMemos] = useState<Record<string, string>>({});
+  const [lessonDrafts, setLessonDrafts] = useState<Record<string, string>>({});
+  const [generationStatuses, setGenerationStatuses] = useState<Record<string, GenerationStatus>>({});
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({});
   const [savedFeedbackRecords, setSavedFeedbackRecords] = useState<
     Array<{ id: string; recordId: string; feedback: string; savedAt: string }>
@@ -531,6 +566,9 @@ export default function DashboardPage() {
   const memoValue = memoDrafts[selectedCase.id] ?? savedMemo;
   const isMemoDirty = memoValue !== savedMemo;
   const canSaveMemo = isMemoDirty && memoValue.trim().length > 0;
+  const lessonDraftValue = lessonDrafts[selectedCase.id] ?? selectedCase.sessionGoal;
+  const generationStatus = generationStatuses[selectedCase.id];
+  const isGeneratingContent = generationStatus?.state === "running";
   const baseMaterialContextItems =
     autoContextItems.length > 0
       ? autoContextItems
@@ -557,6 +595,102 @@ export default function DashboardPage() {
         [reviewId]: stages.map((stage) => (stage.step === step ? updater(stage) : stage)),
       };
     });
+  };
+
+  const handleGenerateContent = async () => {
+    if (!selectedCase.id || !selectedCase.studentId || isGeneratingContent) return;
+
+    const requestedGoal = lessonDraftValue.trim() || selectedCase.primaryNeed;
+    const contentType = activeCaseFile?.profile.studentType ?? selectedApiStudent?.studentType ?? "learning_focus";
+
+    setGenerationStatuses((current) => ({
+      ...current,
+      [selectedCase.id]: {
+        state: "running",
+        message: "학생 맥락을 오케스트레이터에 전달하는 중입니다.",
+      },
+    }));
+
+    try {
+      const orchestratorResult = await createAgentRun({
+        studentId: selectedCase.studentId,
+        caseId: selectedCase.id,
+        requestedGoal,
+        contentType,
+      });
+
+      if (!orchestratorResult.agentRun || orchestratorResult.agentRun.status !== "succeeded") {
+        setGenerationStatuses((current) => ({
+          ...current,
+          [selectedCase.id]: {
+            state: "failed",
+            message: getAiGenerationFailureMessage(orchestratorResult.agentRun),
+          },
+        }));
+        return;
+      }
+
+      setGenerationStatuses((current) => ({
+        ...current,
+        [selectedCase.id]: {
+          state: "running",
+          message: "오케스트레이터 결과로 검토용 콘텐츠를 만드는 중입니다.",
+        },
+      }));
+
+      const generationResult = await createContentGeneration({
+        orchestratorRunId: orchestratorResult.agentRun.id,
+        studentId: selectedCase.studentId,
+        caseId: selectedCase.id,
+      });
+
+      if (!generationResult.content || generationResult.agentRun?.status !== "succeeded") {
+        setGenerationStatuses((current) => ({
+          ...current,
+          [selectedCase.id]: {
+            state: "failed",
+            message: getAiGenerationFailureMessage(generationResult.agentRun),
+          },
+        }));
+        return;
+      }
+
+      const generatedContent = generationResult.content;
+      setSelectedCaseFile((current) =>
+        current && current.profile.id === generatedContent.studentId
+          ? {
+              ...current,
+              recentContents: [
+                generatedContent,
+                ...current.recentContents.filter((content) => content.id !== generatedContent.id),
+              ],
+            }
+          : current,
+      );
+
+      const refreshedCaseFile = await getTeacherStudent(selectedCase.studentId).catch(() => null);
+      if (refreshedCaseFile) {
+        setSelectedCaseFile(refreshedCaseFile);
+      }
+
+      setReviewPreviewStep(1);
+      setOpenReviewId(generatedContent.id);
+      setGenerationStatuses((current) => ({
+        ...current,
+        [selectedCase.id]: {
+          state: "succeeded",
+          message: "검토할 수업 자료 제안이 만들어졌습니다.",
+        },
+      }));
+    } catch (error) {
+      setGenerationStatuses((current) => ({
+        ...current,
+        [selectedCase.id]: {
+          state: "failed",
+          message: getClientGenerationErrorMessage(error),
+        },
+      }));
+    }
   };
 
   useEffect(() => {
@@ -865,7 +999,13 @@ export default function DashboardPage() {
                         <textarea
                           className="mt-2 h-36 w-full resize-none rounded-md border border-[#cbd5e1] bg-[#fbfcfe] p-4 text-sm font-semibold outline-none focus:border-[#1f3a5f]"
                           key={`lesson-${selectedCase.id}`}
-                          defaultValue={selectedCase.sessionGoal}
+                          value={lessonDraftValue}
+                          onChange={(event) =>
+                            setLessonDrafts((current) => ({
+                              ...current,
+                              [selectedCase.id]: event.target.value,
+                            }))
+                          }
                           placeholder="선생님이 조정하고 싶은 수업 방향을 적어주세요."
                         />
                       </label>
@@ -891,9 +1031,30 @@ export default function DashboardPage() {
                         </div>
                       </div>
 
-                      <button className="w-full rounded-md bg-[#1f3a5f] px-4 py-3 text-sm font-bold text-white">
-                        AI 수업 자료 제안받기
+                      <button
+                        disabled={!selectedCase.id || isGeneratingContent}
+                        onClick={handleGenerateContent}
+                        className={`w-full rounded-md px-4 py-3 text-sm font-bold text-white ${
+                          !selectedCase.id || isGeneratingContent
+                            ? "cursor-not-allowed bg-[#94a3b8]"
+                            : "bg-[#1f3a5f] hover:bg-[#172b47]"
+                        }`}
+                      >
+                        {isGeneratingContent ? "AI가 자료를 제안하는 중" : "AI 수업 자료 제안받기"}
                       </button>
+                      {generationStatus && (
+                        <div
+                          className={`rounded-md border px-3 py-2 text-sm font-bold leading-6 ${
+                            generationStatus.state === "succeeded"
+                              ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
+                              : generationStatus.state === "failed"
+                                ? "border-[#fed7aa] bg-[#fff7ed] text-[#9a3412]"
+                                : "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
+                          }`}
+                        >
+                          {generationStatus.message}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </section>
