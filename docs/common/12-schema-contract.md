@@ -1,253 +1,183 @@
-# 프론트/백엔드 스키마 계약
+# 단계별 기능 및 스키마 계약
 
-이 문서는 프론트가 API 연결과 mock 데이터를 맞출 때 기준으로 삼는 공통 스키마 계약이다.
-상세 endpoint는 [08-rest-api-spec.md](08-rest-api-spec.md)를 보고, 데이터 모양은 이 문서를 우선 기준으로 본다.
+이 문서는 프론트/백엔드가 기능을 시작하기 전에 먼저 맞춰야 하는 공통 계약이다.
+REST API endpoint를 먼저 외우는 문서가 아니라, 학생 미션 1~4단계가 각각 어떤 기능을 가져야 하는지 온보딩하면서 합의하기 위한 기준이다.
 
-## 1. 공통 규칙
+endpoint 상세는 [08-rest-api-spec.md](08-rest-api-spec.md)를 보되, field와 단계 의미는 이 문서를 우선 기준으로 한다.
 
-- JSON field는 `camelCase`를 쓴다.
-- 시간 값은 ISO-8601 문자열이다.
-- 성공 응답은 항상 `data`와 `meta.requestId`를 가진다.
-- 오류 응답은 항상 `error.code`, `error.message`, `error.details`를 가진다.
-- 학생에게 노출되는 콘텐츠는 `status = "published"`만 허용한다.
-- `MissionContent.totalSteps`는 항상 `4`다.
-- `ContentStage.step`은 `1, 2, 3, 4`만 허용한다.
-- realtime은 `step = 4`에서만 허용한다.
-- 이미지 asset은 `hero`, `stage_1`, `stage_2`, `stage_3`, `stage_4_realtime`을 모두 가져야 한다.
+## 1. 먼저 고정할 제품 규칙
 
-## 2. 응답 envelope
+- 학생 미션은 화면 기준 4단계다.
+- 회고는 5단계가 아니라 4단계 이후 후속 활동이다.
+- 1~3단계는 교사가 승인한 정적 템플릿 JSON을 렌더링한다.
+- 4단계만 realtime 연습이다.
+- 학생 플레이 중 1~3단계에서 AI가 새 분석이나 새 생성을 하면 안 된다.
+- 학생에게 보이는 콘텐츠는 `published` 상태만 허용한다.
+- 한 미션은 대표 이미지 1장과 단계별 이미지 4장을 가진다.
+- 질문, 선택지, 피드백은 이미지 안 텍스트가 아니라 UI 텍스트로 보여준다.
+- OpenAI key, realtime provider secret, prompt 원문은 프론트로 내려보내지 않는다.
 
-성공:
+## 2. 두 가지 콘텐츠 트랙
 
-```json
-{
-  "data": {},
-  "meta": {
-    "requestId": "uuid"
-  }
-}
-```
+학생 유형에 따라 같은 4단계 구조를 다른 화면 이름과 기능으로 사용한다.
 
-오류:
+| contentType | 대상 | 목적 |
+| --- | --- | --- |
+| `life_support` | 일상생활 도움이 더 필요한 학생 | 실제 생활 상황에서 단서 찾기, 행동 선택, 도움 요청을 연습 |
+| `learning_focus` | 학습 보완이 주된 학생 | 개념 이미지, 기본 문제, 응용 문제, 말로 설명하기를 연습 |
 
-```json
-{
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "로그인이 필요합니다.",
-    "details": {}
-  }
-}
-```
+프론트는 두 트랙을 완전히 다른 앱처럼 만들지 않는다.
+같은 stage shell을 쓰되 `stageRole`, `templateType`, `studentTitle`, `templateJson`으로 화면을 다르게 렌더링한다.
 
-프론트는 오류 처리 시 `error.code`를 우선 분기 기준으로 사용한다.
+## 3. 4단계 기능 정의
 
-## 3. enum 고정값
+### 3.1 생활지원형
 
-### UserRole
+| step | 학생 화면 이름 | stageRole | 기능 목표 | 결과 데이터 |
+| --- | --- | --- | --- | --- |
+| 1 | 상황 만나기 | `scenario_intro` | 상황 이미지와 짧은 이야기로 오늘 미션을 이해 | 시작/조회 이벤트 |
+| 2 | 단서 찾기 | `clue_identification` | 상황 속 중요한 정보, 위치, 조건을 고름 | 선택/핫스팟/매칭 결과 |
+| 3 | 행동 고르기 | `action_selection` | 지금 해야 할 행동이나 순서를 선택 | 정답 여부, 다음 행동 이해 |
+| 4 | 한 번 해보기 | `realtime_practice` | AI 역할과 실제 상황을 짧게 연습 | realtime session, 루브릭 요약 |
 
-```text
-center_admin
-teacher
-content_reviewer
-guardian
-student
-```
+### 3.2 학습집중형
 
-### StudentType
+| step | 학생 화면 이름 | stageRole | 기능 목표 | 결과 데이터 |
+| --- | --- | --- | --- | --- |
+| 1 | 개념 열기 | `concept_intro` | 이미지와 짧은 설명으로 개념 앵커를 잡음 | 시작/조회 이벤트 |
+| 2 | 문제 1 | `basic_problem` | 성공 가능한 기본 문제로 핵심 개념을 확인 | 정답 여부, 피드백 |
+| 3 | 문제 2 | `applied_problem` | 헷갈리는 답, 응용 상황, 빈칸 등으로 한 번 더 적용 | 오답 패턴, 교정 포인트 |
+| 4 | AI에게 말해보기 | `realtime_practice` | 상황 이미지와 AI 질문을 보고 말/텍스트로 설명 | realtime session, 루브릭 요약 |
 
-```text
-life_support
-learning_focus
-```
+## 4. 단계별 기능 요구사항
 
-### MissionStatus
+### 4.1 Step 1: 상황/개념 열기
 
-```text
-draft
-generating
-teacher_review
-revision_requested
-approved
-published
-archived
-```
+프론트 기능:
 
-### StageRole
+- 대표 또는 1단계 이미지를 크게 보여준다.
+- 오늘 미션 목표를 한 문장으로 보여준다.
+- 학생이 해야 할 첫 행동을 짧게 보여준다.
+- 정답 판정은 하지 않는다.
+
+백엔드 제공:
+
+- `studentTitle`
+- `studentInstruction`
+- `templateJson.imageAssetId`
+- `templateJson.storyText` 또는 `templateJson.shortExplanation`
+- `templateJson.missionText`
+
+허용 템플릿:
 
 ```text
-scenario_intro
-clue_identification
-action_selection
-concept_intro
-basic_problem
-applied_problem
-realtime_practice
+life_support: scenario_intro
+learning_focus: concept_intro
 ```
 
-### TemplateType
+### 4.2 Step 2: 핵심 확인
+
+프론트 기능:
+
+- 단서 선택, 카드 매칭, 기본 선택형, 빈칸 등 하나의 짧은 상호작용을 제공한다.
+- 선택지는 2~3개를 기본으로 한다.
+- 제출 후 즉시 피드백을 보여준다.
+- 정답/오답 이벤트를 서버에 보낸다.
+
+백엔드 제공:
+
+- `templateType`
+- `templateJson.question`
+- `templateJson.choices` 또는 `templateJson.hotspots` 또는 `templateJson.tiles`
+- `templateJson.answer` 또는 `templateJson.acceptedAnswers`
+- `templateJson.correctFeedback`
+- `templateJson.wrongFeedback`
+
+허용 템플릿:
 
 ```text
-scenario_intro
-scene_observation
-highlight_clue
-card_match
-action_choice
-sequence_ordering
-decision_card
-concept_intro
-scene_question
-clue_question
-blank_fill
-partition_picker
-applied_question
-mini_simulation
-realtime_roleplay
-realtime_teach_back
+life_support: scene_observation, highlight_clue, card_match
+learning_focus: scene_question, clue_question, blank_fill, partition_picker
 ```
 
-### AssetRole
+### 4.3 Step 3: 적용/결정
+
+프론트 기능:
+
+- Step 2에서 확인한 것을 상황에 적용하게 한다.
+- 생활지원형은 행동 선택 또는 순서 배열이 중심이다.
+- 학습집중형은 응용 문제, 오답 비교, 친구 도와주기, 설명 선택이 중심이다.
+- 제출 후 교정 피드백을 보여준다.
+
+백엔드 제공:
+
+- `templateType`
+- `templateJson.scenario` 또는 `templateJson.question`
+- `templateJson.choices`, `templateJson.cards`, `templateJson.answerOrder`
+- `templateJson.correctFeedback`
+- `templateJson.wrongFeedback`
+- 필요 시 `templateJson.repairText`
+
+허용 템플릿:
 
 ```text
-hero
-stage_1
-stage_2
-stage_3
-stage_4_realtime
+life_support: action_choice, sequence_ordering, decision_card
+learning_focus: applied_question, mini_simulation, card_match, sequence_ordering, explanation_choice, wrong_explanation_fix
 ```
 
-### AssetType
+### 4.4 Step 4: realtime 연습
+
+프론트 기능:
+
+- 4단계 이미지를 보여준다.
+- `realtime-session`을 생성한 뒤 음성 또는 텍스트 연습 UI로 들어간다.
+- 학생이 볼 수 있는 정보만 노출한다.
+- provider key, system prompt, 전체 루브릭 원문은 노출하지 않는다.
+- 완료 후 후속 회고 UI를 보여준다.
+
+백엔드 제공:
+
+- `realtimeSpec.practiceTitle`
+- `realtimeSpec.situationText`
+- `realtimeSpec.openingLine`
+- `realtimeSpec.maxTurns`
+- `realtimeSpec.maxDurationSec`
+- `practiceSpec.imageAssetUrl`
+- session 생성 시 `clientSecret`
+
+허용 템플릿:
 
 ```text
-image
-audio_optional
+life_support: realtime_roleplay
+learning_focus: realtime_teach_back
 ```
 
-## 4. Auth 스키마
+서버 검증:
 
-### DemoLoginRequest
+```text
+content.status == published
+stage.step == 4
+stage.realtimeSpec exists
+student has access
+attempt exists
+```
+
+## 5. 회고는 stage가 아니다
+
+회고는 `post_practice_reflection` 이벤트다.
+프론트에서는 4단계 완료 후 별도 하단 카드나 완료 화면으로 보여준다.
+
+백엔드 저장:
 
 ```json
 {
-  "role": "teacher",
-  "email": "teacher.demo@eduyj.local"
+  "attemptId": "attempt_uuid",
+  "reflectionChoice": "조금 헷갈렸어요",
+  "shortText": "아래 숫자가 전체인 게 헷갈렸어요"
 }
 ```
 
-### StudentAccessRequest
-
-```json
-{
-  "accessCode": "STAR-001"
-}
-```
-
-### AuthResponse.data
-
-교사 로그인:
-
-```json
-{
-  "user": {
-    "id": "user_teacher_demo",
-    "organizationId": "org_yj_center",
-    "email": "teacher.demo@eduyj.local",
-    "displayName": "데모 선생님",
-    "role": "teacher",
-    "status": "active"
-  },
-  "session": {
-    "accessToken": "demo.user.uuid",
-    "expiresAt": "2026-05-02T12:00:00+00:00"
-  }
-}
-```
-
-학생 로그인:
-
-```json
-{
-  "student": {
-    "id": "student_learning_fraction",
-    "organizationId": "org_yj_center",
-    "externalKey": "demo-learning-001",
-    "displayName": "수민",
-    "grade": "middle_2",
-    "schoolCode": "school_demo_001",
-    "studentType": "learning_focus",
-    "primaryNeed": "분수의 전체-부분 관계 이해",
-    "profileJson": {},
-    "status": "active"
-  },
-  "session": {
-    "accessToken": "demo.student.uuid",
-    "expiresAt": "2026-05-02T12:00:00+00:00"
-  }
-}
-```
-
-## 5. 교사 대시보드 스키마
-
-### TeacherStudentListItem
-
-`GET /api/teacher/students`의 `data[]` 항목이다.
-
-```json
-{
-  "studentId": "student_learning_fraction",
-  "displayName": "수민",
-  "grade": "middle_2",
-  "studentType": "learning_focus",
-  "primaryNeed": "분수의 전체-부분 관계 이해",
-  "latestContentStatus": "published",
-  "nextSessionSuggestion": "분모/분자 위치를 짧게 재확인"
-}
-```
-
-### StudentCaseFile
-
-`GET /api/teacher/students/:studentId`의 `data`다.
-
-```json
-{
-  "profile": "Student",
-  "openCase": "SupportCase",
-  "memoryCard": "MemoryCard | null",
-  "weeklyRecords": ["CaseNote"],
-  "monthlySummary": {
-    "repeatedProblemTypes": ["분모/분자 혼동"],
-    "growth": "seed 데모 기준 최근 수행 안정화",
-    "stillBlocking": ["첫 문제는 쉬운 성공 경험으로 시작"]
-  },
-  "recentContents": ["MissionContent"],
-  "plannerItems": ["PlannerItem"],
-  "publicContextSummary": {
-    "schoolCode": "school_demo_001",
-    "sources": ["neis_open_api"]
-  }
-}
-```
-
-## 6. 학생 미션 스키마
-
-### StudentMissionSummary
-
-`GET /api/student/missions/today`의 `data[]` 항목이다.
-
-```json
-{
-  "contentId": "content_fraction_001",
-  "title": "분수 탐험: 빛나는 한 조각",
-  "contentType": "learning_focus",
-  "totalSteps": 4,
-  "heroImageUrl": "/examples/generated/fraction-mission/fraction-pizza.png",
-  "status": "published"
-}
-```
-
-### MissionContent
-
-`GET /api/student/missions/:contentId`의 `data`다.
+## 6. MissionContent 최소 스키마
 
 ```json
 {
@@ -269,7 +199,16 @@ audio_optional
 }
 ```
 
-### ContentStage
+프론트 필수 검증:
+
+```text
+totalSteps === 4
+stages.length === 4
+stages step list === [1, 2, 3, 4]
+assets has hero, stage_1, stage_2, stage_3, stage_4_realtime
+```
+
+## 7. ContentStage 최소 스키마
 
 ```json
 {
@@ -286,26 +225,14 @@ audio_optional
 }
 ```
 
-4단계만 `realtimeSpec`이 필수다.
+규칙:
 
-```json
-{
-  "id": "stage_fraction_4",
-  "missionContentId": "content_fraction_001",
-  "step": 4,
-  "stageRole": "realtime_practice",
-  "templateType": "realtime_teach_back",
-  "studentTitle": "AI에게 말해보기",
-  "studentInstruction": "별이에게 왜 1/4인지 말로 설명해보세요.",
-  "templateJson": {
-    "imageAssetId": "asset_content_fraction_001_stage_4_realtime"
-  },
-  "realtimeSpec": "RealtimePracticeSpec",
-  "sortOrder": 4
-}
-```
+- `step`과 `sortOrder`는 1~4다.
+- `step === 4`이면 `templateType`은 realtime 계열이어야 한다.
+- `step === 4`이면 `realtimeSpec`이 null이면 안 된다.
+- `step !== 4`이면 `realtimeSpec`은 null이다.
 
-### ContentAsset
+## 8. ContentAsset 최소 스키마
 
 ```json
 {
@@ -324,7 +251,17 @@ audio_optional
 }
 ```
 
-## 7. RealtimePracticeSpec
+asset role:
+
+```text
+hero
+stage_1
+stage_2
+stage_3
+stage_4_realtime
+```
+
+## 9. RealtimePracticeSpec 최소 스키마
 
 ```json
 {
@@ -353,123 +290,120 @@ audio_optional
 }
 ```
 
-프론트는 `realtimeSpec` 원문 전체를 학생에게 노출하지 않는다.
-학생 화면에는 `practiceTitle`, `situationText`, `openingLine`, `maxTurns`, `maxDurationSec` 정도만 사용한다.
+프론트 노출 가능:
 
-## 8. 학생 플레이 request/response
+```text
+practiceTitle
+situationText
+openingLine
+maxTurns
+maxDurationSec
+imageAssetUrl
+```
 
-### StartMissionResponse.data
+프론트 노출 금지:
+
+```text
+provider key
+system prompt
+전체 forbidden/prompt 원문
+학생 진단 라벨
+```
+
+## 10. 공통 enum
+
+### contentType
+
+```text
+life_support
+learning_focus
+```
+
+### mission status
+
+```text
+draft
+generating
+teacher_review
+revision_requested
+approved
+published
+archived
+```
+
+### stageRole
+
+```text
+scenario_intro
+clue_identification
+action_selection
+concept_intro
+basic_problem
+applied_problem
+realtime_practice
+```
+
+### templateType
+
+```text
+scenario_intro
+scene_observation
+highlight_clue
+card_match
+action_choice
+sequence_ordering
+decision_card
+concept_intro
+scene_question
+clue_question
+blank_fill
+partition_picker
+applied_question
+mini_simulation
+explanation_choice
+wrong_explanation_fix
+realtime_roleplay
+realtime_teach_back
+```
+
+## 11. API envelope
+
+성공:
 
 ```json
 {
-  "id": "attempt_uuid",
-  "missionContentId": "content_fraction_001",
-  "studentId": "student_learning_fraction",
-  "status": "in_progress",
-  "currentStep": 1,
-  "startedAt": "2026-05-02T12:00:00+00:00",
-  "completedAt": null,
-  "scoreJson": null
+  "data": {},
+  "meta": {
+    "requestId": "uuid"
+  }
 }
 ```
 
-### StageSubmitRequest
-
-1~3단계에서만 사용한다.
-
-```json
-{
-  "attemptId": "attempt_uuid",
-  "answer": {
-    "choiceId": "b"
-  },
-  "clientEventId": "evt_client_001"
-}
-```
-
-### StageSubmitResponse.data
-
-```json
-{
-  "isRealtimeStage": false,
-  "isCorrect": true,
-  "feedback": "맞아요. 전체는 4조각이에요.",
-  "nextStep": 3
-}
-```
-
-4단계에 submit하면 오류가 난다.
+오류:
 
 ```json
 {
   "error": {
-    "code": "REALTIME_STAGE_SUBMIT_BLOCKED",
-    "message": "4단계는 realtime-session API를 사용해야 합니다.",
+    "code": "UNAUTHORIZED",
+    "message": "로그인이 필요합니다.",
     "details": {}
   }
 }
 ```
 
-### RealtimeSessionRequest
+프론트는 오류 처리 시 `error.code`를 우선 분기 기준으로 사용한다.
 
-```json
-{
-  "attemptId": "attempt_uuid"
-}
+## 12. 프론트 agent가 먼저 확인할 질문
+
+프론트 agent는 API 연결 전에 아래를 먼저 확인한다.
+
+```text
+1. 현재 화면이 4단계 구조를 전제로 되어 있는가?
+2. 회고가 5단계처럼 렌더링되고 있지 않은가?
+3. life_support와 learning_focus가 같은 stage shell에서 분기 가능한가?
+4. stageRole/templateType 조합이 위 표와 맞는가?
+5. 1~3단계가 정적 템플릿 JSON만으로 렌더링 가능한가?
+6. 4단계 realtime 진입 버튼이 stage.step === 4에서만 보이는가?
+7. image asset role 5개를 화면에서 어디에 쓰는지 정해져 있는가?
+8. mock 데이터가 이 문서의 최소 스키마를 만족하는가?
 ```
-
-### RealtimeSessionResponse.data
-
-```json
-{
-  "sessionId": "rt_session_uuid",
-  "provider": "openai",
-  "model": "gpt-realtime",
-  "clientSecret": "server-issued-or-demo-secret",
-  "expiresAt": "2026-05-02T12:05:00+00:00",
-  "webrtcUrl": "https://api.openai.com/v1/realtime/calls",
-  "practiceSpec": {
-    "practiceTitle": "별이에게 분수 설명하기",
-    "imageAssetUrl": "/examples/generated/fraction-mission/fraction-pizza.png",
-    "openingLine": "왜 4/1이 아니라 1/4인지 알려줄래?",
-    "maxTurns": 6,
-    "maxDurationSec": 120
-  }
-}
-```
-
-### ReflectionRequest
-
-```json
-{
-  "attemptId": "attempt_uuid",
-  "reflectionChoice": "조금 헷갈렸어요",
-  "shortText": "아래 숫자가 전체인 게 헷갈렸어요"
-}
-```
-
-## 9. 프론트 mock 점검 기준
-
-프론트 mock 또는 임시 데이터는 아래를 반드시 만족해야 한다.
-
-- `MissionContent.totalSteps`는 `4`
-- `stages.length`는 `4`
-- `stages[].step`은 `[1, 2, 3, 4]`
-- 1~3단계 `templateType`은 realtime 계열이 아님
-- 4단계 `templateType`은 `realtime_roleplay` 또는 `realtime_teach_back`
-- 4단계 `realtimeSpec`은 null이 아님
-- `assets`에는 필수 5개 role이 모두 있음
-- `heroImageUrl`은 `assetRole = "hero"`에서 온 값
-- secret, provider key, prompt 원문은 프론트 mock에 넣지 않음
-
-## 10. 백엔드 우선 수정 대상
-
-프론트가 계약 점검 중 아래를 발견하면 백엔드 확인 요청으로 넘긴다.
-
-- 문서에는 있는 field가 API 응답에 없음
-- API 응답 field가 snake_case로 내려옴
-- 오류 응답이 `error` envelope가 아님
-- 4단계 외 stage에서 realtime template이 내려옴
-- `published`가 아닌 미션이 학생 API에 내려옴
-- 이미지 asset role이 부족함
-- realtime session 응답에 `clientSecret`이 없음

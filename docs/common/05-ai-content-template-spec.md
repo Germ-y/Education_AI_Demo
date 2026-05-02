@@ -53,7 +53,7 @@ AI 생성 JSON
 | --- | --- | --- | --- |
 | 1 | 개념 열기 | `concept_intro` | `concept_intro` |
 | 2 | 문제 1 | `basic_problem` | `scene_question`, `clue_question`, `blank_fill`, `partition_picker` |
-| 3 | 문제 2 | `applied_problem` | `applied_question`, `mini_simulation`, `card_match`, `sequence_ordering` |
+| 3 | 문제 2 | `applied_problem` | `applied_question`, `mini_simulation`, `card_match`, `sequence_ordering`, `explanation_choice`, `wrong_explanation_fix` |
 | 4 | AI에게 말해보기 | `realtime_practice` | `realtime_teach_back` |
 
 학습집중형 4단계는 개념 정리가 아니라 **상황 이미지와 AI 대화로 설명을 직접 연습하는 realtime 단계**다. AI는 교사가 승인한 역할/루브릭 안에서만 피드백한다.
