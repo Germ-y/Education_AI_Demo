@@ -217,3 +217,39 @@ push 메시지나 PR 설명에는 다음을 남긴다.
 백엔드 확인 필요:
 실행한 검증:
 ```
+
+## 7. 2026-05-03 backend to dev handoff
+
+이번 push 목적:
+
+```text
+교사 대시보드 학생 컨텍스트, 콘텐츠 검토, 학생 미션 완료, 학습 기록 흐름을 dev에 통합한다.
+팀원이 같은 demo DB 상태에서 작업할 수 있도록 SQL dump와 최신 API 문서를 함께 제공한다.
+```
+
+주요 확인 범위:
+
+```text
+- 학생 목록/홈 card의 한국어 label과 최신 published 콘텐츠 이동
+- 교사 대시보드 학생 정보, 자료 생성·검토, 학습 기록 탭 데이터 fetching
+- 콘텐츠 approve/reject/publish API와 검토 iframe preview
+- 학생 start, stage submit, reflection, complete API
+- complete 후 review summary 생성과 dashboardStage feedback 전환
+- backend/data/eduyj_demo_dump.sql 복원 경로
+```
+
+프론트 확인 필요:
+
+```text
+- 학생 홈 카드 문구는 교사용 제안 문장이 아니라 학생 콘텐츠 진입 문장인지 확인
+- 교사 대시보드 자료 검토 iframe이 content detail과 같은 contentId를 보는지 확인
+- 학습 기록 탭이 report API의 최신 review summary를 표시하는지 확인
+```
+
+백엔드 확인 필요:
+
+```text
+- provider key가 없는 환경에서 asset/realtime 생성이 대체값 없이 424로 실패하는지 확인
+- seed 재실행 후 학생 3명, 미션 3개, 시간표 16개가 유지되는지 확인
+- dev merge 후 backend/frontend 검증을 다시 실행
+```

@@ -1,6 +1,6 @@
 # REST API Spec
 
-확인 기준일: 2026-05-02
+확인 기준일: 2026-05-03
 
 ## 1. 공통 규칙
 
@@ -55,6 +55,7 @@ MVP에서는 회원가입/일반 로그인보다 seed된 사용자/학생/학교
 ### GET /api/context/seed
 
 별도 로그인 없이 seed된 센터, 교사 1명, 학생 3명, 학생별 case/content 매핑을 조회한다.
+학생 목록은 교사 대시보드와 학생 홈이 같은 label을 쓸 수 있도록 한국어 표시값을 함께 반환한다.
 
 ```json
 {
@@ -62,7 +63,22 @@ MVP에서는 회원가입/일반 로그인보다 seed된 사용자/학생/학교
     "mode": "demo_seed",
     "organization": "Organization",
     "teacher": "UserProfile",
-    "students": ["TeacherStudentSummary"],
+    "students": [
+      {
+        "studentId": "student_learning_clock",
+        "displayName": "김지우",
+        "grade": "elementary_3",
+        "gradeLabel": "초3",
+        "studentType": "learning_focus",
+        "studentTypeLabel": "저연령 학습지원형",
+        "trackLabel": "저연령 학습지원형",
+        "primaryNeed": "시간 읽기 기초를 짧은 시각 단서와 2개 선택지로 익히는 수업이 필요해 보입니다.",
+        "latestContentStatus": "published",
+        "dashboardStage": "material_generation",
+        "dashboardStageLabel": "자료 생성",
+        "accessCode": "STAR-003"
+      }
+    ],
     "assignments": [
       {
         "teacherId": "user_teacher_demo",
@@ -76,8 +92,10 @@ MVP에서는 회원가입/일반 로그인보다 seed된 사용자/학생/학교
         "contentId": "content_fraction_001",
         "studentId": "student_learning_fraction",
         "caseId": "case_learning_fraction",
+        "title": "분수 탐험: 빛나는 한 조각",
         "status": "published",
-        "totalSteps": 4
+        "totalSteps": 4,
+        "updatedAt": "2026-05-03T00:00:00.000Z"
       }
     ]
   }
@@ -138,6 +156,14 @@ MVP에서는 회원가입/일반 로그인보다 seed된 사용자/학생/학교
 }
 ```
 
+데모 access code:
+
+```text
+김지우: STAR-003
+이민준: STAR-001
+박수민: STAR-002
+```
+
 ## 3. Teacher Student APIs
 
 ### GET /api/teacher/students
@@ -158,12 +184,23 @@ caseStatus=open
 {
   "data": [
     {
-      "studentId": "student_001",
+      "studentId": "student_learning_fraction",
       "displayName": "이민준",
       "grade": "middle_2",
+      "gradeLabel": "중2",
+      "schoolCode": "school_yeongju_middle",
+      "schoolName": "영주중학교",
       "studentType": "learning_focus",
-      "primaryNeed": "분수의 전체-부분 관계를 단계적으로 익히는 개념 보완 수업이 좋겠어요.",
-      "latestContentStatus": "completed",
+      "studentTypeLabel": "고연령 학습지원형",
+      "trackLabel": "고연령 학습지원형",
+      "primaryNeed": "분수의 전체-부분 관계를 단계적으로 익히는 개념 보완 수업이 필요해 보입니다.",
+      "latestContentStatus": "published",
+      "dashboardStage": "feedback",
+      "dashboardStageLabel": "학습 피드백",
+      "statusLabel": "학습 피드백",
+      "supportStrategy": "전체와 부분을 색 조각으로 분리해 보고, 분모와 분자를 말로 설명하는 활동이 도움이 됩니다.",
+      "summaryLine": "분수의 전체-부분 관계 이해",
+      "aiContextSummary": "분수 개념을 시각 자료와 짧은 발화 연습으로 연결하는 콘텐츠가 적합합니다.",
       "nextSessionSuggestion": "분모/분자 위치를 짧게 재확인"
     }
   ]
@@ -179,12 +216,79 @@ caseStatus=open
 ```text
 profile
 openCase
+dashboardProfile
+contextBundle
 memoryCard
 weeklyRecords
 monthlySummary
 recentContents
 plannerItems
 publicContextSummary
+```
+
+### GET /api/teacher/students/:studentId/context-bundle
+
+교사 대시보드와 AI 오케스트레이터가 함께 쓰는 학생 맥락 bundle을 조회한다.
+이 endpoint는 시나리오를 미리 고정하는 용도가 아니라, 학생에게 필요한 수업 방향을 판단하는 입력이다.
+
+응답:
+
+```json
+{
+  "data": {
+    "student": {
+      "id": "student_learning_clock",
+      "name": "김지우",
+      "displayName": "김지우",
+      "grade": "elementary_3",
+      "gradeLabel": "초3",
+      "studentType": "learning_focus",
+      "studentTypeLabel": "저연령 학습지원형",
+      "trackLabel": "저연령 학습지원형"
+    },
+    "caseSummary": {
+      "caseId": "case_learning_clock",
+      "currentGoal": "시계 그림에서 짧은 바늘을 먼저 찾고 약속 시간을 고르기",
+      "primaryNeed": "시간 읽기 기초를 짧은 시각 단서와 2개 선택지로 익히는 수업이 필요해 보입니다.",
+      "supportStrategy": "시계 그림을 먼저 보고 짧은 바늘을 찾은 뒤, 두 선택지 중 시간을 고르는 방식이 적합합니다.",
+      "dashboardStage": "material_generation",
+      "dashboardStageLabel": "자료 생성"
+    },
+    "teacherInputs": ["CaseNote"],
+    "previousLessons": [
+      {
+        "contentId": "content_clock_001",
+        "title": "시계 그림에서 시간 단서 찾기",
+        "completedAt": null,
+        "summary": "아직 리뷰 요약이 없습니다.",
+        "accuracyRate": null,
+        "studentReviewText": null
+      }
+    ],
+    "memoryCard": "MemoryCard",
+    "schoolContext": "PublicContextBundle",
+    "autoContext": [
+      {
+        "label": "학생 기록",
+        "value": "그림을 먼저 보고, 한 문장 지시와 2개 선택지를 받을 때 반응이 가장 좋습니다."
+      },
+      {
+        "label": "학교 시간표",
+        "value": "2026-05-01 시간표: 국어, 수학, 사회, 과학, 창의적체험활동"
+      },
+      {
+        "label": "다음 목표",
+        "value": "시계 그림에서 짧은 바늘을 먼저 찾고 약속 시간을 고르기"
+      }
+    ],
+    "aiReadyContext": {
+      "summary": "짧은 시각 단서와 2개 선택지를 중심으로 시간 읽기 기초를 익히는 콘텐츠가 적합합니다.",
+      "mustUse": ["시계 그림 먼저 보기", "짧은 바늘 찾기", "2개 선택지"],
+      "avoid": ["긴 문장 지시를 먼저 제시하지 않기"],
+      "evidenceSources": ["school_timetable"]
+    }
+  }
+}
 ```
 
 ### GET /api/teacher/students/:studentId/history
@@ -544,6 +648,7 @@ all assets approvalStatus == approved
 ```
 
 배포되면 콘텐츠 상태는 `published`가 되고 학생 미션 API에서 조회된다.
+연결된 open case가 있으면 교사 대시보드 단계는 `learning`으로 이동한다.
 
 ## 7. Student Mission APIs
 
@@ -699,12 +804,15 @@ Realtime 이벤트 저장. 클라이언트 이벤트, sideband 이벤트, 서버
 ### POST /api/student/missions/:contentId/complete
 
 attempt 완료.
+완료 시 서버는 최신 attempt 기준 리뷰 요약을 자동 생성하거나 기존 요약을 재사용한다.
+연결된 open case가 있으면 교사 대시보드 단계는 `feedback`으로 이동한다.
 
 ### POST /api/contents/:contentId/review-summary
 
 ReviewAgent 실행 요청.
 
 현재 MVP 구현은 저장된 `ContentAttempt`, `ActivityEvent`, `RealtimePracticeSession`을 기준으로 deterministic summary를 만든다.
+같은 최신 attempt에 이미 요약이 있으면 중복 생성하지 않고 기존 요약을 반환한다.
 실제 ReviewAgent provider 호출은 이후 `agent_runs` 기반으로 확장한다.
 
 응답:
@@ -752,6 +860,7 @@ limit=50
 
 ```text
 view_student_case
+view_student_context_bundle
 view_student_history
 approve_content
 reject_content
@@ -848,6 +957,63 @@ className=1
     "mode": "seed_snapshot"
   }
 }
+```
+
+### GET /api/public-data/schools/:schoolCode/timetable
+
+학교 시간표 snapshot을 조회한다.
+저장된 snapshot이 없고 `syncIfMissing=true`이면 NEIS API key와 필수 query가 있을 때만 NEIS 시간표 cache 동기화를 시도한다.
+날짜가 맞지 않는 시간표를 다른 날짜 snapshot으로 대체하지 않는다.
+
+Query:
+
+```text
+date=2026-05-01
+grade=3
+className=1
+syncIfMissing=false
+```
+
+응답:
+
+```json
+{
+  "data": {
+    "school": {
+      "schoolCode": "8751022",
+      "schoolName": "영주중앙초등학교"
+    },
+    "requestedDate": "2026-05-01",
+    "activeDate": "2026-05-01",
+    "grade": "3",
+    "className": "1",
+    "slots": [
+      {
+        "timetableDate": "2026-05-01",
+        "grade": "3",
+        "className": "1",
+        "period": 1,
+        "subjectName": "국어",
+        "sourceCode": "neis_els_timetable"
+      }
+    ],
+    "summary": {
+      "todaySubjects": ["국어", "수학", "사회", "과학", "창의적체험활동"],
+      "source": "NEIS_TIMETABLE_CACHE",
+      "cacheStatus": "cached_snapshot"
+    },
+    "orchestratorHints": [
+      "국어 시간 전후에는 짧은 문장 지시를 사용하면 좋습니다."
+    ]
+  }
+}
+```
+
+오류:
+
+```text
+400 NEIS_TIMETABLE_QUERY_REQUIRED: syncIfMissing=true인데 date, grade, className 중 하나가 없음
+424 NEIS_API_KEY_MISSING: NEIS_API_KEY가 없어 실시간 동기화를 실행할 수 없음
 ```
 
 ### POST /api/public-data/sources/:sourceCode/sync

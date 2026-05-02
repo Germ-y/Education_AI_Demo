@@ -15,7 +15,19 @@ python3 -m venv .venv
 ```bash
 .venv/bin/ruff check app tests
 .venv/bin/python -m pytest
-.venv/bin/python -m app.data.seed_demo
+DATABASE_URL=sqlite+pysqlite:///./data/eduyj_demo.db .venv/bin/python -m app.data.seed_demo
 ```
 
 기본 API는 `http://localhost:4000`에서 실행됩니다.
+
+## Demo DB
+
+공유용 SQL dump는 [data/eduyj_demo_dump.sql](data/eduyj_demo_dump.sql)에 둔다.
+로컬 SQLite DB인 `data/eduyj_demo.db`는 git 추적 대상이 아니다.
+
+```bash
+rm -f data/eduyj_demo.db
+sqlite3 data/eduyj_demo.db < data/eduyj_demo_dump.sql
+```
+
+자세한 복원 기준은 [data/README.md](data/README.md)를 본다.
