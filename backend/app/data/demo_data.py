@@ -13,6 +13,11 @@ def _image_asset(content_id: str, role: str, stage_id: str | None, url: str) -> 
         "assetType": "image",
         "provider": "openai",
         "model": "gpt-image-2",
+        "promptJson": {
+            "visualRole": role,
+            "textRenderingPolicy": "scene_only_no_problem_text",
+            "forbiddenInlineText": ["문제 문장", "선택지", "정답", "힌트", "긴 설명", "복잡한 수식"],
+        },
         "storageUrl": url,
         "previewUrl": url,
         "qaStatus": "passed",

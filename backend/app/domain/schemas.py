@@ -156,12 +156,23 @@ def _validate_template_json(template_type: TemplateType, template_json: dict[str
     if template_type == TemplateType.BLANK_FILL:
         if "acceptedAnswers" not in template_json and "answers" not in template_json:
             raise ValueError("blank_fill은 acceptedAnswers 또는 answers를 가져야 합니다.")
+        _require_any_key(template_json, ["question", "sentence"], "blank_fill")
+    if template_type in {TemplateType.SCENE_QUESTION, TemplateType.CLUE_QUESTION, TemplateType.APPLIED_QUESTION, TemplateType.ACTION_CHOICE}:
+        _require_keys(template_json, ["question", "choices", "correctFeedback", "wrongFeedback"], template_type.value)
+    if template_type == TemplateType.PARTITION_PICKER:
+        _require_any_key(template_json, ["question", "instruction"], "partition_picker")
+        _require_any_key(template_json, ["choices", "visual"], "partition_picker")
 
 
 def _require_keys(template_json: dict[str, Any], keys: list[str], template_type: str) -> None:
     missing = [key for key in keys if key not in template_json]
     if missing:
         raise ValueError(f"{template_type} templateJson 필수 필드가 없습니다: {', '.join(missing)}")
+
+
+def _require_any_key(template_json: dict[str, Any], keys: list[str], template_type: str) -> None:
+    if not any(key in template_json for key in keys):
+        raise ValueError(f"{template_type} templateJson에는 다음 중 하나가 필요합니다: {', '.join(keys)}")
 
 
 class MissionContent(BaseModel):

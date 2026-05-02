@@ -75,3 +75,12 @@ def test_requires_stage_images_and_audio_assets() -> None:
 
     with pytest.raises(ValueError):
         MissionContent.model_validate(content)
+
+
+def test_requires_problem_text_in_template_json_not_image() -> None:
+    stage = create_demo_database().mission_contents[0].stages[1].model_dump(by_alias=True)
+    stage["templateJson"].pop("question")
+    stage["templateJson"].pop("instruction", None)
+
+    with pytest.raises(ValueError):
+        ContentStage.model_validate(stage)

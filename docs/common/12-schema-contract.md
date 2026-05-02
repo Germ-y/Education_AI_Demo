@@ -269,6 +269,8 @@ GET /api/student/missions/:contentId
 - 한 미션은 대표 오디오 1개와 단계별 오디오 4개를 가진다.
 - 프론트는 각 단계 화면 진입 시 이미지와 오디오를 먼저 resolve/load한다.
 - 질문, 선택지, 피드백은 이미지 안 텍스트가 아니라 UI 텍스트로 보여준다.
+- 이미지는 상황 설명, 관계, 대상, 감정, 마스코트 반응을 보여주는 장면 asset이다.
+- 문제 문항, 선택지, 카드 텍스트, 빈칸 문장, 힌트, 정답 피드백은 AI가 `templateJson` 필드로 반환한다.
 - OpenAI key, realtime provider secret, prompt 원문은 프론트로 내려보내지 않는다.
 
 ## 7. 두 가지 콘텐츠 트랙
@@ -509,7 +511,11 @@ assets has hero, stage_1, stage_2, stage_3, stage_4_realtime
   "assetType": "image",
   "provider": "openai",
   "model": "gpt-image-2",
-  "promptJson": {},
+  "promptJson": {
+    "visualRole": "stage_2",
+    "textRenderingPolicy": "scene_only_no_problem_text",
+    "forbiddenInlineText": ["문제 문장", "선택지", "정답", "힌트", "긴 설명"]
+  },
   "storageUrl": "/examples/generated/fraction-mission/fraction-pizza.png",
   "previewUrl": "/examples/generated/fraction-mission/fraction-pizza.png",
   "qaStatus": "passed",

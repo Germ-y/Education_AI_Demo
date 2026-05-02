@@ -29,7 +29,9 @@ teacher exposure: preview only after safety/OCR QA
 student exposure: approved content only
 ```
 
-이미지에는 긴 문장, 정답 문장, 복잡한 수식을 넣지 않는다. 텍스트와 선택지는 앱 UI가 렌더링한다.
+이미지는 상황 설명용 장면 asset이다.
+이미지에는 긴 문장, 문제 문항, 선택지, 정답 문장, 힌트, 복잡한 수식을 넣지 않는다.
+문제 문장과 텍스트 라인은 AI가 `templateJson` 스키마로 반환하고, 프론트가 앱 UI 레이어에서 렌더링한다.
 
 ## 3. 이미지 브리프 스키마
 

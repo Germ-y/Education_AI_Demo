@@ -17,6 +17,18 @@ AI 생성 JSON
 
 단, 4단계는 `Realtime Practice`로 분리한다. 이 단계는 자유 생성 콘텐츠가 아니라 교사가 승인한 `RealtimePracticeSpec` 안에서만 AI가 대화와 짧은 피드백을 제공한다.
 
+이미지는 문제 화면 그 자체가 아니라 **상황/장면 설명용 시각 맥락**이다.
+문제 문장, 선택지, 카드 텍스트, 빈칸 문장, 힌트, 정답 피드백은 모두 AI가 `templateJson`의 구조화된 필드로 반환하고, 프론트가 UI 텍스트로 렌더링한다.
+
+```text
+image asset: 장면, 물체, 관계, 분위기, 캐릭터/마스코트
+templateJson: question, choices, cards, answer, feedback, hint, repairText
+audio asset: templateJson/studentInstruction 기반 안내 음성
+```
+
+이미지 프롬프트에는 긴 한글 문장, 문제 문항, 선택지, 정답, 힌트를 그리도록 요구하지 않는다.
+버스 번호나 간단한 표지판처럼 장면 이해에 필요한 짧은 시각 단서가 예외적으로 들어가면 OCR 검수 대상으로 표시한다.
+
 ## 1.1 사전 TTS 원칙
 
 ElevenLabs는 4단계 realtime 대화에 붙이지 않는다.
