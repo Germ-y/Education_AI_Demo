@@ -56,7 +56,7 @@ export type SceneVisual = {
 
 export type StageQuestion = {
   step: number;
-  kind: "concept" | "quiz" | "scenario" | "summary";
+  kind: "concept" | "quiz" | "scenario" | "summary" | "ox" | "sequence" | "cardMatching" | "fillBlank";
   prompt: string;
   body?: string;
   choices?: string[];
@@ -74,6 +74,30 @@ export type StageQuestion = {
   scenarioLines?: Array<{
     speaker: string;
     text: string;
+  }>;
+  oxStatement?: string;
+  oxItems?: Array<{
+    statement: string;
+    correctAnswer: "O" | "X";
+  }>;
+  sequenceItems?: Array<{
+    id: string;
+    label: string;
+    caption?: string;
+  }>;
+  matchingPairs?: Array<{
+    leftId: string;
+    left: string;
+    rightId: string;
+    right: string;
+  }>;
+  fillBlankText?: Array<{
+    kind: "text" | "blank";
+    value: string;
+  }>;
+  fillOptions?: Array<{
+    id: string;
+    label: string;
   }>;
   visualActiveIndex?: number;
 };
@@ -433,15 +457,27 @@ export const coachingScenes: CoachingScene[] = [
     stageQuestions: [
       {
         step: 1,
-        kind: "concept",
+        kind: "ox",
         prompt: "그림을 보고 전체와 부분을 먼저 알아봐요",
         body: "분수는 전체를 몇 조각으로 나누었는지, 그중 몇 조각을 보았는지 함께 생각하는 방법이에요.",
+        oxStatement: "피자 한 판을 똑같이 4조각으로 나누면, 한 조각은 전체의 부분이에요.",
+        oxItems: [
+          {
+            statement: "피자 한 판을 똑같이 4조각으로 나누면, 한 조각은 전체의 부분이에요.",
+            correctAnswer: "O",
+          },
+          {
+            statement: "분수에서 아래 숫자는 지금 고른 조각 수를 뜻해요.",
+            correctAnswer: "X",
+          },
+        ],
+        choices: ["O", "X"],
+        correctAnswer: "O|X",
         hint: "왼쪽 피자 지도에서 큰 조각이 몇 개인지 천천히 살펴보세요.",
-        correctFeedback: "좋아요. 전체와 부분을 볼 준비가 되었어요.",
-        wrongFeedback: "",
+        correctFeedback: "맞아요. 한 조각은 전체 피자에서 나뉜 부분이에요.",
+        wrongFeedback: "전체는 피자 한 판, 부분은 그중 한 조각이라는 점을 다시 떠올려봐요.",
         completionTitle: "전체 확인 완료",
-        completionMessage: "전체가 4조각이라는 것을 확인했어요.",
-        actionLabel: "개념 확인했어요",
+        completionMessage: "전체가 4조각이고 한 조각은 부분이라는 것을 확인했어요.",
         conceptCards: [
           {
             title: "전체",
@@ -460,60 +496,83 @@ export const coachingScenes: CoachingScene[] = [
       },
       {
         step: 2,
-        kind: "quiz",
-        prompt: "빛나는 구역은 몇 개인가요?",
-        choices: ["1구역", "2구역", "4구역"],
-        correctAnswer: "1구역",
-        hint: "노란 빛이 감싸고 있는 구역만 세어보세요.",
-        correctFeedback: "맞아요. 전체 4구역 중 빛나는 곳은 1구역이에요.",
-        wrongFeedback: "전체 구역이 아니라 빛나는 구역만 다시 세어볼까요?",
-        completionTitle: "빛나는 조각 찾기 완료",
-        completionMessage: "전체 중 선택된 한 조각을 정확히 찾았어요.",
+        kind: "sequence",
+        prompt: "분수를 알아보는 순서를 맞춰보세요",
+        body: "카드를 눌러 올바른 순서대로 놓아보세요.",
+        correctAnswer: "whole>part>fraction",
+        hint: "먼저 전체를 보고, 그다음 고른 부분을 세고, 마지막에 분수로 써요.",
+        correctFeedback: "좋아요. 전체부터 보고 부분을 찾아 분수로 표현했어요.",
+        wrongFeedback: "순서를 다시 생각해볼까요? 전체를 먼저 확인하면 쉬워요.",
+        completionTitle: "순서 배열 완료",
+        completionMessage: "분수를 확인하는 순서를 잘 정리했어요.",
+        sequenceItems: [
+          { id: "part", label: "부분 세기", caption: "고른 조각을 세요" },
+          { id: "fraction", label: "분수로 쓰기", caption: "1/4처럼 표현해요" },
+          { id: "whole", label: "전체 보기", caption: "피자 한 판을 봐요" },
+        ],
         visualActiveIndex: 3,
       },
       {
         step: 3,
-        kind: "concept",
-        prompt: "전체 4조각 중 1조각을 분수로 쓰면 무엇인가요?",
-        body: "분수에서 아래 숫자는 전체 조각 수, 위 숫자는 고른 조각 수를 뜻해요. 전체 4조각 중 1조각이면 1/4이에요.",
-        hint: "아래 숫자는 전체 조각 수, 위 숫자는 고른 조각 수예요.",
-        correctFeedback: "정확해요. 4조각 중 1조각은 1/4이에요.",
-        wrongFeedback: "",
-        completionTitle: "분수 표현 완료",
-        completionMessage: "부분을 분수 1/4로 연결했어요.",
-        actionLabel: "1/4 이해했어요",
-        conceptCards: [
+        kind: "cardMatching",
+        prompt: "서로 맞는 카드를 연결해보세요",
+        body: "왼쪽 카드와 오른쪽 카드를 하나씩 눌러 연결해요.",
+        correctAnswer: "numerator:selected|denominator:whole|fraction:expression|whole:one",
+        hint: "위 숫자는 고른 조각, 아래 숫자는 전체 조각 수와 연결돼요.",
+        correctFeedback: "맞아요. 분자와 분모의 뜻을 잘 연결했어요.",
+        wrongFeedback: "분자와 분모가 각각 무엇을 세는지 다시 살펴봐요.",
+        completionTitle: "카드 매칭 완료",
+        completionMessage: "분수의 숫자와 뜻을 올바르게 연결했어요.",
+        matchingPairs: [
           {
-            title: "위 숫자 1",
-            body: "지금 고른 조각이 1개라는 뜻이에요.",
+            leftId: "numerator",
+            left: "위 숫자 1",
+            rightId: "selected",
+            right: "고른 조각 수",
           },
           {
-            title: "아래 숫자 4",
-            body: "전체가 4조각으로 나뉘었다는 뜻이에요.",
+            leftId: "denominator",
+            left: "아래 숫자 4",
+            rightId: "whole",
+            right: "전체 조각 수",
+          },
+          {
+            leftId: "fraction",
+            left: "1/4",
+            rightId: "expression",
+            right: "분수 표현",
+          },
+          {
+            leftId: "whole",
+            left: "피자 한 판",
+            rightId: "one",
+            right: "기준이 되는 전체",
           },
         ],
         visualActiveIndex: 3,
       },
       {
         step: 4,
-        kind: "scenario",
-        prompt: "생활 속에서 1/4과 가장 비슷한 상황은 무엇인가요?",
-        choices: ["케이크 4조각 중 1조각", "사탕 2개 중 2개", "종이 3장 중 2장"],
-        correctAnswer: "케이크 4조각 중 1조각",
-        hint: "전체가 4개이고 그중 1개만 고른 상황을 찾아보세요.",
-        correctFeedback: "좋아요. 생활 속에서도 4개 중 1개를 찾을 수 있어요.",
-        wrongFeedback: "전체가 4개인 상황부터 다시 찾아볼까요?",
+        kind: "fillBlank",
+        prompt: "빈칸에 알맞은 숫자를 채워보세요",
+        body: "아래 숫자 카드를 눌러 빈칸에 넣어요.",
+        correctAnswer: "1|4",
+        hint: "위에는 고른 조각 수, 아래에는 전체 조각 수를 넣어요.",
+        correctFeedback: "정확해요. 전체 4조각 중 1조각은 1/4이에요.",
+        wrongFeedback: "위와 아래 숫자의 위치를 다시 확인해봐요.",
         completionTitle: "오늘 학습 완료",
-        completionMessage: "전체, 부분, 분수 표현, 생활 연결까지 모두 해냈어요.",
-        scenarioLines: [
-          {
-            speaker: "선생님",
-            text: "친구 네 명이 케이크 한 판을 똑같이 나누었어요.",
-          },
-          {
-            speaker: "수민",
-            text: "그중 내가 한 조각을 먹으면 어떤 분수랑 비슷할까요?",
-          },
+        completionMessage: "전체, 부분, 분수 표현까지 모두 해냈어요.",
+        fillBlankText: [
+          { kind: "text", value: "전체 4조각 중 1조각은 " },
+          { kind: "blank", value: "top" },
+          { kind: "text", value: " / " },
+          { kind: "blank", value: "bottom" },
+          { kind: "text", value: " 이에요." },
+        ],
+        fillOptions: [
+          { id: "1", label: "1" },
+          { id: "2", label: "2" },
+          { id: "4", label: "4" },
         ],
         visualActiveIndex: 3,
       },
