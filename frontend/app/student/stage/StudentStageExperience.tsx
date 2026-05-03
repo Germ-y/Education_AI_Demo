@@ -981,6 +981,7 @@ function RealtimePracticeRoom({
     { id: 1, role: "partner", text: practice.sceneLine },
   ]);
   const [livePartnerText, setLivePartnerText] = useState("");
+  const [liveStudentText, setLiveStudentText] = useState("");
   const messageListRef = useRef<HTMLDivElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -991,6 +992,7 @@ function RealtimePracticeRoom({
   const startedAtRef = useRef<number | null>(null);
   const transcriptRef = useRef<string[]>([practice.sceneLine]);
   const partnerDraftRef = useRef("");
+  const studentDraftRef = useRef("");
   const hasUserSubmittedRef = useRef(false);
 
   useEffect(() => {
@@ -998,7 +1000,7 @@ function RealtimePracticeRoom({
       top: messageListRef.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [livePartnerText, messages]);
+  }, [livePartnerText, liveStudentText, messages]);
 
   useEffect(() => () => closeRealtimeConnection(), []);
 
@@ -1044,8 +1046,23 @@ function RealtimePracticeRoom({
       return;
     }
 
-    if (type === "conversation.item.input_audio_transcription.completed" && typeof event.transcript === "string") {
-      appendMessage("student", event.transcript);
+    if (
+      (type === "conversation.item.input_audio_transcription.delta" || type === "conversation.item.input_audio_transcription.updated") &&
+      typeof event.delta === "string"
+    ) {
+      studentDraftRef.current += event.delta;
+      setLiveStudentText(studentDraftRef.current);
+      return;
+    }
+
+    if (type === "conversation.item.input_audio_transcription.completed" || type === "conversation.item.input_audio_transcription.done") {
+      const text = extractRealtimeEventText(event) || studentDraftRef.current.trim();
+      if (text) {
+        appendMessage("student", text);
+        setDraft("");
+      }
+      studentDraftRef.current = "";
+      setLiveStudentText("");
       return;
     }
 
@@ -1089,6 +1106,10 @@ function RealtimePracticeRoom({
       setConnectionState("error");
       setStatusMessage(`실시간 대화 오류: ${message}`);
       appendMessage("system", `오류: ${message}`);
+      partnerDraftRef.current = "";
+      studentDraftRef.current = "";
+      setLivePartnerText("");
+      setLiveStudentText("");
     }
   };
 
@@ -1144,14 +1165,6 @@ function RealtimePracticeRoom({
         setStatusMessage("연결됐어요. 마이크로 말하거나 아래에 문장을 입력해도 돼요.");
         appendMessage("system", "실시간 대화가 연결됐어요. 말하거나 채팅을 보내세요.");
         sendSessionEvent("realtime_session_connected", { provider: session.provider, model: session.model });
-        dataChannel.send(
-          JSON.stringify({
-            type: "response.create",
-            response: {
-              instructions: `먼저 학생에게 짧게 말을 걸어 주세요. 첫 문장: "${session.practiceSpec.openingLine}"`,
-            },
-          }),
-        );
       });
       dataChannel.addEventListener("message", (event) => {
         try {
@@ -1334,6 +1347,13 @@ function RealtimePracticeRoom({
               {message.text}
             </div>
           ))}
+          {liveStudentText && (
+            <div className="ml-auto max-w-[82%] rounded-[18px] rounded-tr-[6px] px-4 py-3 text-sm font-bold leading-6 text-white shadow-sm" style={{ backgroundColor: theme.accent }}>
+              <p className="mb-1 text-[11px] font-black text-white/80">나</p>
+              {liveStudentText}
+              <span className="ml-1 inline-block h-3 w-1 animate-pulse rounded-full bg-white/70" />
+            </div>
+          )}
           {livePartnerText && (
             <div className="max-w-[82%] rounded-[18px] rounded-tl-[6px] bg-white px-4 py-3 text-sm font-bold leading-6 text-[#334155] shadow-sm">
               <p className="mb-1 text-[11px] font-black text-[#64748b]">{practice.partner}</p>
@@ -1425,6 +1445,26 @@ function extractRealtimeResponseText(event: Record<string, unknown>) {
   }
 
   return parts.join(" ").trim();
+}
+
+function extractRealtimeEventText(event: Record<string, unknown>) {
+  if ("transcript" in event && typeof event.transcript === "string") return event.transcript.trim();
+  if ("text" in event && typeof event.text === "string") return event.text.trim();
+
+  const item = event.item;
+  if (item && typeof item === "object" && "content" in item && Array.isArray(item.content)) {
+    const parts = item.content
+      .map((content) => {
+        if (!content || typeof content !== "object") return "";
+        if ("transcript" in content && typeof content.transcript === "string") return content.transcript;
+        if ("text" in content && typeof content.text === "string") return content.text;
+        return "";
+      })
+      .filter(Boolean);
+    return parts.join(" ").trim();
+  }
+
+  return "";
 }
 
 function HintStar() {
