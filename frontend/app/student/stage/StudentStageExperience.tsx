@@ -16,12 +16,12 @@ import type { SceneTheme, SceneVisual, StageQuestion, StudentContext } from "@/l
 
 function MiniStar() {
   return (
-    <div className="relative h-24 w-24 shrink-0" aria-hidden="true">
+    <div className="relative h-20 w-20 shrink-0" aria-hidden="true">
       <Image
         src="/assets/complete-star/effect.svg"
         alt=""
         fill
-        sizes="96px"
+        sizes="80px"
         className="animate-[completeStarEffectPop_2.2s_ease-in-out_infinite] object-contain"
         draggable={false}
         priority
@@ -30,7 +30,7 @@ function MiniStar() {
         src="/assets/complete-star/without-eyes-effect.svg"
         alt=""
         fill
-        sizes="96px"
+        sizes="80px"
         className="object-contain"
         draggable={false}
         priority
@@ -39,7 +39,7 @@ function MiniStar() {
         src="/assets/complete-star/eyes.svg"
         alt=""
         fill
-        sizes="96px"
+        sizes="80px"
         className="animate-[hintStarBlink_4.2s_ease-in-out_infinite] object-contain"
         draggable={false}
         priority
@@ -1797,19 +1797,19 @@ export function StudentStageExperience({
                 >
                   {isFinished ? (
                     <div
-                      className="grid h-full min-h-[300px] grid-rows-[auto_auto_1fr] rounded-[24px] border p-6 text-center shadow-[inset_0_-12px_0_rgba(39,174,96,0.08)]"
+                      className="grid h-full min-h-[300px] grid-rows-[auto_auto_1fr] rounded-[24px] border p-5 text-center shadow-[inset_0_-12px_0_rgba(39,174,96,0.08)]"
                       style={{ borderColor: theme.border, backgroundColor: theme.accentPale }}
                     >
                       <div className="flex flex-col items-center">
                         <MiniStar />
-                        <h3 className="mt-4 text-4xl font-black" style={{ color: theme.accentStrong }}>
+                        <h3 className="mt-1.5 text-4xl font-black" style={{ color: theme.accentStrong }}>
                           완료!
                         </h3>
-                        <p className="mt-3 max-w-[520px] text-lg font-black leading-7 break-keep">
+                        <p className="mt-2 max-w-[520px] text-lg font-black leading-7 break-keep">
                           오늘의 4단계 미션을 모두 해냈어요.
                         </p>
                       </div>
-                      <div className="mt-5 grid w-full grid-cols-4 gap-2">
+                      <div className="mt-4 grid w-full grid-cols-4 gap-2">
                         {scene.stages.map((stage) => (
                           <div key={stage.step} className="rounded-[16px] bg-white px-3 py-3 text-center shadow-sm">
                             <p className="text-xs font-black" style={{ color: theme.accentStrong }}>
