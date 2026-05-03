@@ -943,7 +943,7 @@ export default function DashboardPage() {
 
     const updateScale = () => {
       const { width, height } = frame.getBoundingClientRect();
-      setReviewPreviewScale(Math.min(width / 1024, height / 768));
+      setReviewPreviewScale(Math.min(1, Math.max(0.1, (width - 24) / 1024), Math.max(0.1, (height - 24) / 768)));
     };
 
     updateScale();
@@ -959,7 +959,7 @@ export default function DashboardPage() {
 
     const updateScale = () => {
       const { width, height } = frame.getBoundingClientRect();
-      setReportPreviewScale(Math.min(width / 1024, height / 768));
+      setReportPreviewScale(Math.min(1, Math.max(0.1, (width - 24) / 1024), Math.max(0.1, (height - 24) / 768)));
     };
 
     updateScale();
