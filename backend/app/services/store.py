@@ -1294,11 +1294,19 @@ def _mission_mapping_sort_key(content: MissionContent) -> tuple[str, str]:
 
 
 def _mission_progress_mapping(content: MissionContent, attempts: list[ContentAttempt]) -> dict[str, Any]:
+    content_attempts = [attempt for attempt in attempts if attempt.mission_content_id == content.id]
     latest_attempt = next(
         (
             attempt
-            for attempt in sorted(attempts, key=lambda item: item.started_at, reverse=True)
-            if attempt.mission_content_id == content.id
+            for attempt in sorted(content_attempts, key=lambda item: item.started_at, reverse=True)
+        ),
+        None,
+    )
+    latest_completed_attempt = next(
+        (
+            attempt
+            for attempt in sorted(content_attempts, key=lambda item: item.completed_at or item.started_at, reverse=True)
+            if attempt.status == "completed"
         ),
         None,
     )
@@ -1314,7 +1322,7 @@ def _mission_progress_mapping(content: MissionContent, attempts: list[ContentAtt
         "latestAttemptStatus": latest_attempt.status,
         "latestAttemptCurrentStep": latest_attempt.current_step,
         "latestAttemptCompletedAt": latest_attempt.completed_at,
-        "isCompleted": latest_attempt.status == "completed",
+        "isCompleted": latest_completed_attempt is not None,
     }
 
 

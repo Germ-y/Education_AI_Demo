@@ -443,6 +443,35 @@ def test_teacher_can_persist_content_review_edits() -> None:
     assert persisted_stage["templateJson"]["choices"][0]["text"] == "4시"
 
 
+def test_completed_mission_stays_completed_after_restart() -> None:
+    client = TestClient(create_app())
+    student_login = client.post("/api/auth/student-access", json={"accessCode": "STAR-003"})
+    student_token = student_login.json()["data"]["session"]["accessToken"]
+    content_id = "content_clock_001"
+
+    first_attempt = client.post(
+        f"/api/student/missions/{content_id}/start",
+        headers={"authorization": f"Bearer {student_token}"},
+    ).json()["data"]
+    completed = client.post(
+        f"/api/student/missions/{content_id}/complete",
+        headers={"authorization": f"Bearer {student_token}"},
+        json={"attemptId": first_attempt["id"]},
+    )
+    assert completed.status_code == 200
+
+    restarted = client.post(
+        f"/api/student/missions/{content_id}/start",
+        headers={"authorization": f"Bearer {student_token}"},
+    )
+    assert restarted.status_code == 200
+
+    seed_context = client.get("/api/context/seed").json()["data"]
+    mapping = next(mapping for mapping in seed_context["missionMappings"] if mapping["contentId"] == content_id)
+    assert mapping["latestAttemptStatus"] == "in_progress"
+    assert mapping["isCompleted"] is True
+
+
 def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, tmp_path) -> None:
     os.environ["OPENAI_API_KEY"] = "test-openai-key"
     os.environ["ELEVENLABS_API_KEY"] = "test-elevenlabs-key"
