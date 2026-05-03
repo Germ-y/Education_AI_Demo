@@ -472,6 +472,27 @@ function mapContentToReviewItem(content: MissionContent, lessonProposalTitle?: s
   };
 }
 
+function getContentActivityTime(content: MissionContent) {
+  const generatedAt = content.briefJson.generatedAt;
+  const timestamp = content.publishedAt ?? content.approvedAt ?? (typeof generatedAt === "string" ? generatedAt : "");
+  const value = timestamp ? new Date(timestamp).getTime() : 0;
+  return Number.isFinite(value) ? value : 0;
+}
+
+function getActivePublishedContentIds(contents: MissionContent[] = []) {
+  const latestByCase = new Map<string, MissionContent>();
+  contents
+    .filter((content) => content.status === "published")
+    .forEach((content) => {
+      const current = latestByCase.get(content.caseId);
+      if (!current || getContentActivityTime(content) > getContentActivityTime(current)) {
+        latestByCase.set(content.caseId, content);
+      }
+    });
+
+  return new Set(Array.from(latestByCase.values()).map((content) => content.id));
+}
+
 function choicesFromTemplate(templateJson: Record<string, unknown>): string[] {
   const choices = templateJson.choices;
   if (Array.isArray(choices)) {
@@ -880,10 +901,11 @@ export default function DashboardPage() {
   const openReviewStages = openReview ? (reviewStageDrafts[openReview.id] ?? mapContentToReviewStages(openReview.content)) : reviewStagePreviews;
   const openReviewNeedsMediaGeneration = openReview ? hasMissingGeneratedMedia(openReview.content) : false;
   const isReviewEditing = openReview ? editingReviewIds.includes(openReview.id) : false;
+  const activePublishedContentIds = getActivePublishedContentIds(activeCaseFile?.recentContents);
   const isMaterialApproved = (item: MaterialReviewItem) =>
     item.content.status === "approved" || item.content.status === "published" || approvedMaterialIds.includes(item.id);
   const isMaterialApplied = (item: MaterialReviewItem) =>
-    item.content.status === "published" || appliedMaterialIds.includes(item.id);
+    activePublishedContentIds.has(item.contentId) || appliedMaterialIds.includes(item.id);
   const isMaterialRejected = (item: MaterialReviewItem) =>
     item.content.status === "revision_requested" || rejectedMaterialIds.includes(item.id);
   const savedMemo = savedMemos[selectedCase.id] ?? "";
@@ -1352,7 +1374,13 @@ export default function DashboardPage() {
     try {
       const content = await publishContent(item.contentId);
       updateCurrentContent(content);
-      setAppliedMaterialIds((current) => (current.includes(item.id) ? current : [...current, item.id]));
+      setAppliedMaterialIds((current) => [
+        ...current.filter((id) => {
+          const reviewItem = selectedReviewItems.find((candidate) => candidate.id === id);
+          return reviewItem?.caseId !== item.caseId;
+        }),
+        item.id,
+      ]);
       await refreshSelectedStudentData();
     } catch {
       setReviewActionError("수업 적용 상태를 저장하지 못했습니다. 승인된 자료인지 다시 확인해 주세요.");
@@ -1369,7 +1397,13 @@ export default function DashboardPage() {
     try {
       const content = await publishContent(record.contentId);
       updateCurrentContent(content);
-      setAppliedMaterialIds((current) => (current.includes(record.contentId) ? current : [...current, record.contentId]));
+      setAppliedMaterialIds((current) => [
+        ...current.filter((id) => {
+          const reviewItem = selectedReviewItems.find((candidate) => candidate.id === id);
+          return reviewItem?.caseId !== record.caseId;
+        }),
+        record.contentId,
+      ]);
       setReusedReportContentIds((current) =>
         current.includes(record.contentId) ? current : [...current, record.contentId],
       );

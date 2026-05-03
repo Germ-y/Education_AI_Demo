@@ -557,6 +557,15 @@ class DemoStore:
             return None
         if any(asset.approval_status != "approved" for asset in mission.assets):
             return None
+        for content in self.db.mission_contents:
+            if (
+                content.id != mission.id
+                and content.student_id == mission.student_id
+                and content.case_id == mission.case_id
+                and content.status == MissionStatus.PUBLISHED
+            ):
+                content.status = MissionStatus.APPROVED
+                content.published_at = None
         mission.status = MissionStatus.PUBLISHED
         mission.published_at = _now()
         support_case = next((case for case in self.db.support_cases if case.id == mission.case_id), None)
