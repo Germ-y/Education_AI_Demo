@@ -135,6 +135,12 @@ TEXT_LIMITS = {
     "default": {"instruction": 120, "question": 100, "choice": 42, "audio": 150},
 }
 
+STRUCTURED_INTERACTION_TEMPLATES = {
+    TemplateType.CARD_MATCH.value,
+    TemplateType.SEQUENCE_ORDERING.value,
+    TemplateType.BLANK_FILL.value,
+}
+
 
 class ContentQualityError(ValueError):
     def __init__(self, issues: list[str]) -> None:
@@ -163,6 +169,7 @@ def validate_orchestrator_plan_quality(
     _validate_korean_text(_nested(plan, "difficultyPolicy", "reason"), "orchestrator.difficultyPolicy.reason", issues)
     _validate_text_list(plan.get("teacherReviewFocus"), "orchestrator.teacherReviewFocus", issues)
     _validate_stage_plan(plan.get("stagePlan"), content_type, issues)
+    _validate_stage_plan_template_variety(plan.get("stagePlan"), issues)
     _validate_intent_roles(plan.get("imagePackageIntent"), "orchestrator.imagePackageIntent", issues)
     _validate_intent_roles(plan.get("ttsNarrationIntent"), "orchestrator.ttsNarrationIntent", issues)
 
@@ -196,6 +203,7 @@ def validate_mission_content_quality(
         issues.append("생성 직후 콘텐츠에는 승인/배포 필드가 없어야 합니다.")
 
     _validate_mission_stage_flow(mission, expected_content_type, issues)
+    _validate_mission_template_variety(mission, issues)
     _validate_asset_package(mission, issues)
     _validate_stage_asset_links(mission, issues)
     _validate_visible_content_text(mission, reading_load, choice_limit, issues)
@@ -237,6 +245,22 @@ def _validate_stage_plan(stage_plan: Any, content_type: str, issues: list[str]) 
         _validate_korean_text(item.get("purpose"), f"orchestrator.stagePlan[{step}].purpose", issues)
 
 
+def _validate_stage_plan_template_variety(stage_plan: Any, issues: list[str]) -> None:
+    if not isinstance(stage_plan, list):
+        return
+
+    stage_2_3_templates = [
+        item.get("templateType")
+        for item in stage_plan
+        if isinstance(item, dict) and item.get("step") in {2, 3}
+    ]
+    if len(stage_2_3_templates) != 2:
+        return
+
+    if not any(template in STRUCTURED_INTERACTION_TEMPLATES for template in stage_2_3_templates):
+        issues.append("orchestrator.stagePlan 2~3단계 중 최소 1개는 card_match, sequence_ordering, blank_fill 중 하나여야 합니다.")
+
+
 def _validate_mission_stage_flow(mission: MissionContent, content_type: str, issues: list[str]) -> None:
     rules = FLOW_RULES.get(content_type)
     if rules is None:
@@ -269,6 +293,19 @@ def _validate_mission_stage_flow(mission: MissionContent, content_type: str, iss
                 issues.append(f"{stage.id}.realtimeSpec.maxTurns는 데모 품질 기준상 8 이하로 제한합니다.")
             if stage.realtime_spec.max_duration_sec > 180:
                 issues.append(f"{stage.id}.realtimeSpec.maxDurationSec는 데모 품질 기준상 180초 이하로 제한합니다.")
+
+
+def _validate_mission_template_variety(mission: MissionContent, issues: list[str]) -> None:
+    stage_2_3_templates = [
+        _as_value(stage.template_type)
+        for stage in mission.stages
+        if stage.step in {2, 3}
+    ]
+    if len(stage_2_3_templates) != 2:
+        return
+
+    if not any(template in STRUCTURED_INTERACTION_TEMPLATES for template in stage_2_3_templates):
+        issues.append("mission.stages 2~3단계 중 최소 1개는 card_match, sequence_ordering, blank_fill 중 하나여야 합니다.")
 
 
 def _validate_asset_package(mission: MissionContent, issues: list[str]) -> None:

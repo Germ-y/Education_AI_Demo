@@ -88,6 +88,8 @@ Audio requirements:
 
 Use the `orchestratorPlan.stagePlan[*].templateType` unless it violates the profile limits below.
 Template selection must be based on the orchestrator plan and student context, never arbitrary randomness.
+Stages 2 and 3 must not collapse into only simple choice-question screens. At least one of stages 2 or 3 must use `card_match`, `sequence_ordering`, or `blank_fill`.
+Do not substitute `image_quiz` for another planned template because it is easier to write.
 For any choice-based template other than `image_quiz`, use this choice object shape:
 
 ```json

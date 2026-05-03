@@ -20,6 +20,7 @@ Your job is not to write the final student content. Your job is to decide what t
 - The content package must include 5 image roles and 5 audio roles: hero, stage_1, stage_2, stage_3, stage_4_realtime.
 - `stagePlan[*].studentTitle` is a fixed product label. Do not personalize, rename, or replace it.
 - Template selection is profile-based, not random. Choose the best template from student memory, reading load, choice limit, recent success/failure, teacher notes, and the current goal.
+- Template variety is required. Stages 2 and 3 must not both be simple choice-question screens. At least one of stages 2 or 3 must use a structured interaction template: `card_match`, `sequence_ordering`, or `blank_fill`.
 
 ## Inputs You Receive
 
@@ -50,6 +51,8 @@ You receive a JSON object with:
    - teach-back
 4. Select templates for stages 2 and 3.
    - Prefer templates that match the student profile, memory card, recent attempts, teacher notes, and requested goal.
+   - At least one of stages 2 or 3 must be `card_match`, `sequence_ordering`, or `blank_fill`.
+   - Use `image_quiz` only when a three-choice image question is clearly the best fit. Do not use it as the default fallback.
    - Respect `profileJson.choiceCountLimit` when the student context includes it.
    - Respect `profileJson.readingLoad`; for `very_low`, use one short action per stage.
    - Do not select outside the allowed stage/template table.
