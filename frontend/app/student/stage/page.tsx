@@ -14,7 +14,10 @@ export default async function StudentStagePage({
   const previewParam = Array.isArray(params.preview) ? params.preview[0] : params.preview;
   const context = await getStudentContextForRoute({ caseId: caseIdParam, contentId: contentIdParam, preview: previewParam === "1" });
   const requestedStep = Number(stepParam);
-  const maxOpenStep = completeParam === "1" || previewParam === "1" ? context.scene.totalSteps : context.scene.currentStep;
+  const maxOpenStep =
+    completeParam === "1" || previewParam === "1" || context.scene.isCompleted
+      ? context.scene.totalSteps
+      : context.scene.currentStep;
   const initialStep =
     Number.isInteger(requestedStep) && requestedStep >= 1 && requestedStep <= maxOpenStep
       ? requestedStep

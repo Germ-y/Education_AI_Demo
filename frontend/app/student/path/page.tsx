@@ -86,7 +86,7 @@ export default async function StudentHomePage({
   const contentIdParam = Array.isArray(params.contentId) ? params.contentId[0] : params.contentId;
   const { student, scene } = await getStudentContextForRoute({ caseId: caseIdParam, contentId: contentIdParam });
   const completeParam = Array.isArray(params.complete) ? params.complete[0] : params.complete;
-  const isComplete = completeParam === "1";
+  const isComplete = completeParam === "1" || Boolean(scene.isCompleted);
   const theme = scene.theme;
   const caseQuery = `caseId=${encodeURIComponent(scene.caseId)}${scene.contentId ? `&contentId=${encodeURIComponent(scene.contentId)}` : ""}`;
 

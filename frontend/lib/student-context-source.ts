@@ -64,6 +64,7 @@ export async function getStudentContextForRoute({ caseId, contentId, preview = f
   }
 
   const mission = await getMissionForRoute(resolvedContentId, { allowReviewable: preview });
+  const progress = seed.mappings.find((mapping) => mapping.contentId === resolvedContentId);
   const validation = validateMissionContent(mission);
 
   if (!validation.ok) {
@@ -110,12 +111,21 @@ export async function getStudentContextForRoute({ caseId, contentId, preview = f
       challengeTags: [],
       planTags: [],
     },
-    scene: missionToScene(mission),
+    scene: missionToScene(mission, progress),
   };
 }
 
-function missionToScene(mission: MissionContent): StudentContext["scene"] {
+function missionToScene(
+  mission: MissionContent,
+  progress?: Awaited<ReturnType<typeof getContextSeed>>["mappings"][number],
+): StudentContext["scene"] {
   const sortedStages = [...mission.stages].sort((left, right) => left.step - right.step);
+  const isCompleted = Boolean(progress?.isCompleted);
+  const currentStep = isCompleted
+    ? 4
+    : typeof progress?.latestAttemptCurrentStep === "number"
+      ? Math.min(4, Math.max(1, progress.latestAttemptCurrentStep))
+      : 1;
 
   return {
     id: `scene-${mission.id}`,
@@ -131,7 +141,8 @@ function missionToScene(mission: MissionContent): StudentContext["scene"] {
     missionTitle: mission.title,
     missionDescription: mission.sessionGoal,
     totalSteps: 4,
-    currentStep: 1,
+    currentStep,
+    isCompleted,
     rewardLabel: "미션 토큰",
     rewardProgress: 0,
     assets: mission.assets
@@ -148,7 +159,7 @@ function missionToScene(mission: MissionContent): StudentContext["scene"] {
       step: stage.step,
       title: stage.studentTitle,
       subtitle: stage.studentInstruction,
-      state: stage.step === 1 ? "current" : "locked",
+      state: isCompleted ? "done" : stage.step < currentStep ? "done" : stage.step === currentStep ? "current" : "locked",
     })),
     visual: buildMissionVisual(mission),
     question: {

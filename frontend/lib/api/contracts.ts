@@ -448,6 +448,10 @@ export type SeedContext = {
     contentId: string;
     status?: MissionStatus | string;
     updatedAt?: string | null;
+    latestAttemptStatus?: "in_progress" | "completed" | "abandoned" | null;
+    latestAttemptCurrentStep?: 1 | 2 | 3 | 4 | null;
+    latestAttemptCompletedAt?: string | null;
+    isCompleted?: boolean;
   }>;
 };
 

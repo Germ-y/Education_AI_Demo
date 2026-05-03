@@ -1298,7 +1298,7 @@ export function StudentStageExperience({
     scene.stages.findIndex((stage) => stage.step === initialStep),
   );
   const initialCompletedSteps =
-    initialMode === "complete"
+    initialMode === "complete" || scene.isCompleted
       ? scene.stages.map((stage) => stage.step)
       : scene.stages.filter((stage) => stage.step < initialStep).map((stage) => stage.step);
   const [activeStageIndex, setActiveStageIndex] = useState(initialMode === "complete" ? scene.stages.length - 1 : initialStageIndex);
@@ -1307,6 +1307,7 @@ export function StudentStageExperience({
   const [attempts, setAttempts] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>(initialCompletedSteps);
   const [isFinished, setIsFinished] = useState(initialMode === "complete");
+  const [hasEverFinished, setHasEverFinished] = useState(initialMode === "complete" || Boolean(scene.isCompleted));
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [sequenceAnswer, setSequenceAnswer] = useState<string[]>([]);
   const [selectedMatchLeft, setSelectedMatchLeft] = useState<string | null>(null);
@@ -1621,6 +1622,7 @@ export function StudentStageExperience({
     window.setTimeout(() => {
       if (isLastStage) {
         setIsFinished(true);
+        setHasEverFinished(true);
       } else {
         setActiveStageIndex((index) => index + 1);
       }
@@ -1643,7 +1645,7 @@ export function StudentStageExperience({
     setAnswer(null);
     setWrongNotice(null);
     setAttempts(0);
-    setCompletedSteps([]);
+    setCompletedSteps(hasEverFinished ? scene.stages.map((stage) => stage.step) : []);
     setIsFinished(false);
     setSequenceAnswer([]);
     setSelectedMatchLeft(null);

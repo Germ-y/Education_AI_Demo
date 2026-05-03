@@ -153,6 +153,7 @@ export type CoachingScene = {
   missionDescription: string;
   totalSteps: number;
   currentStep: number;
+  isCompleted?: boolean;
   rewardLabel: string;
   rewardProgress: number;
   assets?: Array<{

@@ -114,6 +114,7 @@ class DemoStore:
                     "status": content.status,
                     "totalSteps": content.total_steps,
                     "updatedAt": _mission_updated_at(content),
+                    **_mission_progress_mapping(content, self.db.attempts),
                 }
                 for content in sorted(self.db.mission_contents, key=_mission_mapping_sort_key, reverse=True)
             ],
@@ -1290,6 +1291,31 @@ def _mission_updated_at(content: MissionContent) -> str | None:
 
 def _mission_mapping_sort_key(content: MissionContent) -> tuple[str, str]:
     return (_mission_updated_at(content) or "", content.id)
+
+
+def _mission_progress_mapping(content: MissionContent, attempts: list[ContentAttempt]) -> dict[str, Any]:
+    latest_attempt = next(
+        (
+            attempt
+            for attempt in sorted(attempts, key=lambda item: item.started_at, reverse=True)
+            if attempt.mission_content_id == content.id
+        ),
+        None,
+    )
+    if latest_attempt is None:
+        return {
+            "latestAttemptStatus": None,
+            "latestAttemptCurrentStep": None,
+            "latestAttemptCompletedAt": None,
+            "isCompleted": False,
+        }
+
+    return {
+        "latestAttemptStatus": latest_attempt.status,
+        "latestAttemptCurrentStep": latest_attempt.current_step,
+        "latestAttemptCompletedAt": latest_attempt.completed_at,
+        "isCompleted": latest_attempt.status == "completed",
+    }
 
 
 def _duration_seconds(started_at: str, completed_at: str | None) -> int | None:
