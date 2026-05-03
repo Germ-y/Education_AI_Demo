@@ -5,9 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  completeRealtimeSession,
   completeStudentMission,
+  createRealtimeSession,
   saveStudentMissionEvent,
   saveStudentMissionReflection,
+  saveRealtimeSessionEvent,
   startStudentMission,
   studentAccess,
   submitStudentMissionStage,
@@ -944,56 +947,44 @@ function RealtimePracticeRoom({
   scene,
   theme,
   isComplete,
-  onStart,
+  contentId,
+  stageId,
+  attemptId,
+  token,
+  onComplete,
   onFinish,
 }: {
   question: StageQuestion;
   scene: StudentContext["scene"];
   theme: SceneTheme;
   isComplete: boolean;
-  onStart: () => void;
+  contentId?: string | null;
+  stageId?: string;
+  attemptId?: string | null;
+  token?: string | null;
+  onComplete: () => void;
   onFinish: () => void;
 }) {
   const rubric = question.realtimePracticeSpec?.rubric ?? [];
   const practice = getRealtimePracticeCopy(scene, question);
   const timeLimitMinutes = Math.round((question.realtimePracticeSpec?.timeLimitSeconds ?? 180) / 60);
-  const minimumStudentTurns = 3;
+  const minimumStudentTurns = 1;
   const [draft, setDraft] = useState("");
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [speechMessage, setSpeechMessage] = useState("마이크를 누르고 직접 말해보세요.");
+  const [connectionState, setConnectionState] = useState<"idle" | "connecting" | "connected" | "ending" | "complete" | "error">("idle");
+  const [statusMessage, setStatusMessage] = useState("시작을 누르면 별이와 실시간으로 대화할 수 있어요.");
   const [studentTurns, setStudentTurns] = useState(0);
   const [messages, setMessages] = useState<Array<{ id: number; role: "partner" | "student"; text: string }>>([
     { id: 1, role: "partner", text: practice.sceneLine },
-    { id: 2, role: "student", text: practice.studentLine },
-    { id: 3, role: "partner", text: "좋아요. 한 번 더 짧게 말해볼까요?" },
   ]);
   const messageListRef = useRef<HTMLDivElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const dataChannelRef = useRef<RTCDataChannel | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const realtimeSessionIdRef = useRef<string | null>(null);
+  const startedAtRef = useRef<number | null>(null);
+  const transcriptRef = useRef<string[]>([practice.sceneLine]);
   const hasUserSubmittedRef = useRef(false);
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-
-  type SpeechRecognitionResultLike = ArrayLike<{ transcript: string }> & {
-    isFinal?: boolean;
-  };
-  type SpeechRecognitionEventLike = {
-    resultIndex?: number;
-    results: ArrayLike<SpeechRecognitionResultLike>;
-  };
-  type SpeechRecognitionLike = {
-    lang: string;
-    continuous: boolean;
-    interimResults: boolean;
-    maxAlternatives: number;
-    onstart: (() => void) | null;
-    onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-    onend: (() => void) | null;
-    onerror: ((event?: { error?: string }) => void) | null;
-    start: () => void;
-    stop: () => void;
-  };
-  type SpeechRecognitionWindow = Window & {
-    SpeechRecognition?: new () => SpeechRecognitionLike;
-    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
-  };
 
   useEffect(() => {
     if (!hasUserSubmittedRef.current) return;
@@ -1004,91 +995,204 @@ function RealtimePracticeRoom({
     });
   }, [messages]);
 
+  useEffect(() => () => closeRealtimeConnection(), []);
+
+  function closeRealtimeConnection() {
+    dataChannelRef.current?.close();
+    peerConnectionRef.current?.close();
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    dataChannelRef.current = null;
+    peerConnectionRef.current = null;
+    mediaStreamRef.current = null;
+  }
+
+  const appendMessage = (role: "partner" | "student", text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    transcriptRef.current = [...transcriptRef.current, `${role === "student" ? "학생" : "상대"}: ${trimmed}`];
+    setMessages((current) => [...current, { id: current.length + 1, role, text: trimmed }]);
+  };
+
+  const sendSessionEvent = (eventType: string, payloadJson: Record<string, unknown>) => {
+    const sessionId = realtimeSessionIdRef.current;
+    if (!sessionId || !token) return;
+    void saveRealtimeSessionEvent(sessionId, { eventType, payloadJson }, { token }).catch(() => undefined);
+  };
+
+  const handleRealtimeEvent = (rawEvent: unknown) => {
+    if (!rawEvent || typeof rawEvent !== "object" || !("type" in rawEvent)) return;
+    const event = rawEvent as Record<string, unknown>;
+    const type = String(event.type);
+
+    if (type === "input_audio_buffer.speech_started") {
+      setStatusMessage("듣고 있어요. 천천히 말해보세요.");
+      return;
+    }
+
+    if (type === "input_audio_buffer.speech_stopped") {
+      setStudentTurns((current) => current + 1);
+      setStatusMessage("말을 들었어요. 답을 기다리는 중이에요.");
+      return;
+    }
+
+    if ((type === "response.audio_transcript.done" || type === "response.output_text.done") && typeof event.transcript === "string") {
+      appendMessage("partner", event.transcript);
+      return;
+    }
+
+    if (type === "response.output_text.done" && typeof event.text === "string") {
+      appendMessage("partner", event.text);
+      return;
+    }
+
+    if (type === "error") {
+      setConnectionState("error");
+      setStatusMessage("실시간 대화 중 오류가 생겼어요. 잠시 뒤 다시 시도해 주세요.");
+    }
+  };
+
+  const startRealtimeConversation = async () => {
+    if (connectionState === "connecting" || connectionState === "connected") return;
+    if (!contentId || !stageId || !attemptId || !token) {
+      setConnectionState("error");
+      setStatusMessage("학습 기록 연결이 아직 준비되지 않았어요. 잠시 뒤 다시 눌러 주세요.");
+      return;
+    }
+
+    setConnectionState("connecting");
+    setStatusMessage("실시간 대화를 연결하고 있어요.");
+
+    try {
+      const session = await createRealtimeSession(contentId, stageId, { attemptId }, { token });
+      realtimeSessionIdRef.current = session.sessionId;
+      startedAtRef.current = Date.now();
+
+      const peerConnection = new RTCPeerConnection();
+      peerConnectionRef.current = peerConnection;
+      peerConnection.ontrack = (event) => {
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = event.streams[0];
+        }
+      };
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = mediaStream;
+      mediaStream.getAudioTracks().forEach((track) => peerConnection.addTrack(track, mediaStream));
+
+      const dataChannel = peerConnection.createDataChannel("oai-events");
+      dataChannelRef.current = dataChannel;
+      dataChannel.addEventListener("open", () => {
+        setConnectionState("connected");
+        setStatusMessage("연결됐어요. 마이크로 말하거나 아래에 문장을 입력해도 돼요.");
+        sendSessionEvent("realtime_session_connected", { provider: session.provider, model: session.model });
+        dataChannel.send(
+          JSON.stringify({
+            type: "response.create",
+            response: {
+              modalities: ["audio"],
+              instructions: `먼저 학생에게 짧게 말을 걸어 주세요. 첫 문장: "${session.practiceSpec.openingLine}"`,
+            },
+          }),
+        );
+      });
+      dataChannel.addEventListener("message", (event) => {
+        try {
+          handleRealtimeEvent(JSON.parse(event.data));
+        } catch {
+          // Ignore non-JSON diagnostic frames.
+        }
+      });
+      dataChannel.addEventListener("error", () => {
+        setConnectionState("error");
+        setStatusMessage("대화 채널 연결에 실패했어요.");
+      });
+
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      const sdpResponse = await fetch(session.webrtcUrl, {
+        method: "POST",
+        body: offer.sdp,
+        headers: {
+          Authorization: `Bearer ${session.clientSecret}`,
+          "Content-Type": "application/sdp",
+        },
+      });
+
+      if (!sdpResponse.ok) {
+        throw new Error(await sdpResponse.text());
+      }
+
+      await peerConnection.setRemoteDescription({
+        type: "answer",
+        sdp: await sdpResponse.text(),
+      });
+    } catch {
+      closeRealtimeConnection();
+      setConnectionState("error");
+      setStatusMessage("실시간 대화를 시작하지 못했어요. API 키, 마이크 권한, 네트워크 상태를 확인해 주세요.");
+    }
+  };
+
   const submitMessage = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
 
     const nextTurn = studentTurns + 1;
-    const isFinalTurn = nextTurn >= minimumStudentTurns;
-
     hasUserSubmittedRef.current = true;
-    setMessages((current) => [
-      ...current,
-      { id: current.length + 1, role: "student", text: trimmed },
-      {
-        id: current.length + 2,
-        role: "partner",
-        text: isFinalTurn
-          ? "좋아요. 이제 네 말로 충분히 설명했어요. 마무리해도 돼요."
-          : "좋아. 이제 방금 말한 내용을 더 자연스럽게 이어서 말해볼래?",
-      },
-    ]);
+    appendMessage("student", trimmed);
     setStudentTurns(nextTurn);
     setDraft("");
+    sendSessionEvent("realtime_text_message", { text: trimmed });
 
-    if (isFinalTurn && !isComplete) onStart();
+    const dataChannel = dataChannelRef.current;
+    if (dataChannel?.readyState === "open") {
+      dataChannel.send(
+        JSON.stringify({
+          type: "conversation.item.create",
+          item: {
+            type: "message",
+            role: "user",
+            content: [{ type: "input_text", text: trimmed }],
+          },
+        }),
+      );
+      dataChannel.send(JSON.stringify({ type: "response.create", response: { modalities: ["audio"] } }));
+    }
   };
 
-  const startSpeechInput = () => {
-    if (isSpeaking) {
-      recognitionRef.current?.stop();
-      setSpeechMessage("듣기를 멈췄어요. 인식된 문장을 확인해 보세요.");
-      return;
-    }
+  const finishRealtimeConversation = async () => {
+    if (connectionState === "ending") return;
+    setConnectionState("ending");
+    setStatusMessage("대화 기록을 저장하고 있어요.");
+    closeRealtimeConnection();
 
-    const Recognition =
-      (window as SpeechRecognitionWindow).SpeechRecognition ??
-      (window as SpeechRecognitionWindow).webkitSpeechRecognition;
-
-    if (!Recognition) {
-      setSpeechMessage("이 브라우저에서는 말로 입력하기를 지원하지 않아요. 문장을 직접 입력해 주세요.");
+    const sessionId = realtimeSessionIdRef.current;
+    if (!sessionId || !token) {
+      setConnectionState("complete");
+      onComplete();
       return;
     }
 
     try {
-      const recognition = new Recognition();
-      recognitionRef.current = recognition;
-      recognition.lang = "ko-KR";
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.maxAlternatives = 1;
-      recognition.onstart = () => {
-        setIsSpeaking(true);
-        setSpeechMessage("듣는 중이에요. 천천히 말해보세요.");
-      };
-      recognition.onresult = (event) => {
-        let transcript = "";
-        const startIndex = event.resultIndex ?? 0;
-
-        for (let index = startIndex; index < event.results.length; index += 1) {
-          transcript += event.results[index]?.[0]?.transcript ?? "";
-        }
-
-        const normalized = transcript.trim();
-        if (normalized) {
-          setDraft(normalized);
-          setSpeechMessage("말한 내용을 입력했어요. 필요하면 고친 뒤 보내세요.");
-        }
-      };
-      recognition.onend = () => {
-        setIsSpeaking(false);
-        recognitionRef.current = null;
-      };
-      recognition.onerror = (event) => {
-        setIsSpeaking(false);
-        recognitionRef.current = null;
-        setSpeechMessage(
-          event?.error === "not-allowed"
-            ? "마이크 권한이 필요해요. 브라우저에서 마이크 허용을 켜 주세요."
-            : "말을 잘 듣지 못했어요. 마이크를 다시 누르고 말해보세요.",
-        );
-      };
-      recognition.start();
-      return;
+      await completeRealtimeSession(
+        sessionId,
+        {
+          turnCount: studentTurns,
+          durationSec: startedAtRef.current ? Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000)) : 0,
+          rubricResult: {
+            practiced: studentTurns >= minimumStudentTurns,
+            supportNeeded: studentTurns < minimumStudentTurns ? "학생 발화가 충분히 기록되지 않았습니다." : null,
+          },
+          transcriptSummary: transcriptRef.current.slice(-8).join(" / "),
+        },
+        { token },
+      );
+      setConnectionState("complete");
+      setStatusMessage("실시간 대화가 저장됐어요.");
+      onComplete();
     } catch {
-      setIsSpeaking(false);
-      recognitionRef.current = null;
-      setSpeechMessage("마이크를 시작하지 못했어요. 브라우저 권한을 확인해 주세요.");
+      setConnectionState("error");
+      setStatusMessage("대화 저장에 실패했어요. 다시 마치기를 눌러 주세요.");
     }
   };
 
@@ -1119,6 +1223,7 @@ function RealtimePracticeRoom({
           </div>
         </div>
 
+        <audio ref={remoteAudioRef} autoPlay className="hidden" />
       </div>
 
       <div className="grid min-h-0 grid-rows-[auto_1fr_auto] overflow-hidden rounded-[22px] border border-[#e2e8f0] bg-[#f8fafc]">
@@ -1178,47 +1283,51 @@ function RealtimePracticeRoom({
         </div>
         </div>
 
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            submitMessage(draft);
-          }}
-          className="border-t border-[#e2e8f0] bg-white p-4"
-        >
-          <div className="grid grid-cols-[auto_1fr_auto] gap-2">
+        <div className="border-t border-[#e2e8f0] bg-white p-4">
+          {connectionState === "idle" || connectionState === "error" ? (
             <button
               type="button"
-              onClick={startSpeechInput}
-              className="flex h-12 w-12 items-center justify-center rounded-full border border-[#dce5ec] bg-white shadow-sm transition hover:-translate-y-0.5"
-              style={{ color: isSpeaking ? theme.accentStrong : "#475569" }}
-              aria-label={isSpeaking ? "말 입력 멈추기" : "말로 입력하기"}
-              title={isSpeaking ? "말 입력 멈추기" : "말로 입력하기"}
-            >
-              <span className="relative flex h-6 w-6 items-center justify-center" aria-hidden="true">
-                <span className="absolute top-0 h-3.5 w-2.5 rounded-full border-2 border-current" />
-                <span className="absolute top-3 h-1.5 w-4 rounded-b-full border-b-2 border-l-2 border-r-2 border-current" />
-                <span className="absolute bottom-0 h-1.5 w-0.5 rounded-full bg-current" />
-                <span className="absolute bottom-0 h-0.5 w-3 rounded-full bg-current" />
-                {isSpeaking && <span className="absolute -inset-2 rounded-full border-2 border-current opacity-30" />}
-              </span>
-            </button>
-            <input
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              className="min-w-0 rounded-[16px] border border-[#dce5ec] bg-[#f8fafc] px-4 py-3 text-sm font-bold outline-none focus:border-[#94d86a] focus:bg-white"
-              placeholder={question.actionLabel ?? practice.actionLabel}
-            />
-            <button
-              type="submit"
-              className="rounded-[16px] px-5 py-3 text-sm font-black text-white shadow-[0_12px_24px_rgba(39,174,96,0.22)] transition duration-200 hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
+              onClick={startRealtimeConversation}
+              className="w-full rounded-[16px] px-5 py-3 text-sm font-black text-white shadow-[0_12px_24px_rgba(39,174,96,0.22)] transition duration-200 hover:-translate-y-0.5"
               style={{ backgroundColor: theme.accent }}
-              disabled={!draft.trim()}
             >
-              보내기
+              실시간 대화 시작
             </button>
-          </div>
-          <p className="mt-2 text-xs font-bold leading-5 text-[#64748b]">{speechMessage}</p>
-        </form>
+          ) : (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitMessage(draft);
+              }}
+              className="grid grid-cols-[1fr_auto_auto] gap-2"
+            >
+              <input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                className="min-w-0 rounded-[16px] border border-[#dce5ec] bg-[#f8fafc] px-4 py-3 text-sm font-bold outline-none focus:border-[#94d86a] focus:bg-white"
+                placeholder={question.actionLabel ?? practice.actionLabel}
+                disabled={connectionState !== "connected"}
+              />
+              <button
+                type="submit"
+                className="rounded-[16px] px-5 py-3 text-sm font-black text-white shadow-[0_12px_24px_rgba(39,174,96,0.22)] transition duration-200 hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
+                style={{ backgroundColor: theme.accent }}
+                disabled={!draft.trim() || connectionState !== "connected"}
+              >
+                보내기
+              </button>
+              <button
+                type="button"
+                onClick={finishRealtimeConversation}
+                className="rounded-[16px] border border-[#dce5ec] bg-white px-5 py-3 text-sm font-black text-[#334155] shadow-sm transition duration-200 hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
+                disabled={connectionState === "connecting" || connectionState === "ending"}
+              >
+                마치기
+              </button>
+            </form>
+          )}
+          <p className="mt-2 text-xs font-bold leading-5 text-[#64748b]">{statusMessage}</p>
+        </div>
       </div>
     </div>
   );
@@ -1614,15 +1723,15 @@ export function StudentStageExperience({
     setAnswer("completed");
   };
 
-  const startRealtimePractice = () => {
+  const completeRealtimePractice = () => {
     if (!isRealtimeStage) return;
     persistStudentEvent(activeQuestion, "realtime_practice_completed", {
-      mode: "simulated_text",
+      mode: "openai_realtime",
       prompt: activeQuestion.realtimePracticeSpec?.firstPrompt ?? activeQuestion.prompt,
     });
     setAttempts((current) => current + 1);
     setCompletedSteps((steps) => (steps.includes(activeStage.step) ? steps : [...steps, activeStage.step]));
-    setAnswer("realtime-started");
+    setAnswer("realtime-completed");
   };
 
   const showOxCheck = () => {
@@ -1887,7 +1996,11 @@ export function StudentStageExperience({
                         scene={scene}
                         theme={theme}
                         isComplete={isStageComplete}
-                        onStart={startRealtimePractice}
+                        contentId={scene.contentId}
+                        stageId={activeQuestion.stageId}
+                        attemptId={attemptId}
+                        token={studentAccessToken}
+                        onComplete={completeRealtimePractice}
                         onFinish={goToNextStage}
                       />
                     ) : (
@@ -2105,7 +2218,7 @@ export function StudentStageExperience({
 
                 {isFinished ? null : isRealtimeStage && !isStageComplete ? (
                   <button
-                    onClick={startRealtimePractice}
+                    onClick={completeRealtimePractice}
                     disabled={isTransitioning}
                     className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.28)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.32)] disabled:opacity-70 disabled:hover:translate-y-0"
                     style={{ backgroundColor: theme.accent }}

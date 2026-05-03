@@ -527,6 +527,18 @@ export type RealtimeSessionResponse = {
   };
 };
 
+export type RealtimeSessionEventRequest = {
+  eventType: string;
+  payloadJson: Record<string, unknown>;
+};
+
+export type RealtimeSessionCompleteRequest = {
+  turnCount: number;
+  durationSec: number;
+  rubricResult: Record<string, unknown>;
+  transcriptSummary?: string | null;
+};
+
 export type ReviewableContent = MissionContent;
 
 export type AgentRun = {
