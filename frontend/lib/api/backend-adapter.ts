@@ -84,6 +84,15 @@ export const backendAdapter: ApiAdapter = {
   getAgentRun: (agentRunId, options) =>
     apiFetch<AgentRun>(`/api/ai/agent-runs/${encodeURIComponent(agentRunId)}`, { token: options?.token }),
 
+  listAgentRuns: (params, options) => {
+    const searchParams = new URLSearchParams();
+    if (params.studentId) searchParams.set("student_id", params.studentId);
+    if (params.caseId) searchParams.set("case_id", params.caseId);
+    if (params.status) searchParams.set("status", params.status);
+    const query = searchParams.toString();
+    return apiFetch<AgentRun[]>(`/api/ai/agent-runs${query ? `?${query}` : ""}`, { token: options?.token });
+  },
+
   createAgentRun: (payload, options) =>
     apiFetch<OrchestratorRunResponse>("/api/ai/orchestrator-runs", { method: "POST", body: payload, token: options?.token }),
 

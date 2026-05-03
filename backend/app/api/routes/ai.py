@@ -123,6 +123,28 @@ def create_content_generation(
     return ok({"agentRun": agent_run.model_dump(by_alias=True), "content": None})
 
 
+@router.get("/agent-runs")
+def list_agent_runs(
+    student_id: str | None = None,
+    case_id: str | None = None,
+    status: str | None = None,
+    _: SessionPrincipal = Depends(require_teacher),
+    agent_runs: AgentRunRepository = Depends(get_agent_run_repository),
+) -> dict:
+    recent_runs = agent_runs.list_recent(limit=50)
+    filtered_runs = []
+    for agent_run in recent_runs:
+        snapshot = agent_run.input_snapshot_json
+        if student_id and snapshot.get("studentId") != student_id:
+            continue
+        if case_id and snapshot.get("caseId") != case_id:
+            continue
+        if status and agent_run.status != status:
+            continue
+        filtered_runs.append(agent_run.model_dump(by_alias=True))
+    return ok(filtered_runs)
+
+
 @router.get("/agent-runs/{agent_run_id}")
 def get_agent_run(
     agent_run_id: str,

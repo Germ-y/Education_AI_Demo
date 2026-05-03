@@ -6,6 +6,13 @@ export function getAgentRun(agentRunId: string, options?: ApiAdapterOptions & { 
   return getApiAdapter(options?.source).getAgentRun(agentRunId, options);
 }
 
+export function listAgentRuns(
+  params: { studentId?: string; caseId?: string; status?: "running" | "succeeded" | "failed" },
+  options?: ApiAdapterOptions & { source?: ApiDataSource },
+) {
+  return getApiAdapter(options?.source).listAgentRuns(params, options);
+}
+
 export function createAgentRun(payload: AgentRunRequest, options?: ApiAdapterOptions & { source?: ApiDataSource }) {
   return getApiAdapter(options?.source).createAgentRun(payload, options);
 }

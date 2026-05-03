@@ -12,6 +12,7 @@ import {
   getTeacherStudent,
   getTeacherStudentReport,
   getTeacherStudents,
+  listAgentRuns,
   publishContent,
   rejectContent,
   updateContentReview,
@@ -96,6 +97,46 @@ function getGeneratedContentId(agentRun: AgentRun) {
   const candidate = typeof output.missionContent === "object" && output.missionContent !== null ? output.missionContent : output;
   const id = (candidate as { id?: unknown }).id;
   return typeof id === "string" ? id : null;
+}
+
+function getSnapshotText(agentRun: AgentRun, key: string) {
+  const value = agentRun.inputSnapshotJson[key];
+  return typeof value === "string" ? value : "";
+}
+
+function getPendingJobFromAgentRun(agentRun: AgentRun): PendingGenerationJob | null {
+  const studentId = getSnapshotText(agentRun, "studentId");
+  const caseId = getSnapshotText(agentRun, "caseId");
+  if (!studentId || !caseId) return null;
+
+  if (agentRun.agentType === "orchestrator") {
+    return {
+      caseId,
+      studentId,
+      requestedGoal: getSnapshotText(agentRun, "requestedGoal"),
+      contentType: getSnapshotText(agentRun, "contentType") || "learning_focus",
+      phase: "orchestrator",
+      orchestratorRunId: agentRun.id,
+      startedAt: agentRun.createdAt,
+    };
+  }
+
+  if (agentRun.agentType === "content") {
+    const contentId = agentRun.status === "succeeded" ? getGeneratedContentId(agentRun) : null;
+    return {
+      caseId,
+      studentId,
+      requestedGoal: "",
+      contentType: "learning_focus",
+      phase: contentId ? "assets" : "content",
+      orchestratorRunId: getSnapshotText(agentRun, "orchestratorRunId") || undefined,
+      contentRunId: agentRun.id,
+      contentId: contentId ?? undefined,
+      startedAt: agentRun.createdAt,
+    };
+  }
+
+  return null;
 }
 
 type ReviewStageDraft = {
@@ -570,6 +611,47 @@ export default function DashboardPage() {
   useEffect(() => {
     writePendingGenerationJobs(pendingGenerationJobs);
   }, [pendingGenerationJobs]);
+
+  useEffect(() => {
+    if (!selectedStudentId) return;
+
+    let ignore = false;
+    async function restoreServerGenerationJob() {
+      try {
+        const runs = await listAgentRuns({ studentId: selectedStudentId });
+        if (ignore) return;
+        let restorableRun =
+          runs.find((run) => run.status === "running" && (run.agentType === "orchestrator" || run.agentType === "content")) ?? null;
+        if (!restorableRun) {
+          for (const run of runs) {
+            if (run.status !== "succeeded" || run.agentType !== "content") continue;
+            const contentId = getGeneratedContentId(run);
+            if (!contentId) continue;
+            const content = await getReviewableContent(contentId).catch(() => null);
+            if (content && hasMissingGeneratedMedia(content)) {
+              restorableRun = run;
+              break;
+            }
+          }
+        }
+        if (!restorableRun) return;
+
+        const job = getPendingJobFromAgentRun(restorableRun);
+        if (!job) return;
+        updatePendingGenerationJobs((current) => {
+          if (current[job.caseId]) return current;
+          return { ...current, [job.caseId]: job };
+        });
+      } catch {
+        // Local storage restoration still covers the normal path.
+      }
+    }
+
+    void restoreServerGenerationJob();
+    return () => {
+      ignore = true;
+    };
+  }, [selectedStudentId, updatePendingGenerationJobs]);
 
   useEffect(() => {
     let ignore = false;
