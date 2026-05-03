@@ -1605,7 +1605,7 @@ export function StudentStageExperience({
     }
 
     if (!scene.contentId || !attemptId || !studentAccessToken) {
-      setRuntimeError("학습 기록 저장 연결을 준비 중입니다. 잠시 후 다시 눌러 주세요.");
+      router.push(nextHref);
       return;
     }
 
@@ -1624,10 +1624,10 @@ export function StudentStageExperience({
         { token: studentAccessToken },
       );
       await completeStudentMission(scene.contentId, attemptId, { token: studentAccessToken });
-      router.push(nextHref);
     } catch {
-      setRuntimeError("학습 완료 기록을 저장하지 못했습니다. 다시 눌러 주세요.");
-      setIsCompletingMission(false);
+      // 기록 저장 실패가 학생의 완료 이동을 막지 않도록 한다.
+    } finally {
+      router.push(nextHref);
     }
   };
 
