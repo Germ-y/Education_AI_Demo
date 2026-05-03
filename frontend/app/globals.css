@@ -156,3 +156,15 @@ a {
     transform: translateY(2px) rotate(-4deg);
   }
 }
+
+@keyframes completeStarEffectPop {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.96) rotate(-2deg);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.06) rotate(3deg);
+  }
+}

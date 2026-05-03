@@ -16,17 +16,34 @@ import type { SceneTheme, SceneVisual, StageQuestion, StudentContext } from "@/l
 
 function MiniStar() {
   return (
-    <div className="relative h-16 w-16 shrink-0">
-      <div
-        className="absolute left-2 top-1 z-10 h-12 w-12 bg-[#ffd84d] shadow-[inset_0_-5px_0_rgba(184,122,0,0.16),0_10px_20px_rgba(184,122,0,0.14)]"
-        style={{
-          clipPath:
-            "polygon(50% 0%, 61% 34%, 97% 35%, 68% 55%, 79% 91%, 50% 69%, 21% 91%, 32% 55%, 3% 35%, 39% 34%)",
-        }}
+    <div className="relative h-24 w-24 shrink-0" aria-hidden="true">
+      <Image
+        src="/assets/complete-star/effect.svg"
+        alt=""
+        fill
+        sizes="96px"
+        className="animate-[completeStarEffectPop_2.2s_ease-in-out_infinite] object-contain"
+        draggable={false}
+        priority
       />
-      <div className="absolute left-[23px] top-[21px] z-20 h-1.5 w-1.5 rounded-full bg-[#25312a]" />
-      <div className="absolute left-[37px] top-[21px] z-20 h-1.5 w-1.5 rounded-full bg-[#25312a]" />
-      <div className="absolute left-[28px] top-[30px] z-20 h-2.5 w-4 rounded-b-full bg-[#25312a]" />
+      <Image
+        src="/assets/complete-star/without-eyes-effect.svg"
+        alt=""
+        fill
+        sizes="96px"
+        className="object-contain"
+        draggable={false}
+        priority
+      />
+      <Image
+        src="/assets/complete-star/eyes.svg"
+        alt=""
+        fill
+        sizes="96px"
+        className="animate-[hintStarBlink_4.2s_ease-in-out_infinite] object-contain"
+        draggable={false}
+        priority
+      />
     </div>
   );
 }
