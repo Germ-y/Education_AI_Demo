@@ -1050,6 +1050,76 @@ export default function DashboardPage() {
       });
     };
 
+    const completeAssetGeneration = async (assetJob: PendingGenerationJob) => {
+      if (!assetJob.contentId) {
+        failJob("생성된 콘텐츠를 찾지 못했습니다. 다시 시도해 주세요.");
+        return;
+      }
+
+      const localContent = findPendingGenerationContent(assetJob, activeCaseFile);
+      if (isPendingGenerationContentComplete(localContent)) {
+        completeJob(localContent);
+        return;
+      }
+
+      setRunningMessage("이미지와 음성 asset을 연결하는 중입니다.");
+      let generatedContent = await getReviewableContent(assetJob.contentId);
+      if (!hasMissingGeneratedMedia(generatedContent)) {
+        completeJob(generatedContent);
+        return;
+      }
+
+      let assetGenerationErrorMessage: string | null = null;
+      try {
+        const assetPackage = await generateContentAssetPackage(generatedContent.id);
+        const assetsById = new Map(assetPackage.assets.map((asset) => [asset.id, asset]));
+        generatedContent = {
+          ...generatedContent,
+          assets: generatedContent.assets.map((asset) => assetsById.get(asset.id) ?? asset),
+        };
+      } catch (assetError) {
+        assetGenerationErrorMessage = getClientGenerationErrorMessage(assetError);
+      }
+
+      setSelectedCaseFile((current) =>
+        current && current.profile.id === generatedContent.studentId
+          ? {
+              ...current,
+              recentContents: [
+                generatedContent,
+                ...current.recentContents.filter((content) => content.id !== generatedContent.id),
+              ],
+            }
+          : current,
+      );
+
+      const refreshedCaseFile = await getTeacherStudent(assetJob.studentId).catch(() => null);
+      if (refreshedCaseFile) {
+        setSelectedCaseFile(refreshedCaseFile);
+      }
+      const refreshedReport = await getTeacherStudentReport(assetJob.studentId).catch(() => null);
+      if (refreshedReport) {
+        setSelectedReport(refreshedReport);
+      }
+
+      setReviewPreviewStep(1);
+      setOpenReviewId(generatedContent.id);
+      setGenerationStatuses((current) => ({
+        ...current,
+        [assetJob.caseId]: {
+          state: assetGenerationErrorMessage ? "failed" : "succeeded",
+          message: assetGenerationErrorMessage
+            ? `수업 구조는 만들어졌지만 이미지/음성 생성에 실패했습니다. ${assetGenerationErrorMessage}`
+            : "이미지와 음성까지 포함한 검토용 수업 자료가 만들어졌습니다.",
+        },
+      }));
+      updatePendingGenerationJobs((current) => {
+        const next = { ...current };
+        delete next[assetJob.caseId];
+        return next;
+      });
+    };
+
     try {
       if (job.phase === "assets" && job.contentId) {
         const localContent = findPendingGenerationContent(job, activeCaseFile);
@@ -1144,7 +1214,12 @@ export default function DashboardPage() {
             startedAt: new Date().toISOString(),
           },
         }));
-        setRunningMessage("이미지와 음성 asset을 연결하는 중입니다.");
+        await completeAssetGeneration({
+          ...job,
+          phase: "assets",
+          contentId,
+          startedAt: new Date().toISOString(),
+        });
         return;
       }
 
