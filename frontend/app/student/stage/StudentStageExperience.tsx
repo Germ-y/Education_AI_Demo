@@ -977,9 +977,10 @@ function RealtimePracticeRoom({
   const [connectionState, setConnectionState] = useState<"idle" | "connecting" | "connected" | "ending" | "complete" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("시작을 누르면 별이와 실시간으로 대화할 수 있어요.");
   const [studentTurns, setStudentTurns] = useState(0);
-  const [messages, setMessages] = useState<Array<{ id: number; role: "partner" | "student"; text: string }>>([
+  const [messages, setMessages] = useState<Array<{ id: number; role: "partner" | "student" | "system"; text: string }>>([
     { id: 1, role: "partner", text: practice.sceneLine },
   ]);
+  const [livePartnerText, setLivePartnerText] = useState("");
   const messageListRef = useRef<HTMLDivElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -989,16 +990,15 @@ function RealtimePracticeRoom({
   const realtimeTokenRef = useRef<string | null>(null);
   const startedAtRef = useRef<number | null>(null);
   const transcriptRef = useRef<string[]>([practice.sceneLine]);
+  const partnerDraftRef = useRef("");
   const hasUserSubmittedRef = useRef(false);
 
   useEffect(() => {
-    if (!hasUserSubmittedRef.current) return;
-
     messageListRef.current?.scrollTo({
       top: messageListRef.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [messages]);
+  }, [livePartnerText, messages]);
 
   useEffect(() => () => closeRealtimeConnection(), []);
 
@@ -1011,10 +1011,11 @@ function RealtimePracticeRoom({
     mediaStreamRef.current = null;
   }
 
-  const appendMessage = (role: "partner" | "student", text: string) => {
+  const appendMessage = (role: "partner" | "student" | "system", text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    transcriptRef.current = [...transcriptRef.current, `${role === "student" ? "학생" : "상대"}: ${trimmed}`];
+    const label = role === "student" ? "학생" : role === "partner" ? "상대" : "시스템";
+    transcriptRef.current = [...transcriptRef.current, `${label}: ${trimmed}`];
     setMessages((current) => [...current, { id: current.length + 1, role, text: trimmed }]);
   };
 
@@ -1032,12 +1033,14 @@ function RealtimePracticeRoom({
 
     if (type === "input_audio_buffer.speech_started") {
       setStatusMessage("듣고 있어요. 천천히 말해보세요.");
+      appendMessage("system", "마이크 입력을 듣고 있어요.");
       return;
     }
 
     if (type === "input_audio_buffer.speech_stopped") {
       setStudentTurns((current) => current + 1);
       setStatusMessage("말을 들었어요. 답을 기다리는 중이에요.");
+      appendMessage("system", "말을 들었어요. 답변을 기다리는 중이에요.");
       return;
     }
 
@@ -1046,13 +1049,34 @@ function RealtimePracticeRoom({
       return;
     }
 
+    if (type === "response.audio_transcript.delta" && typeof event.delta === "string") {
+      partnerDraftRef.current += event.delta;
+      setLivePartnerText(partnerDraftRef.current);
+      return;
+    }
+
     if ((type === "response.audio_transcript.done" || type === "response.output_text.done") && typeof event.transcript === "string") {
       appendMessage("partner", event.transcript);
+      partnerDraftRef.current = "";
+      setLivePartnerText("");
       return;
     }
 
     if (type === "response.output_text.done" && typeof event.text === "string") {
       appendMessage("partner", event.text);
+      partnerDraftRef.current = "";
+      setLivePartnerText("");
+      return;
+    }
+
+    if (type === "response.done") {
+      const text = extractRealtimeResponseText(event);
+      const fallbackText = partnerDraftRef.current.trim();
+      if (text || fallbackText) {
+        appendMessage("partner", text || fallbackText);
+      }
+      partnerDraftRef.current = "";
+      setLivePartnerText("");
       return;
     }
 
@@ -1064,6 +1088,7 @@ function RealtimePracticeRoom({
           : "잠시 뒤 다시 시도해 주세요.";
       setConnectionState("error");
       setStatusMessage(`실시간 대화 오류: ${message}`);
+      appendMessage("system", `오류: ${message}`);
     }
   };
 
@@ -1117,6 +1142,7 @@ function RealtimePracticeRoom({
       dataChannel.addEventListener("open", () => {
         setConnectionState("connected");
         setStatusMessage("연결됐어요. 마이크로 말하거나 아래에 문장을 입력해도 돼요.");
+        appendMessage("system", "실시간 대화가 연결됐어요. 말하거나 채팅을 보내세요.");
         sendSessionEvent("realtime_session_connected", { provider: session.provider, model: session.model });
         dataChannel.send(
           JSON.stringify({
@@ -1162,6 +1188,7 @@ function RealtimePracticeRoom({
       closeRealtimeConnection();
       setConnectionState("error");
       setStatusMessage("실시간 대화를 시작하지 못했어요. API 키, 마이크 권한, 네트워크 상태를 확인해 주세요.");
+      appendMessage("system", "실시간 대화를 시작하지 못했어요.");
     }
   };
 
@@ -1261,9 +1288,9 @@ function RealtimePracticeRoom({
 
       <div className="grid min-h-0 grid-rows-[auto_1fr_auto] overflow-hidden rounded-[22px] border border-[#e2e8f0] bg-[#f8fafc]">
         <div className="border-b border-[#e2e8f0] bg-white px-5 py-4">
-          <p className="text-sm font-black text-[#172033]">대화 연습</p>
+          <p className="text-sm font-black text-[#172033]">실시간 채팅</p>
           <p className="mt-1 text-xs font-bold text-[#64748b]">
-            목표 시간 {timeLimitMinutes}분 · 내 말 {studentTurns}/{minimumStudentTurns}
+            마이크와 채팅을 함께 사용할 수 있어요 · 목표 시간 {timeLimitMinutes}분 · 내 말 {studentTurns}/{minimumStudentTurns}
           </p>
         </div>
 
@@ -1293,13 +1320,27 @@ function RealtimePracticeRoom({
               className={`max-w-[82%] rounded-[18px] px-4 py-3 text-sm font-bold leading-6 shadow-sm ${
                 message.role === "student"
                   ? "ml-auto rounded-tr-[6px] text-white"
+                  : message.role === "system"
+                    ? "mx-auto max-w-[92%] border border-[#d9ebc9] bg-[#f4fbef] text-center text-[#2f6b3a]"
                   : "rounded-tl-[6px] bg-white text-[#334155]"
               }`}
               style={message.role === "student" ? { backgroundColor: theme.accent } : undefined}
             >
+              {message.role !== "system" && (
+                <p className={`mb-1 text-[11px] font-black ${message.role === "student" ? "text-white/80" : "text-[#64748b]"}`}>
+                  {message.role === "student" ? "나" : practice.partner}
+                </p>
+              )}
               {message.text}
             </div>
           ))}
+          {livePartnerText && (
+            <div className="max-w-[82%] rounded-[18px] rounded-tl-[6px] bg-white px-4 py-3 text-sm font-bold leading-6 text-[#334155] shadow-sm">
+              <p className="mb-1 text-[11px] font-black text-[#64748b]">{practice.partner}</p>
+              {livePartnerText}
+              <span className="ml-1 inline-block h-3 w-1 animate-pulse rounded-full bg-[#94a3b8]" />
+            </div>
+          )}
           <div className="rounded-[18px] border border-[#f0dfb4] bg-[#fff9e8] px-4 py-3">
             <p className="text-xs font-black text-[#8a5a00]">확인할 점</p>
             <div className="mt-2 grid gap-2">
@@ -1364,6 +1405,26 @@ function RealtimePracticeRoom({
       </div>
     </div>
   );
+}
+
+function extractRealtimeResponseText(event: Record<string, unknown>) {
+  const response = event.response;
+  if (!response || typeof response !== "object" || !("output" in response) || !Array.isArray(response.output)) {
+    return "";
+  }
+
+  const parts: string[] = [];
+  for (const output of response.output) {
+    if (!output || typeof output !== "object" || !("content" in output) || !Array.isArray(output.content)) continue;
+
+    for (const content of output.content) {
+      if (!content || typeof content !== "object") continue;
+      if ("transcript" in content && typeof content.transcript === "string") parts.push(content.transcript);
+      if ("text" in content && typeof content.text === "string") parts.push(content.text);
+    }
+  }
+
+  return parts.join(" ").trim();
 }
 
 function HintStar() {
