@@ -123,6 +123,7 @@ def generate_content_asset_package(
     for asset in sorted(content.assets, key=lambda item: (item.asset_type, item.asset_role, item.id)):
         _generate_asset_or_raise(content_id, asset)
         generated.append(asset.model_dump(by_alias=True))
+        demo_store.save_generated_mission_content(content)
 
     demo_store.save_generated_mission_content(content)
     demo_store.record_audit(
@@ -191,21 +192,24 @@ def _generate_asset_or_raise(content_id: str, asset) -> None:
     try:
         if asset.asset_type == AssetType.IMAGE:
             prompt = _extract_image_prompt(asset.prompt_json)
-            relative_path = f"assets/{content_id}/{asset.id}.png"
-            OpenAiProvider(settings).create_image_file(
-                prompt=prompt,
-                output_path=_generated_file_path(relative_path),
-                model=settings.openai_image_model,
-            )
-            asset.provider = "openai"
-            asset.model = settings.openai_image_model
+            relative_path = _generated_asset_relative_path(content_id, asset)
+            output_path = _generated_file_path(relative_path)
+            if not _is_generated_file_ready(output_path):
+                OpenAiProvider(settings).create_image_file(
+                    prompt=prompt,
+                    output_path=output_path,
+                    model=settings.openai_image_model,
+                    timeout_sec=settings.openai_image_timeout_sec,
+                )
+            _apply_generated_asset_metadata(asset, relative_path, provider="openai", model=settings.openai_image_model)
         elif asset.asset_type == AssetType.AUDIO:
             if not asset.source_text:
                 raise HTTPException(status_code=400, detail={"code": "ASSET_SOURCE_TEXT_MISSING", "message": "TTS asset sourceText가 필요합니다."})
-            relative_path = f"assets/{content_id}/{asset.id}.mp3"
-            ElevenLabsProvider(settings).create_speech_file(source_text=asset.source_text, output_path=_generated_file_path(relative_path))
-            asset.provider = "elevenlabs"
-            asset.model = "eleven_multilingual_v2"
+            relative_path = _generated_asset_relative_path(content_id, asset)
+            output_path = _generated_file_path(relative_path)
+            if not _is_generated_file_ready(output_path):
+                ElevenLabsProvider(settings).create_speech_file(source_text=asset.source_text, output_path=output_path)
+            _apply_generated_asset_metadata(asset, relative_path, provider="elevenlabs", model="eleven_multilingual_v2")
         else:
             raise HTTPException(status_code=400, detail={"code": "ASSET_TYPE_NOT_SUPPORTED", "message": "지원하지 않는 assetType입니다."})
     except AiProviderError as exc:
@@ -218,8 +222,21 @@ def _generate_asset_or_raise(content_id: str, asset) -> None:
             },
         ) from exc
 
+
+def _generated_asset_relative_path(content_id: str, asset) -> str:
+    extension = "png" if asset.asset_type == AssetType.IMAGE else "mp3"
+    return f"assets/{content_id}/{asset.id}.{extension}"
+
+
+def _is_generated_file_ready(path: Path) -> bool:
+    return path.exists() and path.is_file() and path.stat().st_size > 0
+
+
+def _apply_generated_asset_metadata(asset, relative_path: str, *, provider: str, model: str) -> None:
     asset.storage_url = f"/generated/{relative_path}"
     asset.preview_url = asset.storage_url
+    asset.provider = provider
+    asset.model = model
     asset.qa_status = "pending"
     asset.approval_status = "pending"
 

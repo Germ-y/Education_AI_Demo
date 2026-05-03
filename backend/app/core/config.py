@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_reasoning_model: str = "gpt-5.1"
     openai_image_model: str = "gpt-image-2"
+    openai_image_timeout_sec: float = 360
     openai_realtime_model: str = "gpt-realtime"
     elevenlabs_api_key: str | None = None
     elevenlabs_voice_id: str | None = None

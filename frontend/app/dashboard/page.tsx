@@ -6,6 +6,7 @@ import {
   approveContent,
   createAgentRun,
   createContentGeneration,
+  generateContentAssetPackage,
   getTeacherStudent,
   getTeacherStudentReport,
   getTeacherStudents,
@@ -289,6 +290,41 @@ function getClientGenerationErrorMessage(error: unknown) {
   return "자료 제안 요청 중 문제가 생겼습니다. 잠시 뒤 다시 시도해 주세요.";
 }
 
+function isGeneratedMediaReady(asset?: MissionContent["assets"][number] | null) {
+  const url = asset?.previewUrl || asset?.storageUrl;
+  if (!url) return false;
+  return /^https?:\/\//.test(url) || url.startsWith("/generated/");
+}
+
+function getStageAssetStatus(content: MissionContent, step: ReviewStageDraft["step"]) {
+  const role = step === 4 ? "stage_4_realtime" : `stage_${step}`;
+  const stage = content.stages.find((item) => item.step === step);
+  const imageAssetId = typeof stage?.templateJson.imageAssetId === "string" ? stage.templateJson.imageAssetId : undefined;
+  const audioAssetId = typeof stage?.templateJson.audioAssetId === "string" ? stage.templateJson.audioAssetId : undefined;
+  const image =
+    content.assets.find((asset) => asset.assetType === "image" && asset.id === imageAssetId) ??
+    content.assets.find((asset) => asset.assetType === "image" && asset.assetRole === role);
+  const audio =
+    content.assets.find((asset) => asset.assetType === "audio" && asset.id === audioAssetId) ??
+    content.assets.find((asset) => asset.assetType === "audio" && asset.assetRole === role);
+
+  return {
+    imageReady: isGeneratedMediaReady(image),
+    audioReady: isGeneratedMediaReady(audio),
+  };
+}
+
+function hasMissingGeneratedMedia(content: MissionContent) {
+  const heroImage = content.assets.find((asset) => asset.assetType === "image" && asset.assetRole === "hero");
+  const heroAudio = content.assets.find((asset) => asset.assetType === "audio" && asset.assetRole === "hero");
+  if (!isGeneratedMediaReady(heroImage) || !isGeneratedMediaReady(heroAudio)) return true;
+
+  return ([1, 2, 3, 4] as Array<ReviewStageDraft["step"]>).some((step) => {
+    const status = getStageAssetStatus(content, step);
+    return !status.imageReady || !status.audioReady;
+  });
+}
+
 function describeMissionStatus(status: MissionContent["status"]) {
   if (status === "teacher_review") return "검토 대기";
   if (status === "revision_requested") return "사용 안 함";
@@ -421,6 +457,7 @@ export default function DashboardPage() {
   const [editingReviewIds, setEditingReviewIds] = useState<string[]>([]);
   const [reviewActionId, setReviewActionId] = useState<string | null>(null);
   const [reviewPreviewStep, setReviewPreviewStep] = useState(1);
+  const [reviewPreviewRefreshKey, setReviewPreviewRefreshKey] = useState(0);
   const [reviewPreviewScale, setReviewPreviewScale] = useState(1);
   const reviewPreviewFrameRef = useRef<HTMLDivElement>(null);
   const [reportPreviewScale, setReportPreviewScale] = useState(1);
@@ -594,6 +631,7 @@ export default function DashboardPage() {
     : 1;
   const openReview = selectedReviewItems.find((item) => item.id === openReviewId);
   const openReviewStages = openReview ? (reviewStageDrafts[openReview.id] ?? mapContentToReviewStages(openReview.content)) : reviewStagePreviews;
+  const openReviewNeedsMediaGeneration = openReview ? hasMissingGeneratedMedia(openReview.content) : false;
   const isReviewEditing = openReview ? editingReviewIds.includes(openReview.id) : false;
   const isMaterialApproved = (item: MaterialReviewItem) =>
     item.content.status === "approved" || item.content.status === "published" || approvedMaterialIds.includes(item.id);
@@ -673,7 +711,7 @@ export default function DashboardPage() {
         ...current,
         [selectedCase.id]: {
           state: "running",
-          message: "오케스트레이터 결과로 검토용 콘텐츠를 만드는 중입니다.",
+          message: "오케스트레이터 결과로 검토용 콘텐츠 구조를 만드는 중입니다.",
         },
       }));
 
@@ -694,7 +732,34 @@ export default function DashboardPage() {
         return;
       }
 
-      const generatedContent = generationResult.content;
+      setGenerationStatuses((current) => ({
+        ...current,
+        [selectedCase.id]: {
+          state: "running",
+          message: "이미지와 음성 asset을 실제 생성하는 중입니다.",
+        },
+      }));
+
+      let generatedContent = generationResult.content;
+      let assetGenerationErrorMessage: string | null = null;
+      try {
+        const assetPackage = await generateContentAssetPackage(generatedContent.id);
+        const assetsById = new Map(assetPackage.assets.map((asset) => [asset.id, asset]));
+        generatedContent = {
+          ...generatedContent,
+          assets: generatedContent.assets.map((asset) => assetsById.get(asset.id) ?? asset),
+        };
+      } catch (assetError) {
+        assetGenerationErrorMessage = getClientGenerationErrorMessage(assetError);
+        setGenerationStatuses((current) => ({
+          ...current,
+          [selectedCase.id]: {
+            state: "failed",
+            message: `수업 구조는 만들어졌지만 이미지/음성 생성에 실패했습니다. ${assetGenerationErrorMessage}`,
+          },
+        }));
+      }
+
       setSelectedCaseFile((current) =>
         current && current.profile.id === generatedContent.studentId
           ? {
@@ -717,8 +782,10 @@ export default function DashboardPage() {
       setGenerationStatuses((current) => ({
         ...current,
         [selectedCase.id]: {
-          state: "succeeded",
-          message: "검토할 수업 자료 제안이 만들어졌습니다.",
+          state: assetGenerationErrorMessage ? "failed" : "succeeded",
+          message: assetGenerationErrorMessage
+            ? `수업 구조는 만들어졌지만 이미지/음성 생성에 실패했습니다. ${assetGenerationErrorMessage}`
+            : "이미지와 음성이 포함된 검토용 수업 자료가 만들어졌습니다.",
         },
       }));
     } catch (error) {
@@ -754,6 +821,47 @@ export default function DashboardPage() {
           }
         : current,
     );
+  };
+
+  const handleGenerateReviewAssets = async (item: MaterialReviewItem) => {
+    if (reviewActionId) return;
+
+    setReviewActionId(item.id);
+    setGenerationStatuses((current) => ({
+      ...current,
+      [item.caseId]: {
+        state: "running",
+        message: "검수 자료의 이미지와 음성을 실제 생성하는 중입니다.",
+      },
+    }));
+
+    try {
+      const assetPackage = await generateContentAssetPackage(item.contentId);
+      const assetsById = new Map(assetPackage.assets.map((asset) => [asset.id, asset]));
+      const updatedContent: MissionContent = {
+        ...item.content,
+        assets: item.content.assets.map((asset) => assetsById.get(asset.id) ?? asset),
+      };
+      updateCurrentContent(updatedContent);
+      setReviewPreviewRefreshKey((current) => current + 1);
+      setGenerationStatuses((current) => ({
+        ...current,
+        [item.caseId]: {
+          state: "succeeded",
+          message: "검수 자료에 이미지와 음성이 연결되었습니다.",
+        },
+      }));
+    } catch (error) {
+      setGenerationStatuses((current) => ({
+        ...current,
+        [item.caseId]: {
+          state: "failed",
+          message: `이미지/음성 생성에 실패했습니다. ${getClientGenerationErrorMessage(error)}`,
+        },
+      }));
+    } finally {
+      setReviewActionId(null);
+    }
   };
 
   const setReviewActionError = (message: string) => {
@@ -835,7 +943,7 @@ export default function DashboardPage() {
 
     const updateScale = () => {
       const { width, height } = frame.getBoundingClientRect();
-      setReviewPreviewScale(Math.min(width / 1024, height / 768) + 0.004);
+      setReviewPreviewScale(Math.min(width / 1024, height / 768));
     };
 
     updateScale();
@@ -851,7 +959,7 @@ export default function DashboardPage() {
 
     const updateScale = () => {
       const { width, height } = frame.getBoundingClientRect();
-      setReportPreviewScale(Math.min(width / 1024, height / 768) + 0.004);
+      setReportPreviewScale(Math.min(width / 1024, height / 768));
     };
 
     updateScale();
@@ -1207,63 +1315,78 @@ export default function DashboardPage() {
                       const materialApproved = isMaterialApproved(item);
                       const materialRejected = isMaterialRejected(item);
                       const isActionRunning = reviewActionId === item.id;
+                      const needsMediaGeneration = hasMissingGeneratedMedia(item.content);
 
                       return (
-                      <div key={item.id} className="rounded-md border border-[#e5e9f0] bg-white p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-base font-black">{item.title}</p>
-                            <p className="mt-1 truncate text-sm font-semibold text-[#64748b]">{item.type}</p>
-                          </div>
-                          <span
-                            className={`shrink-0 rounded-full border px-3 py-1 text-xs font-bold ${
-                              materialApplied
-                                ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
+                        <div key={item.id} className="rounded-md border border-[#e5e9f0] bg-white p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-base font-black">{item.title}</p>
+                              <p className="mt-1 truncate text-sm font-semibold text-[#64748b]">{item.type}</p>
+                            </div>
+                            <span
+                              className={`shrink-0 rounded-full border px-3 py-1 text-xs font-bold ${
+                                materialApplied
+                                  ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
+                                  : materialApproved
+                                    ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
+                                    : materialRejected
+                                      ? "border-[#fecaca] bg-[#fef2f2] text-[#991b1b]"
+                                      : revisionMaterialIds.includes(item.id)
+                                        ? "border-[#fed7aa] bg-[#fff7ed] text-[#9a3412]"
+                                        : "border-[#cbd5e1] bg-[#f8fafc] text-[#475569]"
+                              }`}
+                            >
+                              {materialApplied
+                                ? "적용 완료"
                                 : materialApproved
-                                  ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
+                                  ? "검토 완료"
                                   : materialRejected
-                                    ? "border-[#fecaca] bg-[#fef2f2] text-[#991b1b]"
+                                    ? "사용 안 함"
                                     : revisionMaterialIds.includes(item.id)
-                                      ? "border-[#fed7aa] bg-[#fff7ed] text-[#9a3412]"
-                                      : "border-[#cbd5e1] bg-[#f8fafc] text-[#475569]"
-                            }`}
-                          >
-                            {materialApplied
-                              ? "적용 완료"
-                              : materialApproved
-                                ? "검토 완료"
-                                : materialRejected
-                                  ? "사용 안 함"
-                                  : revisionMaterialIds.includes(item.id)
-                                    ? "수정 중"
-                                    : item.state}
-                          </span>
+                                      ? "수정 중"
+                                      : item.state}
+                            </span>
+                          </div>
+                          {needsMediaGeneration && (
+                            <div className="mt-3 rounded-md border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm font-bold leading-6 text-[#9a3412]">
+                              이미지나 음성 파일이 아직 연결되지 않았습니다. 생성 설정을 확인한 뒤 다시 자료를 만들면 검수 화면에 함께 표시됩니다.
+                            </div>
+                          )}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              onClick={() => {
+                                setReviewPreviewStep(1);
+                                setOpenReviewId(item.id);
+                              }}
+                              className="rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-bold text-[#334155]"
+                            >
+                              제안 검토하기
+                            </button>
+                            {needsMediaGeneration && (
+                              <button
+                                onClick={() => handleGenerateReviewAssets(item)}
+                                disabled={isActionRunning}
+                                className="rounded-md border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm font-bold text-[#9a3412] disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {isActionRunning ? "생성 중" : "이미지·음성 생성하기"}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handlePublishMaterial(item)}
+                              disabled={materialApplied || !materialApproved || materialRejected || isActionRunning}
+                              className={`rounded-md px-3 py-2 text-sm font-bold ${
+                                materialApplied
+                                  ? "bg-[#dcfce7] text-[#15803d]"
+                                  : materialApproved
+                                    ? "bg-[#1f3a5f] text-white"
+                                    : "bg-[#e2e8f0] text-[#64748b]"
+                              }`}
+                            >
+                              {isActionRunning ? "저장 중" : materialApplied ? "적용됨" : "수업에 적용하기"}
+                            </button>
+                          </div>
                         </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <button
-                            onClick={() => {
-                              setReviewPreviewStep(1);
-                              setOpenReviewId(item.id);
-                            }}
-                            className="rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-bold text-[#334155]"
-                          >
-                            제안 검토하기
-                          </button>
-                          <button
-                            onClick={() => handlePublishMaterial(item)}
-                            disabled={materialApplied || !materialApproved || materialRejected || isActionRunning}
-                            className={`rounded-md px-3 py-2 text-sm font-bold ${
-                              materialApplied
-                                ? "bg-[#dcfce7] text-[#15803d]"
-                                : materialApproved
-                                  ? "bg-[#1f3a5f] text-white"
-                                  : "bg-[#e2e8f0] text-[#64748b]"
-                            }`}
-                          >
-                            {isActionRunning ? "저장 중" : materialApplied ? "적용됨" : "수업에 적용하기"}
-                          </button>
-                        </div>
-                      </div>
                       );
                     })}
                   </section>
@@ -1482,7 +1605,7 @@ export default function DashboardPage() {
                 </div>
                 <div
                   ref={reportPreviewFrameRef}
-                  className="relative mx-auto aspect-[4/3] h-[min(40vh,420px)] overflow-hidden rounded-md bg-[#e7edf4]"
+                  className="relative mx-auto h-[min(52vh,560px)] min-h-[420px] w-full overflow-hidden rounded-md bg-[#e7edf4]"
                 >
                   <iframe
                     title={`학습 리포트 자료 스테이지 ${openReportStageStep}`}
@@ -1520,6 +1643,11 @@ export default function DashboardPage() {
                 <p className="mt-1 text-sm font-semibold text-[#64748b]">
                   4개 스테이지를 확인하고 선생님 판단으로 필요한 부분만 조정합니다.
                 </p>
+                {openReviewNeedsMediaGeneration && (
+                  <p className="mt-3 rounded-md border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm font-bold leading-6 text-[#9a3412]">
+                    이 자료는 이미지나 음성 파일이 아직 모두 연결되지 않았습니다. 생성 설정이 준비된 상태에서 다시 만들면 학생 화면 미리보기와 음성 재생이 함께 확인됩니다.
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => {
@@ -1555,10 +1683,10 @@ export default function DashboardPage() {
                 </div>
                 <div
                   ref={reviewPreviewFrameRef}
-                  className="relative aspect-[4/3] w-full overflow-hidden rounded-md border border-[#cbd5e1] bg-[#e7edf4]"
+                  className="relative h-[min(72vh,760px)] min-h-[620px] w-full overflow-hidden rounded-md border border-[#cbd5e1] bg-[#e7edf4]"
                 >
                   <iframe
-                    key={`${openReview.id}-${reviewPreviewStep}`}
+                    key={`${openReview.id}-${reviewPreviewStep}-${reviewPreviewRefreshKey}`}
                     title={`학생 화면 스테이지 ${reviewPreviewStep}`}
                     src={`/student/stage?caseId=${encodeURIComponent(openReview.caseId)}&contentId=${encodeURIComponent(openReview.contentId)}&step=${reviewPreviewStep}&preview=1`}
                     className="absolute left-1/2 top-1/2 h-[768px] w-[1024px] origin-center border-0"
@@ -1568,6 +1696,7 @@ export default function DashboardPage() {
               </section>
               <div className="min-h-0 space-y-4 overflow-y-auto pr-2">
                 {openReviewStages.map((stage, index) => {
+                  const assetStatus = getStageAssetStatus(openReview.content, stage.step);
                   return (
                     <section key={stage.step} className="rounded-lg border border-[#e5e9f0] bg-[#fbfcfe] p-5">
                       <div className="mb-3 flex items-center justify-between gap-3">
@@ -1631,6 +1760,30 @@ export default function DashboardPage() {
                           </div>
 
                           <div className="rounded-md bg-white p-4">
+                            <p className="text-xs font-black text-[#64748b]">이미지·음성</p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <span
+                                className={`rounded-full border px-3 py-1 text-xs font-black ${
+                                  assetStatus.imageReady
+                                    ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
+                                    : "border-[#fed7aa] bg-[#fff7ed] text-[#9a3412]"
+                                }`}
+                              >
+                                {assetStatus.imageReady ? "이미지 연결됨" : "이미지 생성 필요"}
+                              </span>
+                              <span
+                                className={`rounded-full border px-3 py-1 text-xs font-black ${
+                                  assetStatus.audioReady
+                                    ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
+                                    : "border-[#fed7aa] bg-[#fff7ed] text-[#9a3412]"
+                                }`}
+                              >
+                                {assetStatus.audioReady ? "음성 연결됨" : "음성 생성 필요"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="rounded-md bg-white p-4">
                             <p className="text-xs font-black text-[#64748b]">선택지</p>
                             <div className="mt-2 space-y-2">
                               {stage.choices.map((choice, choiceIndex) =>
@@ -1672,6 +1825,15 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex flex-wrap justify-end gap-3 border-t border-[#e5e9f0] px-6 py-4">
+              {openReviewNeedsMediaGeneration && (
+                <button
+                  onClick={() => handleGenerateReviewAssets(openReview)}
+                  disabled={reviewActionId === openReview.id}
+                  className="rounded-md border border-[#fed7aa] bg-[#fff7ed] px-5 py-3 text-sm font-bold text-[#9a3412] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {reviewActionId === openReview.id ? "생성 중" : "이미지·음성 생성하기"}
+                </button>
+              )}
               <button
                 onClick={handleRejectReview}
                 disabled={reviewActionId === openReview.id}
