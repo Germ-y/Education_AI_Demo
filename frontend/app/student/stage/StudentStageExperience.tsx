@@ -1951,11 +1951,36 @@ export function StudentStageExperience({
                     className="mt-3 animate-[stagePopIn_360ms_cubic-bezier(0.16,1,0.3,1)_both]"
                   >
                   {isFinished ? (
-                    <div
-                      className="rounded-[18px] px-4 py-4 text-base font-black leading-7"
-                      style={{ backgroundColor: theme.accentSoft, color: theme.accentStrong }}
-                    >
-                      완료한 스테이지 {completedSteps.length}개
+                    <div className="space-y-3">
+                      <div
+                        className="rounded-[18px] px-4 py-4 text-base font-black leading-7"
+                        style={{ backgroundColor: theme.accentSoft, color: theme.accentStrong }}
+                      >
+                        완료한 스테이지 {completedSteps.length}개
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={resetMission}
+                          disabled={isTransitioning}
+                          className="rounded-[18px] border bg-white px-4 py-3 text-center text-base font-black shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(57,78,97,0.12)] disabled:opacity-70 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
+                          style={{ borderColor: theme.border, color: theme.accentStrong }}
+                        >
+                          다시 하기
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!reflectionText.trim() || isCompletingMission}
+                          onClick={completeMissionAndReturn}
+                          className={`rounded-[18px] px-4 py-3 text-center text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.28)] transition duration-200 ${
+                            reflectionText.trim() && !isCompletingMission
+                              ? "hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.32)]"
+                              : "cursor-not-allowed opacity-45"
+                          }`}
+                          style={{ backgroundColor: reflectionText.trim() && !isCompletingMission ? theme.accent : "#9aa39b" }}
+                        >
+                          {isCompletingMission ? "저장 중" : "학습 길로"}
+                        </button>
+                      </div>
                     </div>
                   ) : activeQuestion.kind === "ox" ? (
                     isOxReady ? (
@@ -2060,31 +2085,7 @@ export function StudentStageExperience({
 
                 </div>
 
-                {isFinished ? (
-                  <div className="-mt-1 grid grid-cols-2 gap-3 self-start">
-                    <button
-                      onClick={resetMission}
-                      disabled={isTransitioning}
-                      className="rounded-[18px] border bg-white px-4 py-3 text-center text-base font-black shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(57,78,97,0.12)] disabled:opacity-70 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
-                      style={{ borderColor: theme.border, color: theme.accentStrong }}
-                    >
-                      다시 하기
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!reflectionText.trim() || isCompletingMission}
-                      onClick={completeMissionAndReturn}
-                      className={`rounded-[18px] px-4 py-3 text-center text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.28)] transition duration-200 ${
-                        reflectionText.trim() && !isCompletingMission
-                          ? "hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.32)]"
-                          : "cursor-not-allowed opacity-45"
-                      }`}
-                      style={{ backgroundColor: reflectionText.trim() && !isCompletingMission ? theme.accent : "#9aa39b" }}
-                    >
-                      {isCompletingMission ? "저장 중" : "학습 길로"}
-                    </button>
-                  </div>
-                ) : isRealtimeStage && !isStageComplete ? (
+                {isFinished ? null : isRealtimeStage && !isStageComplete ? (
                   <button
                     onClick={startRealtimePractice}
                     disabled={isTransitioning}
