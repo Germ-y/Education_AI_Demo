@@ -50,6 +50,10 @@ backend/.ruff_cache/
 __pycache__/
 *.py[cod]
 *.db
+*.db-journal
 *.sqlite
 *.sqlite3
+backend/*.err
+backend/*.log
+backend/logs/
 backend/generated/assets/

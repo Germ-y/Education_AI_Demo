@@ -103,6 +103,8 @@ export function getTemplateRenderer(templateType: TemplateType): StageTemplateRe
     templateType === "partition_picker" ||
     templateType === "applied_question" ||
     templateType === "action_choice" ||
+    templateType === "explanation_choice" ||
+    templateType === "wrong_explanation_fix" ||
     templateType === "decision_card"
   ) {
     return "image_quiz";

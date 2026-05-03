@@ -147,14 +147,26 @@ def generate_content_asset_package(
     _preflight_provider_keys(content)
 
     package_started_at = time.perf_counter()
+    sorted_assets = sorted(content.assets, key=lambda item: (item.asset_type, item.asset_role, item.id))
+    total_assets = len(sorted_assets)
     logger.info(
         "contents.assets.package_started content_id=%s student_id=%s asset_count=%s",
         content.id,
         content.student_id,
-        len(content.assets),
+        total_assets,
     )
     generated = []
-    for asset in sorted(content.assets, key=lambda item: (item.asset_type, item.asset_role, item.id)):
+    for index, asset in enumerate(sorted_assets, start=1):
+        logger.info(
+            "contents.assets.generating content_id=%s progress=%s/%s asset_id=%s type=%s role=%s stage_id=%s",
+            content.id,
+            index,
+            total_assets,
+            asset.id,
+            asset.asset_type,
+            asset.asset_role,
+            asset.stage_id,
+        )
         _generate_asset_or_raise(content_id, asset)
         generated.append(asset.model_dump(by_alias=True))
         demo_store.save_generated_mission_content(content)

@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     schoolinfo_api_key: str | None = None
     public_data_sync_enabled: bool = False
     generated_assets_dir: str = str(BACKEND_DIR / "generated")
+    generation_log_file: str = str(BACKEND_DIR / "logs" / "generation.log")
     demo_seed_mode: bool = True
     demo_seed_reset: bool = False
 

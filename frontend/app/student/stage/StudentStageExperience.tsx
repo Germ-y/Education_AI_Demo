@@ -287,6 +287,46 @@ function LearningVisual({ visual, compact = false }: { visual: SceneVisual; comp
   return <FractionVisual visual={visual} compact={compact} />;
 }
 
+function AudioPlayButton({ src, theme, floating = false }: { src: string; theme: SceneTheme; floating?: boolean }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const toggleAudio = async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isPlaying) {
+      audio.pause();
+      setIsPlaying(false);
+      return;
+    }
+
+    try {
+      await audio.play();
+      setIsPlaying(true);
+    } catch {
+      setIsPlaying(false);
+    }
+  };
+
+  return (
+    <>
+      <audio ref={audioRef} src={src} preload="auto" onEnded={() => setIsPlaying(false)} onPause={() => setIsPlaying(false)} className="hidden" />
+      <button
+        type="button"
+        onClick={toggleAudio}
+        aria-label={isPlaying ? "음성 멈추기" : "음성 듣기"}
+        className={`flex h-12 w-12 items-center justify-center rounded-full border bg-white/95 text-lg font-black shadow-[0_14px_30px_rgba(57,78,97,0.18)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(57,78,97,0.22)] ${
+          floating ? "absolute left-4 top-4 z-10" : ""
+        }`}
+        style={{ borderColor: theme.border, color: theme.accentStrong }}
+      >
+        {isPlaying ? "II" : "▶"}
+      </button>
+    </>
+  );
+}
+
 function StageMedia({
   question,
   theme,
@@ -306,7 +346,7 @@ function StageMedia({
 
   return (
     <div
-      className={`overflow-hidden rounded-[20px] border bg-white shadow-sm ${full ? "flex h-full min-h-[280px] flex-col p-3" : compact ? "p-2" : "p-3"}`}
+      className={`relative overflow-hidden rounded-[20px] border bg-white shadow-sm ${full ? "flex h-full min-h-[280px] flex-col p-3" : compact ? "p-2" : "p-3"}`}
       style={{ borderColor: theme.border }}
     >
       {question.imageUrl && (
@@ -323,15 +363,15 @@ function StageMedia({
                   ? "h-[clamp(72px,10vh,92px)]"
                   : featured
                     ? "h-[clamp(150px,20vh,190px)]"
-                    : "h-[clamp(96px,16vh,132px)]"
+                    : "h-[clamp(190px,28vh,280px)]"
                 : "h-[clamp(260px,42vh,420px)]"
           }`}
           unoptimized
         />
       )}
       {question.audioUrl && (
-        <div className={question.imageUrl ? `${dense ? "mt-2" : "mt-3"} shrink-0` : ""}>
-          <audio className="w-full" src={question.audioUrl} controls preload="auto" />
+        <div className={question.imageUrl ? "" : "grid min-h-24 place-items-center"}>
+          <AudioPlayButton src={question.audioUrl} theme={theme} floating={Boolean(question.imageUrl)} />
         </div>
       )}
     </div>
@@ -427,12 +467,12 @@ function FloatingStageFeedback({
   if (!showSuccess && !showWrong) return null;
 
   return (
-    <div className="pointer-events-none mb-3 grid place-items-center">
+    <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+12px)] z-40 grid place-items-center">
       <div
         className={`rounded-[18px] px-5 py-3 text-center text-sm font-bold leading-6 shadow-[0_18px_42px_rgba(31,41,55,0.18)] ${
           showSuccess ? "border border-[#f0dfb4] bg-[#fff7dd] text-[#6b4b12]" : "bg-[#fff0ed] text-[#b84232]"
         }`}
-        style={{ width: "min(560px, 100%)" }}
+        style={{ width: "min(560px, 72%)" }}
       >
         {showSuccess && (
           <p className="font-black" style={{ color: theme.accentStrong }}>
@@ -586,7 +626,7 @@ function SequenceTemplate({
   const availableItems = items.filter((item) => !selectedIds.includes(item.id));
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(92px,auto)_minmax(96px,1fr)] gap-2 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-3 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]">
+    <div className="grid min-h-0 grid-rows-[auto_auto_auto] gap-2 overflow-hidden rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-3 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-base font-black leading-5">{question.prompt}</p>
@@ -617,15 +657,15 @@ function SequenceTemplate({
           return (
             <div
               key={index}
-              className={`flex min-h-[64px] flex-col items-center justify-center rounded-[16px] border-2 border-dashed px-2.5 py-1.5 text-center transition ${
+              className={`flex h-[74px] flex-col items-center justify-center rounded-[16px] border-2 border-dashed px-2.5 py-2 text-center transition ${
                 item ? "border-solid bg-white shadow-[0_10px_24px_rgba(57,78,97,0.10)]" : "bg-white/55"
               }`}
               style={{ borderColor: item ? theme.accent : "#cfd8cf" }}
             >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black text-white" style={{ backgroundColor: theme.accent }}>
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white" style={{ backgroundColor: theme.accent }}>
                 {index + 1}
               </span>
-              <span className={`mt-1 line-clamp-2 text-[13px] font-black leading-[18px] break-keep ${item ? "text-[#1f211d]" : "text-[#9aa39b]"}`}>
+              <span className={`mt-1 block text-[15px] font-black leading-6 break-keep ${item ? "text-[#1f211d]" : "text-[#9aa39b]"}`}>
                 {item?.label ?? "여기에 놓기"}
               </span>
               <span className="line-clamp-1 min-h-4 text-[10px] font-bold leading-4 text-[#6d746c] break-keep">
@@ -637,7 +677,7 @@ function SequenceTemplate({
         </div>
       </div>
 
-      <div className="min-h-0 rounded-[18px] border border-[#f0dfb4] bg-[#fff9e8] p-2.5">
+      <div className="overflow-hidden rounded-[18px] border border-[#f0dfb4] bg-[#fff9e8] p-2.5">
         <div className="flex items-center justify-between">
           <p className="text-xs font-black text-[#8a5a00]">카드 트레이</p>
           {availableItems.length > 0 && <p className="text-[11px] font-bold text-[#8a5a00]">카드를 차례대로 눌러요</p>}
@@ -651,7 +691,7 @@ function SequenceTemplate({
               key={item.id}
               onClick={() => onPick(item.id)}
               disabled={picked}
-              className="min-h-[46px] cursor-grab rounded-[16px] border bg-white px-3 py-1.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(57,78,97,0.12)] active:cursor-grabbing disabled:cursor-default disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
+              className="h-[48px] cursor-grab rounded-[16px] border bg-white px-3 py-1.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(57,78,97,0.12)] active:cursor-grabbing disabled:cursor-default disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
               style={{ borderColor: picked ? theme.accent : "#dde6ee" }}
             >
               <p className="line-clamp-2 text-[13px] font-black leading-[18px] break-keep">{item.label}</p>
@@ -681,7 +721,7 @@ function SequenceStageBoard({
   onReset: () => void;
 }) {
   return (
-    <div className="grid h-full min-h-0 grid-rows-[minmax(150px,0.28fr)_minmax(0,1fr)] gap-3">
+    <div className="grid h-full min-h-0 grid-rows-[minmax(220px,1fr)_auto] gap-3">
       <div className="min-h-0 overflow-hidden">
         <StageVisualBoard visual={visual} question={question} theme={theme} compact />
       </div>
@@ -730,8 +770,8 @@ function CardMatchingTemplate({
 
   return (
     <div
-      className={`grid h-full min-h-0 gap-4 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-5 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)] ${
-        question.imageUrl || question.audioUrl ? "grid-rows-[auto_auto_minmax(0,1fr)]" : "grid-rows-[auto_minmax(0,1fr)]"
+      className={`grid min-h-0 gap-4 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-5 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)] ${
+        question.imageUrl || question.audioUrl ? "grid-rows-[auto_auto_auto]" : "grid-rows-[auto_auto]"
       }`}
     >
       <div className="flex items-start justify-between gap-4">
@@ -746,7 +786,7 @@ function CardMatchingTemplate({
 
       {(question.imageUrl || question.audioUrl) && (
         <div className="mx-auto min-h-0 w-full max-w-[920px]">
-          <StageMedia question={question} theme={theme} compact dense />
+          <StageMedia question={question} theme={theme} compact featured />
         </div>
       )}
 
@@ -2126,7 +2166,7 @@ export function StudentStageExperience({
 
                 <div
                   key={`stage-board-${activeStage.step}-${activeQuestion.kind}`}
-                  className="mt-5 min-h-0 flex-1 animate-[stagePopIn_360ms_cubic-bezier(0.16,1,0.3,1)_both]"
+                  className="relative mt-5 min-h-0 flex-1 animate-[stagePopIn_360ms_cubic-bezier(0.16,1,0.3,1)_both]"
                 >
                   {isFinished ? (
                     <div

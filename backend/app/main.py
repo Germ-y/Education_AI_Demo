@@ -7,10 +7,12 @@ from fastapi.staticfiles import StaticFiles
 from app.api.response import ok
 from app.api.routes import ai, audit, auth, contents, context, public_data, review, student, teacher
 from app.core.config import get_settings
+from app.core.logging import configure_generation_logging
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    configure_generation_logging(settings)
     app = FastAPI(title="EduYJ Backend", version="0.1.0")
 
     app.add_middleware(
