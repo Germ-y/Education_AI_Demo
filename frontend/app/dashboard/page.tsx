@@ -69,7 +69,8 @@ type PendingGenerationJob = {
 };
 
 const PENDING_GENERATION_STORAGE_KEY = "eduyj:pending-generation-jobs";
-const GENERATION_RUNNING_TIMEOUT_MS = 15 * 60 * 1000;
+const GENERATION_RUNNING_TIMEOUT_MS = 30 * 60 * 1000;
+const ASSET_GENERATION_RUNNING_TIMEOUT_MS = 60 * 60 * 1000;
 
 function readPendingGenerationJobs(): Record<string, PendingGenerationJob> {
   if (typeof window === "undefined") return {};
@@ -105,9 +106,9 @@ function getSnapshotText(agentRun: AgentRun, key: string) {
   return typeof value === "string" ? value : "";
 }
 
-function isTimedOutIsoDate(value: string) {
+function isTimedOutIsoDate(value: string, timeoutMs = GENERATION_RUNNING_TIMEOUT_MS) {
   const timestamp = new Date(value).getTime();
-  return Number.isFinite(timestamp) && Date.now() - timestamp > GENERATION_RUNNING_TIMEOUT_MS;
+  return Number.isFinite(timestamp) && Date.now() - timestamp > timeoutMs;
 }
 
 function isAgentRunTimedOut(agentRun: AgentRun) {
@@ -115,7 +116,10 @@ function isAgentRunTimedOut(agentRun: AgentRun) {
 }
 
 function isPendingGenerationJobTimedOut(job: PendingGenerationJob) {
-  return isTimedOutIsoDate(job.startedAt);
+  return isTimedOutIsoDate(
+    job.startedAt,
+    job.phase === "assets" ? ASSET_GENERATION_RUNNING_TIMEOUT_MS : GENERATION_RUNNING_TIMEOUT_MS,
+  );
 }
 
 function getPendingJobFromAgentRun(agentRun: AgentRun): PendingGenerationJob | null {
@@ -146,7 +150,7 @@ function getPendingJobFromAgentRun(agentRun: AgentRun): PendingGenerationJob | n
       orchestratorRunId: getSnapshotText(agentRun, "orchestratorRunId") || undefined,
       contentRunId: agentRun.id,
       contentId: contentId ?? undefined,
-      startedAt: agentRun.createdAt,
+      startedAt: contentId ? new Date().toISOString() : agentRun.createdAt,
     };
   }
 
@@ -1028,6 +1032,7 @@ export default function DashboardPage() {
             ...job,
             phase: "content",
             contentRunId: generationResult.agentRun?.id,
+            startedAt: new Date().toISOString(),
           },
         }));
         setRunningMessage("검토할 수업 콘텐츠 구조를 만드는 중입니다.");
@@ -1064,6 +1069,7 @@ export default function DashboardPage() {
             ...job,
             phase: "assets",
             contentId,
+            startedAt: new Date().toISOString(),
           },
         }));
         setRunningMessage("이미지와 음성 asset을 연결하는 중입니다.");
