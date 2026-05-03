@@ -426,6 +426,13 @@ def _generate_valid_mission_content(
             )
             if attempt == MAX_CONTENT_GENERATION_ATTEMPTS:
                 raise
+            logger.info(
+                "ai.content.retrying_after_quality_invalid student_id=%s case_id=%s next_attempt=%s/%s",
+                student_id,
+                case_id,
+                attempt + 1,
+                MAX_CONTENT_GENERATION_ATTEMPTS,
+            )
         except ValueError as exc:
             validation_errors = [str(exc)]
             logger.warning(
@@ -437,6 +444,13 @@ def _generate_valid_mission_content(
             )
             if attempt == MAX_CONTENT_GENERATION_ATTEMPTS:
                 raise
+            logger.info(
+                "ai.content.retrying_after_schema_invalid student_id=%s case_id=%s next_attempt=%s/%s",
+                student_id,
+                case_id,
+                attempt + 1,
+                MAX_CONTENT_GENERATION_ATTEMPTS,
+            )
 
     raise ContentQualityError(["콘텐츠 생성 품질 재시도 흐름이 예기치 않게 종료되었습니다."])
 
