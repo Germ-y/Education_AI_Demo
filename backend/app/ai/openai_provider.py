@@ -63,7 +63,13 @@ class OpenAiProvider:
                         "transcription": {
                             "model": "gpt-4o-mini-transcribe",
                             "language": "ko",
-                        }
+                        },
+                        "turn_detection": {
+                            "type": "server_vad",
+                            "threshold": 0.75,
+                            "prefix_padding_ms": 300,
+                            "silence_duration_ms": 900,
+                        },
                     }
                 },
                 "output_modalities": ["audio"],

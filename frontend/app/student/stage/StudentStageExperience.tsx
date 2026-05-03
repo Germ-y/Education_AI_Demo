@@ -293,12 +293,14 @@ function StageMedia({
   compact = false,
   full = false,
   featured = false,
+  dense = false,
 }: {
   question: StageQuestion;
   theme: SceneTheme;
   compact?: boolean;
   full?: boolean;
   featured?: boolean;
+  dense?: boolean;
 }) {
   if (!question.imageUrl && !question.audioUrl) return null;
 
@@ -317,16 +319,18 @@ function StageMedia({
             full
               ? "min-h-0 flex-1"
               : compact
-                ? featured
-                  ? "h-[clamp(150px,20vh,190px)]"
-                  : "h-[clamp(96px,16vh,132px)]"
+                ? dense
+                  ? "h-[clamp(72px,10vh,92px)]"
+                  : featured
+                    ? "h-[clamp(150px,20vh,190px)]"
+                    : "h-[clamp(96px,16vh,132px)]"
                 : "h-[clamp(260px,42vh,420px)]"
           }`}
           unoptimized
         />
       )}
       {question.audioUrl && (
-        <div className={question.imageUrl ? "mt-3 shrink-0" : ""}>
+        <div className={question.imageUrl ? `${dense ? "mt-2" : "mt-3"} shrink-0` : ""}>
           <audio className="w-full" src={question.audioUrl} controls preload="auto" />
         </div>
       )}
@@ -738,13 +742,13 @@ function CardMatchingTemplate({
       </div>
 
       {(question.imageUrl || question.audioUrl) && (
-        <div className="min-h-0">
-          <StageMedia question={question} theme={theme} compact />
+        <div className="mx-auto min-h-0 w-full max-w-[920px]">
+          <StageMedia question={question} theme={theme} compact dense />
         </div>
       )}
 
-      <div className="grid min-h-0 grid-cols-[minmax(240px,1fr)_minmax(260px,0.66fr)_minmax(240px,1fr)] items-stretch gap-4">
-        <div className="grid min-h-0 gap-3">
+      <div className="grid min-h-[172px] grid-cols-[minmax(220px,1fr)_minmax(220px,0.62fr)_minmax(220px,1fr)] items-start gap-3 overflow-hidden">
+        <div className="grid min-h-0 content-start gap-3">
           {items.map((item) => {
             const picked = selectedLeft === item.leftId;
             const matched = Boolean(pairs[item.leftId]);
@@ -753,7 +757,7 @@ function CardMatchingTemplate({
                 key={item.leftId}
                 onClick={() => onLeft(item.leftId)}
                 disabled={matched}
-                className={`relative z-10 flex min-h-20 items-center rounded-[18px] border bg-white px-5 text-left text-lg font-black shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:hover:translate-y-0 ${
+                className={`relative z-10 flex min-h-16 items-center rounded-[18px] border bg-white px-5 text-left text-base font-black leading-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:hover:translate-y-0 ${
                   picked ? "scale-[1.015] shadow-[0_16px_30px_rgba(39,174,96,0.16)]" : ""
                 }`}
                 style={{
@@ -773,7 +777,7 @@ function CardMatchingTemplate({
           })}
         </div>
 
-        <div className="relative min-h-0 overflow-hidden rounded-[20px] border border-dashed border-[#cfd8cf] bg-white/65 px-4 py-4 text-center">
+        <div className="relative min-h-[172px] self-stretch overflow-hidden rounded-[20px] border border-dashed border-[#cfd8cf] bg-white/65 px-4 py-4 text-center">
           <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
             {laneConnections.map((connection) => (
               <path
@@ -803,7 +807,7 @@ function CardMatchingTemplate({
                 </span>
               ))}
             </div>
-            <div className="mt-4 w-full rounded-[18px] bg-white/90 px-4 py-3 shadow-[0_12px_26px_rgba(57,78,97,0.10)]">
+            <div className="mt-3 w-full rounded-[18px] bg-white/90 px-4 py-3 shadow-[0_12px_26px_rgba(57,78,97,0.10)]">
               <p className="whitespace-nowrap text-sm font-black leading-6" style={{ color: theme.accentStrong }}>
                 {selectedLeft ? "오른쪽 카드를 골라요" : "왼쪽 카드를 골라요"}
               </p>
@@ -815,7 +819,7 @@ function CardMatchingTemplate({
           </div>
         </div>
 
-        <div className="grid min-h-0 gap-3">
+        <div className="grid min-h-0 content-start gap-3">
           {rightItems.map((item) => {
             const used = Object.values(pairs).includes(item.rightId);
             return (
@@ -823,7 +827,7 @@ function CardMatchingTemplate({
                 key={item.rightId}
                 onClick={() => onRight(item.rightId)}
                 disabled={!selectedLeft || used}
-                className="relative z-10 flex min-h-20 items-center rounded-[18px] border bg-white px-5 text-left text-lg font-black shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
+                className="relative z-10 flex min-h-16 items-center rounded-[18px] border bg-white px-5 text-left text-base font-black leading-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
                 style={{ borderColor: used ? theme.accent : "#dde6ee", backgroundColor: used ? theme.accentSoft : "#ffffff" }}
               >
                 <span className="flex-1">{item.right}</span>
@@ -993,6 +997,7 @@ function RealtimePracticeRoom({
   const transcriptRef = useRef<string[]>([practice.sceneLine]);
   const partnerDraftRef = useRef("");
   const studentDraftRef = useRef("");
+  const speechStartedAtRef = useRef<number | null>(null);
   const hasUserSubmittedRef = useRef(false);
 
   useEffect(() => {
@@ -1034,13 +1039,19 @@ function RealtimePracticeRoom({
     const type = String(event.type);
 
     if (type === "input_audio_buffer.speech_started") {
+      speechStartedAtRef.current = Date.now();
       setStatusMessage("듣고 있어요. 천천히 말해보세요.");
       appendMessage("system", "마이크 입력을 듣고 있어요.");
       return;
     }
 
     if (type === "input_audio_buffer.speech_stopped") {
-      setStudentTurns((current) => current + 1);
+      const speechDurationMs = speechStartedAtRef.current ? Date.now() - speechStartedAtRef.current : 0;
+      speechStartedAtRef.current = null;
+      if (speechDurationMs > 0 && speechDurationMs < 700) {
+        setStatusMessage("너무 짧은 소리는 넘겼어요. 말할 때만 천천히 이야기해 주세요.");
+        return;
+      }
       setStatusMessage("말을 들었어요. 답을 기다리는 중이에요.");
       appendMessage("system", "말을 들었어요. 답변을 기다리는 중이에요.");
       return;
@@ -1059,6 +1070,9 @@ function RealtimePracticeRoom({
       const text = extractRealtimeEventText(event) || studentDraftRef.current.trim();
       if (text) {
         appendMessage("student", text);
+        if (isMeaningfulStudentSpeech(text)) {
+          setStudentTurns((current) => current + 1);
+        }
         setDraft("");
       }
       studentDraftRef.current = "";
@@ -1445,6 +1459,11 @@ function extractRealtimeResponseText(event: Record<string, unknown>) {
   }
 
   return parts.join(" ").trim();
+}
+
+function isMeaningfulStudentSpeech(text: string) {
+  const normalized = text.replace(/[\s.,!?~…。、？！]/g, "");
+  return normalized.length >= 2;
 }
 
 function extractRealtimeEventText(event: Record<string, unknown>) {
