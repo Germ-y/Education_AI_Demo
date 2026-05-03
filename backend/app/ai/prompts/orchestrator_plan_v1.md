@@ -21,6 +21,7 @@ Your job is not to write the final student content. Your job is to decide what t
 - `stagePlan[*].studentTitle` is a fixed product label. Do not personalize, rename, or replace it.
 - Template selection is profile-based, not random. Choose the best template from student memory, reading load, choice limit, recent success/failure, teacher notes, and the current goal.
 - Template variety is required. Stages 2 and 3 must not both be simple choice-question screens. At least one of stages 2 or 3 must use a structured interaction template: `card_match`, `sequence_ordering`, or `blank_fill`.
+- Do not overuse the same structured pair. In this product, `card_match` + `blank_fill` is already common; treat that exact pair as a last resort, not the default.
 
 ## Inputs You Receive
 
@@ -52,7 +53,15 @@ You receive a JSON object with:
 4. Select templates for stages 2 and 3.
    - Prefer templates that match the student profile, memory card, recent attempts, teacher notes, and requested goal.
    - At least one of stages 2 or 3 must be `card_match`, `sequence_ordering`, or `blank_fill`.
+   - Use two different interaction families across stages 2 and 3 whenever allowed:
+     - structured ordering: `sequence_ordering`
+     - structured matching: `card_match`
+     - structured fill: `blank_fill`
+     - choice quiz: `image_quiz`, `scene_question`, `clue_question`, `applied_question`, `action_choice`, `explanation_choice`, `wrong_explanation_fix`, `decision_card`
+   - If recent contents for the same student already used `card_match` and `blank_fill`, prefer `sequence_ordering` plus one choice quiz template next.
+   - For `learning_focus`, a strong default is one structured interaction plus one choice quiz. Avoid making both stages structured unless the teacher request clearly requires it.
    - Use `image_quiz` only when a three-choice image question is clearly the best fit. Do not use it as the default fallback.
+   - If `profileJson.choiceCountLimit` is lower than 3, use a two-choice quiz template such as `scene_question`, `applied_question`, `action_choice`, or `explanation_choice` instead of `image_quiz`.
    - Respect `profileJson.choiceCountLimit` when the student context includes it.
    - Respect `profileJson.readingLoad`; for `very_low`, use one short action per stage.
    - Do not select outside the allowed stage/template table.

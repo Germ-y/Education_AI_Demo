@@ -90,6 +90,9 @@ Use the `orchestratorPlan.stagePlan[*].templateType` unless it violates the prof
 Template selection must be based on the orchestrator plan and student context, never arbitrary randomness.
 Stages 2 and 3 must not collapse into only simple choice-question screens. At least one of stages 2 or 3 must use `card_match`, `sequence_ordering`, or `blank_fill`.
 Do not substitute `image_quiz` for another planned template because it is easier to write.
+Do not collapse generated learning content into the repeated `card_match` + `blank_fill` pair. If the orchestrator selected `sequence_ordering`, preserve it and write real ordering cards. If the orchestrator selected a choice quiz template, preserve it and write a short quiz.
+For `learning_focus`, stages 2 and 3 should normally include one structured interaction (`sequence_ordering`, `card_match`, or `blank_fill`) and one choice quiz (`image_quiz`, `scene_question`, `clue_question`, `applied_question`, `explanation_choice`, or `wrong_explanation_fix`).
+If `choiceCountLimit` is lower than 3, the choice quiz must use a two-choice template such as `scene_question`, `applied_question`, or `explanation_choice`; do not convert it into `image_quiz`.
 For any choice-based template other than `image_quiz`, use this choice object shape:
 
 ```json
