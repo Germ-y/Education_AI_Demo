@@ -661,6 +661,27 @@ export default function DashboardPage() {
   }, [pendingGenerationJobs]);
 
   useEffect(() => {
+    const failedCaseIds = Object.entries(generationStatuses)
+      .filter(([, status]) => status.state === "failed")
+      .map(([caseId]) => caseId);
+    if (failedCaseIds.length === 0) return;
+
+    const timer = window.setTimeout(() => {
+      setGenerationStatuses((current) => {
+        const next = { ...current };
+        failedCaseIds.forEach((caseId) => {
+          if (next[caseId]?.state === "failed") {
+            delete next[caseId];
+          }
+        });
+        return next;
+      });
+    }, 7000);
+
+    return () => window.clearTimeout(timer);
+  }, [generationStatuses]);
+
+  useEffect(() => {
     if (!selectedStudentId) return;
 
     let ignore = false;
@@ -1814,17 +1835,6 @@ export default function DashboardPage() {
                       >
                         {isGeneratingContent ? "AI가 자료를 제안하는 중" : "AI 수업 자료 제안받기"}
                       </button>
-                      {generationStatus && generationStatus.state !== "succeeded" && (
-                        <div
-                          className={`rounded-md border px-3 py-2 text-sm font-bold leading-6 ${
-                            generationStatus.state === "failed"
-                                ? "border-[#fed7aa] bg-[#fff7ed] text-[#9a3412]"
-                                : "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
-                          }`}
-                        >
-                          {generationStatus.message}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </section>
@@ -1837,14 +1847,30 @@ export default function DashboardPage() {
                         AI가 제안한 자료를 확인하고 선생님 판단으로 적용합니다.
                       </p>
                     </div>
-                    {isGeneratingContent && generationStatus && (
-                      <div className="rounded-md border border-[#bfdbfe] bg-[#eff6ff] p-4 text-[#1d4ed8]">
+                    {generationStatus && generationStatus.state !== "succeeded" && (
+                      <div
+                        className={`rounded-md border p-4 ${
+                          generationStatus.state === "failed"
+                            ? "border-[#fed7aa] bg-[#fff7ed] text-[#9a3412]"
+                            : "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
+                        }`}
+                      >
                         <div className="flex items-start gap-3">
-                          <div className="mt-1 h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-[#93c5fd] border-t-[#1d4ed8]" />
+                          {generationStatus.state === "failed" ? (
+                            <div className="mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full border border-[#fed7aa] bg-white text-xs font-black">
+                              !
+                            </div>
+                          ) : (
+                            <div className="mt-1 h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-[#93c5fd] border-t-[#1d4ed8]" />
+                          )}
                           <div>
-                            <p className="text-base font-black">검토 자료 생성 중</p>
+                            <p className="text-base font-black">
+                              {generationStatus.state === "failed" ? "생성 확인 필요" : "검토 자료 생성 중"}
+                            </p>
                             <p className="mt-1 text-sm font-bold leading-6">{generationStatus.message}</p>
-                            <p className="mt-2 text-xs font-bold text-[#3b82f6]">새로고침해도 여기에서 이어서 확인합니다.</p>
+                            {generationStatus.state === "running" && (
+                              <p className="mt-2 text-xs font-bold text-[#3b82f6]">새로고침해도 여기에서 이어서 확인합니다.</p>
+                            )}
                           </div>
                         </div>
                       </div>
