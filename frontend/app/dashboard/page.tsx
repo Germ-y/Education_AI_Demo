@@ -1577,8 +1577,8 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-              <section className="rounded-lg border border-[#d8dee8] bg-[#f1f5f9] p-3">
+            <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-6 py-4 xl:grid-cols-[minmax(0,0.94fr)_minmax(390px,0.72fr)] xl:overflow-hidden">
+              <section className="flex min-h-[420px] flex-col rounded-lg border border-[#d8dee8] bg-[#f1f5f9] p-3 xl:min-h-0">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-black text-[#64748b]">차시 자료</p>
@@ -1601,7 +1601,7 @@ export default function DashboardPage() {
                 </div>
                 <div
                   ref={reportPreviewFrameRef}
-                  className="relative mx-auto aspect-[4/3] h-[min(46vh,520px)] min-h-[360px] max-w-[760px] overflow-hidden rounded-md bg-[#e7edf4] shadow-inner"
+                  className="relative mx-auto aspect-[4/3] min-h-[300px] w-full max-w-[720px] flex-1 overflow-hidden rounded-md bg-[#e7edf4] shadow-inner"
                 >
                   <iframe
                     title={`학습 리포트 자료 스테이지 ${openReportStageStep}`}
@@ -1612,40 +1612,42 @@ export default function DashboardPage() {
                 </div>
               </section>
 
-              <div className="mt-3 grid gap-2 md:grid-cols-6">
-                <InfoBlock label="걸린 시간" value={`${openReport.durationMinutes}분`} />
-                <InfoBlock label="평균 응답" value={`${openReport.averageResponseSeconds}초`} />
-                <InfoBlock label="문제당 시간" value={`${openReport.secondsPerQuestion}초`} />
-                <InfoBlock label="시도 횟수" value={`${openReport.attemptCount}회`} />
-                <InfoBlock label="오답 횟수" value={`${openReport.wrongCount}회`} />
-                <InfoBlock label="정답률" value={`${openReport.accuracyRate}%`} />
-              </div>
-
-              <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr]">
-                <div className="rounded-lg bg-[#f8fafc] p-4">
-                  <p className="text-sm font-bold text-[#64748b]">기록 요약</p>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">{openReport.note}</p>
+              <aside className="min-h-0 space-y-3 xl:overflow-y-auto xl:pr-2">
+                <div className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-3">
+                  <InfoBlock label="걸린 시간" value={`${openReport.durationMinutes}분`} />
+                  <InfoBlock label="평균 응답" value={`${openReport.averageResponseSeconds}초`} />
+                  <InfoBlock label="문제당 시간" value={`${openReport.secondsPerQuestion}초`} />
+                  <InfoBlock label="시도 횟수" value={`${openReport.attemptCount}회`} />
+                  <InfoBlock label="오답 횟수" value={`${openReport.wrongCount}회`} />
+                  <InfoBlock label="정답률" value={`${openReport.accuracyRate}%`} />
                 </div>
+
+                <div className="rounded-lg border border-[#cbd5e1] bg-white p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-bold text-[#1f3a5f]">선생님 리포트</p>
+                    {openReportTeacherFeedback && (
+                      <span className="rounded-full bg-[#eef4fb] px-3 py-1 text-xs font-black text-[#1f3a5f]">
+                        {openReportTeacherFeedback.savedAt}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">
+                    {openReportTeacherFeedback?.feedback ?? "아직 선생님 리포트가 저장되지 않았습니다."}
+                  </p>
+                </div>
+
                 <div className="rounded-lg border border-[#d9ebc9] bg-[#f4fbef] p-4">
                   <p className="text-sm font-bold text-[#16803c]">학생 회고</p>
                   <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">
                     {openReport.reflectionText ?? "아직 저장된 회고가 없습니다."}
                   </p>
                 </div>
-              </div>
-              <div className="mt-3 rounded-lg border border-[#cbd5e1] bg-white p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-bold text-[#1f3a5f]">선생님 리포트</p>
-                  {openReportTeacherFeedback && (
-                    <span className="rounded-full bg-[#eef4fb] px-3 py-1 text-xs font-black text-[#1f3a5f]">
-                      {openReportTeacherFeedback.savedAt}
-                    </span>
-                  )}
+
+                <div className="rounded-lg bg-[#f8fafc] p-4">
+                  <p className="text-sm font-bold text-[#64748b]">기록 요약</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">{openReport.note}</p>
                 </div>
-                <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">
-                  {openReportTeacherFeedback?.feedback ?? "아직 선생님 리포트가 저장되지 않았습니다."}
-                </p>
-              </div>
+              </aside>
             </div>
           </section>
         </div>
