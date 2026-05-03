@@ -298,7 +298,7 @@ function StageMedia({
               ? "min-h-0 flex-1"
               : compact
                 ? featured
-                  ? "h-[clamp(180px,24vh,220px)]"
+                  ? "h-[clamp(150px,20vh,190px)]"
                   : "h-[clamp(96px,16vh,132px)]"
                 : "h-[clamp(260px,42vh,420px)]"
           }`}
@@ -1066,18 +1066,20 @@ function RealtimePracticeRoom({
           <p className="text-sm font-black" style={{ color: theme.accentStrong }}>
             {practice.label}
           </p>
-          <h3 className="mt-1.5 text-[1.9rem] font-black leading-tight break-keep text-[#172033]">{practice.title}</h3>
+          <h3 className="mt-1.5 text-[1.65rem] font-black leading-tight break-keep text-[#172033]">{practice.title}</h3>
           <div className="mt-3">
             <StageMedia question={question} theme={theme} compact featured />
           </div>
         </div>
 
-        <div className="relative z-10 grid min-h-0 grid-cols-[minmax(0,1fr)_144px] items-center gap-3 pt-3">
-          <div className="relative rounded-[20px] border border-white/80 bg-white/90 p-4 shadow-sm before:absolute before:right-[-12px] before:top-1/2 before:h-6 before:w-6 before:-translate-y-1/2 before:rotate-45 before:border-r before:border-t before:border-white/80 before:bg-white/90">
+        <div className="relative z-10 grid min-h-0 grid-cols-[minmax(0,1fr)_128px] items-end gap-3 pt-3">
+          <div className="relative rounded-[20px] border border-white/80 bg-white/90 p-3.5 shadow-sm before:absolute before:right-[-12px] before:top-1/2 before:h-6 before:w-6 before:-translate-y-1/2 before:rotate-45 before:border-r before:border-t before:border-white/80 before:bg-white/90">
             <p className="text-xs font-black" style={{ color: theme.accentStrong }}>
               {practice.partner}
             </p>
-            <p className="mt-2 text-xl font-black leading-7 break-keep text-[#25312a]">{practice.partnerLine}</p>
+            <p className="mt-2 text-[clamp(1rem,2.2vh,1.35rem)] font-black leading-snug break-keep text-[#25312a]">
+              {practice.partnerLine}
+            </p>
           </div>
           <div className="justify-self-end">
             <QuestionStar />
@@ -1222,12 +1224,12 @@ function HintStar() {
 
 function QuestionStar() {
   return (
-    <div className="relative h-40 w-36 shrink-0" aria-hidden="true">
+    <div className="relative h-32 w-32 shrink-0" aria-hidden="true">
       <Image
         src="/assets/question-star/without-eyes-question.svg"
         alt=""
         fill
-        sizes="144px"
+        sizes="128px"
         className="object-contain"
         draggable={false}
       />
@@ -1235,7 +1237,7 @@ function QuestionStar() {
         src="/assets/question-star/eyes.svg"
         alt=""
         fill
-        sizes="144px"
+        sizes="128px"
         className="animate-[hintStarBlink_4.2s_ease-in-out_infinite] object-contain"
         draggable={false}
       />
@@ -1243,7 +1245,7 @@ function QuestionStar() {
         src="/assets/question-star/question.svg"
         alt=""
         fill
-        sizes="144px"
+        sizes="128px"
         className="animate-[questionStarWiggle_2.4s_ease-in-out_infinite] object-contain"
         draggable={false}
       />
