@@ -349,6 +349,22 @@ class ContentRejectRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class ContentStagePatch(BaseModel):
+    stage_id: str = Field(alias="stageId")
+    student_instruction: str | None = Field(default=None, alias="studentInstruction")
+    question: str | None = None
+    choices: list[str] | None = None
+    realtime_student_goal: str | None = Field(default=None, alias="realtimeStudentGoal")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ContentReviewUpdateRequest(BaseModel):
+    stages: list[ContentStagePatch]
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class StudentActivityEventRequest(BaseModel):
     attempt_id: str | None = Field(default=None, alias="attemptId")
     stage_id: str | None = Field(default=None, alias="stageId")

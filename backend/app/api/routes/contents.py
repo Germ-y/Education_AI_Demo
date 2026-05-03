@@ -9,7 +9,7 @@ from app.api.deps import get_store, require_teacher
 from app.api.response import ok
 from app.core.config import get_settings
 from app.domain.enums import AssetRole, AssetType
-from app.domain.schemas import ContentApprovalRequest, ContentRejectRequest
+from app.domain.schemas import ContentApprovalRequest, ContentRejectRequest, ContentReviewUpdateRequest
 from app.services.store import DemoStore, SessionPrincipal
 
 router = APIRouter(prefix="/api/contents", tags=["contents"])
@@ -74,6 +74,30 @@ def reject_content(
         resource_type="mission_content",
         resource_id=content.id,
         payload_json={"reason": payload.reason, "requestedChanges": payload.requested_changes},
+    )
+    return ok(content.model_dump(by_alias=True))
+
+
+@router.patch("/{content_id}/review")
+def update_content_review(
+    content_id: str,
+    payload: ContentReviewUpdateRequest,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    content = demo_store.update_mission_content_review(content_id, principal.id, payload.stages)
+    if content is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "CONTENT_REVIEW_UPDATE_FAILED", "message": "수업 자료 수정 내용을 저장하지 못했습니다."},
+        )
+    demo_store.record_audit(
+        actor_user_id=principal.id,
+        student_id=content.student_id,
+        action="update_content_review",
+        resource_type="mission_content",
+        resource_id=content.id,
+        payload_json={"stageCount": len(payload.stages)},
     )
     return ok(content.model_dump(by_alias=True))
 

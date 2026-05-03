@@ -31,6 +31,26 @@ export function rejectContent(
   });
 }
 
+export function updateContentReview(
+  contentId: string,
+  payload: {
+    stages: Array<{
+      stageId: string;
+      studentInstruction?: string;
+      question?: string;
+      choices?: string[];
+      realtimeStudentGoal?: string;
+    }>;
+  },
+  options?: ApiAdapterOptions,
+) {
+  return apiFetch<MissionContent>(`/api/contents/${encodeURIComponent(contentId)}/review`, {
+    method: "PATCH",
+    body: payload,
+    token: options?.token,
+  });
+}
+
 export function publishContent(contentId: string, options?: ApiAdapterOptions) {
   return apiFetch<MissionContent>(`/api/contents/${encodeURIComponent(contentId)}/publish`, {
     method: "POST",

@@ -405,6 +405,44 @@ def test_http_errors_use_contract_envelope() -> None:
     }
 
 
+def test_teacher_can_persist_content_review_edits() -> None:
+    client = TestClient(create_app())
+    teacher_login = client.post(
+        "/api/auth/demo-login",
+        json={"role": "teacher", "email": "teacher.demo@eduyj.local"},
+    )
+    teacher_token = teacher_login.json()["data"]["session"]["accessToken"]
+
+    response = client.patch(
+        "/api/contents/content_clock_001/review",
+        headers={"authorization": f"Bearer {teacher_token}"},
+        json={
+            "stages": [
+                {
+                    "stageId": "stage_clock_2",
+                    "studentInstruction": "수정된 시계 문제 설명",
+                    "question": "수정된 시계 문제를 골라요.",
+                    "choices": ["4시", "6시", "9시"],
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    stage = next(stage for stage in response.json()["data"]["stages"] if stage["id"] == "stage_clock_2")
+    assert stage["studentInstruction"] == "수정된 시계 문제 설명"
+    assert stage["templateJson"]["question"] == "수정된 시계 문제를 골라요."
+    assert stage["templateJson"]["choices"][0]["text"] == "4시"
+    assert stage["templateJson"]["answer"] == "a"
+
+    persisted = client.get(
+        "/api/contents/content_clock_001",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    persisted_stage = next(stage for stage in persisted.json()["data"]["stages"] if stage["id"] == "stage_clock_2")
+    assert persisted_stage["templateJson"]["choices"][0]["text"] == "4시"
+
+
 def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, tmp_path) -> None:
     os.environ["OPENAI_API_KEY"] = "test-openai-key"
     os.environ["ELEVENLABS_API_KEY"] = "test-elevenlabs-key"

@@ -20,7 +20,7 @@ from app.domain.models import (
     SchoolProfile,
     SchoolTimetableSlot,
 )
-from app.domain.schemas import MissionContent
+from app.domain.schemas import ContentStagePatch, MissionContent
 from app.repositories.demo_repository import DemoRepository
 
 
@@ -502,6 +502,50 @@ class DemoStore:
         mission.status = MissionStatus.REVISION_REQUESTED
         mission.teacher_review_summary = reason
         mission.brief_json = {**mission.brief_json, "requestedChanges": requested_changes}
+        self.persist()
+        return mission
+
+    def update_mission_content_review(self, content_id: str, teacher_id: str, stage_patches: list[ContentStagePatch]) -> MissionContent | None:
+        self.refresh()
+        mission = self.get_mission_for_teacher(content_id, teacher_id)
+        if mission is None or mission.status in {MissionStatus.GENERATING, MissionStatus.ARCHIVED}:
+            return None
+
+        patches_by_stage_id = {patch.stage_id: patch for patch in stage_patches}
+        updated_stages = []
+        for stage in mission.stages:
+            patch = patches_by_stage_id.get(stage.id)
+            if patch is None:
+                updated_stages.append(stage)
+                continue
+
+            template_json = dict(stage.template_json)
+            if patch.question is not None:
+                template_json["question"] = patch.question
+                if "missionText" in template_json:
+                    template_json["missionText"] = patch.question
+
+            if patch.choices is not None and isinstance(template_json.get("choices"), list):
+                template_json["choices"] = _merge_choice_texts(template_json["choices"], patch.choices)
+
+            realtime_spec = stage.realtime_spec
+            if realtime_spec is not None and patch.realtime_student_goal is not None:
+                realtime_spec = realtime_spec.model_copy(update={"student_goal": patch.realtime_student_goal})
+
+            updated_stages.append(
+                stage.model_copy(
+                    update={
+                        "student_instruction": patch.student_instruction
+                        if patch.student_instruction is not None
+                        else stage.student_instruction,
+                        "template_json": template_json,
+                        "realtime_spec": realtime_spec,
+                    },
+                ),
+            )
+
+        mission.stages = updated_stages
+        mission.teacher_review_summary = "교사 직접 수정 저장"
         self.persist()
         return mission
 
@@ -1295,6 +1339,25 @@ def _evaluate_answer(template_json: dict[str, Any], answer: dict[str, Any]) -> d
         "isCorrect": is_correct,
         "feedback": correct_feedback if is_correct else wrong_feedback,
     }
+
+
+def _merge_choice_texts(existing_choices: Any, choice_texts: list[str]) -> list[Any]:
+    if not isinstance(existing_choices, list):
+        return existing_choices
+
+    merged = []
+    for index, choice in enumerate(existing_choices):
+        if index >= len(choice_texts):
+            merged.append(choice)
+            continue
+
+        text = choice_texts[index]
+        if isinstance(choice, dict):
+            merged.append({**choice, "text": text})
+        else:
+            merged.append(text)
+
+    return merged
 
 
 def _build_korean_review_summary_text(

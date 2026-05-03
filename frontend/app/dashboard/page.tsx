@@ -12,6 +12,7 @@ import {
   getTeacherStudents,
   publishContent,
   rejectContent,
+  updateContentReview,
   type AgentRun,
   type MissionContent,
   type StudentCaseFile,
@@ -440,6 +441,23 @@ function mapContentToReviewStages(content: MissionContent): ReviewStageDraft[] {
         realtimeMaxDurationSec: stage.realtimeSpec?.maxDurationSec,
       };
     });
+}
+
+function buildReviewStagePatches(content: MissionContent, drafts: ReviewStageDraft[]) {
+  return drafts.flatMap((draft) => {
+    const stage = content.stages.find((item) => item.step === draft.step);
+    if (!stage) return [];
+
+    return [
+      {
+        stageId: stage.id,
+        studentInstruction: draft.description,
+        question: draft.question,
+        choices: draft.isRealtimeStage ? undefined : draft.choices,
+        realtimeStudentGoal: draft.isRealtimeStage ? draft.question : undefined,
+      },
+    ];
+  });
 }
 
 function StatusBadge({ supportCase }: { supportCase: SupportCase }) {
@@ -909,6 +927,33 @@ export default function DashboardPage() {
       setOpenReviewId(null);
     } catch {
       setReviewActionError("자료 제안 사용 안 함 상태를 저장하지 못했습니다.");
+    } finally {
+      setReviewActionId(null);
+    }
+  };
+
+  const handleSaveReviewEdits = async () => {
+    if (!openReview || reviewActionId) return;
+
+    setReviewActionId(openReview.id);
+    try {
+      const content = await updateContentReview(openReview.contentId, {
+        stages: buildReviewStagePatches(openReview.content, openReviewStages),
+      });
+      updateCurrentContent(content);
+      setReviewStageDrafts((current) => ({
+        ...current,
+        [openReview.id]: mapContentToReviewStages(content),
+      }));
+      setEditingReviewIds((current) => current.filter((id) => id !== openReview.id));
+      setRevisionMaterialIds((current) => (current.includes(openReview.id) ? current : [...current, openReview.id]));
+      setRejectedMaterialIds((current) => current.filter((id) => id !== openReview.id));
+      setApprovedMaterialIds((current) => current.filter((id) => id !== openReview.id));
+      setAppliedMaterialIds((current) => current.filter((id) => id !== openReview.id));
+      setReviewPreviewRefreshKey((current) => current + 1);
+      await refreshSelectedStudentData();
+    } catch {
+      setReviewActionError("수정 내용을 DB에 저장하지 못했습니다. 다시 확인해 주세요.");
     } finally {
       setReviewActionId(null);
     }
@@ -1989,7 +2034,7 @@ export default function DashboardPage() {
               <button
                 onClick={() => {
                   if (isReviewEditing) {
-                    setEditingReviewIds((current) => current.filter((id) => id !== openReview.id));
+                    void handleSaveReviewEdits();
                     return;
                   }
 
@@ -2006,6 +2051,7 @@ export default function DashboardPage() {
                     ? "border-[#1f3a5f] bg-[#1f3a5f] text-white"
                     : "border-[#cbd5e1] bg-white text-[#334155]"
                 }`}
+                disabled={reviewActionId === openReview.id}
               >
                 {isReviewEditing ? "수정 저장" : "직접 수정"}
               </button>
