@@ -1604,7 +1604,7 @@ export function StudentStageExperience({
       return;
     }
 
-    if (!scene.contentId || !attemptId || !studentAccessToken) {
+    if (!scene.contentId) {
       router.push(nextHref);
       return;
     }
@@ -1613,17 +1613,33 @@ export function StudentStageExperience({
     setRuntimeError(null);
 
     try {
+      let activeToken = studentAccessToken;
+      let activeAttemptId = attemptId;
+
+      if ((!activeToken || !activeAttemptId) && student.accessCode) {
+        const access = await studentAccess({ accessCode: student.accessCode });
+        const attempt = await startStudentMission(scene.contentId, { token: access.session.accessToken });
+        activeToken = access.session.accessToken;
+        activeAttemptId = attempt.id;
+        setStudentAccessToken(activeToken);
+        setAttemptId(activeAttemptId);
+      }
+
+      if (!activeToken || !activeAttemptId) {
+        throw new Error("runtime_not_ready");
+      }
+
       const reflection = reflectionText.trim();
       await saveStudentMissionReflection(
         scene.contentId,
         {
-          attemptId,
+          attemptId: activeAttemptId,
           reflectionChoice: reflection,
           shortText: reflection,
         },
-        { token: studentAccessToken },
+        { token: activeToken },
       );
-      await completeStudentMission(scene.contentId, attemptId, { token: studentAccessToken });
+      await completeStudentMission(scene.contentId, activeAttemptId, { token: activeToken });
     } catch {
       // 기록 저장 실패가 학생의 완료 이동을 막지 않도록 한다.
     } finally {

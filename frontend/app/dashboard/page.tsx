@@ -80,6 +80,7 @@ type SessionLog = {
   completionRate: number;
   secondsPerQuestion: number;
   accuracyRate: number;
+  reflectionText: string | null;
 };
 
 const tabs: Array<{ id: DashboardTab; label: string; description: string }> = [
@@ -462,6 +463,7 @@ export default function DashboardPage() {
   const reviewPreviewFrameRef = useRef<HTMLDivElement>(null);
   const [reportPreviewScale, setReportPreviewScale] = useState(1);
   const reportPreviewFrameRef = useRef<HTMLDivElement>(null);
+  const [reportPreviewStep, setReportPreviewStep] = useState(1);
   const [reviewStageDrafts, setReviewStageDrafts] = useState<Record<string, ReviewStageDraft[]>>({});
   const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({});
   const [savedMemos, setSavedMemos] = useState<Record<string, string>>({});
@@ -605,6 +607,12 @@ export default function DashboardPage() {
       completionRate,
       secondsPerQuestion: averageResponseSeconds,
       accuracyRate,
+      reflectionText:
+        typeof record.reflection?.shortText === "string"
+          ? record.reflection.shortText
+          : typeof record.reflection?.reflectionChoice === "string"
+            ? record.reflection.reflectionChoice
+            : null,
     };
   });
   const currentWorkflowStep =
@@ -625,9 +633,7 @@ export default function DashboardPage() {
   const feedbackTarget =
     feedbackQueue.find((record) => record.id === selectedFeedbackId) ?? feedbackQueue[0] ?? sessionLogs[0];
   const openReport = sessionLogs.find((record) => record.id === openReportId);
-  const openReportStageStep = openReport
-    ? Math.min(Math.max(sessionLogs.findIndex((record) => record.id === openReport.id) + 1, 1), 4)
-    : 1;
+  const openReportStageStep = reportPreviewStep;
   const openReview = selectedReviewItems.find((item) => item.id === openReviewId);
   const openReviewStages = openReview ? (reviewStageDrafts[openReview.id] ?? mapContentToReviewStages(openReview.content)) : reviewStagePreviews;
   const openReviewNeedsMediaGeneration = openReview ? hasMissingGeneratedMedia(openReview.content) : false;
@@ -939,6 +945,11 @@ export default function DashboardPage() {
   }, [openReview]);
 
   useEffect(() => {
+    if (!openReportId) return;
+    setReportPreviewStep(1);
+  }, [openReportId]);
+
+  useEffect(() => {
     if (!openReport) return;
     const frame = reportPreviewFrameRef.current;
     if (!frame) return;
@@ -952,7 +963,7 @@ export default function DashboardPage() {
     const observer = new ResizeObserver(updateScale);
     observer.observe(frame);
     return () => observer.disconnect();
-  }, [openReport]);
+  }, [openReport, reportPreviewStep]);
 
   return (
     <main className="relative min-h-screen bg-[#f5f7fa] text-[#172033]">
@@ -1552,7 +1563,7 @@ export default function DashboardPage() {
       </div>
       {openReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/45 p-6">
-          <section className="flex h-[min(88vh,820px)] w-[min(92vw,1280px)] flex-col rounded-xl bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+          <section className="flex h-[min(90vh,900px)] w-[min(94vw,1320px)] flex-col rounded-xl bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#e5e9f0] px-6 py-4">
               <div>
                 <p className="text-sm font-bold text-[#64748b]">학습 리포트</p>
@@ -1569,17 +1580,31 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 px-6 py-4">
-              <section className="rounded-lg border border-[#d8dee8] bg-[#e7edf4] p-3">
-                <div className="mb-2">
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+              <section className="rounded-lg border border-[#d8dee8] bg-[#f1f5f9] p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-black text-[#64748b]">차시 자료</p>
                     <p className="mt-1 text-base font-black text-[#172033]">스테이지 {openReportStageStep} 학습 화면</p>
                   </div>
+                  <div className="flex rounded-lg bg-white p-1 shadow-sm">
+                    {[1, 2, 3, 4].map((step) => (
+                      <button
+                        key={step}
+                        type="button"
+                        onClick={() => setReportPreviewStep(step)}
+                        className={`h-8 w-10 rounded-md text-sm font-black transition ${
+                          reportPreviewStep === step ? "bg-[#1f3a5f] text-white" : "text-[#64748b] hover:bg-[#eef2f7]"
+                        }`}
+                      >
+                        {step}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div
                   ref={reportPreviewFrameRef}
-                  className="relative mx-auto h-[min(52vh,560px)] min-h-[420px] w-full overflow-hidden rounded-md bg-[#e7edf4]"
+                  className="relative mx-auto aspect-[4/3] h-[min(46vh,520px)] min-h-[360px] max-w-[760px] overflow-hidden rounded-md bg-[#e7edf4] shadow-inner"
                 >
                   <iframe
                     title={`학습 리포트 자료 스테이지 ${openReportStageStep}`}
@@ -1599,9 +1624,17 @@ export default function DashboardPage() {
                 <InfoBlock label="정답률" value={`${openReport.accuracyRate}%`} />
               </div>
 
-              <div className="mt-3 rounded-lg bg-[#f8fafc] p-4">
-                <p className="text-sm font-bold text-[#64748b]">기록 요약</p>
-                <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">{openReport.note}</p>
+              <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr]">
+                <div className="rounded-lg bg-[#f8fafc] p-4">
+                  <p className="text-sm font-bold text-[#64748b]">기록 요약</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">{openReport.note}</p>
+                </div>
+                <div className="rounded-lg border border-[#d9ebc9] bg-[#f4fbef] p-4">
+                  <p className="text-sm font-bold text-[#16803c]">학생 회고</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">
+                    {openReport.reflectionText ?? "아직 저장된 회고가 없습니다."}
+                  </p>
+                </div>
               </div>
             </div>
           </section>
