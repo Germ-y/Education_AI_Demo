@@ -427,12 +427,12 @@ function FloatingStageFeedback({
   if (!showSuccess && !showWrong) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+10px)] z-40 grid place-items-center">
+    <div className="pointer-events-none mb-3 grid place-items-center">
       <div
         className={`animate-[stageToastIn_220ms_ease-out_both] rounded-[18px] px-5 py-3 text-center text-sm font-bold leading-6 shadow-[0_18px_42px_rgba(31,41,55,0.18)] ${
           showSuccess ? "border border-[#f0dfb4] bg-[#fff7dd] text-[#6b4b12]" : "bg-[#fff0ed] text-[#b84232]"
         }`}
-        style={{ width: "min(560px, 72%)" }}
+        style={{ width: "min(560px, 100%)" }}
       >
         {showSuccess && (
           <p className="font-black" style={{ color: theme.accentStrong }}>
@@ -710,6 +710,9 @@ function CardMatchingTemplate({
   const items = question.matchingPairs ?? [];
   const rightItems = [...items].reverse();
   const matchedCount = Object.keys(pairs).length;
+  const matchingRowHeight = 72;
+  const matchingGap = 12;
+  const matchingLaneHeight = items.length * matchingRowHeight + Math.max(0, items.length - 1) * matchingGap;
   const laneConnections = items
     .map((item, index) => {
       const rightId = pairs[item.leftId];
@@ -747,7 +750,10 @@ function CardMatchingTemplate({
         </div>
       )}
 
-      <div className="grid min-h-[172px] grid-cols-[minmax(220px,1fr)_minmax(220px,0.62fr)_minmax(220px,1fr)] items-start gap-3 overflow-hidden">
+      <div
+        className="grid grid-cols-[minmax(220px,1fr)_minmax(220px,0.62fr)_minmax(220px,1fr)] items-start gap-3 overflow-hidden"
+        style={{ minHeight: matchingLaneHeight }}
+      >
         <div className="grid min-h-0 content-start gap-3">
           {items.map((item) => {
             const picked = selectedLeft === item.leftId;
@@ -757,7 +763,7 @@ function CardMatchingTemplate({
                 key={item.leftId}
                 onClick={() => onLeft(item.leftId)}
                 disabled={matched}
-                className={`relative z-10 flex min-h-16 items-center rounded-[18px] border bg-white px-5 text-left text-base font-black leading-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:hover:translate-y-0 ${
+                className={`relative z-10 flex h-[72px] items-center rounded-[18px] border bg-white px-5 text-left text-base font-black leading-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:hover:translate-y-0 ${
                   picked ? "scale-[1.015] shadow-[0_16px_30px_rgba(39,174,96,0.16)]" : ""
                 }`}
                 style={{
@@ -777,7 +783,10 @@ function CardMatchingTemplate({
           })}
         </div>
 
-        <div className="relative min-h-[172px] self-stretch overflow-hidden rounded-[20px] border border-dashed border-[#cfd8cf] bg-white/65 px-4 py-4 text-center">
+        <div
+          className="relative overflow-hidden rounded-[20px] border border-dashed border-[#cfd8cf] bg-white/65 px-4 py-4 text-center"
+          style={{ height: matchingLaneHeight }}
+        >
           <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
             {laneConnections.map((connection) => (
               <path
@@ -827,7 +836,7 @@ function CardMatchingTemplate({
                 key={item.rightId}
                 onClick={() => onRight(item.rightId)}
                 disabled={!selectedLeft || used}
-                className="relative z-10 flex min-h-16 items-center rounded-[18px] border bg-white px-5 text-left text-base font-black leading-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
+                className="relative z-10 flex h-[72px] items-center rounded-[18px] border bg-white px-5 text-left text-base font-black leading-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
                 style={{ borderColor: used ? theme.accent : "#dde6ee", backgroundColor: used ? theme.accentSoft : "#ffffff" }}
               >
                 <span className="flex-1">{item.right}</span>
@@ -999,6 +1008,7 @@ function RealtimePracticeRoom({
   const studentDraftRef = useRef("");
   const speechStartedAtRef = useRef<number | null>(null);
   const hasUserSubmittedRef = useRef(false);
+  const responseInProgressRef = useRef(false);
 
   useEffect(() => {
     messageListRef.current?.scrollTo({
@@ -1081,6 +1091,7 @@ function RealtimePracticeRoom({
     }
 
     if (type === "response.audio_transcript.delta" && typeof event.delta === "string") {
+      responseInProgressRef.current = true;
       partnerDraftRef.current += event.delta;
       setLivePartnerText(partnerDraftRef.current);
       return;
@@ -1100,7 +1111,13 @@ function RealtimePracticeRoom({
       return;
     }
 
+    if (type === "response.created" || type === "response.in_progress") {
+      responseInProgressRef.current = true;
+      return;
+    }
+
     if (type === "response.done") {
+      responseInProgressRef.current = false;
       const text = extractRealtimeResponseText(event);
       const fallbackText = partnerDraftRef.current.trim();
       if (text || fallbackText) {
@@ -1124,6 +1141,7 @@ function RealtimePracticeRoom({
       studentDraftRef.current = "";
       setLivePartnerText("");
       setLiveStudentText("");
+      responseInProgressRef.current = false;
     }
   };
 
@@ -1242,6 +1260,11 @@ function RealtimePracticeRoom({
           },
         }),
       );
+      if (responseInProgressRef.current) {
+        setStatusMessage("?대떦 ?듬? ?앷컖???덈굹硫??ㅼ쓬 留먯쓣 蹂대궡二쇱꽭??");
+        return;
+      }
+      responseInProgressRef.current = true;
       dataChannel.send(JSON.stringify({ type: "response.create" }));
     }
   };
@@ -1548,6 +1571,9 @@ function QuestionStar() {
   );
 }
 
+const STAGE_FRAME_WIDTH = 1093;
+const STAGE_FRAME_HEIGHT = 820;
+
 export function StudentStageExperience({
   context,
   initialStep = context.scene.currentStep,
@@ -1598,6 +1624,7 @@ export function StudentStageExperience({
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [isCompletingMission, setIsCompletingMission] = useState(false);
+  const [stageFrameScale, setStageFrameScale] = useState(1);
   const noticeCounter = useRef(0);
   const runtimeStartedRef = useRef(false);
   const pendingAnswerSubmissionsRef = useRef<PendingAnswerSubmission[]>([]);
@@ -1631,6 +1658,18 @@ export function StudentStageExperience({
   const isCorrect = (isChoiceStage || isStructuredStage) && answer === activeQuestion.correctAnswer;
   const isStageComplete = completedSteps.includes(activeStage.step);
   const isLastStage = activeStageIndex === scene.stages.length - 1;
+
+  useEffect(() => {
+    const resizeStageFrame = () => {
+      const availableWidth = Math.max(320, window.innerWidth - 32);
+      const availableHeight = Math.max(320, window.innerHeight - 32);
+      setStageFrameScale(Math.min(availableWidth / STAGE_FRAME_WIDTH, availableHeight / STAGE_FRAME_HEIGHT));
+    };
+
+    resizeStageFrame();
+    window.addEventListener("resize", resizeStageFrame);
+    return () => window.removeEventListener("resize", resizeStageFrame);
+  }, []);
 
   useEffect(() => {
     if (
@@ -1990,7 +2029,7 @@ export function StudentStageExperience({
   };
 
   return (
-    <main className="relative flex min-h-screen overflow-x-hidden bg-[#e7edf4] p-4 text-[#1f211d]">
+    <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[#e7edf4] p-4 text-[#1f211d]">
       {!previewMode && (
       <Link
         href="/"
@@ -1999,8 +2038,20 @@ export function StudentStageExperience({
         홈으로
       </Link>
       )}
-      <div className="m-auto w-full max-w-[1093px]">
-        <div className="relative aspect-[4/3] h-[min(calc(100vh-32px),820px)] w-full rounded-[44px] bg-[#202939] p-4 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+      <div
+        style={{
+          width: STAGE_FRAME_WIDTH * stageFrameScale,
+          height: STAGE_FRAME_HEIGHT * stageFrameScale,
+        }}
+      >
+        <div
+          className="relative origin-top-left rounded-[44px] bg-[#202939] p-4 shadow-[0_30px_90px_rgba(15,23,42,0.28)]"
+          style={{
+            width: STAGE_FRAME_WIDTH,
+            height: STAGE_FRAME_HEIGHT,
+            transform: `scale(${stageFrameScale})`,
+          }}
+        >
           <div className="absolute bottom-5 left-1/2 h-1.5 w-24 -translate-x-1/2 rounded-full bg-white/22" />
 
           <div className="h-full overflow-hidden rounded-[30px] bg-[#fbfaf4]">
