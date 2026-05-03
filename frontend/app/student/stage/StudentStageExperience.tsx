@@ -429,7 +429,7 @@ function FloatingStageFeedback({
   return (
     <div className="pointer-events-none mb-3 grid place-items-center">
       <div
-        className={`animate-[stageToastIn_220ms_ease-out_both] rounded-[18px] px-5 py-3 text-center text-sm font-bold leading-6 shadow-[0_18px_42px_rgba(31,41,55,0.18)] ${
+        className={`rounded-[18px] px-5 py-3 text-center text-sm font-bold leading-6 shadow-[0_18px_42px_rgba(31,41,55,0.18)] ${
           showSuccess ? "border border-[#f0dfb4] bg-[#fff7dd] text-[#6b4b12]" : "bg-[#fff0ed] text-[#b84232]"
         }`}
         style={{ width: "min(560px, 100%)" }}
@@ -586,7 +586,7 @@ function SequenceTemplate({
   const availableItems = items.filter((item) => !selectedIds.includes(item.id));
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_auto_auto] gap-2 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-3 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]">
+    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(104px,auto)_minmax(116px,1fr)] gap-3 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-3 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-base font-black leading-5">{question.prompt}</p>
@@ -603,7 +603,7 @@ function SequenceTemplate({
         )}
       </div>
 
-      <div className="rounded-[18px] border border-dashed border-[#cfd8cf] bg-white/70 p-2.5">
+      <div className="rounded-[18px] border border-dashed border-[#cfd8cf] bg-white/70 p-3">
         <div className="flex items-center justify-between">
           <p className="text-xs font-black" style={{ color: theme.accentStrong }}>
             순서 칸
@@ -617,7 +617,7 @@ function SequenceTemplate({
           return (
             <div
               key={index}
-              className={`flex h-[56px] flex-col items-center justify-center rounded-[16px] border-2 border-dashed px-2 py-1.5 text-center transition ${
+              className={`flex min-h-[76px] flex-col items-center justify-center rounded-[16px] border-2 border-dashed px-2.5 py-2 text-center transition ${
                 item ? "border-solid bg-white shadow-[0_10px_24px_rgba(57,78,97,0.10)]" : "bg-white/55"
               }`}
               style={{ borderColor: item ? theme.accent : "#cfd8cf" }}
@@ -625,7 +625,7 @@ function SequenceTemplate({
               <span className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black text-white" style={{ backgroundColor: theme.accent }}>
                 {index + 1}
               </span>
-              <span className={`mt-1 line-clamp-1 text-sm font-black leading-5 break-keep ${item ? "text-[#1f211d]" : "text-[#9aa39b]"}`}>
+              <span className={`mt-1 line-clamp-2 text-[13px] font-black leading-[18px] break-keep ${item ? "text-[#1f211d]" : "text-[#9aa39b]"}`}>
                 {item?.label ?? "여기에 놓기"}
               </span>
               <span className="line-clamp-1 min-h-4 text-[10px] font-bold leading-4 text-[#6d746c] break-keep">
@@ -637,12 +637,12 @@ function SequenceTemplate({
         </div>
       </div>
 
-      <div className="rounded-[18px] border border-[#f0dfb4] bg-[#fff9e8] p-2.5">
+      <div className="min-h-0 rounded-[18px] border border-[#f0dfb4] bg-[#fff9e8] p-3">
         <div className="flex items-center justify-between">
           <p className="text-xs font-black text-[#8a5a00]">카드 트레이</p>
           {availableItems.length > 0 && <p className="text-[11px] font-bold text-[#8a5a00]">카드를 차례대로 눌러요</p>}
         </div>
-        <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}>
+        <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(Math.max(items.length, 1), 3)}, minmax(0, 1fr))` }}>
           {items.map((item) => {
             const picked = selectedIds.includes(item.id);
 
@@ -651,10 +651,10 @@ function SequenceTemplate({
               key={item.id}
               onClick={() => onPick(item.id)}
               disabled={picked}
-              className="min-h-[44px] cursor-grab rounded-[16px] border bg-white px-3 py-1.5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-[0_12px_24px_rgba(57,78,97,0.12)] active:cursor-grabbing disabled:cursor-default disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
+              className="min-h-[54px] cursor-grab rounded-[16px] border bg-white px-3 py-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(57,78,97,0.12)] active:cursor-grabbing disabled:cursor-default disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
               style={{ borderColor: picked ? theme.accent : "#dde6ee" }}
             >
-              <p className="text-sm font-black leading-5 break-keep">{item.label}</p>
+              <p className="line-clamp-2 text-[13px] font-black leading-[18px] break-keep">{item.label}</p>
               {item.caption && <p className="text-[10px] font-bold leading-4 text-[#6d746c] break-keep">{item.caption}</p>}
             </button>
             );
@@ -681,11 +681,11 @@ function SequenceStageBoard({
   onReset: () => void;
 }) {
   return (
-    <div className="grid h-full min-h-0 grid-rows-[minmax(150px,0.28fr)_minmax(0,1fr)] gap-3">
+    <div className="grid h-full min-h-0 grid-rows-[minmax(172px,0.32fr)_minmax(0,1fr)] gap-3">
       <div className="min-h-0 overflow-hidden">
         <StageVisualBoard visual={visual} question={question} theme={theme} compact />
       </div>
-      <div className="min-h-0 overflow-auto">
+      <div className="min-h-0 overflow-hidden">
         <SequenceTemplate question={question} selected={selected} theme={theme} onPick={onPick} onReset={onReset} />
       </div>
     </div>
@@ -1574,13 +1574,6 @@ function QuestionStar() {
 const STAGE_FRAME_WIDTH = 1093;
 const STAGE_FRAME_HEIGHT = 820;
 
-function getInitialStageFrameScale() {
-  if (typeof window === "undefined") return 1;
-  const availableWidth = Math.max(320, window.innerWidth - 32);
-  const availableHeight = Math.max(320, window.innerHeight - 32);
-  return Math.min(availableWidth / STAGE_FRAME_WIDTH, availableHeight / STAGE_FRAME_HEIGHT);
-}
-
 export function StudentStageExperience({
   context,
   initialStep = context.scene.currentStep,
@@ -1631,7 +1624,8 @@ export function StudentStageExperience({
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [isCompletingMission, setIsCompletingMission] = useState(false);
-  const [stageFrameScale, setStageFrameScale] = useState(getInitialStageFrameScale);
+  const [stageFrameScale, setStageFrameScale] = useState(1);
+  const [isStageFrameReady, setIsStageFrameReady] = useState(false);
   const noticeCounter = useRef(0);
   const runtimeStartedRef = useRef(false);
   const pendingAnswerSubmissionsRef = useRef<PendingAnswerSubmission[]>([]);
@@ -1671,6 +1665,7 @@ export function StudentStageExperience({
       const availableWidth = Math.max(320, window.innerWidth - 32);
       const availableHeight = Math.max(320, window.innerHeight - 32);
       setStageFrameScale(Math.min(availableWidth / STAGE_FRAME_WIDTH, availableHeight / STAGE_FRAME_HEIGHT));
+      setIsStageFrameReady(true);
     };
 
     resizeStageFrame();
@@ -2047,8 +2042,8 @@ export function StudentStageExperience({
       )}
       <div
         style={{
-          width: STAGE_FRAME_WIDTH * stageFrameScale,
-          height: STAGE_FRAME_HEIGHT * stageFrameScale,
+          width: isStageFrameReady ? STAGE_FRAME_WIDTH * stageFrameScale : STAGE_FRAME_WIDTH,
+          height: isStageFrameReady ? STAGE_FRAME_HEIGHT * stageFrameScale : STAGE_FRAME_HEIGHT,
         }}
       >
         <div
@@ -2056,7 +2051,7 @@ export function StudentStageExperience({
           style={{
             width: STAGE_FRAME_WIDTH,
             height: STAGE_FRAME_HEIGHT,
-            transform: `scale(${stageFrameScale})`,
+            transform: isStageFrameReady ? `scale(${stageFrameScale})` : "scale(1)",
           }}
         >
           <div className="absolute bottom-5 left-1/2 h-1.5 w-24 -translate-x-1/2 rounded-full bg-white/22" />
@@ -2243,7 +2238,7 @@ export function StudentStageExperience({
                 )}
 
                 {(activeQuestion.kind === "sequence" || activeQuestion.kind === "cardMatching") && !isFinished && (
-                  <div className="relative mt-3">
+                  <div className="relative mt-3 min-h-[118px]">
                     <FloatingStageFeedback
                       showSuccess={((answer && isCorrect) || isStageComplete) && !isFinished}
                       showWrong={Boolean(wrongNotice) && !isStageComplete && !isFinished}
