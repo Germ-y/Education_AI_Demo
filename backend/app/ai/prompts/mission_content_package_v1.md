@@ -361,6 +361,15 @@ Stage 4 must include:
 
 The stage 4 audio is a pre-realtime opening narration. It is not the live realtime conversation.
 
+Stage 4 realtime practice is not an exact-answer quiz:
+
+- Design it as open-ended concept talk or role practice that invites the student to explain in their own words.
+- `studentGoal` should describe what the student may try to explain, not a strict answer.
+- `rubric` labels are gentle conversation hints for the teacher/AI partner; they must not be treated as all-required pass/fail criteria.
+- Prefer `required: false` unless a criterion is only "student made a meaningful attempt".
+- `allowedFeedback` must affirm partial attempts first and then ask one simple follow-up.
+- Never make the AI partner reject a student because they missed a keyword, used different wording, or gave a short sentence.
+
 ## Quality Gate Before Return
 
 The backend will reject and not save the content if any of these fail:

@@ -450,6 +450,10 @@ function findPendingGenerationContent(job: PendingGenerationJob, caseFile?: Stud
   );
 }
 
+function isPendingGenerationContentComplete(content: MissionContent | null): content is MissionContent {
+  return content !== null && !hasMissingGeneratedMedia(content);
+}
+
 function describeMissionStatus(status: MissionContent["status"]) {
   if (status === "teacher_review") return "검토 대기";
   if (status === "revision_requested") return "사용 안 함";
@@ -810,19 +814,29 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!activeCaseFile) return;
 
+    const completedJobIds = Object.values(pendingGenerationJobs)
+      .filter((job) => isPendingGenerationContentComplete(findPendingGenerationContent(job, activeCaseFile)))
+      .map((job) => job.caseId);
+    if (completedJobIds.length === 0) return;
+
     updatePendingGenerationJobs((current) => {
-      let changed = false;
       const next = { ...current };
-      Object.values(current).forEach((job) => {
-        const content = findPendingGenerationContent(job, activeCaseFile);
-        if (content && !hasMissingGeneratedMedia(content)) {
-          delete next[job.caseId];
-          changed = true;
-        }
+      completedJobIds.forEach((caseId) => {
+        delete next[caseId];
       });
-      return changed ? next : current;
+      return next;
     });
-  }, [activeCaseFile, updatePendingGenerationJobs]);
+    setGenerationStatuses((currentStatuses) => {
+      const nextStatuses = { ...currentStatuses };
+      completedJobIds.forEach((caseId) => {
+        nextStatuses[caseId] = {
+          state: "succeeded",
+          message: "이미지와 음성까지 준비된 검토 자료가 만들어졌습니다.",
+        };
+      });
+      return nextStatuses;
+    });
+  }, [activeCaseFile, pendingGenerationJobs, updatePendingGenerationJobs]);
 
   const selectedCase: SupportCase = activeCaseFile
     ? toSupportCaseFromCaseFile(activeCaseFile, selectedApiStudent)
@@ -923,8 +937,7 @@ export default function DashboardPage() {
   const selectedPendingGenerationContent = selectedPendingGenerationJob
     ? findPendingGenerationContent(selectedPendingGenerationJob, activeCaseFile)
     : null;
-  const isSelectedPendingGenerationComplete =
-    selectedPendingGenerationContent !== null && !hasMissingGeneratedMedia(selectedPendingGenerationContent);
+  const isSelectedPendingGenerationComplete = isPendingGenerationContentComplete(selectedPendingGenerationContent);
   const selectedPendingGenerationStatus: GenerationStatus | undefined = selectedPendingGenerationJob
     ? {
         state: isSelectedPendingGenerationComplete
@@ -944,9 +957,11 @@ export default function DashboardPage() {
       }
     : undefined;
   const generationStatus =
-    generationStatuses[selectedCase.id] ??
-    (selectedPendingGenerationJob ? generationStatuses[selectedPendingGenerationJob.caseId] : undefined) ??
-    selectedPendingGenerationStatus;
+    isSelectedPendingGenerationComplete && selectedPendingGenerationStatus
+      ? selectedPendingGenerationStatus
+      : generationStatuses[selectedCase.id] ??
+        (selectedPendingGenerationJob ? generationStatuses[selectedPendingGenerationJob.caseId] : undefined) ??
+        selectedPendingGenerationStatus;
   const isGeneratingContent =
     generationStatus?.state === "running" ||
     Boolean(
@@ -992,7 +1007,46 @@ export default function DashboardPage() {
       });
     };
 
+    const completeJob = (content: MissionContent) => {
+      setSelectedCaseFile((current) =>
+        current && current.profile.id === content.studentId
+          ? {
+              ...current,
+              recentContents: [content, ...current.recentContents.filter((item) => item.id !== content.id)],
+            }
+          : current,
+      );
+      setReviewPreviewStep(1);
+      setOpenReviewId(content.id);
+      setGenerationStatuses((current) => ({
+        ...current,
+        [job.caseId]: {
+          state: "succeeded",
+          message: "이미지와 음성까지 준비된 검토 자료가 만들어졌습니다.",
+        },
+      }));
+      updatePendingGenerationJobs((current) => {
+        const next = { ...current };
+        delete next[job.caseId];
+        return next;
+      });
+    };
+
     try {
+      const localContent = findPendingGenerationContent(job, activeCaseFile);
+      if (isPendingGenerationContentComplete(localContent)) {
+        completeJob(localContent);
+        return;
+      }
+
+      if (job.contentId) {
+        const existingContent = await getReviewableContent(job.contentId).catch(() => null);
+        if (isPendingGenerationContentComplete(existingContent)) {
+          completeJob(existingContent);
+          return;
+        }
+      }
+
       if (isPendingGenerationJobTimedOut(job)) {
         failJob("생성 작업이 오래 응답하지 않아 멈춘 것으로 표시했습니다. 다시 제안받기를 눌러 주세요.");
         return;
@@ -1137,7 +1191,7 @@ export default function DashboardPage() {
     } finally {
       generationPollLocks.current.delete(job.caseId);
     }
-  }, [updatePendingGenerationJobs]);
+  }, [activeCaseFile, updatePendingGenerationJobs]);
 
   useEffect(() => {
     Object.values(pendingGenerationJobs).forEach((job) => {
