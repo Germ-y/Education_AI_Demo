@@ -437,6 +437,15 @@ function hasMissingGeneratedMedia(content: MissionContent) {
   });
 }
 
+function findPendingGenerationContent(job: PendingGenerationJob, caseFile?: StudentCaseFile | null) {
+  if (!caseFile) return null;
+  return (
+    caseFile.recentContents.find((content) => job.contentId && content.id === job.contentId) ??
+    caseFile.recentContents.find((content) => content.caseId === job.caseId && content.studentId === job.studentId) ??
+    null
+  );
+}
+
 function describeMissionStatus(status: MissionContent["status"]) {
   if (status === "teacher_review") return "검토 대기";
   if (status === "revision_requested") return "사용 안 함";
@@ -772,6 +781,24 @@ export default function DashboardPage() {
   const activeCaseFile = selectedCaseFile?.profile.id === selectedStudent.id ? selectedCaseFile : null;
   const activeReport = selectedReport?.student.id === selectedStudent.id ? selectedReport : null;
   const dashboardProfile = activeCaseFile?.dashboardProfile;
+
+  useEffect(() => {
+    if (!activeCaseFile) return;
+
+    updatePendingGenerationJobs((current) => {
+      let changed = false;
+      const next = { ...current };
+      Object.values(current).forEach((job) => {
+        const content = findPendingGenerationContent(job, activeCaseFile);
+        if (content && !hasMissingGeneratedMedia(content)) {
+          delete next[job.caseId];
+          changed = true;
+        }
+      });
+      return changed ? next : current;
+    });
+  }, [activeCaseFile, updatePendingGenerationJobs]);
+
   const selectedCase: SupportCase = activeCaseFile
     ? toSupportCaseFromCaseFile(activeCaseFile, selectedApiStudent)
     : selectedApiStudent
@@ -867,10 +894,21 @@ export default function DashboardPage() {
   const selectedPendingGenerationJob = Object.values(pendingGenerationJobs).find(
     (job) => job.caseId === selectedCase.id || (selectedCase.studentId && job.studentId === selectedCase.studentId),
   );
+  const selectedPendingGenerationContent = selectedPendingGenerationJob
+    ? findPendingGenerationContent(selectedPendingGenerationJob, activeCaseFile)
+    : null;
+  const isSelectedPendingGenerationComplete =
+    selectedPendingGenerationContent !== null && !hasMissingGeneratedMedia(selectedPendingGenerationContent);
   const selectedPendingGenerationStatus: GenerationStatus | undefined = selectedPendingGenerationJob
     ? {
-        state: isPendingGenerationJobTimedOut(selectedPendingGenerationJob) ? "failed" : "running",
-        message: isPendingGenerationJobTimedOut(selectedPendingGenerationJob)
+        state: isSelectedPendingGenerationComplete
+          ? "succeeded"
+          : isPendingGenerationJobTimedOut(selectedPendingGenerationJob)
+            ? "failed"
+            : "running",
+        message: isSelectedPendingGenerationComplete
+          ? "이미지와 음성까지 준비된 검토 자료가 만들어졌습니다."
+          : isPendingGenerationJobTimedOut(selectedPendingGenerationJob)
           ? "생성 작업이 오래 응답하지 않아 멈춘 것으로 표시했습니다. 다시 제안받기를 눌러 주세요."
           : selectedPendingGenerationJob.phase === "orchestrator"
             ? "학생 기록을 바탕으로 수업 방향을 정리하는 중입니다."
@@ -885,7 +923,11 @@ export default function DashboardPage() {
     selectedPendingGenerationStatus;
   const isGeneratingContent =
     generationStatus?.state === "running" ||
-    Boolean(selectedPendingGenerationJob && !isPendingGenerationJobTimedOut(selectedPendingGenerationJob));
+    Boolean(
+      selectedPendingGenerationJob &&
+        !isSelectedPendingGenerationComplete &&
+        !isPendingGenerationJobTimedOut(selectedPendingGenerationJob),
+    );
 
   const updateReviewStageDraft = (
     reviewId: string,
