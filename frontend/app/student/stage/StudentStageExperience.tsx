@@ -2247,16 +2247,18 @@ export function StudentStageExperience({
                       wrongMessage={activeQuestion.wrongFeedback}
                       theme={theme}
                     />
-                    {(isCorrect || isStageComplete) && (
-                      <button
-                        onClick={goToNextStage}
-                        disabled={isTransitioning}
-                        className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.28)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.32)] disabled:opacity-70 disabled:hover:translate-y-0"
-                        style={{ backgroundColor: theme.accent }}
-                      >
-                        다음 스테이지 →
-                      </button>
-                    )}
+                    <button
+                      onClick={goToNextStage}
+                      disabled={(!isCorrect && !isStageComplete) || isTransitioning}
+                      className={`w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.28)] transition duration-200 ${
+                        isCorrect || isStageComplete
+                          ? "hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.32)]"
+                          : "cursor-not-allowed opacity-45"
+                      } disabled:hover:translate-y-0`}
+                      style={{ backgroundColor: isCorrect || isStageComplete ? theme.accent : "#9aa39b" }}
+                    >
+                      다음 스테이지
+                    </button>
                   </div>
                 )}
               </div>
