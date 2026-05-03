@@ -1077,7 +1077,7 @@ function RealtimePracticeRoom({
             <p className="text-xs font-black" style={{ color: theme.accentStrong }}>
               {practice.partner}
             </p>
-            <p className="mt-2 text-[clamp(1rem,2.2vh,1.35rem)] font-black leading-snug break-keep text-[#25312a]">
+            <p className="mt-1.5 text-[clamp(0.9rem,1.9vh,1.15rem)] font-black leading-snug break-keep text-[#25312a]">
               {practice.partnerLine}
             </p>
           </div>
