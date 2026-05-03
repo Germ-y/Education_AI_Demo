@@ -1660,8 +1660,8 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            <div className="grid min-h-0 flex-1 gap-[clamp(16px,1.2vw,24px)] px-[clamp(24px,2vw,36px)] py-[clamp(18px,1.5vw,28px)] lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,0.85fr)]">
-              <section className="flex min-h-0 flex-col rounded-lg border border-[#d8dee8] bg-[#e7edf4] p-4">
+            <div className="grid min-h-0 flex-1 gap-[clamp(16px,1.2vw,24px)] overflow-y-auto px-[clamp(24px,2vw,36px)] py-[clamp(18px,1.5vw,28px)] lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,0.85fr)] lg:overflow-hidden">
+              <section className="flex min-h-[460px] flex-col overflow-hidden rounded-lg border border-[#d8dee8] bg-[#e7edf4] p-4 lg:min-h-0">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-black text-[#64748b]">학생 화면 미리보기</p>
@@ -1683,7 +1683,7 @@ export default function DashboardPage() {
                 </div>
                 <div
                   ref={reviewPreviewFrameRef}
-                  className="relative h-[min(72vh,760px)] min-h-[620px] w-full overflow-hidden rounded-md border border-[#cbd5e1] bg-[#e7edf4]"
+                  className="relative h-[520px] min-h-0 w-full overflow-hidden rounded-md border border-[#cbd5e1] bg-[#e7edf4] lg:flex-1"
                 >
                   <iframe
                     key={`${openReview.id}-${reviewPreviewStep}-${reviewPreviewRefreshKey}`}
