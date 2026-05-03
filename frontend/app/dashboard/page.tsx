@@ -599,9 +599,10 @@ export default function DashboardPage() {
           challengeTags: [],
           planTags: [],
         };
-  const selectedReviewItems = (activeCaseFile?.recentContents ?? []).map((content) =>
-    mapContentToReviewItem(content, dashboardProfile?.primaryNeedTitle),
-  );
+  const completedContentIds = new Set((activeReport?.reports ?? []).map((record) => record.contentId));
+  const selectedReviewItems = (activeCaseFile?.recentContents ?? [])
+    .filter((content) => !completedContentIds.has(content.id))
+    .map((content) => mapContentToReviewItem(content, dashboardProfile?.primaryNeedTitle));
   const selectedRecords: SessionLog[] = (activeReport?.reports ?? []).map((record) => {
     const durationMinutes = Math.max(1, Math.round((record.durationSec ?? 0) / 60));
     const attemptCount = Math.max(1, record.answerCount);
@@ -1316,6 +1317,11 @@ export default function DashboardPage() {
                         AI가 제안한 자료를 확인하고 선생님 판단으로 적용합니다.
                       </p>
                     </div>
+                    {selectedReviewItems.length === 0 && (
+                      <div className="rounded-md border border-[#e5e9f0] bg-white p-4 text-sm font-bold leading-6 text-[#64748b]">
+                        검토할 수업 자료 제안이 없습니다. 학생이 완료한 자료는 학습 기록에서 확인할 수 있어요.
+                      </div>
+                    )}
                     {selectedReviewItems.map((item) => {
                       const materialApplied = isMaterialApplied(item);
                       const materialApproved = isMaterialApproved(item);
