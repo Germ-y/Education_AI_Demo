@@ -6,6 +6,8 @@
 
 이 문서는 팀원이 바로 이어받기 위한 단일 인수인계 문서다. 상세 API는 [API.md](API.md), DB 복원은 [../backend/data/README.md](../backend/data/README.md)를 기준으로 한다.
 
+2026-05-04 학생 스테이지 UI, 생성 진행 로그, 임시 생성 스크립트 정리 내역은 [STUDENT_STAGE_HANDOFF_2026-05-04.md](STUDENT_STAGE_HANDOFF_2026-05-04.md)를 함께 확인한다.
+
 ## 현재 완성된 흐름
 
 - 데모 학생 3명 seed가 교사 대시보드, 학생 홈, 학생 미션 화면에서 같은 데이터로 연결된다.

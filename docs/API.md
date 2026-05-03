@@ -52,7 +52,7 @@
 - `POST /api/contents/{contentId}/reject`: 반려 및 수정 요청 저장
 - `POST /api/contents/{contentId}/publish`: 학생에게 배포하고 대시보드 단계를 `learning`으로 이동
 - `POST /api/contents/{contentId}/assets/{assetId}/generate`: 단일 asset 생성
-- `POST /api/contents/{contentId}/assets/generate-package`: 이미지 5개와 오디오 5개 batch 생성
+- `POST /api/contents/{contentId}/assets/generate-package`: 이미지/오디오 asset batch 생성. 서버 생성 로그에 `progress=1/10` 같은 asset 진행률을 남긴다.
 - `GET /api/contents/{contentId}/review-summary`: 최신 attempt 기반 리뷰 요약 조회
 - `POST /api/contents/{contentId}/review-summary`: 최신 attempt 기반 리뷰 요약 생성
 - `POST /api/review-summaries/{reviewId}/apply-to-memory`: 교사 확인 후 리뷰 요약을 메모리에 반영
@@ -73,6 +73,14 @@
 ## Audit
 
 - `GET /api/audit-logs`: 감사 로그 조회
+
+## Generation Logs
+
+- 기본 파일: `backend/logs/generation.log`
+- 환경변수: `GENERATION_LOG_FILE`
+- 대상: AI/content route, OpenAI provider, ElevenLabs provider
+- 형식 예시: `[04:12:03] INFO contents.assets.generating content_id=... progress=1/10 asset_id=...`
+- 로컬 로그 파일은 `.gitignore` 대상이다. `backend/logs/`, `backend/*.log`, `backend/*.err`는 커밋하지 않는다.
 
 ## 주요 상태값
 
