@@ -630,9 +630,9 @@ export default function DashboardPage() {
   const [reviewActionId, setReviewActionId] = useState<string | null>(null);
   const [reviewPreviewStep, setReviewPreviewStep] = useState(1);
   const [reviewPreviewRefreshKey, setReviewPreviewRefreshKey] = useState(0);
-  const [reviewPreviewScale, setReviewPreviewScale] = useState(1);
+  const [reviewPreviewScale, setReviewPreviewScale] = useState(0.65);
   const reviewPreviewFrameRef = useRef<HTMLDivElement>(null);
-  const [reportPreviewScale, setReportPreviewScale] = useState(1);
+  const [reportPreviewScale, setReportPreviewScale] = useState(0.65);
   const reportPreviewFrameRef = useRef<HTMLDivElement>(null);
   const [reportPreviewStep, setReportPreviewStep] = useState(1);
   const [reviewStageDrafts, setReviewStageDrafts] = useState<Record<string, ReviewStageDraft[]>>({});

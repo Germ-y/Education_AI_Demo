@@ -1574,6 +1574,13 @@ function QuestionStar() {
 const STAGE_FRAME_WIDTH = 1093;
 const STAGE_FRAME_HEIGHT = 820;
 
+function getInitialStageFrameScale() {
+  if (typeof window === "undefined") return 1;
+  const availableWidth = Math.max(320, window.innerWidth - 32);
+  const availableHeight = Math.max(320, window.innerHeight - 32);
+  return Math.min(availableWidth / STAGE_FRAME_WIDTH, availableHeight / STAGE_FRAME_HEIGHT);
+}
+
 export function StudentStageExperience({
   context,
   initialStep = context.scene.currentStep,
@@ -1624,7 +1631,7 @@ export function StudentStageExperience({
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [isCompletingMission, setIsCompletingMission] = useState(false);
-  const [stageFrameScale, setStageFrameScale] = useState(1);
+  const [stageFrameScale, setStageFrameScale] = useState(getInitialStageFrameScale);
   const noticeCounter = useRef(0);
   const runtimeStartedRef = useRef(false);
   const pendingAnswerSubmissionsRef = useRef<PendingAnswerSubmission[]>([]);
