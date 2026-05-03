@@ -623,6 +623,17 @@ export default function DashboardPage() {
         let restorableRun =
           runs.find((run) => run.status === "running" && (run.agentType === "orchestrator" || run.agentType === "content")) ?? null;
         if (!restorableRun) {
+          restorableRun =
+            runs.find((run) => {
+              if (run.status !== "succeeded" || run.agentType !== "orchestrator") return false;
+              return !runs.some(
+                (candidate) =>
+                  candidate.agentType === "content" &&
+                  getSnapshotText(candidate, "orchestratorRunId") === run.id,
+              );
+            }) ?? null;
+        }
+        if (!restorableRun) {
           for (const run of runs) {
             if (run.status !== "succeeded" || run.agentType !== "content") continue;
             const contentId = getGeneratedContentId(run);
