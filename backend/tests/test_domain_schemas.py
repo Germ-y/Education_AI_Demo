@@ -230,6 +230,14 @@ def test_mission_quality_respects_student_sequence_card_limit() -> None:
         )
 
 
+def test_blank_fill_rejects_generic_image_fill_instruction() -> None:
+    content = _generated_fraction_content()
+    content["stages"][2]["templateJson"]["question"] = "그림을 보고 알맞은 값을 골라 빈칸을 채워 보세요. __"
+
+    with pytest.raises(ValueError, match="blank_fill"):
+        MissionContent.model_validate(content)
+
+
 def test_mission_quality_requires_fixed_student_stage_titles() -> None:
     content = _generated_fraction_content()
     content["stages"][1]["studentTitle"] = "전체 세기"

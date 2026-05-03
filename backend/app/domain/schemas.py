@@ -173,6 +173,7 @@ def _validate_template_json(template_type: TemplateType, template_json: dict[str
         blank_sentence = str(template_json.get("sentence") or template_json.get("question") or "")
         if "__" not in blank_sentence and "[A]" not in blank_sentence and "[B]" not in blank_sentence:
             raise ValueError("blank_fill은 question 또는 sentence 안에 __, [A], [B] 중 하나의 빈칸 표시를 가져야 합니다.")
+        _validate_blank_fill_sentence(blank_sentence)
     if template_type in CHOICE_TEMPLATE_TYPES:
         _require_keys(template_json, ["question", "choices", "answer", "correctFeedback", "wrongFeedback"], template_type.value)
         _validate_choice_answer(template_json, template_type.value)
@@ -190,6 +191,12 @@ def _require_keys(template_json: dict[str, Any], keys: list[str], template_type:
 def _require_any_key(template_json: dict[str, Any], keys: list[str], template_type: str) -> None:
     if not any(key in template_json for key in keys):
         raise ValueError(f"{template_type} templateJson에는 다음 중 하나가 필요합니다: {', '.join(keys)}")
+
+
+def _validate_blank_fill_sentence(sentence: str) -> None:
+    generic_instruction_terms = ("그림", "이미지", "사진", "알맞은 값을 골라", "빈칸을 채", "칸에 넣")
+    if any(term in sentence for term in generic_instruction_terms):
+        raise ValueError("blank_fill은 그림 지시문이 아니라 빈칸이 포함된 완성 문장이어야 합니다.")
 
 
 def _validate_choice_answer(template_json: dict[str, Any], template_type: str) -> None:

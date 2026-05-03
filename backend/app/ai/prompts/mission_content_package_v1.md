@@ -333,13 +333,26 @@ Required:
 
 ### `blank_fill`
 
+Use this only for completing a sentence with blanks. The student should read one meaningful sentence and place short tiles into the blanks.
+Good examples:
+
+- `절반은 분수로 __입니다.`
+- `절반은 분수로 __, 반의 반은 분수로 __입니다.`
+- `짧은 바늘이 3을 가리키면 __시입니다.`
+
+Bad examples:
+
+- `그림을 보고 알맞은 값을 골라 빈칸을 채워 보세요.`
+- `각 그림에서 전체와 색칠된 부분을 보고, 분수와 소수가 같은 양이 되도록 알맞은 것을 골라 빈칸을 채워 보세요.`
+- Any sentence that relies on blank boxes drawn inside the image.
+
 Required:
 
 ```json
 {
   "imageAssetId": "string",
   "audioAssetId": "string",
-  "question": "string with an explicit blank marker such as __, [A], or [B]",
+  "question": "one natural Korean sentence with explicit blank markers such as __, [A], or [B]",
   "tiles": ["string"],
   "acceptedAnswers": [{ "key": "value" }],
   "correctFeedback": "string",
@@ -350,6 +363,10 @@ Required:
 Rules:
 
 - The blank must be in `question` or `sentence`; do not rely on blanks drawn inside the image.
+- The blank sentence itself is the task. Do not write generic instructions such as "look at the image and fill the blanks."
+- Do not mention `image`, `picture`, `box`, or `blank box` as the thing to fill. The UI already shows the blank slots.
+- The image should only provide context or manipulatives; it must not contain the blanks, choices, answer, or problem text.
+- Include `tiles` with short values that fit directly into the sentence.
 - If the visible prompt is `0.__`, the tile and accepted answer should be the missing part only, for example `"5"`, not `"0.5"`.
 - If more than one tile must be selected, include the same number of blank markers in the sentence.
 
