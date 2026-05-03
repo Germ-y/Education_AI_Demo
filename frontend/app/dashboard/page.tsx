@@ -442,12 +442,8 @@ function hasMissingGeneratedMedia(content: MissionContent) {
 }
 
 function findPendingGenerationContent(job: PendingGenerationJob, caseFile?: StudentCaseFile | null) {
-  if (!caseFile) return null;
-  return (
-    caseFile.recentContents.find((content) => job.contentId && content.id === job.contentId) ??
-    caseFile.recentContents.find((content) => content.caseId === job.caseId && content.studentId === job.studentId) ??
-    null
-  );
+  if (!caseFile || !job.contentId) return null;
+  return caseFile.recentContents.find((content) => content.id === job.contentId) ?? null;
 }
 
 function isPendingGenerationContentComplete(content: MissionContent | null): content is MissionContent {
@@ -815,6 +811,7 @@ export default function DashboardPage() {
     if (!activeCaseFile) return;
 
     const completedJobIds = Object.values(pendingGenerationJobs)
+      .filter((job) => job.phase === "assets" && Boolean(job.contentId))
       .filter((job) => isPendingGenerationContentComplete(findPendingGenerationContent(job, activeCaseFile)))
       .map((job) => job.caseId);
     if (completedJobIds.length === 0) return;
@@ -1033,13 +1030,13 @@ export default function DashboardPage() {
     };
 
     try {
-      const localContent = findPendingGenerationContent(job, activeCaseFile);
-      if (isPendingGenerationContentComplete(localContent)) {
-        completeJob(localContent);
-        return;
-      }
+      if (job.phase === "assets" && job.contentId) {
+        const localContent = findPendingGenerationContent(job, activeCaseFile);
+        if (isPendingGenerationContentComplete(localContent)) {
+          completeJob(localContent);
+          return;
+        }
 
-      if (job.contentId) {
         const existingContent = await getReviewableContent(job.contentId).catch(() => null);
         if (isPendingGenerationContentComplete(existingContent)) {
           completeJob(existingContent);
