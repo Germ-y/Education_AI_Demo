@@ -358,7 +358,7 @@ function StageVisualBoard({
   }
 
   return (
-    <div className="grid h-full min-h-[300px] grid-rows-1 gap-3">
+    <div className={`grid h-full grid-rows-1 gap-3 ${compact ? "min-h-0" : "min-h-[300px]"}`}>
       <div className="min-h-0 overflow-hidden">
         <LearningVisual visual={visual} compact={compact} />
       </div>
@@ -586,7 +586,7 @@ function SequenceTemplate({
   const availableItems = items.filter((item) => !selectedIds.includes(item.id));
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(104px,auto)_minmax(116px,1fr)] gap-3 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-3 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]">
+    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(92px,auto)_minmax(96px,1fr)] gap-2 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-3 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-base font-black leading-5">{question.prompt}</p>
@@ -603,7 +603,7 @@ function SequenceTemplate({
         )}
       </div>
 
-      <div className="rounded-[18px] border border-dashed border-[#cfd8cf] bg-white/70 p-3">
+      <div className="rounded-[18px] border border-dashed border-[#cfd8cf] bg-white/70 p-2.5">
         <div className="flex items-center justify-between">
           <p className="text-xs font-black" style={{ color: theme.accentStrong }}>
             순서 칸
@@ -617,7 +617,7 @@ function SequenceTemplate({
           return (
             <div
               key={index}
-              className={`flex min-h-[76px] flex-col items-center justify-center rounded-[16px] border-2 border-dashed px-2.5 py-2 text-center transition ${
+              className={`flex min-h-[64px] flex-col items-center justify-center rounded-[16px] border-2 border-dashed px-2.5 py-1.5 text-center transition ${
                 item ? "border-solid bg-white shadow-[0_10px_24px_rgba(57,78,97,0.10)]" : "bg-white/55"
               }`}
               style={{ borderColor: item ? theme.accent : "#cfd8cf" }}
@@ -637,7 +637,7 @@ function SequenceTemplate({
         </div>
       </div>
 
-      <div className="min-h-0 rounded-[18px] border border-[#f0dfb4] bg-[#fff9e8] p-3">
+      <div className="min-h-0 rounded-[18px] border border-[#f0dfb4] bg-[#fff9e8] p-2.5">
         <div className="flex items-center justify-between">
           <p className="text-xs font-black text-[#8a5a00]">카드 트레이</p>
           {availableItems.length > 0 && <p className="text-[11px] font-bold text-[#8a5a00]">카드를 차례대로 눌러요</p>}
@@ -651,7 +651,7 @@ function SequenceTemplate({
               key={item.id}
               onClick={() => onPick(item.id)}
               disabled={picked}
-              className="min-h-[54px] cursor-grab rounded-[16px] border bg-white px-3 py-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(57,78,97,0.12)] active:cursor-grabbing disabled:cursor-default disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
+              className="min-h-[46px] cursor-grab rounded-[16px] border bg-white px-3 py-1.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(57,78,97,0.12)] active:cursor-grabbing disabled:cursor-default disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
               style={{ borderColor: picked ? theme.accent : "#dde6ee" }}
             >
               <p className="line-clamp-2 text-[13px] font-black leading-[18px] break-keep">{item.label}</p>
@@ -681,7 +681,7 @@ function SequenceStageBoard({
   onReset: () => void;
 }) {
   return (
-    <div className="grid h-full min-h-0 grid-rows-[minmax(172px,0.32fr)_minmax(0,1fr)] gap-3">
+    <div className="grid h-full min-h-0 grid-rows-[minmax(150px,0.28fr)_minmax(0,1fr)] gap-3">
       <div className="min-h-0 overflow-hidden">
         <StageVisualBoard visual={visual} question={question} theme={theme} compact />
       </div>
@@ -2238,7 +2238,7 @@ export function StudentStageExperience({
                 )}
 
                 {(activeQuestion.kind === "sequence" || activeQuestion.kind === "cardMatching") && !isFinished && (
-                  <div className="relative mt-3 min-h-[118px]">
+                  <div className="relative mt-3">
                     <FloatingStageFeedback
                       showSuccess={((answer && isCorrect) || isStageComplete) && !isFinished}
                       showWrong={Boolean(wrongNotice) && !isStageComplete && !isFinished}
