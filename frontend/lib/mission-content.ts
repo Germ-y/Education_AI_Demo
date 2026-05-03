@@ -96,6 +96,8 @@ export function getTemplateRenderer(templateType: TemplateType): StageTemplateRe
   if (templateType === "sequence_ordering") return "sequence_ordering";
   if (templateType === "blank_fill") return "blank_fill";
   if (
+    templateType === "scene_observation" ||
+    templateType === "highlight_clue" ||
     templateType === "scene_question" ||
     templateType === "clue_question" ||
     templateType === "partition_picker" ||
