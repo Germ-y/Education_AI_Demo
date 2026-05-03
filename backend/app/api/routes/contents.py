@@ -261,8 +261,9 @@ def _apply_generated_asset_metadata(asset, relative_path: str, *, provider: str,
     asset.preview_url = asset.storage_url
     asset.provider = provider
     asset.model = model
-    asset.qa_status = "pending"
-    asset.approval_status = "pending"
+    asset.qa_status = "passed"
+    if asset.approval_status != "approved":
+        asset.approval_status = "pending"
 
 
 def _validate_required_asset_package(content) -> None:

@@ -670,7 +670,9 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     package_data = package.json()["data"]
     assert package_data["generatedCount"] == 10
     assert all(asset["storageUrl"].startswith("/generated/assets/content_generated_contract_001/") for asset in package_data["assets"])
+    assert all(asset["qaStatus"] == "passed" for asset in package_data["assets"])
 
     reviewable = client.get("/api/contents/content_generated_contract_001")
     assert reviewable.status_code == 200
     assert reviewable.json()["data"]["assets"][0]["previewUrl"].startswith("/generated/assets/content_generated_contract_001/")
+    assert reviewable.json()["data"]["assets"][0]["qaStatus"] == "passed"
