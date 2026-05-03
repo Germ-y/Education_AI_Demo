@@ -108,7 +108,7 @@ AI 콘텐츠 JSON 생성
 | 1 | 상황 만나기 | `scenario_intro` | `scenario_intro` |
 | 2 | 단서 찾기 | `clue_identification` | `scene_observation`, `highlight_clue`, `image_quiz`, `card_match` |
 | 3 | 행동 고르기 | `action_selection` | `image_quiz`, `card_match`, `sequence_ordering`, `action_choice`, `decision_card` |
-| 4 | AI와 연습하기 | `realtime_practice` | `realtime_roleplay` |
+| 4 | 한 번 해보기 | `realtime_practice` | `realtime_roleplay` |
 
 ## 4. 학습집중형 단계
 
@@ -117,16 +117,18 @@ AI 콘텐츠 JSON 생성
 | 1 | 개념 열기 | `concept_intro` | `concept_intro` |
 | 2 | 문제 1 | `basic_problem` | `image_quiz`, `card_match`, `sequence_ordering`, `blank_fill`, `scene_question`, `clue_question`, `partition_picker` |
 | 3 | 문제 2 | `applied_problem` | `image_quiz`, `card_match`, `sequence_ordering`, `blank_fill`, `applied_question`, `mini_simulation`, `explanation_choice`, `wrong_explanation_fix` |
-| 4 | AI에게 말해보기 | `realtime_practice` | `realtime_teach_back` |
+| 4 | 설명해보기 | `realtime_practice` | `realtime_teach_back` |
 
 학습집중형 4단계는 개념 정리가 아니라 **상황 이미지와 AI 대화로 설명을 직접 연습하는 realtime 단계**다. AI는 교사가 승인한 역할/루브릭 안에서만 피드백한다.
 
 회고는 4단계 실시간 연습 종료 후 `post_practice_reflection` 이벤트로 수집한다. 별도 스테이지로 카운트하지 않는다.
 
-2~3단계는 오케스트레이터가 허용 목록 안에서 템플릿을 선택한다.
+`studentTitle`은 위 표의 학생 화면 이름으로 고정한다. 콘텐츠별 제목이나 활동명은 `studentInstruction`, `templateJson.question`, `missionContent.title`에 둔다.
+
+2~3단계는 오케스트레이터가 허용 목록 안에서 학생 메모리, 난이도, 선택지 제한, 최근 성공/실패 템플릿, 교사 메모를 보고 프로필 기반으로 선택한다.
 프론트는 `templateType`별 렌더러를 준비하고, 콘텐츠 fetch 결과의 `templateJson`을 그대로 사용한다.
 
-공통 랜덤 후보:
+공통 프로필 기반 선택 후보:
 
 | templateType | 화면 성격 | 핵심 데이터 |
 | --- | --- | --- |
@@ -644,25 +646,25 @@ answer는 choices의 id 중 하나다.
   "stages": [
     {
       "step": 1,
-      "studentLabel": "개념 열기",
+      "studentTitle": "개념 열기",
       "stageRole": "concept_intro",
       "templateType": "concept_intro"
     },
     {
       "step": 2,
-      "studentLabel": "문제 1",
+      "studentTitle": "문제 1",
       "stageRole": "basic_problem",
       "templateType": "scene_question"
     },
     {
       "step": 3,
-      "studentLabel": "문제 2",
+      "studentTitle": "문제 2",
       "stageRole": "applied_problem",
       "templateType": "partition_picker"
     },
     {
       "step": 4,
-      "studentLabel": "AI에게 말해보기",
+      "studentTitle": "설명해보기",
       "stageRole": "realtime_practice",
       "templateType": "realtime_teach_back"
     }

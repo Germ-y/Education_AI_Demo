@@ -73,6 +73,21 @@ FLOW_RULES: dict[str, dict[int, tuple[str, set[str]]]] = {
     },
 }
 
+STAGE_TITLE_RULES: dict[str, dict[int, str]] = {
+    StudentType.LEARNING_FOCUS.value: {
+        1: "개념 열기",
+        2: "문제 1",
+        3: "문제 2",
+        4: "설명해보기",
+    },
+    StudentType.LIFE_SUPPORT.value: {
+        1: "상황 만나기",
+        2: "단서 찾기",
+        3: "행동 고르기",
+        4: "한 번 해보기",
+    },
+}
+
 VISIBLE_TEMPLATE_TEXT_KEYS = {
     "question",
     "storyText",
@@ -216,6 +231,9 @@ def _validate_stage_plan(stage_plan: Any, content_type: str, issues: list[str]) 
         if template_type not in allowed_templates:
             issues.append(f"orchestrator.stagePlan[{step}].templateType이 허용 범위를 벗어났습니다: {template_type}")
         _validate_korean_text(item.get("studentTitle"), f"orchestrator.stagePlan[{step}].studentTitle", issues)
+        expected_title = STAGE_TITLE_RULES.get(content_type, {}).get(step)
+        if expected_title and item.get("studentTitle") != expected_title:
+            issues.append(f"orchestrator.stagePlan[{step}].studentTitle은 '{expected_title}'이어야 합니다.")
         _validate_korean_text(item.get("purpose"), f"orchestrator.stagePlan[{step}].purpose", issues)
 
 
@@ -235,6 +253,9 @@ def _validate_mission_stage_flow(mission: MissionContent, content_type: str, iss
         if stage.sort_order != stage.step:
             issues.append(f"{stage.id}.sortOrder는 step과 같아야 합니다.")
         expected_role, allowed_templates = rules[stage.step]
+        expected_title = STAGE_TITLE_RULES.get(content_type, {}).get(stage.step)
+        if expected_title and stage.student_title != expected_title:
+            issues.append(f"{stage.id}.studentTitle은 '{expected_title}'이어야 합니다.")
         if _as_value(stage.stage_role) != expected_role:
             issues.append(f"{stage.id}.stageRole이 {content_type} 흐름과 맞지 않습니다.")
         if _as_value(stage.template_type) not in allowed_templates:
@@ -417,13 +438,10 @@ def _iter_named_visible_text(value: Any, prefix: str) -> list[tuple[str, str]]:
 
 
 def _validate_choice_limit(template_json: dict[str, Any], limit: int, path: str, issues: list[str]) -> None:
-    for key in ("choices", "leftCards", "rightCards"):
+    for key in ("choices", "leftCards", "rightCards", "cards", "tiles"):
         value = template_json.get(key)
         if isinstance(value, list) and len(value) > limit:
             issues.append(f"{path}.{key}는 학생 선택지 제한 {limit}개를 넘을 수 없습니다.")
-    cards = template_json.get("cards")
-    if isinstance(cards, list) and limit <= 2 and len(cards) > 3:
-        issues.append(f"{path}.cards는 저연령/저부담 학생 기준으로 3개 이하가 적합합니다.")
 
 
 def _validate_intent_roles(value: Any, path: str, issues: list[str]) -> None:

@@ -200,6 +200,49 @@ def test_mission_quality_respects_student_choice_limit() -> None:
         )
 
 
+def test_mission_quality_respects_student_sequence_card_limit() -> None:
+    content = _generated_fraction_content()
+    content["stages"][1]["templateJson"]["choices"] = [{"id": "a", "text": "1조각"}, {"id": "b", "text": "4조각"}]
+    content["stages"][2]["templateType"] = "sequence_ordering"
+    content["stages"][2]["templateJson"] = {
+        "imageAssetId": content["stages"][2]["templateJson"]["imageAssetId"],
+        "audioAssetId": content["stages"][2]["templateJson"]["audioAssetId"],
+        "assetBundle": content["stages"][2]["templateJson"]["assetBundle"],
+        "question": "분수를 읽는 순서를 골라보세요.",
+        "cards": [
+            {"id": "whole", "text": "전체 세기"},
+            {"id": "part", "text": "고른 것 세기"},
+            {"id": "fraction", "text": "분수 말하기"},
+        ],
+        "answerOrder": ["whole", "part", "fraction"],
+        "correctFeedback": "좋아요. 전체와 고른 것을 차례대로 봤어요.",
+        "wrongFeedback": "먼저 전체를 세는 카드부터 골라볼까요?",
+    }
+    mission = MissionContent.model_validate(content)
+    case_file = _fraction_case_file()
+    case_file["profile"]["profileJson"]["choiceCountLimit"] = 2
+
+    with pytest.raises(ContentQualityError, match="cards"):
+        validate_mission_content_quality(
+            mission,
+            case_file=case_file,
+            orchestrator_plan=_valid_learning_plan(),
+        )
+
+
+def test_mission_quality_requires_fixed_student_stage_titles() -> None:
+    content = _generated_fraction_content()
+    content["stages"][1]["studentTitle"] = "전체 세기"
+    mission = MissionContent.model_validate(content)
+
+    with pytest.raises(ContentQualityError, match="studentTitle"):
+        validate_mission_content_quality(
+            mission,
+            case_file=_fraction_case_file(),
+            orchestrator_plan=_valid_learning_plan(),
+        )
+
+
 def test_mission_quality_rejects_ui_text_inside_image_prompt() -> None:
     content = _generated_fraction_content()
     content["assets"][1]["promptJson"]["prompt"] += " 전체는 몇 조각인가요?"
@@ -235,21 +278,21 @@ def _valid_learning_plan() -> dict:
                 "step": 2,
                 "stageRole": "basic_problem",
                 "templateType": "partition_picker",
-                "studentTitle": "전체 세기",
+                "studentTitle": "문제 1",
                 "purpose": "전체 조각 수를 먼저 세게 합니다.",
             },
             {
                 "step": 3,
                 "stageRole": "applied_problem",
                 "templateType": "blank_fill",
-                "studentTitle": "분수 넣기",
+                "studentTitle": "문제 2",
                 "purpose": "고른 수와 전체 수를 분수 자리에 연결합니다.",
             },
             {
                 "step": 4,
                 "stageRole": "realtime_practice",
                 "templateType": "realtime_teach_back",
-                "studentTitle": "말로 설명하기",
+                "studentTitle": "설명해보기",
                 "purpose": "왜 1/4인지 짧게 말해봅니다.",
             },
         ],

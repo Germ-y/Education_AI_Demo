@@ -141,7 +141,7 @@ def build_fraction_content() -> MissionContent:
                     "step": 4,
                     "stageRole": "realtime_practice",
                     "templateType": "realtime_teach_back",
-                    "studentTitle": "AI에게 말해보기",
+                    "studentTitle": "설명해보기",
                     "studentInstruction": "별이에게 왜 1/4인지 말로 설명해보세요.",
                     "sortOrder": 4,
                     "templateJson": {
@@ -239,7 +239,7 @@ def build_clock_content() -> MissionContent:
                     "step": 1,
                     "stageRole": "concept_intro",
                     "templateType": "concept_intro",
-                    "studentTitle": "\uc2dc\uacc4 \ub2e8\uc11c \ubcf4\uae30",
+                    "studentTitle": "개념 열기",
                     "studentInstruction": "\uc2dc\uce68\uacfc \ubd84\uce68\uc774 \uc5b4\ub514\uc5d0 \uc788\ub294\uc9c0 \ubcf4\uc138\uc694.",
                     "sortOrder": 1,
                     "templateJson": {
@@ -256,7 +256,7 @@ def build_clock_content() -> MissionContent:
                     "step": 2,
                     "stageRole": "basic_problem",
                     "templateType": "scene_question",
-                    "studentTitle": "\uc2dc\uce68 \ucc3e\uae30",
+                    "studentTitle": "문제 1",
                     "studentInstruction": "\uc9e7\uc740 \ubc14\ub298\uc774 \uac00\ub9ac\ud0a4\ub294 \uc22b\uc790\ub97c \uace0\ub974\uc138\uc694.",
                     "sortOrder": 2,
                     "templateJson": {
@@ -276,7 +276,7 @@ def build_clock_content() -> MissionContent:
                     "step": 3,
                     "stageRole": "applied_problem",
                     "templateType": "sequence_ordering",
-                    "studentTitle": "\uc21c\uc11c\ub85c \uc77d\uae30",
+                    "studentTitle": "문제 2",
                     "studentInstruction": "\uc2dc\uacc4\ub97c \uc77d\ub294 \uc21c\uc11c\ub97c \uace0\ub974\uc138\uc694.",
                     "sortOrder": 3,
                     "templateJson": {
@@ -299,7 +299,7 @@ def build_clock_content() -> MissionContent:
                     "step": 4,
                     "stageRole": "realtime_practice",
                     "templateType": "realtime_teach_back",
-                    "studentTitle": "AI\uc5d0\uac8c \uc124\uba85\ud558\uae30",
+                    "studentTitle": "설명해보기",
                     "studentInstruction": "\ubcc4\uc774\uc5d0\uac8c \uc2dc\uacc4\ub97c \uc77d\ub294 \ubc29\ubc95\uc744 \ub9d0\ud574\ubd05\uc2dc\ub2e4.",
                     "sortOrder": 4,
                     "templateJson": {
@@ -465,9 +465,8 @@ def build_bus_content() -> MissionContent:
                         "cards": [
                             {"id": "check_bus", "text": "버스 번호 확인"},
                             {"id": "take_bus", "text": "버스 타기"},
-                            {"id": "arrive_center", "text": "센터 도착"},
                         ],
-                        "answerOrder": ["check_bus", "take_bus", "arrive_center"],
+                        "answerOrder": ["check_bus", "take_bus"],
                         "correctFeedback": "좋아요. 먼저 확인하고, 그다음 버스를 타요.",
                         "wrongFeedback": "버스를 타기 전에 확인해야 할 일을 앞으로 옮겨볼까요?",
                     },
@@ -478,7 +477,7 @@ def build_bus_content() -> MissionContent:
                     "step": 4,
                     "stageRole": "realtime_practice",
                     "templateType": "realtime_roleplay",
-                    "studentTitle": "AI와 연습하기",
+                    "studentTitle": "한 번 해보기",
                     "studentInstruction": "AI 안내 직원에게 센터 가는 길을 물어보세요.",
                     "sortOrder": 4,
                     "templateJson": {
@@ -1100,7 +1099,7 @@ def create_demo_database() -> DemoDatabase:
                     "studentId": "student_life_bus",
                     "stageId": "stage_bus_3",
                     "eventType": "answer_submitted",
-                    "payloadJson": {"answer": {"order": ["check_bus", "take_bus", "arrive_center"]}, "isCorrect": True, "hintUsed": True},
+                    "payloadJson": {"answer": {"order": ["check_bus", "take_bus"]}, "isCorrect": True, "hintUsed": True},
                     "occurredAt": "2026-05-02T10:12:50.000Z",
                 },
                 {

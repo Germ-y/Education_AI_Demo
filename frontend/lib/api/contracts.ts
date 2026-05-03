@@ -378,13 +378,23 @@ export type RealtimePracticeSpec = {
   postPracticeReflection: string[];
 };
 
+export type StudentStageTitle =
+  | "상황 만나기"
+  | "단서 찾기"
+  | "행동 고르기"
+  | "한 번 해보기"
+  | "개념 열기"
+  | "문제 1"
+  | "문제 2"
+  | "설명해보기";
+
 export type ContentStage = {
   id: string;
   missionContentId: string;
   step: 1 | 2 | 3 | 4;
   stageRole: StageRole;
   templateType: TemplateType;
-  studentTitle: string;
+  studentTitle: StudentStageTitle;
   studentInstruction: string;
   templateJson: Record<string, unknown>;
   realtimeSpec: RealtimePracticeSpec | null;

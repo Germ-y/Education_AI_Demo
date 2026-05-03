@@ -159,7 +159,7 @@ AI와 실시간 설명 연습
 | 1 | 상황 만나기 | 일상 시나리오 이미지/짧은 이야기 | `scenario_intro` |
 | 2 | 단서 찾기 | 상황 속 중요한 정보 고르기 | `scene_observation`, `highlight_clue`, `card_match` |
 | 3 | 행동 고르기 | 지금 해야 할 행동 선택 | `action_choice`, `sequence_ordering`, `decision_card` |
-| 4 | AI와 연습하기 | 상황 이미지 기반 실시간 롤플레잉/피드백 | `realtime_roleplay` |
+| 4 | 한 번 해보기 | 상황 이미지 기반 실시간 롤플레잉/피드백 | `realtime_roleplay` |
 
 회고는 4단계 실시간 연습 종료 후 1~2개 버튼으로 수집한다. 콘텐츠 단계로는 카운트하지 않고 `post_practice_reflection` 이벤트로 저장한다.
 
@@ -180,7 +180,7 @@ AI와 실시간 설명 연습
 | 1 | 개념 열기 | 개념 설명 + 시나리오 이미지 | `concept_intro` |
 | 2 | 문제 1 | 시나리오 기반 기본 문제 | `scene_question`, `clue_question`, `blank_fill` |
 | 3 | 문제 2 | 문제 1 응용 및 심화 문제 | `applied_question`, `mini_simulation`, `card_match` |
-| 4 | AI에게 말해보기 | 상황 이미지 기반 실시간 설명/피드백 | `realtime_teach_back` |
+| 4 | 설명해보기 | 상황 이미지 기반 실시간 설명/피드백 | `realtime_teach_back` |
 
 4단계는 `생활에 적용`이나 `개념 정리`가 아니다. 학생이 상황 이미지와 별이의 질문을 보고, AI에게 직접 말하거나 짧게 입력하며 설명을 연습한다. AI는 실시간으로 "좋아요", "전체가 몇 조각인지도 말해볼까요?"처럼 피드백하지만, 교사가 승인한 루브릭 밖의 새 문제를 만들지 않는다.
 
@@ -292,9 +292,9 @@ TeacherReviewSummary
 중요:
 
 ```text
-랜덤처럼 보일 수 있지만 완전 랜덤이면 안 된다.
-학생 유형, 문제 유형, 최근 반응에 따라 선택하되,
-같은 조건에서 재현 가능한 seeded random을 사용한다.
+완전 랜덤이면 안 된다.
+학생 유형, 문제 유형, 선택지 제한, 최근 반응, 교사 메모를 보고 선택한다.
+같은 조건에서는 같은 우선순위로 재현 가능해야 한다.
 ```
 
 예:

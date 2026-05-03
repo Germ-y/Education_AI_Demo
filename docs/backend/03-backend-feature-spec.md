@@ -295,7 +295,7 @@ publicDataReferences
     { "step": 1, "label": "개념 열기", "stageRole": "concept_intro", "templateType": "concept_intro" },
     { "step": 2, "label": "문제 1", "stageRole": "basic_problem", "templateType": "sequence_ordering" },
     { "step": 3, "label": "문제 2", "stageRole": "applied_problem", "templateType": "blank_fill" },
-    { "step": 4, "label": "AI에게 말해보기", "stageRole": "realtime_practice", "templateType": "realtime_teach_back" }
+    { "step": 4, "label": "설명해보기", "stageRole": "realtime_practice", "templateType": "realtime_teach_back" }
   ],
   "realtimePracticeSpec": {
     "aiRole": "별이",
@@ -324,7 +324,7 @@ publicDataReferences
 
 ```text
 완전 랜덤 금지
-seeded random 허용
+학생 메모리/난이도/최근 성공·실패/교사 메모 기반 선택
 교사가 고정한 템플릿은 우선 적용
 최근 2회기에서 실패한 템플릿은 가중치 하향
 학생이 잘 반응한 템플릿은 가중치 상향
@@ -338,7 +338,7 @@ seeded random 허용
 | 1 | 개념 열기 | `concept_intro` | `concept_intro` |
 | 2 | 문제 1 | `basic_problem` | `image_quiz`, `card_match`, `sequence_ordering`, `blank_fill`, `scene_question`, `partition_picker` |
 | 3 | 문제 2 | `applied_problem` | `image_quiz`, `card_match`, `sequence_ordering`, `blank_fill`, `applied_question`, `mini_simulation` |
-| 4 | AI에게 말해보기 | `realtime_practice` | `realtime_teach_back` |
+| 4 | 설명해보기 | `realtime_practice` | `realtime_teach_back` |
 
 생활지원형 기본 플로우:
 
@@ -347,7 +347,7 @@ seeded random 허용
 | 1 | 상황 만나기 | `scenario_intro` | `scenario_intro` |
 | 2 | 단서 찾기 | `clue_identification` | `scene_observation`, `highlight_clue`, `image_quiz`, `card_match` |
 | 3 | 행동 고르기 | `action_selection` | `image_quiz`, `card_match`, `sequence_ordering`, `action_choice`, `decision_card` |
-| 4 | AI와 연습하기 | `realtime_practice` | `realtime_roleplay` |
+| 4 | 한 번 해보기 | `realtime_practice` | `realtime_roleplay` |
 
 회고는 4단계 실시간 연습 뒤 `post_practice_reflection` 이벤트로 수집한다.
 

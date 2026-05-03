@@ -85,7 +85,7 @@ frontend/lib/demo-data.ts
 1. 개념 열기
 2. 문제 1
 3. 문제 2
-4. 직접 설명해보기: realtime 설명 연습
+4. 설명해보기: realtime 설명 연습
 ```
 
 ## 6. 백엔드 변경 후 프론트가 확인할 것

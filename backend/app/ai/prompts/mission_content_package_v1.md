@@ -32,6 +32,7 @@ Generate a complete MissionContent JSON package from an approved OrchestratorPla
 - Every image asset must have a rich `promptJson.prompt` optimized for `gpt-image-2`.
 - Every image asset must include a `promptJson.textRenderingPolicy` or `promptJson.ocrPolicy` value that clearly means `scene_only_no_problem_text`.
 - Every audio asset must have `sourceText` that can be sent directly to ElevenLabs.
+- `studentTitle` values are fixed product labels. Copy the fixed label for the content type and step; do not use custom lesson titles as `studentTitle`.
 
 ## Content Package Requirements
 
@@ -51,8 +52,8 @@ Each package must include:
   - stage_4_realtime
 - 4 stages:
   - stage 1 introduction
-  - stage 2 random/static template
-  - stage 3 random/static template
+  - stage 2 profile-selected static template
+  - stage 3 profile-selected static template
   - stage 4 realtime practice
 
 Asset id convention:
@@ -86,6 +87,7 @@ Audio requirements:
 ## Template JSON Rules
 
 Use the `orchestratorPlan.stagePlan[*].templateType` unless it violates the profile limits below.
+Template selection must be based on the orchestrator plan and student context, never arbitrary randomness.
 For any choice-based template other than `image_quiz`, use this choice object shape:
 
 ```json
@@ -94,10 +96,23 @@ For any choice-based template other than `image_quiz`, use this choice object sh
 
 When `caseFile.profile.profileJson.choiceCountLimit` is present:
 
-- No `choices`, `leftCards`, or `rightCards` array may exceed that number.
+- No `choices`, `leftCards`, `rightCards`, `cards`, or `tiles` array may exceed that number.
 - If the limit is 2, create exactly 2 short choices for `scene_question`, `clue_question`, `applied_question`, `action_choice`, `explanation_choice`, and `wrong_explanation_fix`.
 - If the limit is 2, do not use `image_quiz`, because `image_quiz` requires exactly 3 choices.
-- If the limit is 2, `sequence_ordering.cards` should normally use 2 cards and must not exceed 3 cards.
+- If the limit is 2, `sequence_ordering.cards` must use exactly 2 cards.
+
+Fixed `studentTitle` labels:
+
+- `learning_focus`
+  - step 1: `개념 열기`
+  - step 2: `문제 1`
+  - step 3: `문제 2`
+  - step 4: `설명해보기`
+- `life_support`
+  - step 1: `상황 만나기`
+  - step 2: `단서 찾기`
+  - step 3: `행동 고르기`
+  - step 4: `한 번 해보기`
 
 Allowed stage/template flow:
 

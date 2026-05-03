@@ -303,7 +303,9 @@ GET /api/student/missions/:contentId
 | 1 | 개념 열기 | `concept_intro` | 이미지와 짧은 설명으로 개념 앵커를 잡음 | 시작/조회 이벤트 |
 | 2 | 문제 1 | `basic_problem` | 성공 가능한 기본 문제로 핵심 개념을 확인 | 정답 여부, 피드백 |
 | 3 | 문제 2 | `applied_problem` | 헷갈리는 답, 응용 상황, 빈칸 등으로 한 번 더 적용 | 오답 패턴, 교정 포인트 |
-| 4 | AI에게 말해보기 | `realtime_practice` | 상황 이미지와 AI 질문을 보고 말/텍스트로 설명 | realtime session, 루브릭 요약 |
+| 4 | 설명해보기 | `realtime_practice` | 상황 이미지와 AI 질문을 보고 말/텍스트로 설명 | realtime session, 루브릭 요약 |
+
+`studentTitle`은 위 표의 값으로 고정한다. 생활지원형은 `상황 만나기`, `단서 찾기`, `행동 고르기`, `한 번 해보기`, 학습집중형은 `개념 열기`, `문제 1`, `문제 2`, `설명해보기`만 허용한다.
 
 ## 9. 단계별 기능 요구사항
 
@@ -381,7 +383,7 @@ life_support: image_quiz, card_match, sequence_ordering, action_choice, decision
 learning_focus: image_quiz, card_match, sequence_ordering, blank_fill, applied_question, mini_simulation, explanation_choice, wrong_explanation_fix
 ```
 
-2~3단계 랜덤 템플릿 후보의 공통 풀은 아래 4개다.
+2~3단계 프로필 기반 선택 템플릿 후보의 공통 풀은 아래 4개다.
 
 ```text
 image_quiz: 이미지 + 3지선다 퀴즈
