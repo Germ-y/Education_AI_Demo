@@ -69,6 +69,7 @@ type PendingGenerationJob = {
 };
 
 const PENDING_GENERATION_STORAGE_KEY = "eduyj:pending-generation-jobs";
+const GENERATION_RUNNING_TIMEOUT_MS = 15 * 60 * 1000;
 
 function readPendingGenerationJobs(): Record<string, PendingGenerationJob> {
   if (typeof window === "undefined") return {};
@@ -102,6 +103,19 @@ function getGeneratedContentId(agentRun: AgentRun) {
 function getSnapshotText(agentRun: AgentRun, key: string) {
   const value = agentRun.inputSnapshotJson[key];
   return typeof value === "string" ? value : "";
+}
+
+function isTimedOutIsoDate(value: string) {
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) && Date.now() - timestamp > GENERATION_RUNNING_TIMEOUT_MS;
+}
+
+function isAgentRunTimedOut(agentRun: AgentRun) {
+  return agentRun.status === "running" && isTimedOutIsoDate(agentRun.createdAt);
+}
+
+function isPendingGenerationJobTimedOut(job: PendingGenerationJob) {
+  return isTimedOutIsoDate(job.startedAt);
 }
 
 function getPendingJobFromAgentRun(agentRun: AgentRun): PendingGenerationJob | null {
@@ -621,7 +635,12 @@ export default function DashboardPage() {
         const runs = await listAgentRuns({ studentId: selectedStudentId });
         if (ignore) return;
         let restorableRun =
-          runs.find((run) => run.status === "running" && (run.agentType === "orchestrator" || run.agentType === "content")) ?? null;
+          runs.find(
+            (run) =>
+              run.status === "running" &&
+              !isAgentRunTimedOut(run) &&
+              (run.agentType === "orchestrator" || run.agentType === "content"),
+          ) ?? null;
         if (!restorableRun) {
           restorableRun =
             runs.find((run) => {
@@ -850,9 +869,10 @@ export default function DashboardPage() {
   );
   const selectedPendingGenerationStatus: GenerationStatus | undefined = selectedPendingGenerationJob
     ? {
-        state: "running",
-        message:
-          selectedPendingGenerationJob.phase === "orchestrator"
+        state: isPendingGenerationJobTimedOut(selectedPendingGenerationJob) ? "failed" : "running",
+        message: isPendingGenerationJobTimedOut(selectedPendingGenerationJob)
+          ? "생성 작업이 오래 응답하지 않아 멈춘 것으로 표시했습니다. 다시 제안받기를 눌러 주세요."
+          : selectedPendingGenerationJob.phase === "orchestrator"
             ? "학생 기록을 바탕으로 수업 방향을 정리하는 중입니다."
             : selectedPendingGenerationJob.phase === "content"
               ? "검토할 수업 콘텐츠 구조를 만드는 중입니다."
@@ -863,7 +883,9 @@ export default function DashboardPage() {
     generationStatuses[selectedCase.id] ??
     (selectedPendingGenerationJob ? generationStatuses[selectedPendingGenerationJob.caseId] : undefined) ??
     selectedPendingGenerationStatus;
-  const isGeneratingContent = generationStatus?.state === "running" || Boolean(selectedPendingGenerationJob);
+  const isGeneratingContent =
+    generationStatus?.state === "running" ||
+    Boolean(selectedPendingGenerationJob && !isPendingGenerationJobTimedOut(selectedPendingGenerationJob));
 
   const updateReviewStageDraft = (
     reviewId: string,
@@ -903,6 +925,11 @@ export default function DashboardPage() {
     };
 
     try {
+      if (isPendingGenerationJobTimedOut(job)) {
+        failJob("생성 작업이 오래 응답하지 않아 멈춘 것으로 표시했습니다. 다시 제안받기를 눌러 주세요.");
+        return;
+      }
+
       if (job.phase === "orchestrator") {
         if (!job.orchestratorRunId) {
           failJob("자료 방향 생성 기록을 찾지 못했습니다. 다시 시도해 주세요.");
@@ -911,6 +938,10 @@ export default function DashboardPage() {
 
         setRunningMessage("학생 기록을 바탕으로 수업 방향을 정리하는 중입니다.");
         const orchestratorRun = await getAgentRun(job.orchestratorRunId);
+        if (isAgentRunTimedOut(orchestratorRun)) {
+          failJob("자료 방향 생성이 오래 응답하지 않아 중단된 것으로 표시했습니다. 다시 시도해 주세요.");
+          return;
+        }
         if (orchestratorRun.status === "running") return;
         if (orchestratorRun.status === "failed") {
           failJob(getAiGenerationFailureMessage(orchestratorRun));
@@ -947,6 +978,10 @@ export default function DashboardPage() {
 
         setRunningMessage("검토할 수업 콘텐츠 구조를 만드는 중입니다.");
         const contentRun = await getAgentRun(job.contentRunId);
+        if (isAgentRunTimedOut(contentRun)) {
+          failJob("콘텐츠 생성이 오래 응답하지 않아 중단된 것으로 표시했습니다. 다시 시도해 주세요.");
+          return;
+        }
         if (contentRun.status === "running") return;
         if (contentRun.status === "failed") {
           failJob(getAiGenerationFailureMessage(contentRun));
