@@ -951,6 +951,8 @@ function RealtimePracticeRoom({
   stageId,
   attemptId,
   token,
+  accessCode,
+  onRuntimeReady,
   onComplete,
   onFinish,
 }: {
@@ -962,6 +964,8 @@ function RealtimePracticeRoom({
   stageId?: string;
   attemptId?: string | null;
   token?: string | null;
+  accessCode?: string | null;
+  onRuntimeReady: (nextToken: string, nextAttemptId: string) => void;
   onComplete: () => void;
   onFinish: () => void;
 }) {
@@ -982,6 +986,7 @@ function RealtimePracticeRoom({
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const realtimeSessionIdRef = useRef<string | null>(null);
+  const realtimeTokenRef = useRef<string | null>(null);
   const startedAtRef = useRef<number | null>(null);
   const transcriptRef = useRef<string[]>([practice.sceneLine]);
   const hasUserSubmittedRef = useRef(false);
@@ -1015,8 +1020,9 @@ function RealtimePracticeRoom({
 
   const sendSessionEvent = (eventType: string, payloadJson: Record<string, unknown>) => {
     const sessionId = realtimeSessionIdRef.current;
-    if (!sessionId || !token) return;
-    void saveRealtimeSessionEvent(sessionId, { eventType, payloadJson }, { token }).catch(() => undefined);
+    const activeToken = realtimeTokenRef.current ?? token;
+    if (!sessionId || !activeToken) return;
+    void saveRealtimeSessionEvent(sessionId, { eventType, payloadJson }, { token: activeToken }).catch(() => undefined);
   };
 
   const handleRealtimeEvent = (rawEvent: unknown) => {
@@ -1053,9 +1059,9 @@ function RealtimePracticeRoom({
 
   const startRealtimeConversation = async () => {
     if (connectionState === "connecting" || connectionState === "connected") return;
-    if (!contentId || !stageId || !attemptId || !token) {
+    if (!contentId || !stageId) {
       setConnectionState("error");
-      setStatusMessage("학습 기록 연결이 아직 준비되지 않았어요. 잠시 뒤 다시 눌러 주세요.");
+      setStatusMessage("실시간 연습을 시작할 수 있는 단계 정보를 찾지 못했어요.");
       return;
     }
 
@@ -1063,7 +1069,24 @@ function RealtimePracticeRoom({
     setStatusMessage("실시간 대화를 연결하고 있어요.");
 
     try {
-      const session = await createRealtimeSession(contentId, stageId, { attemptId }, { token });
+      let activeToken = token;
+      let activeAttemptId = attemptId;
+
+      if ((!activeToken || !activeAttemptId) && accessCode) {
+        setStatusMessage("학습 기록을 준비하고 있어요.");
+        const access = await studentAccess({ accessCode });
+        const attempt = await startStudentMission(contentId, { token: access.session.accessToken });
+        activeToken = access.session.accessToken;
+        activeAttemptId = attempt.id;
+        onRuntimeReady(activeToken, activeAttemptId);
+      }
+
+      if (!activeToken || !activeAttemptId) {
+        throw new Error("runtime_not_ready");
+      }
+
+      realtimeTokenRef.current = activeToken;
+      const session = await createRealtimeSession(contentId, stageId, { attemptId: activeAttemptId }, { token: activeToken });
       realtimeSessionIdRef.current = session.sessionId;
       startedAtRef.current = Date.now();
 
@@ -1167,7 +1190,8 @@ function RealtimePracticeRoom({
     closeRealtimeConnection();
 
     const sessionId = realtimeSessionIdRef.current;
-    if (!sessionId || !token) {
+    const activeToken = realtimeTokenRef.current ?? token;
+    if (!sessionId || !activeToken) {
       setConnectionState("complete");
       onComplete();
       return;
@@ -1185,7 +1209,7 @@ function RealtimePracticeRoom({
           },
           transcriptSummary: transcriptRef.current.slice(-8).join(" / "),
         },
-        { token },
+        { token: activeToken },
       );
       setConnectionState("complete");
       setStatusMessage("실시간 대화가 저장됐어요.");
@@ -2000,6 +2024,12 @@ export function StudentStageExperience({
                         stageId={activeQuestion.stageId}
                         attemptId={attemptId}
                         token={studentAccessToken}
+                        accessCode={student.accessCode}
+                        onRuntimeReady={(nextToken, nextAttemptId) => {
+                          setStudentAccessToken(nextToken);
+                          setAttemptId(nextAttemptId);
+                          setRuntimeError(null);
+                        }}
                         onComplete={completeRealtimePractice}
                         onFinish={goToNextStage}
                       />

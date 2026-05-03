@@ -209,15 +209,12 @@ async function getMissionForRoute(contentId: string, options: { allowReviewable:
     return await getReviewableContent(contentId);
   }
 
-  try {
-    return await getStudentMission(contentId);
-  } catch (error) {
-    const content = await getReviewableContent(contentId);
-    if (content.status === "published") {
-      return content;
-    }
-    throw error;
+  const content = await getReviewableContent(contentId);
+  if (content.status === "published") {
+    return content;
   }
+
+  return await getStudentMission(contentId);
 }
 
 function resolveContentIdFromSeed(seed: Awaited<ReturnType<typeof getContextSeed>>, caseId?: string, options: { preview: boolean } = { preview: false }) {
