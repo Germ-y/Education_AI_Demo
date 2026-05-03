@@ -508,7 +508,7 @@ class DemoStore:
     def publish_mission_content(self, content_id: str, teacher_id: str) -> MissionContent | None:
         self.refresh()
         mission = self.get_mission_for_teacher(content_id, teacher_id)
-        if mission is None or mission.status != MissionStatus.APPROVED:
+        if mission is None or mission.status not in {MissionStatus.APPROVED, MissionStatus.PUBLISHED}:
             return None
         if any(asset.approval_status != "approved" for asset in mission.assets):
             return None

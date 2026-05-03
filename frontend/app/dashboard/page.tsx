@@ -471,6 +471,7 @@ export default function DashboardPage() {
   const [selectedFeedbackId, setSelectedFeedbackId] = useState<string | null>(null);
   const [approvedMaterialIds, setApprovedMaterialIds] = useState<string[]>([]);
   const [appliedMaterialIds, setAppliedMaterialIds] = useState<string[]>([]);
+  const [reusedReportContentIds, setReusedReportContentIds] = useState<string[]>([]);
   const [revisionMaterialIds, setRevisionMaterialIds] = useState<string[]>([]);
   const [rejectedMaterialIds, setRejectedMaterialIds] = useState<string[]>([]);
   const [editingReviewIds, setEditingReviewIds] = useState<string[]>([]);
@@ -491,6 +492,7 @@ export default function DashboardPage() {
   const [savedFeedbackRecords, setSavedFeedbackRecords] = useState<
     Array<{ id: string; recordId: string; feedback: string; savedAt: string }>
   >([]);
+  const [reportReuseError, setReportReuseError] = useState("");
 
   useEffect(() => {
     let ignore = false;
@@ -656,6 +658,8 @@ export default function DashboardPage() {
     ? savedFeedbackRecords.find((feedback) => feedback.recordId === openReport.id)
     : null;
   const openReportStageStep = reportPreviewStep;
+  const isOpenReportReusing = openReport ? reviewActionId === openReport.contentId : false;
+  const isOpenReportReused = openReport ? reusedReportContentIds.includes(openReport.contentId) : false;
   const openReview = selectedReviewItems.find((item) => item.id === openReviewId);
   const openReviewStages = openReview ? (reviewStageDrafts[openReview.id] ?? mapContentToReviewStages(openReview.content)) : reviewStagePreviews;
   const openReviewNeedsMediaGeneration = openReview ? hasMissingGeneratedMedia(openReview.content) : false;
@@ -945,6 +949,26 @@ export default function DashboardPage() {
       await refreshSelectedStudentData();
     } catch {
       setReviewActionError("수업 적용 상태를 저장하지 못했습니다. 승인된 자료인지 다시 확인해 주세요.");
+    } finally {
+      setReviewActionId(null);
+    }
+  };
+
+  const handleReuseReportContent = async (record: SessionLog) => {
+    if (reviewActionId || reusedReportContentIds.includes(record.contentId)) return;
+
+    setReportReuseError("");
+    setReviewActionId(record.contentId);
+    try {
+      const content = await publishContent(record.contentId);
+      updateCurrentContent(content);
+      setAppliedMaterialIds((current) => (current.includes(record.contentId) ? current : [...current, record.contentId]));
+      setReusedReportContentIds((current) =>
+        current.includes(record.contentId) ? current : [...current, record.contentId],
+      );
+      await refreshSelectedStudentData();
+    } catch {
+      setReportReuseError("학생 화면에 다시 적용하지 못했습니다. 잠시 후 다시 눌러 주세요.");
     } finally {
       setReviewActionId(null);
     }
@@ -1670,6 +1694,25 @@ export default function DashboardPage() {
                   <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">
                     {openReportTeacherFeedback?.feedback ?? "아직 선생님 리포트가 저장되지 않았습니다."}
                   </p>
+                </div>
+                <div className="rounded-lg border border-[#d9ebc9] bg-[#f4fbef] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-[#16803c]">재사용</p>
+                      <p className="mt-1 text-sm font-semibold leading-6 text-[#334155]">
+                        이 리포트의 수업을 학생 화면에 다시 적용합니다.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleReuseReportContent(openReport)}
+                      disabled={isOpenReportReusing || isOpenReportReused}
+                      className="rounded-md bg-[#5dae6b] px-5 py-3 text-sm font-black text-white shadow-[0_10px_24px_rgba(93,174,107,0.22)] transition hover:bg-[#4d9f5d] disabled:cursor-not-allowed disabled:bg-[#c7d2c6]"
+                    >
+                      {isOpenReportReusing ? "적용 중" : isOpenReportReused ? "적용됨" : "학생 화면에 재사용"}
+                    </button>
+                  </div>
+                  {reportReuseError && <p className="mt-2 text-sm font-bold text-[#b42318]">{reportReuseError}</p>}
                 </div>
               </aside>
             </div>
