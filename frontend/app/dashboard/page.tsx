@@ -1622,6 +1622,18 @@ export default function DashboardPage() {
                   <InfoBlock label="정답률" value={`${openReport.accuracyRate}%`} />
                 </div>
 
+                <div className="rounded-lg border border-[#d9ebc9] bg-[#f4fbef] p-4">
+                  <p className="text-sm font-bold text-[#16803c]">학생 회고</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">
+                    {openReport.reflectionText ?? "아직 저장된 회고가 없습니다."}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-[#f8fafc] p-4">
+                  <p className="text-sm font-bold text-[#64748b]">기록 요약</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">{openReport.note}</p>
+                </div>
+
                 <div className="rounded-lg border border-[#cbd5e1] bg-white p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-bold text-[#1f3a5f]">선생님 리포트</p>
@@ -1634,18 +1646,6 @@ export default function DashboardPage() {
                   <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">
                     {openReportTeacherFeedback?.feedback ?? "아직 선생님 리포트가 저장되지 않았습니다."}
                   </p>
-                </div>
-
-                <div className="rounded-lg border border-[#d9ebc9] bg-[#f4fbef] p-4">
-                  <p className="text-sm font-bold text-[#16803c]">학생 회고</p>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">
-                    {openReport.reflectionText ?? "아직 저장된 회고가 없습니다."}
-                  </p>
-                </div>
-
-                <div className="rounded-lg bg-[#f8fafc] p-4">
-                  <p className="text-sm font-bold text-[#64748b]">기록 요약</p>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">{openReport.note}</p>
                 </div>
               </aside>
             </div>
