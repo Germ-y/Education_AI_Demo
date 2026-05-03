@@ -229,17 +229,35 @@ def publish_content(
 
 def _generate_asset_or_raise(content_id: str, asset) -> None:
     settings = get_settings()
+    asset_started_at = time.perf_counter()
     try:
         if asset.asset_type == AssetType.IMAGE:
             prompt = _extract_image_prompt(asset.prompt_json)
             relative_path = _generated_asset_relative_path(content_id, asset)
             output_path = _generated_file_path(relative_path)
             if not _is_generated_file_ready(output_path):
+                logger.info(
+                    "contents.asset.image_started content_id=%s asset_id=%s role=%s stage_id=%s path=%s",
+                    content_id,
+                    asset.id,
+                    asset.asset_role,
+                    asset.stage_id,
+                    output_path,
+                )
                 OpenAiProvider(settings).create_image_file(
                     prompt=prompt,
                     output_path=output_path,
                     model=settings.openai_image_model,
                     timeout_sec=settings.openai_image_timeout_sec,
+                )
+            else:
+                logger.info(
+                    "contents.asset.image_skipped_existing content_id=%s asset_id=%s role=%s stage_id=%s path=%s",
+                    content_id,
+                    asset.id,
+                    asset.asset_role,
+                    asset.stage_id,
+                    output_path,
                 )
             _apply_generated_asset_metadata(asset, relative_path, provider="openai", model=settings.openai_image_model)
         elif asset.asset_type == AssetType.AUDIO:
@@ -248,11 +266,48 @@ def _generate_asset_or_raise(content_id: str, asset) -> None:
             relative_path = _generated_asset_relative_path(content_id, asset)
             output_path = _generated_file_path(relative_path)
             if not _is_generated_file_ready(output_path):
+                logger.info(
+                    "contents.asset.audio_started content_id=%s asset_id=%s role=%s stage_id=%s path=%s",
+                    content_id,
+                    asset.id,
+                    asset.asset_role,
+                    asset.stage_id,
+                    output_path,
+                )
                 ElevenLabsProvider(settings).create_speech_file(source_text=asset.source_text, output_path=output_path)
+            else:
+                logger.info(
+                    "contents.asset.audio_skipped_existing content_id=%s asset_id=%s role=%s stage_id=%s path=%s",
+                    content_id,
+                    asset.id,
+                    asset.asset_role,
+                    asset.stage_id,
+                    output_path,
+                )
             _apply_generated_asset_metadata(asset, relative_path, provider="elevenlabs", model="eleven_multilingual_v2")
         else:
             raise HTTPException(status_code=400, detail={"code": "ASSET_TYPE_NOT_SUPPORTED", "message": "지원하지 않는 assetType입니다."})
+        logger.info(
+            "contents.asset.succeeded content_id=%s asset_id=%s type=%s role=%s stage_id=%s elapsed_sec=%.1f",
+            content_id,
+            asset.id,
+            asset.asset_type,
+            asset.asset_role,
+            asset.stage_id,
+            time.perf_counter() - asset_started_at,
+        )
     except AiProviderError as exc:
+        logger.warning(
+            "contents.asset.failed content_id=%s asset_id=%s type=%s role=%s stage_id=%s code=%s elapsed_sec=%.1f message=%s",
+            content_id,
+            asset.id,
+            asset.asset_type,
+            asset.asset_role,
+            asset.stage_id,
+            exc.code,
+            time.perf_counter() - asset_started_at,
+            exc.message,
+        )
         raise HTTPException(
             status_code=424,
             detail={
