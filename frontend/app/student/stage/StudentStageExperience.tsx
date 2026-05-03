@@ -1249,6 +1249,11 @@ export function StudentStageExperience({
   nextHref: string;
   previewMode?: boolean;
 }) {
+  type PendingAnswerSubmission = {
+    stageId: string;
+    answer: Record<string, unknown>;
+  };
+
   const router = useRouter();
   const { student, scene } = context;
   const theme = scene.theme;
@@ -1280,6 +1285,7 @@ export function StudentStageExperience({
   const [isCompletingMission, setIsCompletingMission] = useState(false);
   const noticeCounter = useRef(0);
   const runtimeStartedRef = useRef(false);
+  const pendingAnswerSubmissionsRef = useRef<PendingAnswerSubmission[]>([]);
 
   const activeStage = scene.stages[activeStageIndex] ?? scene.stages[0];
   const activeQuestion = useMemo(
@@ -1368,6 +1374,21 @@ export function StudentStageExperience({
 
   const canPersistRuntime = !previewMode && scene.status === "published" && Boolean(scene.contentId && attemptId && studentAccessToken);
 
+  const queueAnswerSubmission = (question: StageQuestion, answerPayload: Record<string, unknown>) => {
+    if (previewMode || scene.status !== "published" || !question.stageId) return;
+    pendingAnswerSubmissionsRef.current.push({ stageId: question.stageId, answer: answerPayload });
+  };
+
+  const flushPendingAnswerSubmissions = async (contentId: string, activeAttemptId: string, activeToken: string) => {
+    const pending = pendingAnswerSubmissionsRef.current;
+    if (pending.length === 0) return;
+
+    pendingAnswerSubmissionsRef.current = [];
+    for (const item of pending) {
+      await submitStudentMissionStage(contentId, item.stageId, { attemptId: activeAttemptId, answer: item.answer }, { token: activeToken });
+    }
+  };
+
   const persistStudentEvent = (question: StageQuestion, eventType: string, payloadJson: Record<string, unknown>) => {
     if (!canPersistRuntime || !scene.contentId || !studentAccessToken) return;
 
@@ -1386,7 +1407,10 @@ export function StudentStageExperience({
   };
 
   const submitRuntimeAnswer = (question: StageQuestion, answerPayload: Record<string, unknown>) => {
-    if (!canPersistRuntime || !scene.contentId || !attemptId || !studentAccessToken || !question.stageId) return;
+    if (!canPersistRuntime || !scene.contentId || !attemptId || !studentAccessToken || !question.stageId) {
+      queueAnswerSubmission(question, answerPayload);
+      return;
+    }
 
     void submitStudentMissionStage(scene.contentId, question.stageId, { attemptId, answer: answerPayload }, { token: studentAccessToken })
       .then(() => setRuntimeError(null))
@@ -1628,6 +1652,8 @@ export function StudentStageExperience({
       if (!activeToken || !activeAttemptId) {
         throw new Error("runtime_not_ready");
       }
+
+      await flushPendingAnswerSubmissions(scene.contentId, activeAttemptId, activeToken);
 
       const reflection = reflectionText.trim();
       await saveStudentMissionReflection(
