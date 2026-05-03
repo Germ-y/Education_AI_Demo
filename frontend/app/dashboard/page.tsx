@@ -561,7 +561,6 @@ export default function DashboardPage() {
   const activeCaseFile = selectedCaseFile?.profile.id === selectedStudent.id ? selectedCaseFile : null;
   const activeReport = selectedReport?.student.id === selectedStudent.id ? selectedReport : null;
   const dashboardProfile = activeCaseFile?.dashboardProfile;
-  const autoContextItems = dashboardProfile?.autoContext ?? activeCaseFile?.contextBundle?.autoContext ?? [];
   const selectedCase: SupportCase = activeCaseFile
     ? toSupportCaseFromCaseFile(activeCaseFile, selectedApiStudent)
     : selectedApiStudent
@@ -643,22 +642,9 @@ export default function DashboardPage() {
   const memoValue = memoDrafts[selectedCase.id] ?? savedMemo;
   const isMemoDirty = memoValue !== savedMemo;
   const canSaveMemo = isMemoDirty && memoValue.trim().length > 0;
-  const lessonDraftValue = lessonDrafts[selectedCase.id] ?? selectedCase.sessionGoal;
+  const lessonDraftValue = lessonDrafts[selectedCase.id] ?? "";
   const generationStatus = generationStatuses[selectedCase.id];
   const isGeneratingContent = generationStatus?.state === "running";
-  const baseMaterialContextItems =
-    autoContextItems.length > 0
-      ? autoContextItems
-      : [
-          {
-            label: "학생 기록",
-            value: `${selectedStudent.name} · ${selectedStudent.school} · ${selectedCase.caseType}`,
-          },
-          { label: "수업 제안", value: selectedCase.primaryNeed },
-        ];
-  const materialContextItems = savedMemo
-    ? [...baseMaterialContextItems, { label: "교사 메모리", value: savedMemo }]
-    : baseMaterialContextItems;
 
   const updateReviewStageDraft = (
     reviewId: string,
@@ -684,7 +670,7 @@ export default function DashboardPage() {
       ...current,
       [selectedCase.id]: {
         state: "running",
-        message: "학생 맥락을 오케스트레이터에 전달하는 중입니다.",
+        message: "선생님 요청을 바탕으로 자료 방향을 정리하는 중입니다.",
       },
     }));
 
@@ -1231,7 +1217,7 @@ export default function DashboardPage() {
                       <div>
                         <h3 className="text-xl font-black">수업 자료 제안</h3>
                         <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                          학생 맥락을 바탕으로 수업 자료 방향을 제안받습니다.
+                          선생님이 원하는 방향을 적으면 검토용 수업 자료를 제안받습니다.
                         </p>
                       </div>
                     </div>
@@ -1249,7 +1235,7 @@ export default function DashboardPage() {
                               [selectedCase.id]: event.target.value,
                             }))
                           }
-                          placeholder="선생님이 조정하고 싶은 수업 방향을 적어주세요."
+                          placeholder="오늘 만들고 싶은 수업 방향을 적어주세요. 비워두면 학생 기록을 바탕으로 기본 제안을 만듭니다."
                         />
                       </label>
 
@@ -1261,18 +1247,6 @@ export default function DashboardPage() {
                           <option>도전</option>
                         </select>
                       </label>
-
-                      <div className="rounded-md bg-[#f8fafc] p-3">
-                        <p className="text-sm font-bold text-[#64748b]">AI가 참고할 학생 맥락</p>
-                        <div className="mt-2 space-y-2">
-                          {materialContextItems.map((item) => (
-                            <div key={`${item.label}-${item.value}`} className="grid gap-1 rounded-md bg-white px-3 py-2 md:grid-cols-[88px_minmax(0,1fr)]">
-                              <span className="text-xs font-black text-[#1f3a5f]">{item.label}</span>
-                              <span className="text-sm font-semibold leading-6 text-[#334155]">{item.value}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
 
                       <button
                         disabled={!selectedCase.id || isGeneratingContent}
