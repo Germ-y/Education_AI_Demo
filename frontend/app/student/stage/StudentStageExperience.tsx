@@ -1061,7 +1061,7 @@ function RealtimePracticeRoom({
 
   return (
     <div className="grid h-full min-h-[440px] grid-cols-[minmax(360px,0.9fr)_minmax(390px,1fr)] gap-4 rounded-[24px] border border-[#dce5ec] bg-white p-4 shadow-[0_18px_48px_rgba(57,78,97,0.10)]">
-      <div className="relative grid min-h-0 grid-rows-[auto_1fr] overflow-hidden rounded-[22px] border p-4" style={{ borderColor: theme.border, backgroundColor: theme.accentPale }}>
+      <div className="relative flex min-h-0 flex-col overflow-hidden rounded-[22px] border p-4" style={{ borderColor: theme.border, backgroundColor: theme.accentPale }}>
         <div className="relative z-10">
           <p className="text-sm font-black" style={{ color: theme.accentStrong }}>
             {practice.label}
@@ -1072,7 +1072,7 @@ function RealtimePracticeRoom({
           </div>
         </div>
 
-        <div className="relative z-10 grid min-h-0 grid-cols-[minmax(0,1fr)_128px] items-end gap-3 pt-3">
+        <div className="relative z-10 mt-4 grid grid-cols-[minmax(0,1fr)_128px] items-end gap-3">
           <div className="relative rounded-[20px] border border-white/80 bg-white/90 p-3.5 shadow-sm before:absolute before:right-[-12px] before:top-1/2 before:h-6 before:w-6 before:-translate-y-1/2 before:rotate-45 before:border-r before:border-t before:border-white/80 before:bg-white/90">
             <p className="text-xs font-black" style={{ color: theme.accentStrong }}>
               {practice.partner}
