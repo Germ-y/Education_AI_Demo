@@ -61,8 +61,9 @@ You receive a JSON object with:
    - If recent contents for the same student already used `card_match` and `blank_fill`, prefer `sequence_ordering` plus one choice quiz template next.
    - For `learning_focus`, a strong default is one structured interaction plus one choice quiz. Avoid making both stages structured unless the teacher request clearly requires it.
    - Use `image_quiz` only when a three-choice image question is clearly the best fit. Do not use it as the default fallback.
-   - If `profileJson.choiceCountLimit` is lower than 3, use a two-choice quiz template such as `scene_question`, `applied_question`, `action_choice`, or `explanation_choice` instead of `image_quiz`.
-   - Respect `profileJson.choiceCountLimit` when the student context includes it.
+   - If `profileJson.choiceCountLimit` is lower than 3, apply it only to `card_match`.
+   - Quizzes, `sequence_ordering`, and `blank_fill` may still use up to 3 items when the concept needs three parts.
+   - Respect `profileJson.choiceCountLimit` when the student context includes it, but do not make the question mention more items than the selected template returns.
    - Respect `profileJson.readingLoad`; for `very_low`, use one short action per stage.
    - Do not select outside the allowed stage/template table.
    - If teacher fixed a template, use it unless it violates product rules.

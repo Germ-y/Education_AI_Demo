@@ -228,6 +228,18 @@ def test_mission_quality_rejects_raw_internal_terms_in_student_text() -> None:
 
 def test_mission_quality_respects_student_choice_limit() -> None:
     content = _generated_fraction_content()
+    content["stages"][1]["templateType"] = "card_match"
+    content["stages"][1]["templateJson"] = {
+        "imageAssetId": content["stages"][1]["templateJson"]["imageAssetId"],
+        "audioAssetId": content["stages"][1]["templateJson"]["audioAssetId"],
+        "assetBundle": content["stages"][1]["templateJson"]["assetBundle"],
+        "question": "같은 양끼리 이어 보세요.",
+        "leftCards": [{"id": "a", "text": "1/2"}, {"id": "b", "text": "1/4"}, {"id": "c", "text": "3/4"}],
+        "rightCards": [{"id": "d", "text": "0.5"}, {"id": "e", "text": "0.25"}, {"id": "f", "text": "0.75"}],
+        "matches": {"a": "d", "b": "e", "c": "f"},
+        "correctFeedback": "좋아요. 같은 양을 잘 찾았어요.",
+        "wrongFeedback": "분수와 소수를 다시 비교해 볼까요?",
+    }
     mission = MissionContent.model_validate(content)
     case_file = _fraction_case_file()
     case_file["profile"]["profileJson"]["choiceCountLimit"] = 2
@@ -240,7 +252,7 @@ def test_mission_quality_respects_student_choice_limit() -> None:
         )
 
 
-def test_mission_quality_respects_student_sequence_card_limit() -> None:
+def test_mission_quality_allows_three_sequence_cards_with_two_choice_limit() -> None:
     content = _generated_fraction_content()
     content["stages"][1]["templateJson"]["choices"] = [{"id": "a", "text": "1조각"}, {"id": "b", "text": "4조각"}]
     content["stages"][2]["templateType"] = "sequence_ordering"
@@ -262,7 +274,68 @@ def test_mission_quality_respects_student_sequence_card_limit() -> None:
     case_file = _fraction_case_file()
     case_file["profile"]["profileJson"]["choiceCountLimit"] = 2
 
+    validate_mission_content_quality(
+        mission,
+        case_file=case_file,
+        orchestrator_plan=_valid_learning_plan(),
+    )
+
+
+def test_mission_quality_rejects_four_sequence_cards() -> None:
+    content = _generated_fraction_content()
+    content["stages"][1]["templateJson"]["choices"] = [{"id": "a", "text": "1議곌컖"}, {"id": "b", "text": "4議곌컖"}]
+    content["stages"][2]["templateType"] = "sequence_ordering"
+    content["stages"][2]["templateJson"] = {
+        "imageAssetId": content["stages"][2]["templateJson"]["imageAssetId"],
+        "audioAssetId": content["stages"][2]["templateJson"]["audioAssetId"],
+        "assetBundle": content["stages"][2]["templateJson"]["assetBundle"],
+        "question": "분수를 읽는 순서를 골라보세요.",
+        "cards": [
+            {"id": "whole", "text": "전체 보기"},
+            {"id": "part", "text": "고른 것 보기"},
+            {"id": "fraction", "text": "분수 말하기"},
+            {"id": "check", "text": "다시 확인하기"},
+        ],
+        "answerOrder": ["whole", "part", "fraction", "check"],
+        "correctFeedback": "좋아요. 차례대로 잘 놓았어요.",
+        "wrongFeedback": "먼저 전체를 보는 카드부터 골라볼까요?",
+    }
+    mission = MissionContent.model_validate(content)
+    case_file = _fraction_case_file()
+    case_file["profile"]["profileJson"]["choiceCountLimit"] = 2
+
     with pytest.raises(ContentQualityError, match="cards"):
+        validate_mission_content_quality(
+            mission,
+            case_file=case_file,
+            orchestrator_plan=_valid_learning_plan(),
+        )
+
+
+def test_mission_quality_allows_three_blank_fill_tiles_with_two_choice_limit() -> None:
+    content = _generated_fraction_content()
+    content["stages"][1]["templateJson"]["choices"] = [{"id": "a", "text": "1議곌컖"}, {"id": "b", "text": "4議곌컖"}]
+    content["stages"][2]["templateJson"]["tiles"] = ["1", "2", "4"]
+    mission = MissionContent.model_validate(content)
+    case_file = _fraction_case_file()
+    case_file["profile"]["profileJson"]["choiceCountLimit"] = 2
+
+    validate_mission_content_quality(
+        mission,
+        case_file=case_file,
+        orchestrator_plan=_valid_learning_plan(),
+    )
+
+
+def test_mission_quality_rejects_four_blank_fill_tiles() -> None:
+    content = _generated_fraction_content()
+    content["stages"][1]["templateJson"]["choices"] = [{"id": "a", "text": "1議곌컖"}, {"id": "b", "text": "4議곌컖"}]
+    content["stages"][2]["templateJson"]["tiles"] = ["1", "2", "3", "4"]
+    mission = MissionContent.model_validate(content)
+    case_file = _fraction_case_file()
+    case_file["profile"]["profileJson"]["choiceCountLimit"] = 2
+
+    with pytest.raises(ContentQualityError, match="tiles"):
         validate_mission_content_quality(
             mission,
             case_file=case_file,

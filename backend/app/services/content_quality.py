@@ -382,7 +382,7 @@ def _validate_visible_content_text(
             if path.endswith(".text") and len(text) > limits["choice"]:
                 issues.append(f"{path} 선택지 문구가 학생 읽기 부담 기준보다 깁니다.")
         if choice_limit is not None:
-            _validate_choice_limit(stage.template_json, choice_limit, f"{stage.id}.templateJson", issues)
+            _validate_choice_limit(stage.template_json, stage.template_type.value, choice_limit, f"{stage.id}.templateJson", issues)
         if _has_student_proposal_phrase(stage.student_title) or _has_student_proposal_phrase(stage.student_instruction):
             issues.append(f"{stage.id} 학생 문구에 교사용 제안 말투가 섞였습니다.")
 
@@ -474,11 +474,36 @@ def _iter_named_visible_text(value: Any, prefix: str) -> list[tuple[str, str]]:
     return items
 
 
-def _validate_choice_limit(template_json: dict[str, Any], limit: int, path: str, issues: list[str]) -> None:
-    for key in ("choices", "leftCards", "rightCards", "cards", "tiles"):
-        value = template_json.get(key)
-        if isinstance(value, list) and len(value) > limit:
-            issues.append(f"{path}.{key}는 학생 선택지 제한 {limit}개를 넘을 수 없습니다.")
+def _validate_choice_limit(template_json: dict[str, Any], template_type: str, limit: int, path: str, issues: list[str]) -> None:
+    if template_type == TemplateType.CARD_MATCH.value:
+        _validate_array_limit(template_json, "leftCards", limit, path, issues)
+        _validate_array_limit(template_json, "rightCards", limit, path, issues)
+        matches = template_json.get("matches")
+        if isinstance(matches, dict) and len(matches) > limit:
+            issues.append(f"{path}.matches는 학생 선택지 제한 {limit}개를 넘을 수 없습니다.")
+        return
+
+    if template_type == TemplateType.IMAGE_QUIZ.value:
+        _validate_array_limit(template_json, "choices", 3, path, issues)
+        return
+
+    if template_type == TemplateType.SEQUENCE_ORDERING.value:
+        _validate_array_limit(template_json, "cards", 3, path, issues)
+        return
+
+    if template_type == TemplateType.BLANK_FILL.value:
+        _validate_array_limit(template_json, "choices", 3, path, issues)
+        _validate_array_limit(template_json, "tiles", 3, path, issues)
+        return
+
+    for key in ("choices", "tiles"):
+        _validate_array_limit(template_json, key, max(limit, 3), path, issues)
+
+
+def _validate_array_limit(template_json: dict[str, Any], key: str, limit: int, path: str, issues: list[str]) -> None:
+    value = template_json.get(key)
+    if isinstance(value, list) and len(value) > limit:
+        issues.append(f"{path}.{key}는 학생 선택지 제한 {limit}개를 넘을 수 없습니다.")
 
 
 def _validate_intent_roles(value: Any, path: str, issues: list[str]) -> None:

@@ -92,7 +92,7 @@ Stages 2 and 3 must not collapse into only simple choice-question screens. At le
 Do not substitute `image_quiz` for another planned template because it is easier to write.
 Do not collapse generated learning content into the repeated `card_match` + `blank_fill` pair. If the orchestrator selected `sequence_ordering`, preserve it and write real ordering cards. If the orchestrator selected a choice quiz template, preserve it and write a short quiz.
 For `learning_focus`, stages 2 and 3 should normally include one structured interaction (`sequence_ordering`, `card_match`, or `blank_fill`) and one choice quiz (`image_quiz`, `scene_question`, `clue_question`, `applied_question`, `explanation_choice`, or `wrong_explanation_fix`).
-If `choiceCountLimit` is lower than 3, the choice quiz must use a two-choice template such as `scene_question`, `applied_question`, or `explanation_choice`; do not convert it into `image_quiz`.
+If `choiceCountLimit` is lower than 3, apply the product-specific display limits below instead of shrinking every template.
 For any choice-based template other than `image_quiz`, use this choice object shape:
 
 ```json
@@ -101,11 +101,11 @@ For any choice-based template other than `image_quiz`, use this choice object sh
 
 When `caseFile.profile.profileJson.choiceCountLimit` is present:
 
-- No `choices`, `leftCards`, `rightCards`, `cards`, or `tiles` array may exceed that number.
-- If the limit is 2, create exactly 2 short choices for `scene_question`, `clue_question`, `applied_question`, `action_choice`, `explanation_choice`, and `wrong_explanation_fix`.
-- If the limit is 2, do not use `image_quiz`, because `image_quiz` requires exactly 3 choices.
-- If the limit is 2, `sequence_ordering.cards` must use exactly 2 cards.
-- If the limit is 2, `card_match.leftCards` and `card_match.rightCards` must each use exactly 2 cards, with exactly 2 entries in `matches`.
+- Apply the 2-item limit only to `card_match`: `leftCards` exactly 2, `rightCards` exactly 2, and `matches` exactly 2 entries.
+- `sequence_ordering.cards` should use exactly 3 cards when the concept naturally has three ordered parts.
+- Choice quiz templates may use up to 3 choices. `image_quiz` still requires exactly 3 choices.
+- `blank_fill` choice banks may use up to 3 `choices` or `tiles`.
+- Do not write a question that names more items than the returned cards/choices include.
 
 Fixed `studentTitle` labels:
 
@@ -233,7 +233,7 @@ Required:
 
 ### `scene_question`, `clue_question`, `applied_question`, `action_choice`
 
-Use these when the student needs 2 choices or a short visual question. `answer` must be one of the choice ids.
+Use these for a short visual question. Prefer 3 choices for quiz-like stages unless the teacher plan explicitly asks for two. `answer` must be one of the choice ids.
 
 Required:
 
@@ -248,7 +248,8 @@ Required:
   "question": "string",
   "choices": [
     { "id": "a", "text": "string" },
-    { "id": "b", "text": "string" }
+    { "id": "b", "text": "string" },
+    { "id": "c", "text": "string" }
   ],
   "answer": "a",
   "correctFeedback": "string",
@@ -372,7 +373,7 @@ Rules:
 - The blank sentence itself is the task. Do not write generic instructions such as "look at the image and fill the blanks."
 - Do not mention `image`, `picture`, `box`, or `blank box` as the thing to fill. The UI already shows the blank slots.
 - The image should only provide context or manipulatives; it must not contain the blanks, choices, answer, or problem text.
-- Include `tiles` with short values that fit directly into the sentence.
+- Include exactly 3 short `tiles` when students choose from a bank. The correct tile(s) must be included, plus plausible distractors.
 - If the visible prompt is `0.__`, the tile and accepted answer should be the missing part only, for example `"5"`, not `"0.5"`.
 - If more than one tile must be selected, include the same number of blank markers in the sentence.
 
