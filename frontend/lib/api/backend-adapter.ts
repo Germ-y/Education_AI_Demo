@@ -38,6 +38,10 @@ type BackendSeedContext = {
     status?: string;
     totalSteps?: number;
     updatedAt?: string | null;
+    latestAttemptStatus?: "in_progress" | "completed" | "abandoned" | null;
+    latestAttemptCurrentStep?: 1 | 2 | 3 | 4 | null;
+    latestAttemptCompletedAt?: string | null;
+    isCompleted?: boolean;
   }>;
 };
 
@@ -131,6 +135,10 @@ function normalizeSeedContext(seed: BackendSeedContext): SeedContext {
       contentId: mapping.contentId,
       status: mapping.status,
       updatedAt: mapping.updatedAt,
+      latestAttemptStatus: mapping.latestAttemptStatus,
+      latestAttemptCurrentStep: mapping.latestAttemptCurrentStep,
+      latestAttemptCompletedAt: mapping.latestAttemptCompletedAt,
+      isCompleted: mapping.isCompleted,
     })),
   };
 }
