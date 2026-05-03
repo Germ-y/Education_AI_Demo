@@ -69,7 +69,6 @@ type ReviewStageDraft = {
   realtimeStudentGoal?: string;
   realtimeRubric?: string[];
   realtimeAllowedFeedback?: string[];
-  realtimeMaxTurns?: number;
   realtimeMaxDurationSec?: number;
 };
 
@@ -97,6 +96,8 @@ const tabs: Array<{ id: DashboardTab; label: string; description: string }> = [
   { id: "materials", label: "자료 제안·검토", description: "AI 수업 자료 제안을 확인" },
   { id: "records", label: "학습 기록", description: "피드백과 관찰 기록" },
 ];
+
+const realtimeSpeakingTargetTurns = 3;
 
 const statusTone: Record<CaseStatus, string> = {
   intake: "bg-[#f1f5f9] text-[#475569] border-[#cbd5e1]",
@@ -436,7 +437,6 @@ function mapContentToReviewStages(content: MissionContent): ReviewStageDraft[] {
         realtimeStudentGoal: stage.realtimeSpec?.studentGoal,
         realtimeRubric: stage.realtimeSpec?.rubric.map((item) => item.label),
         realtimeAllowedFeedback: stage.realtimeSpec?.allowedFeedback,
-        realtimeMaxTurns: stage.realtimeSpec?.maxTurns,
         realtimeMaxDurationSec: stage.realtimeSpec?.maxDurationSec,
       };
     });
@@ -1804,7 +1804,7 @@ export default function DashboardPage() {
                                 <p className="text-xs font-black text-[#16803c]">발화 연습</p>
                                 <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#16803c]">
                                   {stage.realtimeMaxDurationSec ? `${stage.realtimeMaxDurationSec}초` : "실시간"}
-                                  {stage.realtimeMaxTurns ? ` · ${stage.realtimeMaxTurns}턴` : ""}
+                                  {` · 발화 ${realtimeSpeakingTargetTurns}회`}
                                 </span>
                               </div>
                               <p className="mt-2 text-sm font-black leading-6 text-[#172033]">
