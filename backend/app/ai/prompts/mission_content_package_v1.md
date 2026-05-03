@@ -336,13 +336,19 @@ Required:
 {
   "imageAssetId": "string",
   "audioAssetId": "string",
-  "question": "string",
+  "question": "string with an explicit blank marker such as __, [A], or [B]",
   "tiles": ["string"],
   "acceptedAnswers": [{ "key": "value" }],
   "correctFeedback": "string",
   "wrongFeedback": "string"
 }
 ```
+
+Rules:
+
+- The blank must be in `question` or `sentence`; do not rely on blanks drawn inside the image.
+- If the visible prompt is `0.__`, the tile and accepted answer should be the missing part only, for example `"5"`, not `"0.5"`.
+- If more than one tile must be selected, include the same number of blank markers in the sentence.
 
 ## Realtime Stage Rules
 

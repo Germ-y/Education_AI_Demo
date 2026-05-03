@@ -853,28 +853,29 @@ function FillBlankTemplate({
 }) {
   let blankIndex = 0;
   const hasSlots = slots.length > 0;
+  const fillParts = getFillBlankParts(question);
 
   return (
-    <div className="grid min-h-[360px] grid-rows-[auto_1fr_auto] gap-4 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-5 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]">
-      <div className="flex items-start justify-between gap-4">
-        {question.body && <p className="min-w-0 text-sm font-bold leading-6 text-[#596157]">{question.body}</p>}
+    <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-4 shadow-[inset_0_-8px_0_rgba(39,174,96,0.05)]">
+      <div className="flex items-start justify-between gap-3">
+        {question.body && <p className="min-w-0 text-sm font-bold leading-6 text-[#596157] line-clamp-2">{question.body}</p>}
         <button
           onClick={onReset}
           disabled={!hasSlots}
-          className="shrink-0 rounded-full border bg-white px-4 py-2 text-sm font-black shadow-sm transition disabled:opacity-35"
+          className="shrink-0 rounded-full border bg-white px-3 py-2 text-xs font-black shadow-sm transition disabled:opacity-35"
           style={{ borderColor: theme.border, color: theme.accentStrong }}
         >
           다시 채우기
         </button>
       </div>
 
-      <div className="flex items-center justify-center rounded-[20px] border border-[#dde6ee] bg-white px-4 py-6 text-center text-2xl font-black leading-[3rem] break-keep">
-        <div>
-        {question.fillBlankText?.map((part, index) => {
+      <div className="min-h-0 overflow-y-auto rounded-[20px] border border-[#dde6ee] bg-white px-4 py-5 text-center text-[1.35rem] font-black leading-9 break-keep">
+        <div className="mx-auto max-w-[26rem]">
+        {fillParts.map((part, index) => {
           if (part.kind === "text") return <span key={`${part.value}-${index}`}>{part.value}</span>;
           const value = slots[blankIndex++];
           return (
-            <span key={`${part.value}-${index}`} className="mx-1 inline-flex h-12 min-w-16 items-center justify-center rounded-[14px] border-2 border-dashed align-middle" style={{ borderColor: theme.accent, color: theme.accentStrong }}>
+            <span key={`${part.value}-${index}`} className="mx-1 inline-flex h-11 min-w-20 items-center justify-center rounded-[14px] border-2 border-dashed bg-[#f8fff3] px-3 align-middle text-xl" style={{ borderColor: theme.accent, color: theme.accentStrong }}>
               {value || ""}
             </span>
           );
@@ -882,12 +883,12 @@ function FillBlankTemplate({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 rounded-[20px] border border-[#f0dfb4] bg-[#fff9e8] p-3">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(82px,1fr))] gap-3 rounded-[20px] border border-[#f0dfb4] bg-[#fff9e8] p-3">
         {question.fillOptions?.map((option) => (
           <button
             key={option.id}
             onClick={() => onPick(option.id)}
-            className="h-16 rounded-[18px] border bg-white text-2xl font-black shadow-sm transition hover:-translate-y-0.5"
+            className="h-14 rounded-[16px] border bg-white px-2 text-xl font-black shadow-sm transition hover:-translate-y-0.5"
             style={{ borderColor: slots.includes(option.id) ? theme.accent : "#dde6ee" }}
           >
             {option.label}
@@ -896,6 +897,21 @@ function FillBlankTemplate({
       </div>
     </div>
   );
+}
+
+function getFillBlankParts(question: StageQuestion) {
+  const parts = question.fillBlankText ?? [];
+  if (parts.some((part) => part.kind === "blank")) return parts;
+
+  return [
+    { kind: "text" as const, value: "알맞은 값을 골라 " },
+    { kind: "blank" as const, value: "__" },
+    { kind: "text" as const, value: " 칸에 넣어보세요." },
+  ];
+}
+
+function getFillBlankCount(question: StageQuestion) {
+  return getFillBlankParts(question).filter((part) => part.kind === "blank").length;
 }
 
 function getRealtimePracticeCopy(scene: StudentContext["scene"], question: StageQuestion) {
@@ -1583,7 +1599,7 @@ export function StudentStageExperience({
   const fillBlank = (id: string) => {
     if (isStageComplete) return;
 
-    const blankCount = activeQuestion.fillBlankText?.filter((part) => part.kind === "blank").length ?? 0;
+    const blankCount = getFillBlankCount(activeQuestion);
     const nextAnswer = [...fillBlankAnswer, id].slice(0, blankCount);
     setFillBlankAnswer(nextAnswer);
 

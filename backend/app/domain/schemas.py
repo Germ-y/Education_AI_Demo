@@ -170,6 +170,9 @@ def _validate_template_json(template_type: TemplateType, template_json: dict[str
         if "acceptedAnswers" not in template_json and "answers" not in template_json:
             raise ValueError("blank_fill은 acceptedAnswers 또는 answers를 가져야 합니다.")
         _require_any_key(template_json, ["question", "sentence"], "blank_fill")
+        blank_sentence = str(template_json.get("sentence") or template_json.get("question") or "")
+        if "__" not in blank_sentence and "[A]" not in blank_sentence and "[B]" not in blank_sentence:
+            raise ValueError("blank_fill은 question 또는 sentence 안에 __, [A], [B] 중 하나의 빈칸 표시를 가져야 합니다.")
     if template_type in CHOICE_TEMPLATE_TYPES:
         _require_keys(template_json, ["question", "choices", "answer", "correctFeedback", "wrongFeedback"], template_type.value)
         _validate_choice_answer(template_json, template_type.value)
