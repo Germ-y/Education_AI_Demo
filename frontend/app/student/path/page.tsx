@@ -91,15 +91,15 @@ export default async function StudentHomePage({
   const caseQuery = `caseId=${encodeURIComponent(scene.caseId)}${scene.contentId ? `&contentId=${encodeURIComponent(scene.contentId)}` : ""}`;
 
   return (
-    <main className="relative flex h-screen overflow-hidden bg-[#e7edf4] p-4 text-[#1f211d]">
+    <main className="relative flex min-h-screen overflow-x-hidden bg-[#e7edf4] p-4 text-[#1f211d]">
       <Link
         href="/"
         className="fixed bottom-6 right-6 z-50 rounded-full border border-[#25466f] bg-[#1f3a5f] px-5 py-3 text-base font-black text-white shadow-[0_12px_30px_rgba(31,58,95,0.25)]"
       >
         홈으로
       </Link>
-      <div className="m-auto">
-        <div className="relative aspect-[4/3] h-[min(calc(100vh-32px),820px)] rounded-[44px] bg-[#202939] p-4 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+      <div className="m-auto w-full max-w-[1093px]">
+        <div className="relative aspect-[4/3] h-[min(calc(100vh-32px),820px)] w-full rounded-[44px] bg-[#202939] p-4 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
           <div className="absolute bottom-5 left-1/2 h-1.5 w-24 -translate-x-1/2 rounded-full bg-white/22" />
 
           <div className="h-full overflow-hidden rounded-[30px] bg-[#fbfaf4]">
@@ -123,7 +123,7 @@ export default async function StudentHomePage({
               <div className="h-10 w-10 shrink-0" aria-hidden="true" />
             </header>
 
-            <section className="relative grid h-[calc(100%-92px)] grid-cols-[300px_minmax(0,1fr)] gap-8 px-12 py-8">
+            <section className="relative grid h-[calc(100%-92px)] grid-cols-[280px_minmax(0,1fr)] gap-7 px-10 py-7">
               <div className="absolute left-0 top-16 h-64 w-64 rounded-full bg-[#fff0b8]/45 blur-3xl" />
               <div
                 className="absolute bottom-0 right-0 h-72 w-72 rounded-full blur-3xl"
@@ -155,10 +155,10 @@ export default async function StudentHomePage({
 
               <aside className="relative z-[1] flex translate-x-3 flex-col justify-center">
                 <p className="text-base font-black">{student.displayName}아,</p>
-                <h2 className="mt-2 max-w-[270px] text-3xl font-black leading-tight">
+                <h2 className="mt-2 max-w-[270px] text-3xl font-black leading-tight break-keep">
                   {scene.pathHeadline}
                 </h2>
-                <p className="mt-4 max-w-[260px] text-sm font-bold leading-6 text-[#676b62]">
+                <p className="mt-4 max-w-[260px] text-sm font-bold leading-6 break-keep text-[#676b62]">
                   {scene.pathDescription}
                 </p>
                 <div className="mt-5">
@@ -171,7 +171,7 @@ export default async function StudentHomePage({
                   <p className="text-sm font-black" style={{ color: theme.accent }}>
                     오늘의 미션
                   </p>
-                  <h3 className="mt-1 text-xl font-black">{scene.missionTitle}</h3>
+                  <h3 className="mt-1 line-clamp-2 text-xl font-black leading-snug break-keep">{scene.missionTitle}</h3>
                   <div className="mt-4 grid grid-cols-4 gap-2">
                     {scene.stages.map((stage) => (
                       <div
@@ -228,8 +228,8 @@ export default async function StudentHomePage({
                           className={`w-[172px] rounded-[18px] px-4 py-3 shadow-[0_14px_35px_rgba(40,47,35,0.10)] transition duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_18px_38px_rgba(40,47,35,0.16)] ${cardTone}`}
                           style={cardStyle}
                         >
-                          <p className="text-base font-black leading-5">{mission.title}</p>
-                          <p className="mt-1 text-xs font-bold leading-5 text-[#6d746c]">{mission.subtitle}</p>
+                          <p className="line-clamp-2 min-h-10 text-base font-black leading-5 break-keep">{mission.title}</p>
+                          <p className="mt-1 line-clamp-2 text-xs font-bold leading-5 break-keep text-[#6d746c]">{mission.subtitle}</p>
                         </div>
                       )}
                       <StageNode step={mission.step} state={nodeState} theme={theme} />
@@ -238,8 +238,8 @@ export default async function StudentHomePage({
                           className={`w-[172px] rounded-[18px] px-4 py-3 shadow-[0_14px_35px_rgba(40,47,35,0.10)] transition duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_18px_38px_rgba(40,47,35,0.16)] ${cardTone}`}
                           style={cardStyle}
                         >
-                          <p className="text-base font-black leading-5">{mission.title}</p>
-                          <p className="mt-1 text-xs font-bold leading-5 text-[#6d746c]">{mission.subtitle}</p>
+                          <p className="line-clamp-2 min-h-10 text-base font-black leading-5 break-keep">{mission.title}</p>
+                          <p className="mt-1 line-clamp-2 text-xs font-bold leading-5 break-keep text-[#6d746c]">{mission.subtitle}</p>
                         </div>
                       )}
                     </Link>

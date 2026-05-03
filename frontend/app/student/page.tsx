@@ -56,7 +56,7 @@ export default async function StudentStartPage({
   const heroAudio = scene.assets?.find((asset) => asset.assetRole === "hero" && asset.assetType === "audio" && asset.url);
 
   return (
-    <main className="relative flex h-screen overflow-hidden bg-[#e7edf4] p-4 text-[#1f211d]">
+    <main className="relative flex min-h-screen overflow-x-hidden bg-[#e7edf4] p-4 text-[#1f211d]">
       <Link
         href="/"
         className="fixed bottom-6 right-6 z-50 rounded-full border border-[#25466f] bg-[#1f3a5f] px-5 py-3 text-base font-black text-white shadow-[0_12px_30px_rgba(31,58,95,0.25)] transition duration-200 hover:-translate-y-0.5"
@@ -64,8 +64,8 @@ export default async function StudentStartPage({
         홈으로
       </Link>
 
-      <div className="m-auto">
-        <div className="relative aspect-[4/3] h-[min(calc(100vh-32px),820px)] rounded-[44px] bg-[#202939] p-4 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+      <div className="m-auto w-full max-w-[1093px]">
+        <div className="relative aspect-[4/3] h-[min(calc(100vh-32px),820px)] w-full rounded-[44px] bg-[#202939] p-4 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
           <div className="absolute bottom-5 left-1/2 h-1.5 w-24 -translate-x-1/2 rounded-full bg-white/22" />
 
           <div className="relative h-full overflow-hidden rounded-[30px] bg-[#fbfaf4]">
@@ -75,7 +75,7 @@ export default async function StudentStartPage({
               style={{ backgroundColor: `${theme.glow}b8` }}
             />
 
-            <div className="relative grid h-full grid-cols-[minmax(0,0.92fr)_minmax(360px,0.72fr)] gap-10 px-14 py-12">
+            <div className="relative grid h-full grid-cols-[minmax(0,0.92fr)_minmax(340px,0.72fr)] gap-8 px-12 py-10">
               <section className="flex min-h-0 flex-col justify-center">
                 <div
                   className="inline-flex w-fit rounded-full border px-5 py-2 text-base font-black"
@@ -87,10 +87,10 @@ export default async function StudentStartPage({
                 <p className="mt-10 text-lg font-black" style={{ color: theme.accentStrong }}>
                   오늘의 시작점
                 </p>
-                <h1 className="mt-3 max-w-[660px] text-6xl font-black leading-[1.08]">
+                <h1 className="mt-3 max-w-[660px] text-5xl font-black leading-[1.12] break-keep">
                   {nextStage.title}부터 열어볼까요?
                 </h1>
-                <p className="mt-6 max-w-[620px] text-xl font-bold leading-9 text-[#596157]">
+                <p className="mt-5 max-w-[620px] text-lg font-bold leading-8 break-keep text-[#596157]">
                   바로 문제로 뛰어들기 전에 오늘 할 미션만 짧게 보고 시작해요. 준비되면 학습하기를 눌러 길 화면으로 이동해요.
                 </p>
 
@@ -111,7 +111,7 @@ export default async function StudentStartPage({
 
                 <div className="mt-10 max-w-[620px]">
                   <div className="flex items-center justify-between text-sm font-black text-[#6d746c]">
-                    <span>{scene.missionTitle}</span>
+                    <span className="min-w-0 truncate">{scene.missionTitle}</span>
                     <span>
                       {scene.currentStep}/{scene.totalSteps}
                     </span>
@@ -131,7 +131,7 @@ export default async function StudentStartPage({
               </section>
 
               <aside className="flex min-h-0 items-center justify-center">
-                <div className="relative flex w-full max-w-[520px] flex-col items-center">
+                <div className="relative flex max-h-full w-full max-w-[560px] flex-col items-center">
                   {!heroImage?.url && (
                   <div className="mx-auto flex justify-center">
                     <StarterStar />
@@ -139,38 +139,42 @@ export default async function StudentStartPage({
                   )}
 
                   {heroImage?.url && (
-                    <div
-                      className="relative mt-4 w-full overflow-visible rounded-[28px] border bg-white p-3 shadow-[0_20px_54px_rgba(57,78,97,0.10)]"
-                      style={{ borderColor: theme.border }}
-                    >
-                      <div className="pointer-events-none absolute -right-12 -top-28 z-10 scale-[0.58]" aria-hidden="true">
-                        <StarterStar />
-                      </div>
-                      <Image
-                        src={heroImage.url}
-                        alt={heroImage.alt}
-                        width={960}
-                        height={640}
-                        className="h-[min(44vh,390px)] min-h-[300px] w-full rounded-[20px] bg-[#f8fafc] object-contain"
-                        unoptimized
-                        priority
-                      />
-                      {heroAudio?.url && (
-                        <div className="mt-3">
-                          <audio className="w-full" src={heroAudio.url} controls preload="auto" />
+                    <div className="mt-4 grid w-full grid-cols-[112px_minmax(0,1fr)] items-start gap-3">
+                      <div className="pointer-events-none relative h-[132px] w-[112px] overflow-visible" aria-hidden="true">
+                        <div className="absolute left-[-24px] top-0 origin-top-left scale-[0.52]">
+                          <StarterStar />
                         </div>
-                      )}
+                      </div>
+                      <div
+                        className="min-w-0 rounded-[28px] border bg-white p-3 shadow-[0_20px_54px_rgba(57,78,97,0.10)]"
+                        style={{ borderColor: theme.border }}
+                      >
+                        <Image
+                          src={heroImage.url}
+                          alt={heroImage.alt}
+                          width={960}
+                          height={640}
+                          className="h-[clamp(240px,34vh,340px)] w-full rounded-[20px] bg-[#f8fafc] object-contain"
+                          unoptimized
+                          priority
+                        />
+                        {heroAudio?.url && (
+                          <div className="mt-3">
+                            <audio className="w-full" src={heroAudio.url} controls preload="auto" />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                   <div
-                    className="mt-3 rounded-[26px] border px-7 py-6 shadow-[0_20px_54px_rgba(57,78,97,0.10)]"
+                    className="mt-3 rounded-[26px] border px-6 py-5 shadow-[0_20px_54px_rgba(57,78,97,0.10)]"
                     style={{ borderColor: theme.border, backgroundColor: `${theme.accentPale}f4` }}
                   >
                     <p className="text-sm font-black" style={{ color: theme.accentStrong }}>
                       오늘의 미션
                     </p>
-                    <h2 className="mt-2 text-4xl font-black leading-tight">{scene.missionTitle}</h2>
-                    <p className="mt-4 text-lg font-bold leading-8 text-[#596157]">{nextStage.subtitle}</p>
+                    <h2 className="mt-2 line-clamp-2 text-3xl font-black leading-tight break-keep">{scene.missionTitle}</h2>
+                    <p className="mt-3 line-clamp-3 text-base font-bold leading-7 break-keep text-[#596157]">{nextStage.subtitle}</p>
                   </div>
                 </div>
               </aside>

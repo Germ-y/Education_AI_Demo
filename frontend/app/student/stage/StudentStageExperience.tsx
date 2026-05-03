@@ -284,7 +284,7 @@ function StageMedia({
 
   return (
     <div
-      className={`overflow-hidden rounded-[20px] border bg-white shadow-sm ${full ? "flex h-full min-h-[300px] flex-col p-3" : compact ? "p-2" : "p-3"}`}
+      className={`overflow-hidden rounded-[20px] border bg-white shadow-sm ${full ? "flex h-full min-h-[280px] flex-col p-3" : compact ? "p-2" : "p-3"}`}
       style={{ borderColor: theme.border }}
     >
       {question.imageUrl && (
@@ -300,7 +300,7 @@ function StageMedia({
                 ? featured
                   ? "h-[clamp(180px,24vh,220px)]"
                   : "h-[clamp(96px,16vh,132px)]"
-                : "h-[clamp(320px,48vh,460px)]"
+                : "h-[clamp(260px,42vh,420px)]"
           }`}
           unoptimized
         />
@@ -1590,7 +1590,7 @@ export function StudentStageExperience({
   };
 
   return (
-    <main className="relative flex h-screen overflow-hidden bg-[#e7edf4] p-4 text-[#1f211d]">
+    <main className="relative flex min-h-screen overflow-x-hidden bg-[#e7edf4] p-4 text-[#1f211d]">
       {!previewMode && (
       <Link
         href="/"
@@ -1599,8 +1599,8 @@ export function StudentStageExperience({
         홈으로
       </Link>
       )}
-      <div className="m-auto">
-        <div className="relative aspect-[4/3] h-[min(calc(100vh-32px),820px)] rounded-[44px] bg-[#202939] p-4 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+      <div className="m-auto w-full max-w-[1093px]">
+        <div className="relative aspect-[4/3] h-[min(calc(100vh-32px),820px)] w-full rounded-[44px] bg-[#202939] p-4 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
           <div className="absolute bottom-5 left-1/2 h-1.5 w-24 -translate-x-1/2 rounded-full bg-white/22" />
 
           <div className="h-full overflow-hidden rounded-[30px] bg-[#fbfaf4]">
@@ -1642,10 +1642,10 @@ export function StudentStageExperience({
             </header>
 
             <section
-              className={`grid h-[calc(100%-92px)] gap-5 px-8 py-6 ${
+              className={`grid h-[calc(100%-92px)] gap-4 px-7 py-5 ${
                 ((activeQuestion.kind === "sequence" || activeQuestion.kind === "cardMatching") && !isFinished) || (isRealtimeStage && !isFinished)
                   ? "grid-cols-1"
-                  : "grid-cols-[minmax(0,1fr)_minmax(380px,0.62fr)]"
+                  : "grid-cols-[minmax(0,1fr)_minmax(350px,0.58fr)]"
               }`}
             >
               <div
@@ -1658,7 +1658,7 @@ export function StudentStageExperience({
                     <p className="text-sm font-black" style={{ color: theme.accent }}>
                       스테이지 {activeStage.step} · 시도 {attempts}회
                     </p>
-                    <h2 className="mt-1 text-3xl font-black leading-tight">
+                    <h2 className="mt-1 line-clamp-2 text-3xl font-black leading-tight break-keep">
                       {isFinished ? "훌륭해요!" : activeStage.title}
                     </h2>
                   </div>
@@ -1764,7 +1764,7 @@ export function StudentStageExperience({
                     style={{ borderColor: theme.highlight, backgroundColor: `${theme.highlight}99`, color: theme.highlightText }}
                   >
                     <HintStar />
-                    <p>
+                    <p className="line-clamp-2 break-keep">
                       {isFinished
                         ? "다시 해보거나 학습 길로 돌아갈 수 있어요."
                         : isRealtimeStage
@@ -1805,8 +1805,8 @@ export function StudentStageExperience({
                   isTransitioning ? "opacity-70 blur-[1px]" : "opacity-100 blur-0"
                 }`}
               >
-                <div className="relative self-center rounded-[24px] border border-[#dce5ec] bg-white p-5 shadow-[0_18px_48px_rgba(57,78,97,0.10)]">
-                  <h3 className="text-[1.35rem] font-black leading-snug break-keep">
+                <div className="relative min-h-0 self-center overflow-y-auto rounded-[24px] border border-[#dce5ec] bg-white p-5 shadow-[0_18px_48px_rgba(57,78,97,0.10)]">
+                  <h3 className="text-[1.2rem] font-black leading-snug break-keep">
                     {isFinished
                       ? `${scene.missionTitle}, 모두 완료했어요`
                       : isRealtimeStage
