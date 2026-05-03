@@ -633,6 +633,9 @@ export default function DashboardPage() {
   const feedbackTarget =
     feedbackQueue.find((record) => record.id === selectedFeedbackId) ?? feedbackQueue[0] ?? sessionLogs[0];
   const openReport = sessionLogs.find((record) => record.id === openReportId);
+  const openReportTeacherFeedback = openReport
+    ? savedFeedbackRecords.find((feedback) => feedback.recordId === openReport.id)
+    : null;
   const openReportStageStep = reportPreviewStep;
   const openReview = selectedReviewItems.find((item) => item.id === openReviewId);
   const openReviewStages = openReview ? (reviewStageDrafts[openReview.id] ?? mapContentToReviewStages(openReview.content)) : reviewStagePreviews;
@@ -1629,6 +1632,19 @@ export default function DashboardPage() {
                     {openReport.reflectionText ?? "아직 저장된 회고가 없습니다."}
                   </p>
                 </div>
+              </div>
+              <div className="mt-3 rounded-lg border border-[#cbd5e1] bg-white p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-bold text-[#1f3a5f]">선생님 리포트</p>
+                  {openReportTeacherFeedback && (
+                    <span className="rounded-full bg-[#eef4fb] px-3 py-1 text-xs font-black text-[#1f3a5f]">
+                      {openReportTeacherFeedback.savedAt}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">
+                  {openReportTeacherFeedback?.feedback ?? "아직 선생님 리포트가 저장되지 않았습니다."}
+                </p>
               </div>
             </div>
           </section>
