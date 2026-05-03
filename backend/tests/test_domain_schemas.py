@@ -143,6 +143,46 @@ def test_content_generation_output_accepts_direct_mission_content_schema() -> No
     assert len([asset for asset in mission.assets if asset.asset_type == "audio"]) == 5
 
 
+def test_content_generation_strips_unsupported_card_match_cards() -> None:
+    base_content = next(content for content in create_demo_database().mission_contents if content.student_id == "student_learning_fraction")
+    content = base_content.model_dump(by_alias=True)
+    content["id"] = "content_generated_card_match_cleanup"
+    content["status"] = "teacher_review"
+    content["approvedByUserId"] = None
+    content["approvedAt"] = None
+    content["publishedAt"] = None
+    for stage in content["stages"]:
+        stage["missionContentId"] = content["id"]
+    for asset in content["assets"]:
+        asset["missionContentId"] = content["id"]
+        asset["storageUrl"] = ""
+        asset["previewUrl"] = None
+        asset["qaStatus"] = "pending"
+        asset["approvalStatus"] = "pending"
+
+    stage = content["stages"][1]
+    stage["templateType"] = "card_match"
+    stage["templateJson"] = {
+        "imageAssetId": "asset_content_fraction_001_stage_2",
+        "audioAssetId": "asset_content_fraction_001_stage_2_audio",
+        "question": "같은 양끼리 이어 보세요.",
+        "leftCards": [{"id": "half", "text": "1/2"}, {"id": "quarter", "text": "1/4"}],
+        "rightCards": [{"id": "zero_five", "text": "0.5"}, {"id": "zero_two_five", "text": "0.25"}],
+        "cards": [
+            {"id": "extra_1", "text": "추가 카드 1"},
+            {"id": "extra_2", "text": "추가 카드 2"},
+            {"id": "extra_3", "text": "추가 카드 3"},
+        ],
+        "matches": {"half": "zero_five", "quarter": "zero_two_five"},
+        "correctFeedback": "좋아요. 같은 양을 잘 찾았어요.",
+        "wrongFeedback": "그림과 값을 다시 비교해 볼까요?",
+    }
+
+    mission = _mission_from_generation(content, student_id=base_content.student_id, case_id=base_content.case_id)
+
+    assert "cards" not in mission.stages[1].template_json
+
+
 def test_orchestrator_plan_quality_requires_track_matching_four_stage_flow() -> None:
     plan = _valid_learning_plan()
 

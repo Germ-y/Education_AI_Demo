@@ -105,6 +105,7 @@ When `caseFile.profile.profileJson.choiceCountLimit` is present:
 - If the limit is 2, create exactly 2 short choices for `scene_question`, `clue_question`, `applied_question`, `action_choice`, `explanation_choice`, and `wrong_explanation_fix`.
 - If the limit is 2, do not use `image_quiz`, because `image_quiz` requires exactly 3 choices.
 - If the limit is 2, `sequence_ordering.cards` must use exactly 2 cards.
+- If the limit is 2, `card_match.leftCards` and `card_match.rightCards` must each use exactly 2 cards, with exactly 2 entries in `matches`.
 
 Fixed `studentTitle` labels:
 
@@ -209,6 +210,11 @@ Required:
 ```
 
 ### `card_match`
+
+Use only `leftCards`, `rightCards`, and `matches`.
+Do not include a `cards`, `choices`, or `tiles` key in `card_match`.
+When `choiceCountLimit` is 2, create exactly 2 left cards and exactly 2 right cards.
+The `matches` object must have one entry for each left card.
 
 Required:
 

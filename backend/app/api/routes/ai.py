@@ -1,5 +1,6 @@
 import logging
 import time
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import ValidationError
@@ -311,6 +312,7 @@ def _run_content_agent(
 
 def _mission_from_generation(output_json: dict, *, student_id: str, case_id: str) -> MissionContent:
     candidate = output_json.get("missionContent") if isinstance(output_json.get("missionContent"), dict) else output_json
+    candidate = _normalize_generated_mission_candidate(candidate)
     try:
         mission = MissionContent.model_validate(candidate)
     except ValidationError as exc:
@@ -322,6 +324,34 @@ def _mission_from_generation(output_json: dict, *, student_id: str, case_id: str
     if mission.status != "teacher_review":
         raise ValueError("생성된 MissionContent.status는 teacher_review여야 합니다.")
     return mission
+
+
+def _normalize_generated_mission_candidate(candidate: Any) -> Any:
+    if not isinstance(candidate, dict):
+        return candidate
+
+    normalized = dict(candidate)
+    stages = normalized.get("stages")
+    if not isinstance(stages, list):
+        return normalized
+
+    normalized["stages"] = [_normalize_generated_stage(stage) for stage in stages]
+    return normalized
+
+
+def _normalize_generated_stage(stage: Any) -> Any:
+    if not isinstance(stage, dict):
+        return stage
+
+    normalized = dict(stage)
+    template_type = normalized.get("templateType")
+    template_json = normalized.get("templateJson")
+    if template_type == "card_match" and isinstance(template_json, dict):
+        normalized_template_json = dict(template_json)
+        for unsupported_key in ("cards", "choices", "tiles"):
+            normalized_template_json.pop(unsupported_key, None)
+        normalized["templateJson"] = normalized_template_json
+    return normalized
 
 
 def _generate_valid_mission_content(
