@@ -57,11 +57,20 @@ type ReviewStageDraft = {
   stageRole: string;
   templateType: string;
   assetRole: string;
+  isRealtimeStage: boolean;
   title: string;
   description: string;
   question: string;
   choices: string[];
   imagePrompt: string;
+  realtimePracticeTitle?: string;
+  realtimeSituationText?: string;
+  realtimeOpeningLine?: string;
+  realtimeStudentGoal?: string;
+  realtimeRubric?: string[];
+  realtimeAllowedFeedback?: string[];
+  realtimeMaxTurns?: number;
+  realtimeMaxDurationSec?: number;
 };
 
 type SessionLog = {
@@ -415,11 +424,20 @@ function mapContentToReviewStages(content: MissionContent): ReviewStageDraft[] {
         stageRole: stage.stageRole,
         templateType: stage.templateType,
         assetRole: role,
+        isRealtimeStage: stage.step === 4 || stage.stageRole === "realtime_practice",
         title: stage.studentTitle,
         description: stage.studentInstruction,
-        question,
-        choices: choicesFromTemplate(stage.templateJson),
+        question: stage.realtimeSpec?.studentGoal ?? question,
+        choices: stage.step === 4 || stage.stageRole === "realtime_practice" ? [] : choicesFromTemplate(stage.templateJson),
         imagePrompt,
+        realtimePracticeTitle: stage.realtimeSpec?.practiceTitle,
+        realtimeSituationText: stage.realtimeSpec?.situationText,
+        realtimeOpeningLine: stage.realtimeSpec?.openingLine,
+        realtimeStudentGoal: stage.realtimeSpec?.studentGoal,
+        realtimeRubric: stage.realtimeSpec?.rubric.map((item) => item.label),
+        realtimeAllowedFeedback: stage.realtimeSpec?.allowedFeedback,
+        realtimeMaxTurns: stage.realtimeSpec?.maxTurns,
+        realtimeMaxDurationSec: stage.realtimeSpec?.maxDurationSec,
       };
     });
 }
@@ -1761,7 +1779,9 @@ export default function DashboardPage() {
                               </>
                             )}
 
-                            <p className="mt-4 text-xs font-black text-[#64748b]">문제</p>
+                            <p className="mt-4 text-xs font-black text-[#64748b]">
+                              {stage.isRealtimeStage ? "발화 목표" : "문제"}
+                            </p>
                             {isReviewEditing ? (
                               <input
                                 className="mt-2 w-full rounded-md border border-[#cbd5e1] bg-[#fbfcfe] px-3 py-2 text-sm font-black outline-none focus:border-[#1f3a5f]"
@@ -1777,6 +1797,61 @@ export default function DashboardPage() {
                               <p className="mt-2 text-base font-black leading-7 text-[#172033]">{stage.question}</p>
                             )}
                           </div>
+
+                          {stage.isRealtimeStage && (
+                            <div className="rounded-md border border-[#d8e8d2] bg-[#f7fcf4] p-4">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs font-black text-[#16803c]">발화 연습</p>
+                                <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#16803c]">
+                                  {stage.realtimeMaxDurationSec ? `${stage.realtimeMaxDurationSec}초` : "실시간"}
+                                  {stage.realtimeMaxTurns ? ` · ${stage.realtimeMaxTurns}턴` : ""}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-sm font-black leading-6 text-[#172033]">
+                                {stage.realtimePracticeTitle ?? stage.title}
+                              </p>
+                              {stage.realtimeSituationText && (
+                                <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">
+                                  {stage.realtimeSituationText}
+                                </p>
+                              )}
+                              {stage.realtimeOpeningLine && (
+                                <div className="mt-3 rounded-md bg-white px-3 py-2">
+                                  <p className="text-xs font-black text-[#64748b]">시작 멘트</p>
+                                  <p className="mt-1 text-sm font-bold leading-6 text-[#334155]">
+                                    {stage.realtimeOpeningLine}
+                                  </p>
+                                </div>
+                              )}
+                              {stage.realtimeRubric && stage.realtimeRubric.length > 0 && (
+                                <div className="mt-3 rounded-md bg-white px-3 py-2">
+                                  <p className="text-xs font-black text-[#64748b]">확인할 점</p>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {stage.realtimeRubric.map((rubric) => (
+                                      <span
+                                        key={rubric}
+                                        className="rounded-full border border-[#d9ebc9] bg-[#f4fbef] px-3 py-1 text-xs font-black text-[#16803c]"
+                                      >
+                                        {rubric}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {stage.realtimeAllowedFeedback && stage.realtimeAllowedFeedback.length > 0 && (
+                                <div className="mt-3 rounded-md bg-white px-3 py-2">
+                                  <p className="text-xs font-black text-[#64748b]">피드백 예시</p>
+                                  <div className="mt-2 space-y-1">
+                                    {stage.realtimeAllowedFeedback.map((feedback) => (
+                                      <p key={feedback} className="text-sm font-semibold leading-6 text-[#334155]">
+                                        {feedback}
+                                      </p>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                           <div className="rounded-md bg-white p-4">
                             <p className="text-xs font-black text-[#64748b]">이미지·음성</p>
@@ -1802,6 +1877,7 @@ export default function DashboardPage() {
                             </div>
                           </div>
 
+                          {!stage.isRealtimeStage && (
                           <div className="rounded-md bg-white p-4">
                             <p className="text-xs font-black text-[#64748b]">선택지</p>
                             <div className="mt-2 space-y-2">
@@ -1835,6 +1911,7 @@ export default function DashboardPage() {
                               )}
                             </div>
                           </div>
+                          )}
                         </div>
                       </div>
                     </section>
