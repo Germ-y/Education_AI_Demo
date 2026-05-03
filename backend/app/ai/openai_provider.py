@@ -1,5 +1,7 @@
 import base64
 import json
+import logging
+import time
 from pathlib import Path
 from typing import Any
 
@@ -7,6 +9,8 @@ import httpx
 
 from app.ai.provider_errors import ProviderConfigurationError, ProviderOutputError, ProviderRequestError
 from app.core.config import Settings
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAiProvider:
@@ -24,6 +28,8 @@ class OpenAiProvider:
         if not self.settings.openai_api_key:
             raise ProviderConfigurationError("OPENAI_API_KEY_MISSING", "OPENAI_API_KEY가 없어 실제 AI 생성을 실행할 수 없습니다.")
 
+        started_at = time.perf_counter()
+        logger.info("openai.responses.started model=%s timeout_sec=%s", model, timeout_sec)
         payload = {
             "model": model,
             "instructions": instructions,
@@ -31,6 +37,7 @@ class OpenAiProvider:
             "store": True,
         }
         response = self._post("/v1/responses", payload, timeout_sec=timeout_sec)
+        logger.info("openai.responses.returned model=%s elapsed_sec=%.1f", model, time.perf_counter() - started_at)
         output_text = _extract_output_text(response)
         try:
             parsed = json.loads(output_text)
@@ -94,11 +101,14 @@ class OpenAiProvider:
         if not self.settings.openai_api_key:
             raise ProviderConfigurationError("OPENAI_API_KEY_MISSING", "OPENAI_API_KEY가 없어 이미지 생성을 실행할 수 없습니다.")
 
+        started_at = time.perf_counter()
+        logger.info("openai.image.started model=%s size=%s output_path=%s", model, size, output_path)
         data = self._post(
             "/v1/images/generations",
             {"model": model, "prompt": prompt, "n": 1, "size": size, "quality": "high", "output_format": "png"},
             timeout_sec=timeout_sec,
         )
+        logger.info("openai.image.returned model=%s output_path=%s elapsed_sec=%.1f", model, output_path, time.perf_counter() - started_at)
         images = data.get("data")
         if not isinstance(images, list) or not images or not isinstance(images[0], dict):
             raise ProviderOutputError("OPENAI_IMAGE_DATA_MISSING", "OpenAI 이미지 응답에 data[0]가 없습니다.")

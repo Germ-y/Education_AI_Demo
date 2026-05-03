@@ -1,3 +1,6 @@
+import logging
+import time
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import ValidationError
 
@@ -14,6 +17,7 @@ from app.services.store import DemoStore, SessionPrincipal
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 MAX_CONTENT_GENERATION_ATTEMPTS = 2
+logger = logging.getLogger(__name__)
 
 
 @router.post("/orchestrator-runs")
@@ -46,6 +50,14 @@ def create_orchestrator_run(
         output_schema_name=spec.output_schema_name,
         input_snapshot=input_snapshot,
         model=settings.openai_reasoning_model,
+    )
+    logger.info(
+        "ai.orchestrator.queued run_id=%s student_id=%s case_id=%s content_type=%s goal=%r",
+        agent_run.id,
+        payload.student_id,
+        payload.case_id,
+        payload.content_type,
+        payload.requested_goal,
     )
 
     content_type = str(payload.content_type or case_file["profile"]["studentType"])
@@ -107,6 +119,13 @@ def create_content_generation(
         input_snapshot=input_snapshot,
         model=settings.openai_reasoning_model,
     )
+    logger.info(
+        "ai.content.queued run_id=%s student_id=%s case_id=%s orchestrator_run_id=%s",
+        agent_run.id,
+        payload.student_id,
+        payload.case_id,
+        payload.orchestrator_run_id,
+    )
 
     background_tasks.add_task(
         _run_content_agent,
@@ -166,6 +185,14 @@ def _run_orchestrator_agent(
     content_type: str,
     agent_runs: AgentRunRepository,
 ) -> None:
+    started_at = time.perf_counter()
+    logger.info(
+        "ai.orchestrator.started run_id=%s student_id=%s case_id=%s content_type=%s",
+        agent_run_id,
+        student_id,
+        case_id,
+        content_type,
+    )
     try:
         output_json, token_usage = OpenAiProvider(settings).create_json_response(
             model=settings.openai_reasoning_model,
@@ -179,9 +206,22 @@ def _run_orchestrator_agent(
             content_type=content_type,
         )
     except AiProviderError as exc:
+        logger.warning(
+            "ai.orchestrator.failed run_id=%s code=%s elapsed_sec=%.1f message=%s",
+            agent_run_id,
+            exc.code,
+            time.perf_counter() - started_at,
+            exc.message,
+        )
         agent_runs.mark_failed(agent_run_id, error_code=exc.code, error_message=exc.message, review_required=True)
         return
     except ContentQualityError as exc:
+        logger.warning(
+            "ai.orchestrator.quality_failed run_id=%s elapsed_sec=%.1f issues=%s",
+            agent_run_id,
+            time.perf_counter() - started_at,
+            exc.issues,
+        )
         agent_runs.mark_failed(
             agent_run_id,
             error_code="ORCHESTRATOR_PLAN_QUALITY_INVALID",
@@ -191,6 +231,11 @@ def _run_orchestrator_agent(
         return
 
     agent_runs.mark_succeeded(agent_run_id, output_json=output_json, token_usage=token_usage)
+    logger.info(
+        "ai.orchestrator.succeeded run_id=%s elapsed_sec=%.1f",
+        agent_run_id,
+        time.perf_counter() - started_at,
+    )
 
 
 def _run_content_agent(
@@ -204,6 +249,13 @@ def _run_content_agent(
     demo_store: DemoStore,
     agent_runs: AgentRunRepository,
 ) -> None:
+    started_at = time.perf_counter()
+    logger.info(
+        "ai.content.started run_id=%s student_id=%s case_id=%s",
+        agent_run_id,
+        student_id,
+        case_id,
+    )
     try:
         mission, output_json, token_usage = _generate_valid_mission_content(
             settings=settings,
@@ -214,9 +266,22 @@ def _run_content_agent(
             orchestrator_plan=orchestrator_plan,
         )
     except AiProviderError as exc:
+        logger.warning(
+            "ai.content.failed run_id=%s code=%s elapsed_sec=%.1f message=%s",
+            agent_run_id,
+            exc.code,
+            time.perf_counter() - started_at,
+            exc.message,
+        )
         agent_runs.mark_failed(agent_run_id, error_code=exc.code, error_message=exc.message, review_required=True)
         return
     except ContentQualityError as exc:
+        logger.warning(
+            "ai.content.quality_failed run_id=%s elapsed_sec=%.1f issues=%s",
+            agent_run_id,
+            time.perf_counter() - started_at,
+            exc.issues,
+        )
         agent_runs.mark_failed(
             agent_run_id,
             error_code="MISSION_CONTENT_QUALITY_INVALID",
@@ -225,11 +290,23 @@ def _run_content_agent(
         )
         return
     except ValueError as exc:
+        logger.warning(
+            "ai.content.schema_failed run_id=%s elapsed_sec=%.1f error=%s",
+            agent_run_id,
+            time.perf_counter() - started_at,
+            exc,
+        )
         agent_runs.mark_failed(agent_run_id, error_code="MISSION_CONTENT_SCHEMA_INVALID", error_message=str(exc), review_required=True)
         return
 
     demo_store.save_generated_mission_content(mission)
     agent_runs.mark_succeeded(agent_run_id, output_json=output_json, token_usage=token_usage)
+    logger.info(
+        "ai.content.succeeded run_id=%s content_id=%s elapsed_sec=%.1f",
+        agent_run_id,
+        mission.id,
+        time.perf_counter() - started_at,
+    )
 
 
 def _mission_from_generation(output_json: dict, *, student_id: str, case_id: str) -> MissionContent:
@@ -263,6 +340,7 @@ def _generate_valid_mission_content(
     validation_errors: list[str] = []
 
     for attempt in range(1, MAX_CONTENT_GENERATION_ATTEMPTS + 1):
+        attempt_started_at = time.perf_counter()
         generation_snapshot = input_snapshot
         if attempt > 1:
             generation_snapshot = {
@@ -275,23 +353,58 @@ def _generate_valid_mission_content(
                 },
             }
 
+        logger.info(
+            "ai.content.attempt_started student_id=%s case_id=%s attempt=%s/%s",
+            student_id,
+            case_id,
+            attempt,
+            MAX_CONTENT_GENERATION_ATTEMPTS,
+        )
         output_json, token_usage = provider.create_json_response(
             model=settings.openai_reasoning_model,
             instructions=instructions,
             input_snapshot=generation_snapshot,
+        )
+        logger.info(
+            "ai.content.attempt_model_returned student_id=%s case_id=%s attempt=%s elapsed_sec=%.1f",
+            student_id,
+            case_id,
+            attempt,
+            time.perf_counter() - attempt_started_at,
         )
         attempt_usages.append(token_usage)
         previous_output = output_json
         try:
             mission = _mission_from_generation(output_json, student_id=student_id, case_id=case_id)
             validate_mission_content_quality(mission, case_file=case_file, orchestrator_plan=orchestrator_plan)
+            logger.info(
+                "ai.content.attempt_validated student_id=%s case_id=%s attempt=%s content_id=%s",
+                student_id,
+                case_id,
+                attempt,
+                mission.id,
+            )
             return mission, output_json, _merge_token_usage(attempt_usages)
         except ContentQualityError as exc:
             validation_errors = exc.issues
+            logger.warning(
+                "ai.content.attempt_quality_invalid student_id=%s case_id=%s attempt=%s issues=%s",
+                student_id,
+                case_id,
+                attempt,
+                validation_errors,
+            )
             if attempt == MAX_CONTENT_GENERATION_ATTEMPTS:
                 raise
         except ValueError as exc:
             validation_errors = [str(exc)]
+            logger.warning(
+                "ai.content.attempt_schema_invalid student_id=%s case_id=%s attempt=%s error=%s",
+                student_id,
+                case_id,
+                attempt,
+                exc,
+            )
             if attempt == MAX_CONTENT_GENERATION_ATTEMPTS:
                 raise
 

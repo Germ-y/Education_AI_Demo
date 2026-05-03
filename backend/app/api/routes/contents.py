@@ -1,3 +1,5 @@
+import logging
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +15,7 @@ from app.domain.schemas import ContentApprovalRequest, ContentRejectRequest, Con
 from app.services.store import DemoStore, SessionPrincipal
 
 router = APIRouter(prefix="/api/contents", tags=["contents"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/{content_id}")
@@ -143,6 +146,13 @@ def generate_content_asset_package(
     _validate_required_asset_package(content)
     _preflight_provider_keys(content)
 
+    package_started_at = time.perf_counter()
+    logger.info(
+        "contents.assets.package_started content_id=%s student_id=%s asset_count=%s",
+        content.id,
+        content.student_id,
+        len(content.assets),
+    )
     generated = []
     for asset in sorted(content.assets, key=lambda item: (item.asset_type, item.asset_role, item.id)):
         _generate_asset_or_raise(content_id, asset)
@@ -157,6 +167,12 @@ def generate_content_asset_package(
         resource_type="mission_content",
         resource_id=content.id,
         payload_json={"generatedCount": len(generated)},
+    )
+    logger.info(
+        "contents.assets.package_succeeded content_id=%s generated_count=%s elapsed_sec=%.1f",
+        content.id,
+        len(generated),
+        time.perf_counter() - package_started_at,
     )
     return ok({"contentId": content.id, "generatedCount": len(generated), "assets": generated})
 

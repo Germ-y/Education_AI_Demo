@@ -1,9 +1,13 @@
+import logging
+import time
 from pathlib import Path
 
 import httpx
 
 from app.ai.provider_errors import ProviderConfigurationError, ProviderOutputError, ProviderRequestError
 from app.core.config import Settings
+
+logger = logging.getLogger(__name__)
 
 
 class ElevenLabsProvider:
@@ -21,6 +25,8 @@ class ElevenLabsProvider:
             "model_id": "eleven_multilingual_v2",
             "voice_settings": {"stability": 0.55, "similarity_boost": 0.8},
         }
+        started_at = time.perf_counter()
+        logger.info("elevenlabs.speech.started output_path=%s text_length=%s timeout_sec=%s", output_path, len(source_text), timeout_sec)
         url = f"https://api.elevenlabs.io/v1/text-to-speech/{self.settings.elevenlabs_voice_id}"
         try:
             with httpx.Client(timeout=timeout_sec) as client:
@@ -39,4 +45,10 @@ class ElevenLabsProvider:
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(response.content)
+        logger.info(
+            "elevenlabs.speech.returned output_path=%s bytes=%s elapsed_sec=%.1f",
+            output_path,
+            len(response.content),
+            time.perf_counter() - started_at,
+        )
         return output_path
