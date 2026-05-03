@@ -205,11 +205,15 @@ function inferVisualKind(mission: MissionContent, missionText: string): SceneVis
 }
 
 async function getMissionForRoute(contentId: string, options: { allowReviewable: boolean }) {
+  if (options.allowReviewable) {
+    return await getReviewableContent(contentId);
+  }
+
   try {
     return await getStudentMission(contentId);
   } catch (error) {
     const content = await getReviewableContent(contentId);
-    if (options.allowReviewable || content.status === "published") {
+    if (content.status === "published") {
       return content;
     }
     throw error;
@@ -340,8 +344,8 @@ function readAnswer(templateType: TemplateType, template: Record<string, unknown
   if (typeof template.answer === "string") return readChoiceTextById(template, template.answer) ?? template.answer;
   if (Array.isArray(template.answerOrder)) return template.answerOrder.map(String).join(">");
   if (templateType === "blank_fill") {
-    const answer = readAcceptedFractionAnswer(template);
-    if (answer) return `${answer.numerator}|${answer.denominator}`;
+    const answerValues = readAcceptedBlankValues(template);
+    if (answerValues.length > 0) return answerValues.join("|");
   }
   return undefined;
 }
@@ -350,7 +354,7 @@ function readRuntimeCorrectAnswer(templateType: TemplateType, template: Record<s
   if (typeof template.answer === "string") return { choiceId: template.answer };
   if (Array.isArray(template.answerOrder)) return { order: template.answerOrder.map(String) };
   if (templateType === "blank_fill") {
-    const answer = readAcceptedFractionAnswer(template);
+    const answer = readAcceptedBlankAnswer(template);
     if (answer) return answer;
   }
   return undefined;
@@ -418,12 +422,24 @@ function readMatchingPairs(template: Record<string, unknown>) {
   const leftCards = template.leftCards;
   const rightCards = template.rightCards;
   const matches = template.matches;
-  if (!Array.isArray(leftCards) || !Array.isArray(rightCards) || !Array.isArray(matches)) return undefined;
+  if (!Array.isArray(leftCards) || !Array.isArray(rightCards)) return undefined;
 
-  return matches
+  const matchEntries = Array.isArray(matches)
+    ? matches
+        .map((pair) => {
+          if (!pair || typeof pair !== "object") return null;
+          if (!("leftId" in pair) || !("rightId" in pair)) return null;
+          return { leftId: String(pair.leftId), rightId: String(pair.rightId) };
+        })
+        .filter((item): item is { leftId: string; rightId: string } => Boolean(item))
+    : matches && typeof matches === "object"
+      ? Object.entries(matches).map(([leftId, rightId]) => ({ leftId, rightId: String(rightId) }))
+      : [];
+
+  if (matchEntries.length === 0) return undefined;
+
+  return matchEntries
     .map((pair) => {
-      if (!pair || typeof pair !== "object") return null;
-      if (!("leftId" in pair) || !("rightId" in pair)) return null;
       const left = findCardLabel(leftCards, String(pair.leftId));
       const right = findCardLabel(rightCards, String(pair.rightId));
       if (!left || !right) return null;
@@ -449,10 +465,22 @@ function readFillBlankText(template: Record<string, unknown>) {
   const sentence = readString(template.sentence) ?? readString(template.question);
   if (!sentence) return undefined;
 
-  return sentence.split(/(__|\[A\]|\[B\])/g).map((part) => ({
+  const parts = sentence.split(/(__|\[A\]|\[B\])/g).map((part) => ({
     kind: part === "__" || part === "[A]" || part === "[B]" ? "blank" as const : "text" as const,
     value: part,
   }));
+  if (parts.some((part) => part.kind === "blank")) return parts;
+
+  const acceptedValues = readAcceptedBlankValues(template);
+  if (acceptedValues.length === 0) return parts;
+
+  return [
+    { kind: "text" as const, value: "알맞은 값을 골라 " },
+    ...acceptedValues.flatMap((_, index) => [
+      { kind: "blank" as const, value: `blank_${index + 1}` },
+      { kind: "text" as const, value: index === acceptedValues.length - 1 ? " 칸에 넣어보세요." : " " },
+    ]),
+  ];
 }
 
 function readFillOptions(template: Record<string, unknown>) {
@@ -461,30 +489,43 @@ function readFillOptions(template: Record<string, unknown>) {
     return tiles.filter((tile): tile is string => typeof tile === "string").map((tile) => ({ id: tile, label: tile }));
   }
 
-  const answer = readAcceptedFractionAnswer(template);
-  if (answer) {
-    const values = [answer.numerator, answer.denominator].filter(
-      (value): value is string => typeof value === "string" && value.length > 0,
-    );
-
-    return Array.from(new Set(values)).map((value) => ({
-      id: value,
-      label: value,
-    }));
+  const values = readAcceptedBlankValues(template);
+  if (values.length > 0) {
+    return Array.from(new Set(values)).map((value) => ({ id: value, label: value }));
   }
 
   return undefined;
 }
 
-function readAcceptedFractionAnswer(template: Record<string, unknown>) {
+function readAcceptedBlankAnswer(template: Record<string, unknown>) {
   const acceptedAnswers = template.acceptedAnswers;
   if (!Array.isArray(acceptedAnswers)) return undefined;
 
   const first = acceptedAnswers[0];
-  if (!first || typeof first !== "object" || !("numerator" in first) || !("denominator" in first)) return undefined;
+  if (!first || typeof first !== "object") return undefined;
+  return first as Record<string, unknown>;
+}
 
-  return {
-    numerator: String(first.numerator),
-    denominator: String(first.denominator),
-  };
+function readAcceptedBlankValues(template: Record<string, unknown>) {
+  const answer = readAcceptedBlankAnswer(template);
+  if (!answer) return [];
+
+  const question = readString(template.sentence) ?? readString(template.question) ?? "";
+  if ("numerator" in answer && "denominator" in answer) {
+    return [answer.numerator, answer.denominator]
+      .map((value) => normalizeAcceptedBlankValue(String(value), question))
+      .filter((value) => value.length > 0);
+  }
+
+  return Object.values(answer)
+    .map((value) => normalizeAcceptedBlankValue(String(value), question))
+    .filter((value) => value.length > 0);
+}
+
+function normalizeAcceptedBlankValue(value: string, question: string) {
+  const trimmed = value.trim();
+  if (/0\.__/.test(question) && /^0\.\d+$/.test(trimmed)) {
+    return trimmed.slice(2);
+  }
+  return trimmed;
 }
