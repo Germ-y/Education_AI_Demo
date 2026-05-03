@@ -139,14 +139,14 @@ export default async function StudentStartPage({
                   )}
 
                   {heroImage?.url && (
-                    <div className="mt-4 grid w-full grid-cols-[112px_minmax(0,1fr)] items-start gap-3">
-                      <div className="pointer-events-none relative h-[132px] w-[112px] overflow-visible" aria-hidden="true">
-                        <div className="absolute left-[-24px] top-0 origin-top-left scale-[0.52]">
+                    <div className="relative mt-4 w-full max-w-[460px] self-end">
+                      <div className="pointer-events-none absolute -left-44 top-0 h-[132px] w-[132px] overflow-visible" aria-hidden="true">
+                        <div className="absolute left-0 top-0 origin-top-left scale-[0.52]">
                           <StarterStar />
                         </div>
                       </div>
                       <div
-                        className="min-w-0 rounded-[28px] border bg-white p-3 shadow-[0_20px_54px_rgba(57,78,97,0.10)]"
+                        className="relative rounded-[28px] border bg-white p-3 shadow-[0_20px_54px_rgba(57,78,97,0.10)]"
                         style={{ borderColor: theme.border }}
                       >
                         <Image
