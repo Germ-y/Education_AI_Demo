@@ -927,6 +927,7 @@ function RealtimePracticeRoom({
   const minimumStudentTurns = 3;
   const [draft, setDraft] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechMessage, setSpeechMessage] = useState("마이크를 누르고 직접 말해보세요.");
   const [studentTurns, setStudentTurns] = useState(0);
   const [messages, setMessages] = useState<Array<{ id: number; role: "partner" | "student"; text: string }>>([
     { id: 1, role: "partner", text: practice.sceneLine },
@@ -935,6 +936,31 @@ function RealtimePracticeRoom({
   ]);
   const messageListRef = useRef<HTMLDivElement>(null);
   const hasUserSubmittedRef = useRef(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+  type SpeechRecognitionResultLike = ArrayLike<{ transcript: string }> & {
+    isFinal?: boolean;
+  };
+  type SpeechRecognitionEventLike = {
+    resultIndex?: number;
+    results: ArrayLike<SpeechRecognitionResultLike>;
+  };
+  type SpeechRecognitionLike = {
+    lang: string;
+    continuous: boolean;
+    interimResults: boolean;
+    maxAlternatives: number;
+    onstart: (() => void) | null;
+    onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+    onend: (() => void) | null;
+    onerror: ((event?: { error?: string }) => void) | null;
+    start: () => void;
+    stop: () => void;
+  };
+  type SpeechRecognitionWindow = Window & {
+    SpeechRecognition?: new () => SpeechRecognitionLike;
+    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+  };
 
   useEffect(() => {
     if (!hasUserSubmittedRef.current) return;
@@ -971,51 +997,66 @@ function RealtimePracticeRoom({
   };
 
   const startSpeechInput = () => {
-    const spokenText = practice.studentLine;
-    type SpeechRecognitionEventLike = {
-      results: ArrayLike<ArrayLike<{ transcript: string }>>;
-    };
-    type SpeechRecognitionLike = {
-      lang: string;
-      interimResults: boolean;
-      maxAlternatives: number;
-      onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-      onend: (() => void) | null;
-      onerror: (() => void) | null;
-      start: () => void;
-    };
-    type SpeechRecognitionWindow = Window & {
-      SpeechRecognition?: new () => SpeechRecognitionLike;
-      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
-    };
+    if (isSpeaking) {
+      recognitionRef.current?.stop();
+      setSpeechMessage("듣기를 멈췄어요. 인식된 문장을 확인해 보세요.");
+      return;
+    }
+
     const Recognition =
       (window as SpeechRecognitionWindow).SpeechRecognition ??
       (window as SpeechRecognitionWindow).webkitSpeechRecognition;
 
-    setIsSpeaking(true);
-
-    if (Recognition) {
-      const recognition = new Recognition();
-      recognition.lang = "ko-KR";
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-      recognition.onresult = (event) => {
-        const transcript = event.results[0]?.[0]?.transcript;
-        if (transcript) setDraft(transcript);
-      };
-      recognition.onend = () => setIsSpeaking(false);
-      recognition.onerror = () => {
-        setIsSpeaking(false);
-        setDraft(spokenText);
-      };
-      recognition.start();
+    if (!Recognition) {
+      setSpeechMessage("이 브라우저에서는 말로 입력하기를 지원하지 않아요. 문장을 직접 입력해 주세요.");
       return;
     }
 
-    window.setTimeout(() => {
+    try {
+      const recognition = new Recognition();
+      recognitionRef.current = recognition;
+      recognition.lang = "ko-KR";
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+      recognition.onstart = () => {
+        setIsSpeaking(true);
+        setSpeechMessage("듣는 중이에요. 천천히 말해보세요.");
+      };
+      recognition.onresult = (event) => {
+        let transcript = "";
+        const startIndex = event.resultIndex ?? 0;
+
+        for (let index = startIndex; index < event.results.length; index += 1) {
+          transcript += event.results[index]?.[0]?.transcript ?? "";
+        }
+
+        const normalized = transcript.trim();
+        if (normalized) {
+          setDraft(normalized);
+          setSpeechMessage("말한 내용을 입력했어요. 필요하면 고친 뒤 보내세요.");
+        }
+      };
+      recognition.onend = () => {
+        setIsSpeaking(false);
+        recognitionRef.current = null;
+      };
+      recognition.onerror = (event) => {
+        setIsSpeaking(false);
+        recognitionRef.current = null;
+        setSpeechMessage(
+          event?.error === "not-allowed"
+            ? "마이크 권한이 필요해요. 브라우저에서 마이크 허용을 켜 주세요."
+            : "말을 잘 듣지 못했어요. 마이크를 다시 누르고 말해보세요.",
+        );
+      };
+      recognition.start();
+      return;
+    } catch {
       setIsSpeaking(false);
-      setDraft(spokenText);
-    }, 520);
+      recognitionRef.current = null;
+      setSpeechMessage("마이크를 시작하지 못했어요. 브라우저 권한을 확인해 주세요.");
+    }
   };
 
   return (
@@ -1129,8 +1170,8 @@ function RealtimePracticeRoom({
               onClick={startSpeechInput}
               className="flex h-12 w-12 items-center justify-center rounded-full border border-[#dce5ec] bg-white shadow-sm transition hover:-translate-y-0.5"
               style={{ color: isSpeaking ? theme.accentStrong : "#475569" }}
-              aria-label="말로 입력하기"
-              title={isSpeaking ? "듣는 중" : "말로 입력하기"}
+              aria-label={isSpeaking ? "말 입력 멈추기" : "말로 입력하기"}
+              title={isSpeaking ? "말 입력 멈추기" : "말로 입력하기"}
             >
               <span className="relative flex h-6 w-6 items-center justify-center" aria-hidden="true">
                 <span className="absolute top-0 h-3.5 w-2.5 rounded-full border-2 border-current" />
@@ -1155,6 +1196,7 @@ function RealtimePracticeRoom({
               보내기
             </button>
           </div>
+          <p className="mt-2 text-xs font-bold leading-5 text-[#64748b]">{speechMessage}</p>
         </form>
       </div>
     </div>
