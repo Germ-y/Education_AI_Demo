@@ -7,22 +7,21 @@ description: EduYJ 학생 미션 콘텐츠, 이미지 패키지, 1~3단계 템�
 
 먼저 볼 문서:
 
-- `docs/common/04-child-content-experience.md`
-- `docs/common/05-ai-content-template-spec.md`
-- `docs/common/06-realtime-practice-spec.md`
-- `docs/common/07-image-content-package-spec.md`
-- `docs/common/02-branch-handoff-contract.md`
+- `docs/HANDOFF.md`
+- `docs/API.md`
 
 ## 반드시 지킬 것
 
 - 학생 미션은 화면 기준 4단계다.
 - 1~3단계는 교사가 승인한 정적 템플릿 JSON이다.
 - 4단계는 `RealtimePracticeSpec`을 사용하는 realtime 연습이다.
-- 회고는 4단계 이후에 붙는 후속 활동이며 5단계가 아니다.
+- 회고는 4단계 이후에 붙는 후속 기록이며 단계 수에 포함하지 않는다.
 - 한 미션은 `hero`, `stage_1`, `stage_2`, `stage_3`, `stage_4_realtime` 이미지 asset을 가진다.
 - 이미지는 `gpt-image-2`로 생성한다.
 - 이미지 안 텍스트는 최소화한다. 질문, 선택지, 피드백은 UI 텍스트가 맡는다.
 - 학생에게 보이기 전 교사 승인이 필요하다.
+- 단계명은 학생 유형별 한국어 계약을 따른다.
+- 템플릿은 완전 랜덤이 아니라 학생 메모리, 난이도, 최근 실패/성공 기록을 바탕으로 고른다.
 
 ## 이미지 프롬프트 구성
 

@@ -1,54 +1,30 @@
 # EduYJ AI Education Demo
 
-Integrated workspace for the EduYJ AI education demo.
+영주 공공데이터 공모전용 AI 교육 지원 데모입니다.
 
-## Branches
+## 기준 브랜치
 
-- `frontend`: Next.js student and teacher screens.
-- `backend`: FastAPI API, schema, seed data, and collaboration documents.
-- `dev`: integration branch for frontend/backend verification.
+- `dev`: 프론트/백엔드 통합 검증 기준
+- `frontend`: 프론트 단독 작업 기준
+- `backend`: 백엔드 단독 작업 기준
 
-## Project Structure
-
-```text
-frontend/       Next.js frontend
-backend/        FastAPI backend
-docs/common/    shared frontend/backend contracts
-docs/frontend/  frontend working guide
-docs/backend/   backend working guide
-.agents/        Codex/Ralph working skills
-examples/       generated content samples
-assets/         source/reference assets
-```
-
-## First Documents
-
-1. [AGENTS.md](AGENTS.md)
-2. [GOAL.md](GOAL.md)
-3. [docs/README.md](docs/README.md)
-4. [docs/common/00-agent-navigation.md](docs/common/00-agent-navigation.md)
-5. [docs/common/01-collaboration-contract.md](docs/common/01-collaboration-contract.md)
-6. [docs/common/02-branch-handoff-contract.md](docs/common/02-branch-handoff-contract.md)
-7. [docs/common/13-current-handoff-summary.md](docs/common/13-current-handoff-summary.md)
-
-## Frontend
+팀원이 이어받을 때는 먼저 현재 브랜치와 변경사항을 확인합니다.
 
 ```bash
-cd frontend
-npm install
-npm run dev
+git status --short --branch
 ```
 
-The frontend runs at `http://localhost:3000`.
+## 핵심 문서
 
-Verification:
+- [AGENTS.md](AGENTS.md): 새 작업자가 먼저 읽는 실행 규칙
+- [GOAL.md](GOAL.md): 현재 데모 목표와 남은 일
+- [docs/HANDOFF.md](docs/HANDOFF.md): 진행상황, 설정, DB 복원, 검증, 다음 작업
+- [docs/API.md](docs/API.md): 최신 REST API 요약
+- [backend/data/README.md](backend/data/README.md): 데모 DB dump/seed 복원 방법
 
-```bash
-cd frontend
-npm run lint
-```
+## 실행
 
-## Backend
+Backend:
 
 ```bash
 cd backend
@@ -57,28 +33,20 @@ python3 -m venv .venv
 .venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 4000
 ```
 
-The API runs at `http://localhost:4000`.
-
-Verification:
+Frontend:
 
 ```bash
-cd backend
-.venv/bin/ruff check app tests
-.venv/bin/python -m pytest
-.venv/bin/python -m app.data.seed_demo
+cd frontend
+npm install
+npm run dev
 ```
 
-`app.data.seed_demo` creates the SQLAlchemy schema and writes the demo seed to `DATABASE_URL`.
-For the shared demo SQLite path:
+- 프론트: `http://localhost:3000`
+- 백엔드: `http://localhost:4000`
 
-```bash
-cd backend
-DATABASE_URL=sqlite+pysqlite:///./data/eduyj_demo.db .venv/bin/python -m app.data.seed_demo
-```
+## 데모 DB
 
-The local `.db` file is ignored by git. A reproducible SQL dump is tracked at
-[backend/data/eduyj_demo_dump.sql](backend/data/eduyj_demo_dump.sql), with restore notes in
-[backend/data/README.md](backend/data/README.md).
+로컬 DB는 git에 올리지 않고, 재현 가능한 SQL dump만 추적합니다.
 
 ```bash
 cd backend
@@ -86,10 +54,33 @@ rm -f data/eduyj_demo.db
 sqlite3 data/eduyj_demo.db < data/eduyj_demo_dump.sql
 ```
 
-## Contract Notes
+seed로 다시 만들 때:
 
-- Student missions are 4 stages.
-- Reflection is not stage 5.
-- Stages 1-3 are approved static content.
-- Stage 4 is realtime practice.
-- Frontend/backend contract changes should be reflected in `docs/common/`.
+```bash
+cd backend
+DATABASE_URL=sqlite+pysqlite:///./data/eduyj_demo.db .venv/bin/python -m app.data.seed_demo
+```
+
+## 검증
+
+Backend:
+
+```bash
+cd backend
+.venv/bin/ruff check app tests
+.venv/bin/python -m pytest
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm run lint
+npx tsc --noEmit
+```
+
+문서만 바꾼 경우:
+
+```bash
+git diff --check
+```

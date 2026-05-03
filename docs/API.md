@@ -1,0 +1,98 @@
+# REST API
+
+기준 서버: `http://localhost:4000`
+
+모든 성공 응답은 기본적으로 `ok(...)` 래퍼를 사용한다. 프론트 계약은 `frontend/lib/api/contracts.ts`, 백엔드 스키마는 `backend/app/domain/schemas.py`를 함께 확인한다.
+
+## Health
+
+- `GET /health`: 서버 상태 확인
+
+## Context/Auth
+
+- `GET /api/context/seed`: 데모 교사, 학생 3명, assignment, mission mapping 조회
+- `GET /api/context/me`: 데모 사용자/조직 정보 조회
+- `POST /api/auth/demo-login`: 데모 교사 세션 생성
+- `POST /api/auth/student-access`: 학생 access code 세션 생성
+
+## Teacher
+
+- `GET /api/teacher/students`: 학생 목록, 한국어 label, `dashboardStage`, 최신 콘텐츠 상태 조회
+- `GET /api/teacher/students/{studentId}`: 학생 상세, 대시보드 프로필, 학교 맥락, context bundle 조회
+- `GET /api/teacher/students/{studentId}/history`: 사례 메모, 콘텐츠, 시도, 이벤트, realtime 세션 이력 조회
+- `GET /api/teacher/students/{studentId}/context-bundle`: AI 생성 전 학생 맥락 bundle 조회
+- `GET /api/teacher/students/{studentId}/report`: 리뷰 요약 기반 학습 기록 조회
+- `POST /api/teacher/students/{studentId}/notes`: 교사 메모 저장
+- `PATCH /api/teacher/students/{studentId}/memory-card`: 메모리 카드 부분 수정
+
+## Public Data
+
+- `GET /api/public-data/sources`: 공공데이터 source registry 조회
+- `GET /api/public-data/schools`: seed 학교 목록 조회
+- `GET /api/public-data/schools/{schoolCode}/context`: 학교 일정/시간표 맥락 조회
+- `GET /api/public-data/schools/{schoolCode}/timetable`: 저장된 시간표 snapshot 조회
+- `POST /api/public-data/sources/{sourceCode}/sync`: source 동기화 시도
+
+시간표 query:
+
+- `date`: `YYYY-MM-DD`
+- `grade`: 학년
+- `className`: 반
+- `syncIfMissing`: 저장 snapshot이 없을 때 NEIS 동기화 시도 여부
+
+`syncIfMissing=true`는 필수 query와 `NEIS_API_KEY`가 있을 때만 실제 동기화를 시도한다.
+
+## AI/Content
+
+- `POST /api/ai/orchestrator-runs`: 학생 맥락 기반 생성 계획 생성
+- `POST /api/ai/content-generations`: 4단계 미션 콘텐츠 생성
+- `GET /api/ai/agent-runs/{agentRunId}`: AI 실행 기록 조회
+- `GET /api/contents/{contentId}`: 교사용 콘텐츠 상세 조회
+- `POST /api/contents/{contentId}/approve`: 모든 stage/asset 검수 후 승인
+- `POST /api/contents/{contentId}/reject`: 반려 및 수정 요청 저장
+- `POST /api/contents/{contentId}/publish`: 학생에게 배포하고 대시보드 단계를 `learning`으로 이동
+- `POST /api/contents/{contentId}/assets/{assetId}/generate`: 단일 asset 생성
+- `POST /api/contents/{contentId}/assets/generate-package`: 이미지 5개와 오디오 5개 batch 생성
+- `GET /api/contents/{contentId}/review-summary`: 최신 attempt 기반 리뷰 요약 조회
+- `POST /api/contents/{contentId}/review-summary`: 최신 attempt 기반 리뷰 요약 생성
+- `POST /api/review-summaries/{reviewId}/apply-to-memory`: 교사 확인 후 리뷰 요약을 메모리에 반영
+
+## Student
+
+- `GET /api/student/missions/today`: 로그인 학생의 published 미션 목록 조회
+- `GET /api/student/missions/{contentId}`: published 미션 상세 조회
+- `POST /api/student/missions/{contentId}/start`: attempt 생성
+- `POST /api/student/missions/{contentId}/stages/{stageId}/submit`: 1~3단계 제출
+- `POST /api/student/missions/{contentId}/stages/{stageId}/realtime-session`: 4단계 realtime 세션 생성
+- `POST /api/student/missions/{contentId}/post-practice-reflection`: 학생 회고 저장
+- `POST /api/student/missions/{contentId}/events`: 학생 활동 이벤트 저장
+- `POST /api/student/missions/{contentId}/complete`: attempt 완료, 리뷰 요약 자동 생성, 대시보드 단계를 `feedback`으로 이동
+- `POST /api/student/realtime-sessions/{sessionId}/events`: realtime 이벤트 저장
+- `POST /api/student/realtime-sessions/{sessionId}/complete`: realtime 결과 저장
+
+## Audit
+
+- `GET /api/audit-logs`: 감사 로그 조회
+
+## 주요 상태값
+
+콘텐츠 상태:
+
+- `draft`
+- `teacher_review`
+- `approved`
+- `published`
+- `rejected`
+
+교사 대시보드 단계:
+
+- `material_generation`
+- `material_review`
+- `learning`
+- `feedback`
+
+학생 미션 원칙:
+
+- 학생 API는 `published` 콘텐츠만 반환한다.
+- 학생 플레이 중 1~3단계 콘텐츠는 AI가 새로 생성하거나 바꾸지 않는다.
+- 4단계 realtime 세션은 승인된 `RealtimePracticeSpec`이 있는 stage에서만 만든다.
