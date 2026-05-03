@@ -559,6 +559,14 @@ export default function DashboardPage() {
   >([]);
   const [reportReuseError, setReportReuseError] = useState("");
 
+  const updatePendingGenerationJobs = useCallback((updater: (current: Record<string, PendingGenerationJob>) => Record<string, PendingGenerationJob>) => {
+    setPendingGenerationJobs((current) => {
+      const next = updater(current);
+      writePendingGenerationJobs(next);
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     writePendingGenerationJobs(pendingGenerationJobs);
   }, [pendingGenerationJobs]);
@@ -744,8 +752,25 @@ export default function DashboardPage() {
   const isMemoDirty = memoValue !== savedMemo;
   const canSaveMemo = isMemoDirty && memoValue.trim().length > 0;
   const lessonDraftValue = lessonDrafts[selectedCase.id] ?? "";
-  const generationStatus = generationStatuses[selectedCase.id];
-  const isGeneratingContent = generationStatus?.state === "running";
+  const selectedPendingGenerationJob = Object.values(pendingGenerationJobs).find(
+    (job) => job.caseId === selectedCase.id || (selectedCase.studentId && job.studentId === selectedCase.studentId),
+  );
+  const selectedPendingGenerationStatus: GenerationStatus | undefined = selectedPendingGenerationJob
+    ? {
+        state: "running",
+        message:
+          selectedPendingGenerationJob.phase === "orchestrator"
+            ? "학생 기록을 바탕으로 수업 방향을 정리하는 중입니다."
+            : selectedPendingGenerationJob.phase === "content"
+              ? "검토할 수업 콘텐츠 구조를 만드는 중입니다."
+              : "이미지와 음성 asset을 연결하는 중입니다.",
+      }
+    : undefined;
+  const generationStatus =
+    generationStatuses[selectedCase.id] ??
+    (selectedPendingGenerationJob ? generationStatuses[selectedPendingGenerationJob.caseId] : undefined) ??
+    selectedPendingGenerationStatus;
+  const isGeneratingContent = generationStatus?.state === "running" || Boolean(selectedPendingGenerationJob);
 
   const updateReviewStageDraft = (
     reviewId: string,
@@ -777,7 +802,7 @@ export default function DashboardPage() {
         ...current,
         [job.caseId]: { state: "failed", message },
       }));
-      setPendingGenerationJobs((current) => {
+      updatePendingGenerationJobs((current) => {
         const next = { ...current };
         delete next[job.caseId];
         return next;
@@ -809,7 +834,7 @@ export default function DashboardPage() {
           return;
         }
 
-        setPendingGenerationJobs((current) => ({
+        updatePendingGenerationJobs((current) => ({
           ...current,
           [job.caseId]: {
             ...job,
@@ -841,7 +866,7 @@ export default function DashboardPage() {
           return;
         }
 
-        setPendingGenerationJobs((current) => ({
+        updatePendingGenerationJobs((current) => ({
           ...current,
           [job.caseId]: {
             ...job,
@@ -904,7 +929,7 @@ export default function DashboardPage() {
             : "이미지와 음성까지 포함한 검토용 수업 자료가 만들어졌습니다.",
         },
       }));
-      setPendingGenerationJobs((current) => {
+      updatePendingGenerationJobs((current) => {
         const next = { ...current };
         delete next[job.caseId];
         return next;
@@ -914,7 +939,7 @@ export default function DashboardPage() {
     } finally {
       generationPollLocks.current.delete(job.caseId);
     }
-  }, []);
+  }, [updatePendingGenerationJobs]);
 
   useEffect(() => {
     Object.values(pendingGenerationJobs).forEach((job) => {
@@ -986,7 +1011,7 @@ export default function DashboardPage() {
         startedAt: new Date().toISOString(),
       };
 
-      setPendingGenerationJobs((current) => ({
+      updatePendingGenerationJobs((current) => ({
         ...current,
         [selectedCase.id]: job,
       }));
