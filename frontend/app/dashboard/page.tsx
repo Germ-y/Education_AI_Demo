@@ -1814,12 +1814,10 @@ export default function DashboardPage() {
                       >
                         {isGeneratingContent ? "AI가 자료를 제안하는 중" : "AI 수업 자료 제안받기"}
                       </button>
-                      {generationStatus && (
+                      {generationStatus && generationStatus.state !== "succeeded" && (
                         <div
                           className={`rounded-md border px-3 py-2 text-sm font-bold leading-6 ${
-                            generationStatus.state === "succeeded"
-                              ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
-                              : generationStatus.state === "failed"
+                            generationStatus.state === "failed"
                                 ? "border-[#fed7aa] bg-[#fff7ed] text-[#9a3412]"
                                 : "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
                           }`}
