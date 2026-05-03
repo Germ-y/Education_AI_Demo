@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   approveContent,
   createAgentRun,
   createContentGeneration,
   generateContentAssetPackage,
+  getAgentRun,
+  getReviewableContent,
   getTeacherStudent,
   getTeacherStudentReport,
   getTeacherStudents,
@@ -52,6 +54,49 @@ type GenerationStatus = {
   state: "running" | "succeeded" | "failed";
   message: string;
 };
+
+type PendingGenerationJob = {
+  caseId: string;
+  studentId: string;
+  requestedGoal: string;
+  contentType: string;
+  phase: "orchestrator" | "content" | "assets";
+  orchestratorRunId?: string;
+  contentRunId?: string;
+  contentId?: string;
+  startedAt: string;
+};
+
+const PENDING_GENERATION_STORAGE_KEY = "eduyj:pending-generation-jobs";
+
+function readPendingGenerationJobs(): Record<string, PendingGenerationJob> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(PENDING_GENERATION_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, PendingGenerationJob>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writePendingGenerationJobs(jobs: Record<string, PendingGenerationJob>) {
+  if (typeof window === "undefined") return;
+  if (Object.keys(jobs).length === 0) {
+    window.localStorage.removeItem(PENDING_GENERATION_STORAGE_KEY);
+    return;
+  }
+  window.localStorage.setItem(PENDING_GENERATION_STORAGE_KEY, JSON.stringify(jobs));
+}
+
+function getGeneratedContentId(agentRun: AgentRun) {
+  const output = agentRun.outputJson;
+  if (!output) return null;
+  const candidate = typeof output.missionContent === "object" && output.missionContent !== null ? output.missionContent : output;
+  const id = (candidate as { id?: unknown }).id;
+  return typeof id === "string" ? id : null;
+}
 
 type ReviewStageDraft = {
   step: 1 | 2 | 3 | 4;
@@ -506,11 +551,17 @@ export default function DashboardPage() {
   const [savedMemos, setSavedMemos] = useState<Record<string, string>>({});
   const [lessonDrafts, setLessonDrafts] = useState<Record<string, string>>({});
   const [generationStatuses, setGenerationStatuses] = useState<Record<string, GenerationStatus>>({});
+  const [pendingGenerationJobs, setPendingGenerationJobs] = useState<Record<string, PendingGenerationJob>>(readPendingGenerationJobs);
+  const generationPollLocks = useRef<Set<string>>(new Set());
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({});
   const [savedFeedbackRecords, setSavedFeedbackRecords] = useState<
     Array<{ id: string; recordId: string; feedback: string; savedAt: string }>
   >([]);
   const [reportReuseError, setReportReuseError] = useState("");
+
+  useEffect(() => {
+    writePendingGenerationJobs(pendingGenerationJobs);
+  }, [pendingGenerationJobs]);
 
   useEffect(() => {
     let ignore = false;
@@ -710,73 +761,105 @@ export default function DashboardPage() {
     });
   };
 
-  const handleGenerateContent = async () => {
-    if (!selectedCase.id || !selectedCase.studentId || isGeneratingContent) return;
+  const continueGenerationJob = useCallback(async (job: PendingGenerationJob) => {
+    if (generationPollLocks.current.has(job.caseId)) return;
+    generationPollLocks.current.add(job.caseId);
 
-    const requestedGoal = lessonDraftValue.trim() || selectedCase.primaryNeed;
-    const contentType = activeCaseFile?.profile.studentType ?? selectedApiStudent?.studentType ?? "learning_focus";
+    const setRunningMessage = (message: string) => {
+      setGenerationStatuses((current) => ({
+        ...current,
+        [job.caseId]: { state: "running", message },
+      }));
+    };
 
-    setGenerationStatuses((current) => ({
-      ...current,
-      [selectedCase.id]: {
-        state: "running",
-        message: "선생님 요청을 바탕으로 자료 방향을 정리하는 중입니다.",
-      },
-    }));
+    const failJob = (message: string) => {
+      setGenerationStatuses((current) => ({
+        ...current,
+        [job.caseId]: { state: "failed", message },
+      }));
+      setPendingGenerationJobs((current) => {
+        const next = { ...current };
+        delete next[job.caseId];
+        return next;
+      });
+    };
 
     try {
-      const orchestratorResult = await createAgentRun({
-        studentId: selectedCase.studentId,
-        caseId: selectedCase.id,
-        requestedGoal,
-        contentType,
-      });
+      if (job.phase === "orchestrator") {
+        if (!job.orchestratorRunId) {
+          failJob("자료 방향 생성 기록을 찾지 못했습니다. 다시 시도해 주세요.");
+          return;
+        }
 
-      if (!orchestratorResult.agentRun || orchestratorResult.agentRun.status !== "succeeded") {
-        setGenerationStatuses((current) => ({
+        setRunningMessage("학생 기록을 바탕으로 수업 방향을 정리하는 중입니다.");
+        const orchestratorRun = await getAgentRun(job.orchestratorRunId);
+        if (orchestratorRun.status === "running") return;
+        if (orchestratorRun.status === "failed") {
+          failJob(getAiGenerationFailureMessage(orchestratorRun));
+          return;
+        }
+
+        const generationResult = await createContentGeneration({
+          orchestratorRunId: orchestratorRun.id,
+          studentId: job.studentId,
+          caseId: job.caseId,
+        });
+        if (!generationResult.agentRun) {
+          failJob("콘텐츠 생성 기록을 만들지 못했습니다. 다시 시도해 주세요.");
+          return;
+        }
+
+        setPendingGenerationJobs((current) => ({
           ...current,
-          [selectedCase.id]: {
-            state: "failed",
-            message: getAiGenerationFailureMessage(orchestratorResult.agentRun),
+          [job.caseId]: {
+            ...job,
+            phase: "content",
+            contentRunId: generationResult.agentRun?.id,
           },
         }));
+        setRunningMessage("검토할 수업 콘텐츠 구조를 만드는 중입니다.");
         return;
       }
 
-      setGenerationStatuses((current) => ({
-        ...current,
-        [selectedCase.id]: {
-          state: "running",
-          message: "오케스트레이터 결과로 검토용 콘텐츠 구조를 만드는 중입니다.",
-        },
-      }));
+      if (job.phase === "content") {
+        if (!job.contentRunId) {
+          failJob("콘텐츠 생성 기록을 찾지 못했습니다. 다시 시도해 주세요.");
+          return;
+        }
 
-      const generationResult = await createContentGeneration({
-        orchestratorRunId: orchestratorResult.agentRun.id,
-        studentId: selectedCase.studentId,
-        caseId: selectedCase.id,
-      });
+        setRunningMessage("검토할 수업 콘텐츠 구조를 만드는 중입니다.");
+        const contentRun = await getAgentRun(job.contentRunId);
+        if (contentRun.status === "running") return;
+        if (contentRun.status === "failed") {
+          failJob(getAiGenerationFailureMessage(contentRun));
+          return;
+        }
 
-      if (!generationResult.content || generationResult.agentRun?.status !== "succeeded") {
-        setGenerationStatuses((current) => ({
+        const contentId = getGeneratedContentId(contentRun);
+        if (!contentId) {
+          failJob("생성된 콘텐츠 ID를 확인하지 못했습니다. 다시 시도해 주세요.");
+          return;
+        }
+
+        setPendingGenerationJobs((current) => ({
           ...current,
-          [selectedCase.id]: {
-            state: "failed",
-            message: getAiGenerationFailureMessage(generationResult.agentRun),
+          [job.caseId]: {
+            ...job,
+            phase: "assets",
+            contentId,
           },
         }));
+        setRunningMessage("이미지와 음성 asset을 연결하는 중입니다.");
         return;
       }
 
-      setGenerationStatuses((current) => ({
-        ...current,
-        [selectedCase.id]: {
-          state: "running",
-          message: "이미지와 음성 asset을 실제 생성하는 중입니다.",
-        },
-      }));
+      if (!job.contentId) {
+        failJob("생성된 콘텐츠를 찾지 못했습니다. 다시 시도해 주세요.");
+        return;
+      }
 
-      let generatedContent = generationResult.content;
+      setRunningMessage("이미지와 음성 asset을 연결하는 중입니다.");
+      let generatedContent = await getReviewableContent(job.contentId);
       let assetGenerationErrorMessage: string | null = null;
       try {
         const assetPackage = await generateContentAssetPackage(generatedContent.id);
@@ -787,13 +870,6 @@ export default function DashboardPage() {
         };
       } catch (assetError) {
         assetGenerationErrorMessage = getClientGenerationErrorMessage(assetError);
-        setGenerationStatuses((current) => ({
-          ...current,
-          [selectedCase.id]: {
-            state: "failed",
-            message: `수업 구조는 만들어졌지만 이미지/음성 생성에 실패했습니다. ${assetGenerationErrorMessage}`,
-          },
-        }));
       }
 
       setSelectedCaseFile((current) =>
@@ -808,22 +884,113 @@ export default function DashboardPage() {
           : current,
       );
 
-      const refreshedCaseFile = await getTeacherStudent(selectedCase.studentId).catch(() => null);
+      const refreshedCaseFile = await getTeacherStudent(job.studentId).catch(() => null);
       if (refreshedCaseFile) {
         setSelectedCaseFile(refreshedCaseFile);
+      }
+      const refreshedReport = await getTeacherStudentReport(job.studentId).catch(() => null);
+      if (refreshedReport) {
+        setSelectedReport(refreshedReport);
       }
 
       setReviewPreviewStep(1);
       setOpenReviewId(generatedContent.id);
       setGenerationStatuses((current) => ({
         ...current,
-        [selectedCase.id]: {
+        [job.caseId]: {
           state: assetGenerationErrorMessage ? "failed" : "succeeded",
           message: assetGenerationErrorMessage
             ? `수업 구조는 만들어졌지만 이미지/음성 생성에 실패했습니다. ${assetGenerationErrorMessage}`
-            : "이미지와 음성이 포함된 검토용 수업 자료가 만들어졌습니다.",
+            : "이미지와 음성까지 포함한 검토용 수업 자료가 만들어졌습니다.",
         },
       }));
+      setPendingGenerationJobs((current) => {
+        const next = { ...current };
+        delete next[job.caseId];
+        return next;
+      });
+    } catch (error) {
+      failJob(getClientGenerationErrorMessage(error));
+    } finally {
+      generationPollLocks.current.delete(job.caseId);
+    }
+  }, []);
+
+  useEffect(() => {
+    Object.values(pendingGenerationJobs).forEach((job) => {
+      setGenerationStatuses((current) => ({
+        ...current,
+        [job.caseId]: {
+          state: "running",
+          message:
+            job.phase === "orchestrator"
+              ? "학생 기록을 바탕으로 수업 방향을 정리하는 중입니다."
+              : job.phase === "content"
+                ? "검토할 수업 콘텐츠 구조를 만드는 중입니다."
+                : "이미지와 음성 asset을 연결하는 중입니다.",
+        },
+      }));
+      void continueGenerationJob(job);
+    });
+
+    if (Object.keys(pendingGenerationJobs).length === 0) return;
+    const timer = window.setInterval(() => {
+      Object.values(readPendingGenerationJobs()).forEach((job) => {
+        void continueGenerationJob(job);
+      });
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [continueGenerationJob, pendingGenerationJobs]);
+
+  const handleGenerateContent = async () => {
+    if (!selectedCase.id || !selectedCase.studentId || isGeneratingContent) return;
+
+    const requestedGoal = lessonDraftValue.trim() || selectedCase.primaryNeed;
+    const contentType = activeCaseFile?.profile.studentType ?? selectedApiStudent?.studentType ?? "learning_focus";
+    setActiveTab("materials");
+
+    setGenerationStatuses((current) => ({
+      ...current,
+      [selectedCase.id]: {
+        state: "running",
+        message: "학생 기록을 바탕으로 수업 방향을 정리하는 중입니다.",
+      },
+    }));
+
+    try {
+      const orchestratorResult = await createAgentRun({
+        studentId: selectedCase.studentId,
+        caseId: selectedCase.id,
+        requestedGoal,
+        contentType,
+      });
+
+      if (!orchestratorResult.agentRun) {
+        setGenerationStatuses((current) => ({
+          ...current,
+          [selectedCase.id]: {
+            state: "failed",
+            message: "자료 방향 생성 기록을 만들지 못했습니다. 다시 시도해 주세요.",
+          },
+        }));
+        return;
+      }
+
+      const job: PendingGenerationJob = {
+        caseId: selectedCase.id,
+        studentId: selectedCase.studentId,
+        requestedGoal,
+        contentType,
+        phase: "orchestrator",
+        orchestratorRunId: orchestratorResult.agentRun.id,
+        startedAt: new Date().toISOString(),
+      };
+
+      setPendingGenerationJobs((current) => ({
+        ...current,
+        [selectedCase.id]: job,
+      }));
+      void continueGenerationJob(job);
     } catch (error) {
       setGenerationStatuses((current) => ({
         ...current,
@@ -1386,7 +1553,19 @@ export default function DashboardPage() {
                         AI가 제안한 자료를 확인하고 선생님 판단으로 적용합니다.
                       </p>
                     </div>
-                    {selectedReviewItems.length === 0 && (
+                    {isGeneratingContent && generationStatus && (
+                      <div className="rounded-md border border-[#bfdbfe] bg-[#eff6ff] p-4 text-[#1d4ed8]">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-1 h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-[#93c5fd] border-t-[#1d4ed8]" />
+                          <div>
+                            <p className="text-base font-black">검토 자료 생성 중</p>
+                            <p className="mt-1 text-sm font-bold leading-6">{generationStatus.message}</p>
+                            <p className="mt-2 text-xs font-bold text-[#3b82f6]">새로고침해도 여기에서 이어서 확인합니다.</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {selectedReviewItems.length === 0 && !isGeneratingContent && (
                       <div className="rounded-md border border-[#e5e9f0] bg-white p-4 text-sm font-bold leading-6 text-[#64748b]">
                         검토할 수업 자료 제안이 없습니다. 학생이 완료한 자료는 학습 기록에서 확인할 수 있어요.
                       </div>

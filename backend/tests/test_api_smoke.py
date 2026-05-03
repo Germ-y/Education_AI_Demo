@@ -368,14 +368,16 @@ def test_teacher_and_student_demo_flows() -> None:
     )
     assert orchestrator.status_code == 200
     agent_run = orchestrator.json()["data"]["agentRun"]
-    assert agent_run["status"] == "failed"
-    assert agent_run["errorCode"] == "OPENAI_API_KEY_MISSING"
-    assert agent_run["reviewRequired"] is True
-    assert agent_run["outputJson"] is None
+    assert agent_run["status"] == "running"
 
     agent_run_detail = client.get(f"/api/ai/agent-runs/{agent_run['id']}", headers={"authorization": f"Bearer {teacher_token}"})
     assert agent_run_detail.status_code == 200
-    assert agent_run_detail.json()["data"]["id"] == agent_run["id"]
+    agent_run_detail_data = agent_run_detail.json()["data"]
+    assert agent_run_detail_data["id"] == agent_run["id"]
+    assert agent_run_detail_data["status"] == "failed"
+    assert agent_run_detail_data["errorCode"] == "OPENAI_API_KEY_MISSING"
+    assert agent_run_detail_data["reviewRequired"] is True
+    assert agent_run_detail_data["outputJson"] is None
 
     content_generation = client.post(
         "/api/ai/content-generations",
@@ -619,6 +621,10 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     )
     assert orchestrator.status_code == 200
     orchestrator_run = orchestrator.json()["data"]["agentRun"]
+    assert orchestrator_run["status"] == "running"
+    orchestrator_detail = client.get(f"/api/ai/agent-runs/{orchestrator_run['id']}")
+    assert orchestrator_detail.status_code == 200
+    orchestrator_run = orchestrator_detail.json()["data"]
     assert orchestrator_run["status"] == "succeeded"
 
     content_generation = client.post(
@@ -630,15 +636,25 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
             },
     )
     assert content_generation.status_code == 200
-    content = content_generation.json()["data"]["content"]
+    content_generation_data = content_generation.json()["data"]
+    assert content_generation_data["content"] is None
+    assert content_generation_data["agentRun"]["status"] == "running"
+    content_run_detail = client.get(f"/api/ai/agent-runs/{content_generation_data['agentRun']['id']}")
+    assert content_run_detail.status_code == 200
+    content_generation_run = content_run_detail.json()["data"]
+    assert content_generation_run["status"] == "succeeded"
+    content_output = content_generation_run["outputJson"]
+    content = content_output.get("missionContent", content_output)
     assert content["id"] == "content_generated_contract_001"
     assert content["status"] == "teacher_review"
     assert content["totalSteps"] == 4
     assert content_generation_calls["count"] == 2
-    assert content_generation.json()["data"]["agentRun"]["status"] == "succeeded"
     assert [stage["step"] for stage in content["stages"]] == [1, 2, 3, 4]
     assert len([asset for asset in content["assets"] if asset["assetType"] == "image"]) == 5
     assert len([asset for asset in content["assets"] if asset["assetType"] == "audio"]) == 5
+    saved_content_response = client.get("/api/contents/content_generated_contract_001")
+    assert saved_content_response.status_code == 200
+    content = saved_content_response.json()["data"]
     assert content["briefJson"]["generatedAt"]
 
     latest_seed = client.get("/api/context/seed")

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import ValidationError
 
 from app.ai.openai_provider import OpenAiProvider
@@ -19,6 +19,7 @@ MAX_CONTENT_GENERATION_ATTEMPTS = 2
 @router.post("/orchestrator-runs")
 def create_orchestrator_run(
     payload: OrchestratorRunRequest,
+    background_tasks: BackgroundTasks,
     principal: SessionPrincipal = Depends(require_teacher),
     demo_store: DemoStore = Depends(get_store),
     agent_runs: AgentRunRepository = Depends(get_agent_run_repository),
@@ -49,37 +50,23 @@ def create_orchestrator_run(
 
     content_type = str(payload.content_type or case_file["profile"]["studentType"])
 
-    try:
-        output_json, token_usage = OpenAiProvider(settings).create_json_response(
-            model=settings.openai_reasoning_model,
-            instructions=load_prompt("orchestrator_plan"),
-            input_snapshot=input_snapshot,
-        )
-        validate_orchestrator_plan_quality(
-            output_json,
-            student_id=payload.student_id,
-            case_id=payload.case_id,
-            content_type=content_type,
-        )
-    except AiProviderError as exc:
-        failed = agent_runs.mark_failed(agent_run.id, error_code=exc.code, error_message=exc.message, review_required=True)
-        return ok({"agentRun": failed.model_dump(by_alias=True) if failed else None})
-    except ContentQualityError as exc:
-        failed = agent_runs.mark_failed(
-            agent_run.id,
-            error_code="ORCHESTRATOR_PLAN_QUALITY_INVALID",
-            error_message=str(exc),
-            review_required=True,
-        )
-        return ok({"agentRun": failed.model_dump(by_alias=True) if failed else None})
-
-    succeeded = agent_runs.mark_succeeded(agent_run.id, output_json=output_json, token_usage=token_usage)
-    return ok({"agentRun": succeeded.model_dump(by_alias=True) if succeeded else None})
+    background_tasks.add_task(
+        _run_orchestrator_agent,
+        agent_run.id,
+        settings,
+        input_snapshot,
+        payload.student_id,
+        payload.case_id,
+        content_type,
+        agent_runs,
+    )
+    return ok({"agentRun": agent_run.model_dump(by_alias=True)})
 
 
 @router.post("/content-generations")
 def create_content_generation(
     payload: ContentGenerationRequest,
+    background_tasks: BackgroundTasks,
     principal: SessionPrincipal = Depends(require_teacher),
     demo_store: DemoStore = Depends(get_store),
     agent_runs: AgentRunRepository = Depends(get_agent_run_repository),
@@ -121,33 +108,19 @@ def create_content_generation(
         model=settings.openai_reasoning_model,
     )
 
-    try:
-        mission, output_json, token_usage = _generate_valid_mission_content(
-            settings=settings,
-            input_snapshot=input_snapshot,
-            student_id=payload.student_id,
-            case_id=payload.case_id,
-            case_file=case_file,
-            orchestrator_plan=orchestrator_run.output_json,
-        )
-    except AiProviderError as exc:
-        failed = agent_runs.mark_failed(agent_run.id, error_code=exc.code, error_message=exc.message, review_required=True)
-        return ok({"agentRun": failed.model_dump(by_alias=True) if failed else None, "content": None})
-    except ContentQualityError as exc:
-        failed = agent_runs.mark_failed(
-            agent_run.id,
-            error_code="MISSION_CONTENT_QUALITY_INVALID",
-            error_message=str(exc),
-            review_required=True,
-        )
-        return ok({"agentRun": failed.model_dump(by_alias=True) if failed else None, "content": None})
-    except ValueError as exc:
-        failed = agent_runs.mark_failed(agent_run.id, error_code="MISSION_CONTENT_SCHEMA_INVALID", error_message=str(exc), review_required=True)
-        return ok({"agentRun": failed.model_dump(by_alias=True) if failed else None, "content": None})
-
-    demo_store.save_generated_mission_content(mission)
-    succeeded = agent_runs.mark_succeeded(agent_run.id, output_json=output_json, token_usage=token_usage)
-    return ok({"agentRun": succeeded.model_dump(by_alias=True) if succeeded else None, "content": mission.model_dump(by_alias=True)})
+    background_tasks.add_task(
+        _run_content_agent,
+        agent_run.id,
+        settings,
+        input_snapshot,
+        payload.student_id,
+        payload.case_id,
+        case_file,
+        orchestrator_run.output_json,
+        demo_store,
+        agent_runs,
+    )
+    return ok({"agentRun": agent_run.model_dump(by_alias=True), "content": None})
 
 
 @router.get("/agent-runs/{agent_run_id}")
@@ -160,6 +133,81 @@ def get_agent_run(
     if agent_run is None:
         raise HTTPException(status_code=404, detail={"code": "AGENT_RUN_NOT_FOUND", "message": "AI 실행 기록을 찾을 수 없습니다."})
     return ok(agent_run.model_dump(by_alias=True))
+
+
+def _run_orchestrator_agent(
+    agent_run_id: str,
+    settings,
+    input_snapshot: dict,
+    student_id: str,
+    case_id: str,
+    content_type: str,
+    agent_runs: AgentRunRepository,
+) -> None:
+    try:
+        output_json, token_usage = OpenAiProvider(settings).create_json_response(
+            model=settings.openai_reasoning_model,
+            instructions=load_prompt("orchestrator_plan"),
+            input_snapshot=input_snapshot,
+        )
+        validate_orchestrator_plan_quality(
+            output_json,
+            student_id=student_id,
+            case_id=case_id,
+            content_type=content_type,
+        )
+    except AiProviderError as exc:
+        agent_runs.mark_failed(agent_run_id, error_code=exc.code, error_message=exc.message, review_required=True)
+        return
+    except ContentQualityError as exc:
+        agent_runs.mark_failed(
+            agent_run_id,
+            error_code="ORCHESTRATOR_PLAN_QUALITY_INVALID",
+            error_message=str(exc),
+            review_required=True,
+        )
+        return
+
+    agent_runs.mark_succeeded(agent_run_id, output_json=output_json, token_usage=token_usage)
+
+
+def _run_content_agent(
+    agent_run_id: str,
+    settings,
+    input_snapshot: dict,
+    student_id: str,
+    case_id: str,
+    case_file: dict,
+    orchestrator_plan: dict,
+    demo_store: DemoStore,
+    agent_runs: AgentRunRepository,
+) -> None:
+    try:
+        mission, output_json, token_usage = _generate_valid_mission_content(
+            settings=settings,
+            input_snapshot=input_snapshot,
+            student_id=student_id,
+            case_id=case_id,
+            case_file=case_file,
+            orchestrator_plan=orchestrator_plan,
+        )
+    except AiProviderError as exc:
+        agent_runs.mark_failed(agent_run_id, error_code=exc.code, error_message=exc.message, review_required=True)
+        return
+    except ContentQualityError as exc:
+        agent_runs.mark_failed(
+            agent_run_id,
+            error_code="MISSION_CONTENT_QUALITY_INVALID",
+            error_message=str(exc),
+            review_required=True,
+        )
+        return
+    except ValueError as exc:
+        agent_runs.mark_failed(agent_run_id, error_code="MISSION_CONTENT_SCHEMA_INVALID", error_message=str(exc), review_required=True)
+        return
+
+    demo_store.save_generated_mission_content(mission)
+    agent_runs.mark_succeeded(agent_run_id, output_json=output_json, token_usage=token_usage)
 
 
 def _mission_from_generation(output_json: dict, *, student_id: str, case_id: str) -> MissionContent:

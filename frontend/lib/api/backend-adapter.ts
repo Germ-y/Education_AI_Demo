@@ -2,6 +2,7 @@ import { apiFetch } from "./api-fetch";
 import type { ApiAdapter } from "./adapter";
 import type {
   AssetPackageGenerationResponse,
+  AgentRun,
   ContentGenerationResponse,
   ContextMe,
   DemoLoginResponse,
@@ -79,6 +80,9 @@ export const backendAdapter: ApiAdapter = {
       `/api/student/missions/${encodeURIComponent(contentId)}/stages/${encodeURIComponent(stageId)}/realtime-session`,
       { method: "POST", body: payload, token: options?.token },
     ),
+
+  getAgentRun: (agentRunId, options) =>
+    apiFetch<AgentRun>(`/api/ai/agent-runs/${encodeURIComponent(agentRunId)}`, { token: options?.token }),
 
   createAgentRun: (payload, options) =>
     apiFetch<OrchestratorRunResponse>("/api/ai/orchestrator-runs", { method: "POST", body: payload, token: options?.token }),

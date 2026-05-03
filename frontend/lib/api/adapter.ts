@@ -1,5 +1,6 @@
 import type {
   AssetPackageGenerationResponse,
+  AgentRun,
   AgentRunRequest,
   ContentGenerationRequest,
   ContentGenerationResponse,
@@ -43,6 +44,7 @@ export type ApiAdapter = {
     payload: RealtimeSessionRequest,
     options?: ApiAdapterOptions,
   ): Promise<RealtimeSessionResponse>;
+  getAgentRun(agentRunId: string, options?: ApiAdapterOptions): Promise<AgentRun>;
   createAgentRun(payload: AgentRunRequest, options?: ApiAdapterOptions): Promise<OrchestratorRunResponse>;
   createContentGeneration(payload: ContentGenerationRequest, options?: ApiAdapterOptions): Promise<ContentGenerationResponse>;
   generateContentAssetPackage(contentId: string, options?: ApiAdapterOptions): Promise<AssetPackageGenerationResponse>;
