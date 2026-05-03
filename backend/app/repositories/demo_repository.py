@@ -551,6 +551,7 @@ def _mission_from_row(content: rows.MissionContentRow, stages: list[rows.Content
 
 
 def _stage(row: rows.ContentStageRow) -> dict:
+    template_json = _normalize_template_json(row.template_type, row.template_json)
     return {
         "id": row.id,
         "missionContentId": row.mission_content_id,
@@ -559,10 +560,41 @@ def _stage(row: rows.ContentStageRow) -> dict:
         "templateType": row.template_type,
         "studentTitle": row.student_title,
         "studentInstruction": row.student_instruction,
-        "templateJson": row.template_json,
+        "templateJson": template_json,
         "realtimeSpec": row.realtime_spec_json,
         "sortOrder": row.sort_order,
     }
+
+
+def _normalize_template_json(template_type: str, template_json: dict | None) -> dict | None:
+    if template_type != "blank_fill" or not isinstance(template_json, dict):
+        return template_json
+
+    sentence = str(template_json.get("sentence") or template_json.get("question") or "")
+    if "__" in sentence or "[A]" in sentence or "[B]" in sentence:
+        return template_json
+
+    return {**template_json, "sentence": _legacy_blank_fill_sentence(template_json)}
+
+
+def _legacy_blank_fill_sentence(template_json: dict) -> str:
+    values = _legacy_blank_values(template_json)
+    question = str(template_json.get("question") or "")
+    if len(values) >= 2:
+        return "분수는 __ / __입니다."
+    if "시계" in question or "정각" in question:
+        return "시계는 __시예요."
+    return "알맞은 말은 __입니다."
+
+
+def _legacy_blank_values(template_json: dict) -> list[str]:
+    accepted_answers = template_json.get("acceptedAnswers") or template_json.get("answers")
+    if isinstance(accepted_answers, list) and accepted_answers and isinstance(accepted_answers[0], dict):
+        return [str(value) for value in accepted_answers[0].values()]
+    tiles = template_json.get("tiles")
+    if isinstance(tiles, list):
+        return [str(value) for value in tiles]
+    return []
 
 
 def _asset(row: rows.ContentAssetRow) -> dict:

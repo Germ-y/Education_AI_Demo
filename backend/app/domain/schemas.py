@@ -194,7 +194,7 @@ def _require_any_key(template_json: dict[str, Any], keys: list[str], template_ty
 
 
 def _validate_blank_fill_sentence(sentence: str) -> None:
-    generic_instruction_terms = ("그림", "이미지", "사진", "알맞은 값을 골라", "빈칸을 채", "칸에 넣")
+    generic_instruction_terms = ("알맞은 값을 골라", "빈칸을 채", "칸에 넣")
     if any(term in sentence for term in generic_instruction_terms):
         raise ValueError("blank_fill은 그림 지시문이 아니라 빈칸이 포함된 완성 문장이어야 합니다.")
 
