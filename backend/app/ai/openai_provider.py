@@ -58,6 +58,14 @@ class OpenAiProvider:
                 "type": "realtime",
                 "model": model,
                 "instructions": instructions,
+                "audio": {
+                    "input": {
+                        "transcription": {
+                            "model": "gpt-4o-mini-transcribe",
+                            "language": "ko",
+                        }
+                    }
+                },
                 "output_modalities": ["audio"],
             },
         }

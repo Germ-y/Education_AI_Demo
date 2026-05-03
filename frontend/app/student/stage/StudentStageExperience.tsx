@@ -1041,6 +1041,11 @@ function RealtimePracticeRoom({
       return;
     }
 
+    if (type === "conversation.item.input_audio_transcription.completed" && typeof event.transcript === "string") {
+      appendMessage("student", event.transcript);
+      return;
+    }
+
     if ((type === "response.audio_transcript.done" || type === "response.output_text.done") && typeof event.transcript === "string") {
       appendMessage("partner", event.transcript);
       return;
@@ -1052,8 +1057,13 @@ function RealtimePracticeRoom({
     }
 
     if (type === "error") {
+      const error = event.error;
+      const message =
+        error && typeof error === "object" && "message" in error && typeof error.message === "string"
+          ? error.message
+          : "잠시 뒤 다시 시도해 주세요.";
       setConnectionState("error");
-      setStatusMessage("실시간 대화 중 오류가 생겼어요. 잠시 뒤 다시 시도해 주세요.");
+      setStatusMessage(`실시간 대화 오류: ${message}`);
     }
   };
 
@@ -1112,7 +1122,6 @@ function RealtimePracticeRoom({
           JSON.stringify({
             type: "response.create",
             response: {
-              modalities: ["audio"],
               instructions: `먼저 학생에게 짧게 말을 걸어 주세요. 첫 문장: "${session.practiceSpec.openingLine}"`,
             },
           }),
@@ -1179,7 +1188,7 @@ function RealtimePracticeRoom({
           },
         }),
       );
-      dataChannel.send(JSON.stringify({ type: "response.create", response: { modalities: ["audio"] } }));
+      dataChannel.send(JSON.stringify({ type: "response.create" }));
     }
   };
 
