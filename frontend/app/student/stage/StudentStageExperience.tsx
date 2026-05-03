@@ -1070,31 +1070,17 @@ function RealtimePracticeRoom({
           <div className="mt-3">
             <StageMedia question={question} theme={theme} compact featured />
           </div>
-          <p className="mt-2 text-sm font-bold leading-6 break-keep text-[#596157]">{practice.sceneLine}</p>
         </div>
 
-        <div className="relative z-10 grid min-h-0 grid-cols-[minmax(0,1fr)_112px] items-center gap-3 pt-3">
-          <div className="rounded-[20px] border border-white/80 bg-white/90 p-4 shadow-sm">
+        <div className="relative z-10 grid min-h-0 grid-cols-[minmax(0,1fr)_144px] items-center gap-3 pt-3">
+          <div className="relative rounded-[20px] border border-white/80 bg-white/90 p-4 shadow-sm before:absolute before:right-[-12px] before:top-1/2 before:h-6 before:w-6 before:-translate-y-1/2 before:rotate-45 before:border-r before:border-t before:border-white/80 before:bg-white/90">
             <p className="text-xs font-black" style={{ color: theme.accentStrong }}>
               {practice.partner}
             </p>
             <p className="mt-2 text-xl font-black leading-7 break-keep text-[#25312a]">{practice.partnerLine}</p>
           </div>
-          <div className="relative h-36 w-28 justify-self-end overflow-hidden">
-            <div className="absolute bottom-0 right-0 h-56 w-40 origin-bottom-right scale-[0.64]">
-              <div className="absolute bottom-0 left-3 h-28 w-32 rounded-t-[56px] border border-white/80 bg-[#ffe6a8] shadow-[inset_0_-10px_0_rgba(190,134,35,0.12)]" />
-              <div className="absolute bottom-[112px] left-5 h-[112px] w-[112px] rounded-full bg-[#4f3424]" />
-              <div className="absolute bottom-[94px] left-6 h-28 w-28 rounded-full border border-white/80 bg-[#ffd9bf] shadow-[inset_0_-8px_0_rgba(185,110,70,0.14)]">
-                <span className="absolute -top-3 left-4 h-9 w-9 rounded-full bg-[#4f3424]" />
-                <span className="absolute -top-4 left-11 h-10 w-10 rounded-full bg-[#4f3424]" />
-                <span className="absolute -top-2 right-5 h-8 w-8 rounded-full bg-[#4f3424]" />
-                <span className="absolute left-7 top-10 h-2.5 w-2.5 rounded-full bg-[#25312a]" />
-                <span className="absolute right-7 top-10 h-2.5 w-2.5 rounded-full bg-[#25312a]" />
-                <span className="absolute left-1/2 top-[58px] h-3 w-9 -translate-x-1/2 rounded-b-full border-b-[3px] border-[#25312a]" />
-              </div>
-              <div className="absolute bottom-[70px] left-0 h-16 w-8 rotate-[24deg] rounded-full bg-[#ffd9bf]" />
-              <div className="absolute bottom-[70px] right-0 h-16 w-8 rotate-[-24deg] rounded-full bg-[#ffd9bf]" />
-            </div>
+          <div className="justify-self-end">
+            <QuestionStar />
           </div>
         </div>
 
@@ -1228,6 +1214,37 @@ function HintStar() {
         fill
         sizes="72px"
         className="animate-[hintStarLightFloat_2.8s_ease-in-out_infinite] object-contain"
+        draggable={false}
+      />
+    </div>
+  );
+}
+
+function QuestionStar() {
+  return (
+    <div className="relative h-40 w-36 shrink-0" aria-hidden="true">
+      <Image
+        src="/assets/question-star/without-eyes-question.svg"
+        alt=""
+        fill
+        sizes="144px"
+        className="object-contain"
+        draggable={false}
+      />
+      <Image
+        src="/assets/question-star/eyes.svg"
+        alt=""
+        fill
+        sizes="144px"
+        className="animate-[hintStarBlink_4.2s_ease-in-out_infinite] object-contain"
+        draggable={false}
+      />
+      <Image
+        src="/assets/question-star/question.svg"
+        alt=""
+        fill
+        sizes="144px"
+        className="animate-[questionStarWiggle_2.4s_ease-in-out_infinite] object-contain"
         draggable={false}
       />
     </div>

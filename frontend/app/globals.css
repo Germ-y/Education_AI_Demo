@@ -143,3 +143,16 @@ a {
     transform: translateY(-6px) rotate(2deg);
   }
 }
+
+@keyframes questionStarWiggle {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  35% {
+    transform: translateY(-4px) rotate(5deg);
+  }
+  70% {
+    transform: translateY(2px) rotate(-4deg);
+  }
+}
