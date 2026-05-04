@@ -34,6 +34,8 @@ Generate a complete MissionContent JSON package from an approved OrchestratorPla
 - Every image asset must include a `promptJson.textRenderingPolicy` or `promptJson.ocrPolicy` value that clearly means `scene_only_no_problem_text`.
 - Every audio asset must have `sourceText` that can be sent directly to ElevenLabs.
 - `studentTitle` values are fixed product labels. Copy the fixed label for the content type and step; do not use custom lesson titles as `studentTitle`.
+- Treat the mission like one emotionally coherent mini-scenario, not four independent worksheets. The student should understand why the scene matters and why each next task naturally follows from the previous one.
+- Use student memory for emotional support, scaffolding, and interaction style. Do not let older stored unit memories override the teacher-requested topic or make the content feel like a compromise between two unrelated subjects.
 
 ## Content Package Requirements
 
@@ -78,6 +80,9 @@ Image prompt requirements:
 - The visual should show the scene only: objects, characters, emotion, relationship, route, or manipulatives.
 - If the orchestrator image intent asks for blank cards, worksheet cards, UI panels, answer areas, or speech bubbles, ignore that part and translate the intent into a real-world scene or learning material object instead.
 - Each of the 5 image assets must be visually distinct and match its role.
+- Every image prompt must visibly support the exact stage activity. If `templateJson` mentions concrete objects, places, or actions such as paper cups, tumblers, bus numbers, a center entrance, a library shelf, a schedule board, measuring cups, or a poster board, the matching image prompt must include those visual anchors.
+- Do not use a generic decorative image for a specific problem. If the UI asks the student to judge poster sentences, the image should clearly feel like a poster-reading scene; if the UI asks for an action order, the image should show the situation where that order matters.
+- Exact problem sentences, choices, and answers still belong only in `templateJson`. Show the real-world objects and relationship in the image, not the answer text.
 - Put visual constraints in `promptJson.prompt`, plus optional structured fields such as `visualRole`, `scene`, `style`, `avoid`, and `ocrPolicy`.
 
 Audio requirements:
@@ -101,12 +106,16 @@ Every mission must be a concrete playable micro-scenario, not a generic workshee
 - Honor the teacher requested topic. If the teacher asks for discounts, percent, reading comprehension, data, or another non-fraction topic, do not import fraction language unless the teacher explicitly asked for it.
 - When the requested topic differs from the stored case goal, keep the requested topic as the source of truth. Use the stored student context only for scaffolding, reading load, interaction style, and emotional support.
 - Match the scenario maturity to the student's grade and context. Lower the reading burden, not the student's social age.
+- Before writing stages, decide the scenario spine in your own reasoning: where the student is, what concrete thing they are looking at, what small success they can get first, what changes in the applied problem, and what they will say or do in stage 4.
+- Stage 1 must introduce that spine with enough emotional context: not just a definition, but a scene where the concept or behavior is useful.
 - For older `life_support` students, prefer practical participation goals: finding a resource for a task, asking staff for help, checking a route, handling a schedule change, choosing a safe next action, or explaining what help is needed.
 - Avoid trivial clue questions such as "what color is it?" when that is the whole task. The clue question should support an actual later action, such as what information to tell a helper.
 - Stage 1 must introduce one clear anchor example with concrete numbers, objects, or labels that the student will reuse.
 - Stage 2 must be the easiest success step using that same anchor example, but it should still feel purposeful rather than a throwaway obvious answer.
 - Stage 3 must be a meaningful transfer or one-step deeper version, not a sudden jump to a much harder calculation or a generic order sort.
 - Stage 4 must ask the student to explain or act out the exact reasoning/behavior practiced in stages 1~3.
+- If stage 2 uses `card_match`, the left and right cards must feel semantically natural in the scenario. Avoid abstract label matching unless stage 1 already made the criteria concrete.
+- If stage 3 uses a choice template, include the reason for the answer in feedback so the student hears the connection, not just "맞아요".
 - `sequence_ordering` may rehearse a method, but it must not be the whole learning task. Pair it with a concrete value/object scenario and make the next stage apply the method.
 - Prefer friendly classroom or daily-life values that can be solved mentally. Avoid awkward numbers, hidden arithmetic, or operations that were not taught in stages 1~2.
 - The correct answer should be educationally checkable from the visible UI text alone; do not rely on information hidden only in the image.

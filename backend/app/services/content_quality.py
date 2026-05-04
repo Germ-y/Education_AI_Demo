@@ -130,9 +130,9 @@ PROPOSAL_PHRASES = (
 )
 
 TEXT_LIMITS = {
-    "very_low": {"instruction": 60, "question": 52, "choice": 24, "audio": 95},
-    "low": {"instruction": 90, "question": 80, "choice": 32, "audio": 125},
-    "default": {"instruction": 120, "question": 100, "choice": 42, "audio": 150},
+    "very_low": {"instruction": 60, "question": 52, "choice": 24, "audio": 95, "audio_min": 24},
+    "low": {"instruction": 90, "question": 80, "choice": 32, "audio": 125, "audio_min": 32},
+    "default": {"instruction": 120, "question": 100, "choice": 42, "audio": 150, "audio_min": 36},
 }
 
 STRUCTURED_INTERACTION_TEMPLATES = {
@@ -390,6 +390,8 @@ def _validate_visible_content_text(
             issues.append(f"{stage.id}.studentInstruction이 학생 읽기 부담 기준보다 깁니다.")
         for path, text in _iter_template_visible_text(stage.template_json, stage.id):
             _validate_korean_text(text, path, issues)
+            if _has_student_proposal_phrase(text):
+                issues.append(f"{path} 학생 문구에 교사용 제안 말투가 섞였습니다.")
             if path.endswith(".question") and len(text) > limits["question"]:
                 issues.append(f"{path}이 학생 읽기 부담 기준보다 깁니다.")
             if path.endswith(".text") and len(text) > limits["choice"]:
@@ -421,6 +423,8 @@ def _validate_visible_content_text(
         if asset.asset_type != AssetType.AUDIO or not asset.source_text:
             continue
         _validate_korean_text(asset.source_text, f"{asset.id}.sourceText", issues)
+        if len(asset.source_text.strip()) < limits["audio_min"]:
+            issues.append(f"{asset.id}.sourceText가 장면과 과제를 연결하기에 너무 짧습니다.")
         if len(asset.source_text) > limits["audio"]:
             issues.append(f"{asset.id}.sourceText가 학생 듣기 부담 기준보다 깁니다.")
 

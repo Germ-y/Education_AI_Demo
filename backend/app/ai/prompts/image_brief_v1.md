@@ -38,6 +38,8 @@ The frontend renders all text from `templateJson`.
 - Clear subject separation.
 - Enough empty space for UI overlay.
 - Consistent mascot/visual language across the five images.
+- The image must support the exact stage activity with recognizable real-world anchors. A stage about poster sentences should show poster-reading context and relevant objects; a stage about route or schedule decisions should show route or schedule context; a stage about measuring or comparing should show the manipulatives or objects being compared.
+- Do not create a beautiful but generic scene. The teacher should be able to see why this image belongs to this stage before reading the backend prompt.
 - Avoid one-note palettes.
 - Avoid decorative gradient blobs.
 - No stock-photo feeling.

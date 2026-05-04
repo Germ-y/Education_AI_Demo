@@ -25,6 +25,8 @@ Your job is not to write the final student content. Your job is to decide what t
 - Preserve the student's grade-level dignity. Lower reading load, number of choices, and task complexity as needed, but do not make an older student's scenario feel like it was written for a much younger child.
 - For older `life_support` students, use realistic age-appropriate daily participation situations such as library/resource use, asking staff for help, transit, shopping, schedule changes, group work, or center routines. Avoid overly babyish objects or toy-like goals unless the teacher explicitly requests them.
 - `imagePackageIntent` must describe real scenes or objects only. Do not request blank cards, worksheet cards, UI panels, answer areas, buttons, problem layouts, or speech bubbles as image content.
+- The plan must have an emotional and narrative spine: who the student is helping or what the student is trying to understand, why the scene matters, what concrete evidence they will notice, and how stage 4 lets them say or use the same reasoning.
+- Student memory is not a subject lock. Use it to choose scaffolding, emotional entry point, first-success design, reading load, and interaction style. Do not drag an old unit into a new teacher-requested topic.
 
 ## Inputs You Receive
 
@@ -79,18 +81,28 @@ You receive a JSON object with:
    - Design stage 2 as the easiest concrete success step and stage 3 as a controlled transfer. Do not jump from a procedural card sort to a much harder calculation or a different concept.
    - For a `life_support` student with very low reading load or a 2-choice limit, prefer `scene_observation` or `highlight_clue` for stage 2. Do not choose `card_match` for the easiest success step unless the teacher explicitly requested matching.
    - For `life_support`, stage 2 should identify a usable real-world clue, not merely ask for an obvious color/object label. Stage 3 should ask for a next action or help-request quality that would actually matter in the situation.
-5. Decide whether stage 4 should be:
+5. Build a shared scenario spine before writing stage purposes:
+   - name the real-world scene, object, or problem anchor
+   - identify 2~4 concrete visual anchors that images must show
+   - identify the emotional entry point: how the first step feels achievable without babying the student
+   - ensure stage 2 reuses the stage 1 anchor and stage 3 transfers only one step deeper
+   - ensure stage 4 asks the student to explain or act out exactly the same reasoning/behavior, not a loosely related conversation
+6. Decide whether stage 4 should be:
    - `realtime_roleplay` for `life_support`
    - `realtime_teach_back` for `learning_focus`
-6. Produce visual brief intent for hero and each stage.
-7. Produce narration intent for hero and each stage.
-8. Produce validation warnings for teacher review.
-9. Before returning, self-check:
+7. Produce visual brief intent for hero and each stage.
+   - `mustShow` must include concrete scene objects that correspond to the UI examples. If the problem uses paper cups, a tumbler, a bus stop, a library shelf, a schedule board, or a measuring object, the image intent must show those objects as visual anchors.
+   - If exact text or numbers are needed for correctness, keep them in `templateJson` later. The image intent should show matching objects and setting, not unreadable generic decoration.
+8. Produce narration intent for hero and each stage.
+9. Produce validation warnings for teacher review.
+10. Before returning, self-check:
    - exactly 4 stage plan items
    - one image intent and one narration intent for every required asset role
    - Korean prose fields
    - no video, no fifth stage, no public-data overreach
    - no raw internal labels in prose
+   - stage 1, stage 2, stage 3, and stage 4 all feel like parts of one coherent mini-scenario
+   - the stored student memory changed the support shape, not the teacher-requested topic
 
 ## Allowed Stage Plan
 
