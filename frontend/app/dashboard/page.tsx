@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   approveContent,
+  applyReviewSummaryToMemory,
   createAgentRun,
   createContentGeneration,
   createTeacherStudentNote,
@@ -18,6 +19,7 @@ import {
   rejectContent,
   updateContentReview,
   type AgentRun,
+  type CaseNote,
   type MissionContent,
   type StudentCaseFile,
   type StudentListItem,
@@ -197,6 +199,13 @@ type SessionLog = {
   reflectionText: string | null;
 };
 
+type SavedFeedbackRecord = {
+  id: string;
+  recordId: string;
+  feedback: string;
+  savedAt: string;
+};
+
 const tabs: Array<{ id: DashboardTab; label: string; description: string }> = [
   { id: "info", label: "학생 정보", description: "기본 정보와 현재 학습 상태" },
   { id: "materials", label: "자료 제안·검토", description: "AI 수업 자료 제안을 확인" },
@@ -247,6 +256,7 @@ const learningStatus: Record<CaseStatus, { label: string; progress: number; curr
 };
 
 const workflowSteps = ["자료 제안", "제안 검토", "학습", "학습 피드백"];
+const reportFeedbackNotePrefix = "review_summary_feedback:";
 
 const reviewStagePreviews: ReviewStageDraft[] = [];
 
@@ -360,6 +370,26 @@ function toTimestamp(value?: string | null) {
   if (!value) return 0;
   const timestamp = new Date(value).getTime();
   return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function encodeReportFeedbackNote(recordId: string, feedback: string) {
+  return `${reportFeedbackNotePrefix}${recordId}\n${feedback}`;
+}
+
+function parseReportFeedbackNote(note: CaseNote): SavedFeedbackRecord | null {
+  if (!note.body.startsWith(reportFeedbackNotePrefix)) return null;
+
+  const [recordIdLine = "", ...feedbackLines] = note.body.slice(reportFeedbackNotePrefix.length).split("\n");
+  const recordId = recordIdLine.trim();
+  const feedback = feedbackLines.join("\n").trim();
+  if (!recordId || !feedback) return null;
+
+  return {
+    id: note.id,
+    recordId,
+    feedback,
+    savedAt: note.createdAt.slice(0, 10),
+  };
 }
 
 function toRecordLevel(percent: number): "상" | "중" | "하" {
@@ -651,9 +681,8 @@ export default function DashboardPage() {
   const [pendingGenerationJobs, setPendingGenerationJobs] = useState<Record<string, PendingGenerationJob>>(readPendingGenerationJobs);
   const generationPollLocks = useRef<Set<string>>(new Set());
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({});
-  const [savedFeedbackRecords, setSavedFeedbackRecords] = useState<
-    Array<{ id: string; recordId: string; feedback: string; savedAt: string }>
-  >([]);
+  const [savedFeedbackRecords, setSavedFeedbackRecords] = useState<SavedFeedbackRecord[]>([]);
+  const [savingFeedbackRecordId, setSavingFeedbackRecordId] = useState<string | null>(null);
   const [reportReuseError, setReportReuseError] = useState("");
 
   const updatePendingGenerationJobs = useCallback((updater: (current: Record<string, PendingGenerationJob>) => Record<string, PendingGenerationJob>) => {
@@ -895,6 +924,19 @@ export default function DashboardPage() {
           challengeTags: [],
           planTags: [],
         };
+  const serverSavedFeedbackRecords = useMemo(
+    () =>
+      (activeCaseFile?.weeklyRecords ?? [])
+        .map(parseReportFeedbackNote)
+        .filter((item): item is SavedFeedbackRecord => Boolean(item)),
+    [activeCaseFile?.weeklyRecords],
+  );
+  const storedFeedbackRecords = useMemo(() => {
+    const byRecordId = new Map<string, SavedFeedbackRecord>();
+    savedFeedbackRecords.forEach((item) => byRecordId.set(item.recordId, item));
+    serverSavedFeedbackRecords.forEach((item) => byRecordId.set(item.recordId, item));
+    return Array.from(byRecordId.values());
+  }, [savedFeedbackRecords, serverSavedFeedbackRecords]);
   const completedContentIds = new Set((activeReport?.reports ?? []).map((record) => record.contentId));
   const selectedReviewItems = (activeCaseFile?.recentContents ?? [])
     .filter((content) => !completedContentIds.has(content.id))
@@ -943,13 +985,13 @@ export default function DashboardPage() {
   const sessionLogs = selectedRecords;
   const feedbackQueue = sessionLogs;
   const pendingFeedbackQueue = feedbackQueue.filter(
-    (record) => !savedFeedbackRecords.some((feedback) => feedback.recordId === record.id),
+    (record) => !storedFeedbackRecords.some((feedback) => feedback.recordId === record.id),
   );
   const feedbackTarget =
     feedbackQueue.find((record) => record.id === selectedFeedbackId) ?? feedbackQueue[0] ?? sessionLogs[0];
   const openReport = sessionLogs.find((record) => record.id === openReportId);
   const openReportTeacherFeedback = openReport
-    ? savedFeedbackRecords.find((feedback) => feedback.recordId === openReport.id)
+    ? storedFeedbackRecords.find((feedback) => feedback.recordId === openReport.id)
     : null;
   const openReportStageStep = reportPreviewStep;
   const isOpenReportReusing = openReport ? reviewActionId === openReport.contentId : false;
@@ -1429,6 +1471,37 @@ export default function DashboardPage() {
       await refreshSelectedStudentData();
     } finally {
       setSavingMemoCaseId(null);
+    }
+  };
+
+  const handleSaveTeacherFeedback = async (record: SessionLog) => {
+    const feedback = feedbackDrafts[record.id]?.trim();
+    if (!feedback || !selectedCase.studentId || savingFeedbackRecordId) return;
+
+    setSavingFeedbackRecordId(record.id);
+    try {
+      await createTeacherStudentNote(selectedCase.studentId, {
+        noteType: "session",
+        body: encodeReportFeedbackNote(record.id, feedback),
+        visibility: "teacher_only",
+      });
+      await applyReviewSummaryToMemory(record.id);
+      setSavedFeedbackRecords((current) => [
+        {
+          id: `feedback-${record.id}-${Date.now()}`,
+          recordId: record.id,
+          feedback,
+          savedAt: "방금 저장",
+        },
+        ...current.filter((item) => item.recordId !== record.id),
+      ]);
+      setFeedbackDrafts((current) => ({
+        ...current,
+        [record.id]: "",
+      }));
+      await refreshSelectedStudentData();
+    } finally {
+      setSavingFeedbackRecordId(null);
     }
   };
 
@@ -2141,7 +2214,10 @@ export default function DashboardPage() {
                           모든 학습 기록이 선생님 리포트로 저장되었습니다.
                         </div>
                       )}
-                      {pendingFeedbackQueue.map((record) => (
+                      {pendingFeedbackQueue.map((record) => {
+                        const isSavingFeedback = savingFeedbackRecordId === record.id;
+
+                        return (
                         <section key={record.id} className="rounded-lg border border-[#e5e9f0] bg-[#f8fafc] p-4">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
@@ -2191,39 +2267,27 @@ export default function DashboardPage() {
                           />
                           <div className="mt-3 flex justify-end">
                             <button
-                              onClick={() => {
-                                const feedback = feedbackDrafts[record.id]?.trim();
-                                if (!feedback) return;
-
-                                setSavedFeedbackRecords((current) => [
-                                  {
-                                    id: `feedback-${record.id}-${Date.now()}`,
-                                    recordId: record.id,
-                                    feedback,
-                                    savedAt: "방금 저장",
-                                  },
-                                  ...current.filter((item) => item.recordId !== record.id),
-                                ]);
-                              }}
-                              disabled={!feedbackDrafts[record.id]?.trim()}
+                              onClick={() => void handleSaveTeacherFeedback(record)}
+                              disabled={!feedbackDrafts[record.id]?.trim() || Boolean(savingFeedbackRecordId)}
                               className="rounded-md bg-[#1f3a5f] px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
                             >
-                              최근 기록으로 저장
+                              {isSavingFeedback ? "저장 중" : "최근 기록으로 저장"}
                             </button>
                           </div>
                         </section>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
                   <div className="space-y-4 rounded-lg border border-[#e5e9f0] bg-white p-5 xl:order-2">
                     <h3 className="text-xl font-black">최근 기록</h3>
-                    {savedFeedbackRecords.length === 0 && (
+                    {storedFeedbackRecords.length === 0 && (
                       <div className="rounded-md bg-[#f8fafc] p-4 text-sm font-bold leading-6 text-[#64748b]">
                         선생님 리포트로 저장된 최근 기록이 아직 없습니다.
                       </div>
                     )}
-                    {savedFeedbackRecords.map((feedbackRecord) => {
+                    {storedFeedbackRecords.map((feedbackRecord) => {
                       const sourceRecord = sessionLogs.find((record) => record.id === feedbackRecord.recordId);
                       if (!sourceRecord) return null;
 

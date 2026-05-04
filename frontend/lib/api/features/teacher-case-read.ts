@@ -1,7 +1,7 @@
 import type { ApiAdapterOptions } from "../adapter";
 import { apiFetch } from "../api-fetch";
 import { getApiAdapter, type ApiDataSource } from "../client";
-import type { CaseNote, CaseNoteCreate } from "../contracts";
+import type { CaseNote, CaseNoteCreate, MemoryCard } from "../contracts";
 
 export function getTeacherStudents(options?: ApiAdapterOptions & { source?: ApiDataSource }) {
   return getApiAdapter(options?.source).getTeacherStudents(options);
@@ -23,6 +23,13 @@ export function createTeacherStudentNote(
   return apiFetch<CaseNote>(`/api/teacher/students/${encodeURIComponent(studentId)}/notes`, {
     method: "POST",
     body: payload,
+    token: options?.token,
+  });
+}
+
+export function applyReviewSummaryToMemory(reviewId: string, options?: ApiAdapterOptions) {
+  return apiFetch<MemoryCard>(`/api/review-summaries/${encodeURIComponent(reviewId)}/apply-to-memory`, {
+    method: "POST",
     token: options?.token,
   });
 }
