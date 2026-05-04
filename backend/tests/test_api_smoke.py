@@ -153,12 +153,12 @@ def test_teacher_and_student_demo_flows() -> None:
     assert fraction_case.status_code == 200
     assert fraction_case.json()["data"]["profile"]["displayName"] == "이민준"
     assert fraction_case.json()["data"]["dashboardProfile"]["headline"] == "영주중학교 · 중2 · 고연령 학습지원형"
-    assert fraction_case.json()["data"]["dashboardProfile"]["primaryNeedTitle"] == "분수 개념 보완 수업"
+    assert fraction_case.json()["data"]["dashboardProfile"]["primaryNeedTitle"] == "정보 읽기 근거 설명 수업"
     assert "수업이 좋겠어요" in fraction_case.json()["data"]["dashboardProfile"]["primaryNeedDetail"]
-    assert "말로 정리하기" in fraction_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
+    assert "근거" in fraction_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
     assert "좋겠어요" in fraction_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
-    assert fraction_case.json()["data"]["dashboardProfile"]["strengths"][0] == "그림이나 조각 모델을 보면 전체와 부분을 더 쉽게 이해해요."
-    assert fraction_case.json()["data"]["dashboardProfile"]["weaknesses"][0] == "분모와 분자가 각각 무엇을 뜻하는지 자주 바꿔 생각해요."
+    assert fraction_case.json()["data"]["dashboardProfile"]["strengths"][0] == "포스터나 안내문처럼 실제 장면이 있으면 읽어야 할 문장을 더 잘 찾습니다."
+    assert fraction_case.json()["data"]["dashboardProfile"]["weaknesses"][0] == "확인할 수 있는 사실과 생각·권유가 담긴 의견을 가끔 섞어 판단합니다."
     assert_no_teacher_raw_terms(fraction_case.json()["data"]["dashboardProfile"])
     life_case = client.get("/api/teacher/students/student_life_bus", headers={"authorization": f"Bearer {teacher_token}"})
     assert life_case.status_code == 200
@@ -176,7 +176,7 @@ def test_teacher_and_student_demo_flows() -> None:
     assert bundle["student"]["gradeLabel"] == "중2"
     assert bundle["student"]["name"] == "이민준"
     assert bundle["student"]["displayName"] == "이민준"
-    assert "개념 보완 수업" in bundle["caseSummary"]["primaryNeed"]
+    assert "정보 문장" in bundle["caseSummary"]["primaryNeed"]
     assert bundle["schoolContext"]["timetableSummary"]["todaySubjects"] == ["역사", "동아리활동", "진로와 직업", "국어", "과학", "도덕"]
     assert [item["label"] for item in bundle["autoContext"]] == ["학생 기록", "이전 수업", "학교 시간표", "다음 목표"]
     assert bundle["aiReadyContext"]["evidenceSources"]
