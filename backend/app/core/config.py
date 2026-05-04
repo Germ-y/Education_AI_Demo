@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     openai_api_key: str | None = None
     openai_reasoning_model: str = "gpt-5.5"
+    openai_response_timeout_sec: float = 180
     openai_image_model: str = "gpt-image-2"
     openai_image_timeout_sec: float = 360
     openai_realtime_model: str = "gpt-realtime-1.5"

@@ -205,6 +205,7 @@ def _run_orchestrator_agent(
             student_id=student_id,
             case_id=case_id,
             content_type=content_type,
+            case_file=input_snapshot.get("caseFile") if isinstance(input_snapshot.get("caseFile"), dict) else None,
         )
     except AiProviderError as exc:
         logger.warning(

@@ -203,6 +203,23 @@ def test_orchestrator_plan_quality_requires_track_matching_four_stage_flow() -> 
         )
 
 
+def test_orchestrator_plan_quality_allows_choice_flow_for_very_low_reading_load() -> None:
+    plan = _valid_learning_plan()
+    plan["stagePlan"][1]["templateType"] = "scene_question"
+    plan["stagePlan"][2]["templateType"] = "applied_question"
+    case_file = _fraction_case_file()
+    case_file["profile"]["profileJson"]["readingLoad"] = "very_low"
+    case_file["profile"]["profileJson"]["choiceCountLimit"] = 2
+
+    validate_orchestrator_plan_quality(
+        plan,
+        student_id="student_learning_fraction",
+        case_id="case_learning_fraction",
+        content_type="learning_focus",
+        case_file=case_file,
+    )
+
+
 def test_mission_quality_accepts_generated_korean_contract() -> None:
     mission = MissionContent.model_validate(_generated_fraction_content())
 
@@ -377,17 +394,56 @@ def test_mission_quality_rejects_ui_text_inside_image_prompt() -> None:
         )
 
 
-def test_mission_quality_rejects_ui_like_image_prompt_layout() -> None:
+def test_mission_quality_leaves_ui_like_image_prompt_wording_to_pre_asset_review() -> None:
     content = _generated_fraction_content()
     content["assets"][1]["promptJson"]["prompt"] += " 빈 카드와 말풍선, 선택지 영역을 함께 배치합니다."
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="UI형 이미지"):
+    validate_mission_content_quality(
+        mission,
+        case_file=_fraction_case_file(),
+        orchestrator_plan=_valid_learning_plan(),
+    )
+
+
+def test_mission_quality_allows_real_object_button_word_in_image_prompt() -> None:
+    content = _generated_fraction_content()
+    content["assets"][1]["promptJson"]["prompt"] += " 안내문 옆 실제 사물의 작은 전원 버튼은 배경 소품으로만 보입니다."
+    mission = MissionContent.model_validate(content)
+
+    validate_mission_content_quality(
+        mission,
+        case_file=_fraction_case_file(),
+        orchestrator_plan=_valid_learning_plan(),
+    )
+
+
+def test_mission_quality_requires_source_lines_for_notice_or_poster_tasks() -> None:
+    content = _generated_fraction_content()
+    content["stages"][0]["studentInstruction"] = "포스터 문구를 보고 단서를 찾아봅니다."
+    content["stages"][0]["templateJson"]["storyText"] = "교실 게시판에 환경 포스터가 붙어 있어요."
+    mission = MissionContent.model_validate(content)
+
+    with pytest.raises(ContentQualityError, match="sourceTextLines"):
         validate_mission_content_quality(
             mission,
             case_file=_fraction_case_file(),
             orchestrator_plan=_valid_learning_plan(),
         )
+
+
+def test_mission_quality_allows_source_lines_for_notice_or_poster_tasks() -> None:
+    content = _generated_fraction_content()
+    content["stages"][0]["studentInstruction"] = "포스터 문구를 보고 단서를 찾아봅니다."
+    content["stages"][0]["templateJson"]["storyText"] = "교실 게시판에 환경 포스터가 붙어 있어요."
+    content["stages"][0]["templateJson"]["sourceTextLines"] = ["종이컵 20개를 모았어요.", "텀블러를 쓰면 더 멋져요."]
+    mission = MissionContent.model_validate(content)
+
+    validate_mission_content_quality(
+        mission,
+        case_file=_fraction_case_file(),
+        orchestrator_plan=_valid_learning_plan(),
+    )
 
 
 def _valid_learning_plan() -> dict:

@@ -153,7 +153,21 @@ UI_LIKE_IMAGE_PROMPT_TERMS = (
     "정답 영역",
     "문제 영역",
     "UI 패널",
-    "버튼",
+    "UI 버튼",
+    "클릭 버튼",
+    "버튼형 UI",
+    "버튼처럼",
+)
+
+SOURCE_MATERIAL_TERMS = (
+    "안내문",
+    "포스터",
+    "표지판",
+    "간판",
+    "시간표",
+    "메뉴",
+    "영수증",
+    "문구",
 )
 
 
@@ -172,8 +186,12 @@ def validate_orchestrator_plan_quality(
     student_id: str,
     case_id: str,
     content_type: str,
+    case_file: dict[str, Any] | None = None,
 ) -> None:
     issues: list[str] = []
+    profile_json = _profile_json_from_case_file(case_file)
+    reading_load = str(profile_json.get("readingLoad") or "default")
+    choice_limit = _positive_int(profile_json.get("choiceCountLimit"))
 
     _expect_equal(plan.get("studentId"), student_id, "orchestrator.studentId", issues)
     _expect_equal(plan.get("caseId"), case_id, "orchestrator.caseId", issues)
@@ -184,7 +202,7 @@ def validate_orchestrator_plan_quality(
     _validate_korean_text(_nested(plan, "difficultyPolicy", "reason"), "orchestrator.difficultyPolicy.reason", issues)
     _validate_text_list(plan.get("teacherReviewFocus"), "orchestrator.teacherReviewFocus", issues)
     _validate_stage_plan(plan.get("stagePlan"), content_type, issues)
-    _validate_stage_plan_template_variety(plan.get("stagePlan"), issues)
+    _validate_stage_plan_template_variety(plan.get("stagePlan"), issues, reading_load=reading_load, choice_limit=choice_limit)
     _validate_intent_roles(plan.get("imagePackageIntent"), "orchestrator.imagePackageIntent", issues)
     _validate_intent_roles(plan.get("ttsNarrationIntent"), "orchestrator.ttsNarrationIntent", issues)
 
@@ -218,10 +236,11 @@ def validate_mission_content_quality(
         issues.append("생성 직후 콘텐츠에는 승인/배포 필드가 없어야 합니다.")
 
     _validate_mission_stage_flow(mission, expected_content_type, issues)
-    _validate_mission_template_variety(mission, issues)
+    _validate_mission_template_variety(mission, issues, reading_load=reading_load, choice_limit=choice_limit)
     _validate_asset_package(mission, issues)
     _validate_stage_asset_links(mission, issues)
     _validate_visible_content_text(mission, reading_load, choice_limit, issues)
+    _validate_source_material_evidence(mission, issues)
     _validate_image_prompt_policy(mission, issues)
 
     if issues:
@@ -260,8 +279,10 @@ def _validate_stage_plan(stage_plan: Any, content_type: str, issues: list[str]) 
         _validate_korean_text(item.get("purpose"), f"orchestrator.stagePlan[{step}].purpose", issues)
 
 
-def _validate_stage_plan_template_variety(stage_plan: Any, issues: list[str]) -> None:
+def _validate_stage_plan_template_variety(stage_plan: Any, issues: list[str], *, reading_load: str = "default", choice_limit: int | None = None) -> None:
     if not isinstance(stage_plan, list):
+        return
+    if _allows_choice_first_flow(reading_load, choice_limit):
         return
 
     stage_2_3_templates = [
@@ -310,7 +331,10 @@ def _validate_mission_stage_flow(mission: MissionContent, content_type: str, iss
                 issues.append(f"{stage.id}.realtimeSpec.maxDurationSec는 데모 품질 기준상 180초 이하로 제한합니다.")
 
 
-def _validate_mission_template_variety(mission: MissionContent, issues: list[str]) -> None:
+def _validate_mission_template_variety(mission: MissionContent, issues: list[str], *, reading_load: str = "default", choice_limit: int | None = None) -> None:
+    if _allows_choice_first_flow(reading_load, choice_limit):
+        return
+
     stage_2_3_templates = [
         _as_value(stage.template_type)
         for stage in mission.stages
@@ -453,20 +477,30 @@ def _validate_image_prompt_policy(mission: MissionContent, issues: list[str]) ->
             continue
         text_policy = str(prompt_json.get("textRenderingPolicy") or prompt_json.get("ocrPolicy") or "")
         allows_scene_text = bool(prompt_json.get("ocrRequired")) and "short_scene_text_allowed" in text_policy
-        if "scene_only" not in text_policy and "no_problem_text" not in text_policy and not allows_scene_text:
-            issues.append(f"{asset.id}.promptJson에는 이미지 안에 문제/선택지/정답을 넣지 않는 정책이 필요합니다.")
         if allows_scene_text:
             scene_text_lines = _iter_prompt_scene_text(prompt_json)
             if not scene_text_lines:
                 issues.append(f"{asset.id}.promptJson은 짧은 장면 텍스트 허용 시 sceneTextLines를 함께 제공해야 합니다.")
-        for term in UI_LIKE_IMAGE_PROMPT_TERMS:
-            if term in prompt:
-                issues.append(f"{asset.id}.promptJson.prompt가 UI형 이미지 요소를 요청합니다: {term}")
-                break
         for text in visible_texts:
             if text and text in prompt and not (allows_scene_text and text in allowed_scene_texts):
                 issues.append(f"{asset.id}.promptJson.prompt에 UI 문구가 그대로 들어갔습니다: {text[:20]}")
                 break
+
+
+def _validate_source_material_evidence(mission: MissionContent, issues: list[str]) -> None:
+    for stage in mission.stages:
+        template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
+        scene_lines = _iter_scene_source_text(template_json)
+        visible_text = " ".join(
+            text
+            for _, text in _iter_template_visible_text(template_json, stage.id)
+        )
+        combined = f"{stage.student_instruction} {visible_text}"
+        if any(term in combined for term in SOURCE_MATERIAL_TERMS) and not scene_lines:
+            issues.append(
+                f"{stage.id}.templateJson.sourceTextLines 또는 sceneTextLines가 필요합니다. "
+                "안내문/포스터/표지판처럼 읽거나 확인할 자료를 쓰는 단계는 실제 근거 문구를 먼저 구조화해야 합니다."
+            )
 
 
 def _iter_template_visible_text(value: Any, prefix: str) -> list[tuple[str, str]]:
@@ -662,3 +696,17 @@ def _positive_int(value: Any) -> int | None:
     except (TypeError, ValueError):
         return None
     return number if number > 0 else None
+
+
+def _profile_json_from_case_file(case_file: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(case_file, dict):
+        return {}
+    profile = case_file.get("profile")
+    if not isinstance(profile, dict):
+        return {}
+    profile_json = profile.get("profileJson")
+    return profile_json if isinstance(profile_json, dict) else {}
+
+
+def _allows_choice_first_flow(reading_load: str, choice_limit: int | None) -> bool:
+    return reading_load == "very_low" or (choice_limit is not None and choice_limit <= 2)

@@ -14,6 +14,7 @@ Return strict JSON only.
 - If `orchestratorPlan.sessionGoal` or the teacher request clearly sets a new topic, that topic is the source of truth. Do not reject the mission merely because the stored case goal or previous lesson is about a different subject.
 - Student case context should be used to judge scaffolding, reading load, interaction pattern, age fit, and support strategy, not to override a clearly requested safe topic.
 - The mission feels like a concrete playable micro-scenario, not a generic worksheet.
+- The mission has enough instructional substance before images/audio are generated. Short visible text is fine, but the package must still include a concrete situation, evidence source, feedback reason, and stage-to-stage purpose.
 - Stage 1 opens a clear situation or concept anchor that stages 2 and 3 reuse.
 - Stage 2 is the easiest success step.
 - Stage 3 is a controlled transfer or one-step deeper problem, not a sudden difficulty jump.
@@ -30,6 +31,9 @@ Return strict JSON only.
 - Image prompts describe visual scenes only and do not ask for worksheet cards, empty cards, UI panels, answer-choice layouts, problem text, buttons, or speech bubbles.
 - Image prompts visually match the concrete objects or setting used in the stage problem. If the UI text mentions a poster, paper cups, a tumbler, a schedule, a route, a shelf, a clock, or a measuring object, the corresponding image prompt must make that scene recognizable without rendering answer text.
 - Image prompts make the learning evidence visually dominant enough to inspect. People, mascots, or decorative classroom atmosphere may support the scene, but they must not become the repeated main subject across the package.
+- If the task asks the student to read or inspect a notice, poster, sign, label, schedule, bus number, or similar source, the source material must be explicit in `templateJson.sourceTextLines` or `templateJson.sceneTextLines` and reflected in the image prompt as short scene text when needed. Do not pass a blank/icon-only source when the learning target is reading evidence.
+- Stage 1 text must not be only a generic action like "그림을 보고 찾아봅시다." It should name the concrete anchor evidence the student will reuse, while staying short.
+- Stage 2 and stage 3 feedback must explain the reason in student-friendly Korean. Do not pass feedback that only says the answer is correct or asks the student to try again.
 - Student-facing Korean is short, concrete, and age-appropriate.
 
 ## Repair Triggers
@@ -37,6 +41,9 @@ Return strict JSON only.
 Return `verdict: "repair"` if any of these happen:
 
 - The content feels bland, generic, or disconnected from the student's context.
+- Stage 1 is merely a label or generic instruction and does not establish why the student is looking at the scene.
+- A notice/poster/sign task has no actual source lines, or the source lines are absent from both `templateJson` and the image prompt.
+- The content lowers reading load by deleting the learning evidence instead of simplifying it.
 - The content feels emotionally flat: it has definitions and choices but no clear reason the student is looking at this scene or why the next step matters.
 - The image prompt and the stage question do not share concrete objects, place, or action anchors.
 - Image prompts are mostly portraits or generic people-looking-at-materials shots, while the actual learning evidence is small, vague, or decorative.

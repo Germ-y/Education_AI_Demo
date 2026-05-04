@@ -23,11 +23,12 @@ class OpenAiProvider:
         model: str,
         instructions: str,
         input_snapshot: dict[str, Any],
-        timeout_sec: float = 90,
+        timeout_sec: float | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any] | None]:
         if not self.settings.openai_api_key:
             raise ProviderConfigurationError("OPENAI_API_KEY_MISSING", "OPENAI_API_KEY가 없어 실제 AI 생성을 실행할 수 없습니다.")
 
+        timeout_sec = timeout_sec or self.settings.openai_response_timeout_sec
         started_at = time.perf_counter()
         logger.info("openai.responses.started model=%s timeout_sec=%s", model, timeout_sec)
         payload = {

@@ -37,6 +37,7 @@ Generate a complete MissionContent JSON package from an approved OrchestratorPla
 - `studentTitle` values are fixed product labels. Copy the fixed label for the content type and step; do not use custom lesson titles as `studentTitle`.
 - Treat the mission like one emotionally coherent mini-scenario, not four independent worksheets. The student should understand why the scene matters and why each next task naturally follows from the previous one.
 - Use student memory for emotional support, scaffolding, and interaction style. Do not let older stored unit memories override the teacher-requested topic or make the content feel like a compromise between two unrelated subjects.
+- Short visible instructions are allowed, but thin content is not. Keep `studentInstruction` short while making `storyText`, `missionText`, feedback, source text, image prompts, and audio narration carry a concrete scenario.
 
 ## Content Package Requirements
 
@@ -85,6 +86,8 @@ Image prompt requirements:
 - Do not use a generic decorative image for a specific problem. If the UI asks the student to judge poster sentences, the image should clearly feel like a poster-reading scene; if the UI asks for an action order, the image should show the situation where that order matters.
 - Exact problem instructions, choices, answers, and feedback still belong only in `templateJson`.
 - For literacy tasks that ask the student to read a poster, notice, sign, or label, put the short source text in `templateJson.sourceTextLines` and ask the image prompt to render those same lines on the real-world object. Do not put category labels such as "사실", "의견", "정답", or matching answers in the image.
+- For notice/poster/sign tasks, never describe the stage only as "그림을 보고 찾아봅시다." Include the actual short source lines the student is using, such as `오늘 준비물`, `돋보기`, `종이컵 20개`, or the teacher-requested source phrase. These are scene evidence, not UI problem text.
+- `studentInstruction` should name the concrete evidence or action, not only a generic screen action. Bad: `안내문 그림을 보고 오늘 챙길 물건을 찾아봅시다.` Better: `오늘 표시와 돋보기 그림을 찾아봐요.`
 - Put visual constraints in `promptJson.prompt`, plus optional structured fields such as `visualRole`, `scene`, `style`, `avoid`, and `ocrPolicy`.
 
 Audio requirements:
@@ -100,9 +103,11 @@ Audio requirements:
 Use the `orchestratorPlan.stagePlan[*].templateType` unless it violates the profile limits below.
 Template selection must be based on the orchestrator plan and student context, never arbitrary randomness.
 Stages 2 and 3 must not collapse into only simple choice-question screens. At least one of stages 2 or 3 must use `card_match`, `sequence_ordering`, or `blank_fill`.
+Exception: when the student profile has `readingLoad: very_low` or `choiceCountLimit: 2`, do not force a structured template if the orchestrator selected choice-based stages. For those students, a clear two-choice success flow is preferred over a cramped matching/sorting task.
 Do not substitute `image_quiz` for another planned template because it is easier to write.
 Do not collapse generated learning content into the repeated `card_match` + `blank_fill` pair. If the orchestrator selected `sequence_ordering`, preserve it and write real ordering cards. If the orchestrator selected a choice quiz template, preserve it and write a short quiz.
 For `learning_focus`, stages 2 and 3 should normally include one structured interaction (`sequence_ordering`, `card_match`, or `blank_fill`) and one choice quiz (`image_quiz`, `scene_question`, `clue_question`, `applied_question`, `explanation_choice`, or `wrong_explanation_fix`).
+For `learning_focus` with `readingLoad: very_low` or `choiceCountLimit: 2`, avoid `card_match` unless the teacher explicitly requested matching. The interaction should feel like noticing one useful clue and then choosing/confirming a next answer, not like a line-drawing worksheet.
 Every mission must be a concrete playable micro-scenario, not a generic worksheet:
 
 - Honor the teacher requested topic. If the teacher asks for discounts, percent, reading comprehension, data, or another non-fraction topic, do not import fraction language unless the teacher explicitly asked for it.
