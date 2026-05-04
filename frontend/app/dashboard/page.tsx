@@ -6,6 +6,7 @@ import {
   approveContent,
   createAgentRun,
   createContentGeneration,
+  createTeacherStudentNote,
   generateContentAssetPackage,
   getAgentRun,
   getReviewableContent,
@@ -355,6 +356,12 @@ function toPercentScore(value: number | null | undefined) {
   return Math.min(100, Math.max(0, Math.round(percent)));
 }
 
+function toTimestamp(value?: string | null) {
+  if (!value) return 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 function toRecordLevel(percent: number): "상" | "중" | "하" {
   if (percent >= 80) return "상";
   if (percent >= 50) return "중";
@@ -638,6 +645,7 @@ export default function DashboardPage() {
   const [reviewStageDrafts, setReviewStageDrafts] = useState<Record<string, ReviewStageDraft[]>>({});
   const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({});
   const [savedMemos, setSavedMemos] = useState<Record<string, string>>({});
+  const [savingMemoCaseId, setSavingMemoCaseId] = useState<string | null>(null);
   const [lessonDrafts, setLessonDrafts] = useState<Record<string, string>>({});
   const [generationStatuses, setGenerationStatuses] = useState<Record<string, GenerationStatus>>({});
   const [pendingGenerationJobs, setPendingGenerationJobs] = useState<Record<string, PendingGenerationJob>>(readPendingGenerationJobs);
@@ -831,6 +839,19 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!activeCaseFile) return;
 
+    const latestMemo = [...activeCaseFile.weeklyRecords]
+      .filter((note) => note.noteType === "teacher_comment")
+      .sort((left, right) => toTimestamp(right.createdAt) - toTimestamp(left.createdAt))[0];
+    const memo = latestMemo?.body ?? "";
+    const caseId = activeCaseFile.openCase.id;
+
+    setSavedMemos((current) => (current[caseId] === memo ? current : { ...current, [caseId]: memo }));
+    setMemoDrafts((current) => (current[caseId] === undefined ? { ...current, [caseId]: memo } : current));
+  }, [activeCaseFile]);
+
+  useEffect(() => {
+    if (!activeCaseFile) return;
+
     const completedJobIds = Object.values(pendingGenerationJobs)
       .filter((job) => job.phase === "assets" && Boolean(job.contentId))
       .filter((job) => isPendingGenerationContentComplete(findPendingGenerationContent(job, activeCaseFile)))
@@ -947,7 +968,8 @@ export default function DashboardPage() {
   const savedMemo = savedMemos[selectedCase.id] ?? "";
   const memoValue = memoDrafts[selectedCase.id] ?? savedMemo;
   const isMemoDirty = memoValue !== savedMemo;
-  const canSaveMemo = isMemoDirty && memoValue.trim().length > 0;
+  const isSavingMemo = savingMemoCaseId === selectedCase.id;
+  const canSaveMemo = isMemoDirty && memoValue.trim().length > 0 && !isSavingMemo;
   const lessonDraftValue = lessonDrafts[selectedCase.id] ?? "";
   const selectedPendingGenerationJob = Object.values(pendingGenerationJobs).find(
     (job) => job.caseId === selectedCase.id || (selectedCase.studentId && job.studentId === selectedCase.studentId),
@@ -1383,6 +1405,31 @@ export default function DashboardPage() {
     setTeacherStudentItems(items);
     setSelectedCaseFile(caseFile);
     setSelectedReport(report);
+  };
+
+  const handleSaveMemo = async () => {
+    if (!canSaveMemo || !selectedCase.studentId || !selectedCase.id) return;
+
+    const nextMemo = memoValue.trim();
+    setSavingMemoCaseId(selectedCase.id);
+    try {
+      await createTeacherStudentNote(selectedCase.studentId, {
+        noteType: "teacher_comment",
+        body: nextMemo,
+        visibility: "teacher_only",
+      });
+      setSavedMemos((current) => ({
+        ...current,
+        [selectedCase.id]: nextMemo,
+      }));
+      setMemoDrafts((current) => ({
+        ...current,
+        [selectedCase.id]: nextMemo,
+      }));
+      await refreshSelectedStudentData();
+    } finally {
+      setSavingMemoCaseId(null);
+    }
   };
 
   const updateCurrentContent = (content: MissionContent) => {
@@ -1836,24 +1883,14 @@ export default function DashboardPage() {
                     </button>
                     <button
                       disabled={!canSaveMemo}
-                      onClick={() => {
-                        const nextMemo = memoValue.trim();
-                        setSavedMemos((current) => ({
-                          ...current,
-                          [selectedCase.id]: nextMemo,
-                        }));
-                        setMemoDrafts((current) => ({
-                          ...current,
-                          [selectedCase.id]: nextMemo,
-                        }));
-                      }}
+                      onClick={() => void handleSaveMemo()}
                       className={`rounded-md px-4 py-2 text-sm font-bold transition ${
                         canSaveMemo
                           ? "bg-[#1f3a5f] text-white shadow-[0_8px_18px_rgba(31,58,95,0.18)]"
                           : "cursor-not-allowed bg-[#e2e8f0] text-[#94a3b8]"
                       }`}
                     >
-                      메모리로 저장
+                      {isSavingMemo ? "저장 중" : "메모리로 저장"}
                     </button>
                   </div>
                 </section>

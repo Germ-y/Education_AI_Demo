@@ -236,6 +236,12 @@ export type CaseNote = {
   createdAt: string;
 };
 
+export type CaseNoteCreate = {
+  noteType: CaseNote["noteType"];
+  body: string;
+  visibility?: CaseNote["visibility"];
+};
+
 export type MemoryCard = {
   id: string;
   studentId: string;
