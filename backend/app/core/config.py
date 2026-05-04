@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     elevenlabs_style: float = 0.32
     elevenlabs_speed: float = 1.03
     elevenlabs_use_speaker_boost: bool = True
-    elevenlabs_enable_audio_tags: bool = True
+    elevenlabs_enable_audio_tags: bool = False
     neis_api_key: str | None = None
     public_data_api_key: str | None = Field(
         default=None,

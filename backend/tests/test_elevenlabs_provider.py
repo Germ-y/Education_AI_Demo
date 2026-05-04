@@ -12,6 +12,21 @@ def test_teacher_narration_text_adds_tags_for_eleven_v3() -> None:
     assert text == "[warmly] 천천히 단서를 확인해 보세요."
 
 
+def test_elevenlabs_payload_keeps_plain_text_when_audio_tags_are_disabled() -> None:
+    provider = ElevenLabsProvider(
+        Settings(
+            elevenlabs_api_key="test-key",
+            elevenlabs_voice_id="test-voice",
+            elevenlabs_model_id="eleven_v3",
+            elevenlabs_enable_audio_tags=False,
+        )
+    )
+
+    payload = provider.build_payload("좋아요. 또렷하게 말해볼게요.")
+
+    assert payload["text"] == "좋아요. 또렷하게 말해볼게요."
+
+
 def test_teacher_narration_text_keeps_plain_text_for_v2() -> None:
     text = build_teacher_narration_text(
         "천천히 단서를 확인해 보세요.",
