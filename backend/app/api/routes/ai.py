@@ -407,6 +407,15 @@ def _generate_valid_mission_content(
         try:
             mission = _mission_from_generation(output_json, student_id=student_id, case_id=case_id)
             validate_mission_content_quality(mission, case_file=case_file, orchestrator_plan=orchestrator_plan)
+            critique = _critique_mission_content_quality(
+                provider=provider,
+                settings=settings,
+                case_file=case_file,
+                orchestrator_plan=orchestrator_plan,
+                mission=mission,
+            )
+            if critique["verdict"] != "pass":
+                raise ContentQualityError(_critique_issues(critique))
             logger.info(
                 "ai.content.attempt_validated student_id=%s case_id=%s attempt=%s content_id=%s",
                 student_id,
@@ -453,6 +462,40 @@ def _generate_valid_mission_content(
             )
 
     raise ContentQualityError(["콘텐츠 생성 품질 재시도 흐름이 예기치 않게 종료되었습니다."])
+
+
+def _critique_mission_content_quality(
+    *,
+    provider: OpenAiProvider,
+    settings,
+    case_file: dict,
+    orchestrator_plan: dict,
+    mission: MissionContent,
+) -> dict[str, Any]:
+    output_json, _ = provider.create_json_response(
+        model=settings.openai_reasoning_model,
+        instructions=load_prompt("content_quality_critique"),
+        input_snapshot={
+            "caseFile": case_file,
+            "orchestratorPlan": orchestrator_plan,
+            "missionContent": mission.model_dump(by_alias=True),
+        },
+    )
+    verdict = output_json.get("verdict")
+    if verdict not in {"pass", "repair"}:
+        raise ContentQualityError(["content quality critique verdict는 pass 또는 repair여야 합니다."])
+    issues = output_json.get("issues")
+    if verdict == "repair" and not isinstance(issues, list):
+        raise ContentQualityError(["content quality critique repair에는 issues list가 필요합니다."])
+    return output_json
+
+
+def _critique_issues(critique: dict[str, Any]) -> list[str]:
+    issues = [str(issue) for issue in critique.get("issues", []) if str(issue).strip()]
+    repair_instruction = critique.get("repairInstruction")
+    if isinstance(repair_instruction, str) and repair_instruction.strip():
+        issues.append(repair_instruction.strip())
+    return issues or ["콘텐츠 품질 비평 단계에서 수정이 필요하다고 판단했습니다."]
 
 
 def _merge_token_usage(attempt_usages: list[dict | None]) -> dict | None:

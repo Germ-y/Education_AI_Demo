@@ -552,6 +552,16 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
                 },
                 {"input_tokens": 3, "output_tokens": 5},
             )
+        if "Content Quality Critic" in instructions:
+            return (
+                {
+                    "critiqueVersion": "content_quality_critique_v1",
+                    "verdict": "pass",
+                    "issues": [],
+                    "repairInstruction": "",
+                },
+                {"input_tokens": 4, "output_tokens": 4},
+            )
         if "MissionContent" in instructions:
             content_generation_calls["count"] += 1
             if content_generation_calls["count"] == 1:

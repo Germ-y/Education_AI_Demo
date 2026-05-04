@@ -4,7 +4,13 @@ from app.ai.prompt_registry import list_prompt_specs, load_prompt
 def test_prompt_registry_loads_all_versioned_prompts() -> None:
     specs = list_prompt_specs()
 
-    assert {spec.key for spec in specs} == {"orchestrator_plan", "mission_content_package", "image_brief", "tts_script"}
+    assert {spec.key for spec in specs} == {
+        "orchestrator_plan",
+        "mission_content_package",
+        "content_quality_critique",
+        "image_brief",
+        "tts_script",
+    }
 
     for spec in specs:
         prompt = load_prompt(spec.key)
@@ -39,8 +45,10 @@ def test_generation_prompts_lock_stage_labels_and_profile_based_templates() -> N
 def test_generation_prompts_require_concrete_playable_micro_scenarios() -> None:
     orchestrator_prompt = load_prompt("orchestrator_plan")
     content_prompt = load_prompt("mission_content_package")
+    critique_prompt = load_prompt("content_quality_critique")
 
     assert "Honor the teacher requested topic" in orchestrator_prompt
     assert "concrete playable micro-scenario" in content_prompt
+    assert "concrete playable micro-scenario" in critique_prompt
     assert "Stage 2 must be the easiest success step" in content_prompt
     assert "Stage 3 must be a meaningful transfer" in content_prompt

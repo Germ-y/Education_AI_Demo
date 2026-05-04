@@ -32,6 +32,12 @@ PROMPT_SPECS: dict[str, PromptSpec] = {
         file_name="image_brief_v1.md",
         output_schema_name="ImageBriefPackageV1",
     ),
+    "content_quality_critique": PromptSpec(
+        key="content_quality_critique",
+        version="content_quality_critique_v1",
+        file_name="content_quality_critique_v1.md",
+        output_schema_name="ContentQualityCritiqueV1",
+    ),
     "tts_script": PromptSpec(
         key="tts_script",
         version="tts_script_v1",
