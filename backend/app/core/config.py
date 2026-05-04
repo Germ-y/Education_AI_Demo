@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     openai_image_model: str = "gpt-image-2"
     openai_image_timeout_sec: float = 360
     openai_realtime_model: str = "gpt-realtime-1.5"
+    openai_realtime_voice: str = "marin"
+    openai_realtime_voice_speed: float = 0.92
     elevenlabs_api_key: str | None = None
     elevenlabs_voice_id: str | None = None
     neis_api_key: str | None = None

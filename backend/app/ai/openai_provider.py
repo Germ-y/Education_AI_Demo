@@ -77,7 +77,11 @@ class OpenAiProvider:
                             "prefix_padding_ms": 300,
                             "silence_duration_ms": 900,
                         },
-                    }
+                    },
+                    "output": {
+                        "voice": self.settings.openai_realtime_voice,
+                        "speed": self.settings.openai_realtime_voice_speed,
+                    },
                 },
                 "output_modalities": ["audio"],
             },
