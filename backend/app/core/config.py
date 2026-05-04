@@ -15,10 +15,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://eduyj:eduyj@localhost:5432/eduyj"
     cors_origins: str = "http://localhost:3000"
     openai_api_key: str | None = None
-    openai_reasoning_model: str = "gpt-5.1"
+    openai_reasoning_model: str = "gpt-5.5"
     openai_image_model: str = "gpt-image-2"
     openai_image_timeout_sec: float = 360
-    openai_realtime_model: str = "gpt-realtime"
+    openai_realtime_model: str = "gpt-realtime-1.5"
     elevenlabs_api_key: str | None = None
     elevenlabs_voice_id: str | None = None
     neis_api_key: str | None = None

@@ -92,6 +92,16 @@ Stages 2 and 3 must not collapse into only simple choice-question screens. At le
 Do not substitute `image_quiz` for another planned template because it is easier to write.
 Do not collapse generated learning content into the repeated `card_match` + `blank_fill` pair. If the orchestrator selected `sequence_ordering`, preserve it and write real ordering cards. If the orchestrator selected a choice quiz template, preserve it and write a short quiz.
 For `learning_focus`, stages 2 and 3 should normally include one structured interaction (`sequence_ordering`, `card_match`, or `blank_fill`) and one choice quiz (`image_quiz`, `scene_question`, `clue_question`, `applied_question`, `explanation_choice`, or `wrong_explanation_fix`).
+Every mission must be a concrete playable micro-scenario, not a generic worksheet:
+
+- Honor the teacher requested topic. If the teacher asks for discounts, percent, reading comprehension, data, or another non-fraction topic, do not import fraction language unless the teacher explicitly asked for it.
+- Stage 1 must introduce one clear anchor example with concrete numbers, objects, or labels that the student will reuse.
+- Stage 2 must be the easiest success step using that same anchor example.
+- Stage 3 must be a meaningful transfer or one-step deeper version, not a sudden jump to a much harder calculation.
+- Stage 4 must ask the student to explain the exact reasoning pattern practiced in stages 1~3.
+- `sequence_ordering` may rehearse a method, but it must not be the whole learning task. Pair it with a concrete value/object scenario and make the next stage apply the method.
+- Prefer friendly classroom or daily-life values that can be solved mentally. Avoid awkward numbers, hidden arithmetic, or operations that were not taught in stages 1~2.
+- The correct answer should be educationally checkable from the visible UI text alone; do not rely on information hidden only in the image.
 If `choiceCountLimit` is lower than 3, apply the product-specific display limits below instead of shrinking every template.
 For any choice-based template other than `image_quiz`, use this choice object shape:
 

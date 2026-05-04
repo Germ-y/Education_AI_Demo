@@ -1269,11 +1269,13 @@ function RealtimePracticeRoom({
         type: "answer",
         sdp: await sdpResponse.text(),
       });
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "알 수 없는 오류";
+      console.error("Realtime conversation failed", error);
       closeRealtimeConnection();
       setConnectionState("error");
-      setStatusMessage("실시간 대화를 시작하지 못했어요. API 키, 마이크 권한, 네트워크 상태를 확인해 주세요.");
-      appendMessage("system", "실시간 대화를 시작하지 못했어요.");
+      setStatusMessage(`실시간 대화를 시작하지 못했어요. ${message.slice(0, 140)}`);
+      appendMessage("system", `실시간 대화를 시작하지 못했어요. ${message.slice(0, 140)}`);
     }
   };
 

@@ -34,3 +34,13 @@ def test_generation_prompts_lock_stage_labels_and_profile_based_templates() -> N
     for label in ["상황 만나기", "단서 찾기", "행동 고르기", "한 번 해보기", "개념 열기", "문제 1", "문제 2", "설명해보기"]:
         assert label in orchestrator_prompt
         assert label in content_prompt
+
+
+def test_generation_prompts_require_concrete_playable_micro_scenarios() -> None:
+    orchestrator_prompt = load_prompt("orchestrator_plan")
+    content_prompt = load_prompt("mission_content_package")
+
+    assert "Honor the teacher requested topic" in orchestrator_prompt
+    assert "concrete playable micro-scenario" in content_prompt
+    assert "Stage 2 must be the easiest success step" in content_prompt
+    assert "Stage 3 must be a meaningful transfer" in content_prompt

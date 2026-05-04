@@ -52,6 +52,7 @@ You receive a JSON object with:
    - teach-back
 4. Select templates for stages 2 and 3.
    - Prefer templates that match the student profile, memory card, recent attempts, teacher notes, and requested goal.
+   - Honor the teacher requested topic as the source of truth for the next content. Student memory decides scaffolding and interaction style, not a different topic.
    - At least one of stages 2 or 3 must be `card_match`, `sequence_ordering`, or `blank_fill`.
    - Use two different interaction families across stages 2 and 3 whenever allowed:
      - structured ordering: `sequence_ordering`
@@ -70,6 +71,7 @@ You receive a JSON object with:
    - Recent failed template: lower priority.
    - Recent successful template: higher priority.
    - Do not describe this as random selection in any prose field.
+   - Design stage 2 as the easiest concrete success step and stage 3 as a controlled transfer. Do not jump from a procedural card sort to a much harder calculation or a different concept.
 5. Decide whether stage 4 should be:
    - `realtime_roleplay` for `life_support`
    - `realtime_teach_back` for `learning_focus`
