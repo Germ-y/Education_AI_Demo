@@ -368,7 +368,7 @@ function StageMedia({
               ? "min-h-0 flex-1"
               : compact
                 ? dense
-                  ? "h-[clamp(140px,18vh,170px)] w-auto max-w-full"
+                  ? "h-[clamp(220px,23vh,250px)] w-auto max-w-full"
                   : featured
                     ? "h-[clamp(150px,20vh,190px)]"
                     : "h-[clamp(190px,28vh,280px)]"
@@ -758,8 +758,8 @@ function CardMatchingTemplate({
   const items = question.matchingPairs ?? [];
   const rightItems = [...items].reverse();
   const matchedCount = Object.keys(pairs).length;
-  const matchingRowHeight = 64;
-  const matchingGap = 10;
+  const matchingRowHeight = 48;
+  const matchingGap = 5;
   const matchingLaneHeight = items.length * matchingRowHeight + Math.max(0, items.length - 1) * matchingGap;
   const laneConnections = items
     .map((item, index) => {
@@ -778,13 +778,13 @@ function CardMatchingTemplate({
 
   return (
     <div
-      className={`grid h-full min-h-0 content-start gap-3 overflow-y-auto rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-4 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)] ${
+      className={`grid h-full min-h-0 content-start gap-2.5 overflow-y-auto rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-3.5 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)] ${
         question.imageUrl || question.audioUrl ? "grid-rows-[auto_auto_auto]" : "grid-rows-[auto_auto]"
       }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[1.45rem] font-black leading-7">서로 맞는 카드를 연결해보세요</p>
+          <p className="text-[1.35rem] font-black leading-7">서로 맞는 카드를 연결해보세요</p>
           <p className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-[#596157]">{question.body ?? "왼쪽 카드를 누르고 맞는 오른쪽 카드를 눌러요."}</p>
         </div>
         <div className="rounded-full bg-white px-4 py-2 text-sm font-black shadow-sm" style={{ color: theme.accentStrong }}>
@@ -793,7 +793,7 @@ function CardMatchingTemplate({
       </div>
 
       {(question.imageUrl || question.audioUrl) && (
-        <div className="mx-auto min-h-0 w-full max-w-[780px]">
+        <div className="mx-auto min-h-[260px] w-full max-w-[780px]">
           <StageMedia question={question} theme={theme} compact dense />
         </div>
       )}
@@ -802,7 +802,7 @@ function CardMatchingTemplate({
         className="grid grid-cols-[minmax(220px,1fr)_minmax(190px,0.52fr)_minmax(220px,1fr)] items-start gap-3 overflow-hidden"
         style={{ height: matchingLaneHeight }}
       >
-        <div className="grid min-h-0 content-start gap-2.5">
+        <div className="grid min-h-0 content-start gap-1.5">
           {items.map((item) => {
             const picked = selectedLeft === item.leftId;
             const matched = Boolean(pairs[item.leftId]);
@@ -811,7 +811,7 @@ function CardMatchingTemplate({
                 key={item.leftId}
                 onClick={() => onLeft(item.leftId)}
                 disabled={matched}
-                className={`relative z-10 flex h-16 items-center rounded-[18px] border bg-white px-4 text-left text-[0.98rem] font-black leading-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:hover:translate-y-0 ${
+                className={`relative z-10 flex h-[48px] items-center rounded-[16px] border bg-white px-4 text-left text-[0.84rem] font-black leading-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:hover:translate-y-0 ${
                   picked ? "scale-[1.015] shadow-[0_16px_30px_rgba(39,174,96,0.16)]" : ""
                 }`}
                 style={{
@@ -864,7 +864,7 @@ function CardMatchingTemplate({
                 </span>
               ))}
             </div>
-            <div className="mt-3 w-full rounded-[18px] bg-white/90 px-4 py-3 shadow-[0_12px_26px_rgba(57,78,97,0.10)]">
+            <div className="mt-2 w-full rounded-[18px] bg-white/90 px-4 py-2.5 shadow-[0_12px_26px_rgba(57,78,97,0.10)]">
               <p className="whitespace-nowrap text-sm font-black leading-6" style={{ color: theme.accentStrong }}>
                 {selectedLeft ? "오른쪽 카드를 골라요" : "왼쪽 카드를 골라요"}
               </p>
@@ -876,7 +876,7 @@ function CardMatchingTemplate({
           </div>
         </div>
 
-        <div className="grid min-h-0 content-start gap-2.5">
+        <div className="grid min-h-0 content-start gap-1.5">
           {rightItems.map((item) => {
             const used = Object.values(pairs).includes(item.rightId);
             return (
@@ -884,7 +884,7 @@ function CardMatchingTemplate({
                 key={item.rightId}
                 onClick={() => onRight(item.rightId)}
                 disabled={!selectedLeft || used}
-                className="relative z-10 flex h-16 items-center rounded-[18px] border bg-white px-4 text-left text-[0.98rem] font-black leading-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
+                className="relative z-10 flex h-[48px] items-center rounded-[16px] border bg-white px-4 text-left text-[0.84rem] font-black leading-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
                 style={{ borderColor: used ? theme.accent : "#dde6ee", backgroundColor: used ? theme.accentSoft : "#ffffff" }}
               >
                 <span className="flex-1">{item.right}</span>
