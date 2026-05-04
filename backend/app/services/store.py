@@ -20,7 +20,7 @@ from app.domain.models import (
     SchoolProfile,
     SchoolTimetableSlot,
 )
-from app.domain.schemas import ContentStagePatch, MissionContent
+from app.domain.schemas import ContentAsset, ContentStagePatch, MissionContent
 from app.repositories.demo_repository import DemoRepository
 
 
@@ -486,6 +486,8 @@ class DemoStore:
         asset_ids = {asset.id for asset in mission.assets}
         if not stage_ids.issubset(set(approved_stage_ids)) or not asset_ids.issubset(set(approved_asset_ids)):
             return None
+        if any(not _is_asset_ready_for_teacher_approval(asset) for asset in mission.assets):
+            return None
         for asset in mission.assets:
             asset.approval_status = "approved"
         mission.status = MissionStatus.APPROVED
@@ -555,7 +557,7 @@ class DemoStore:
         mission = self.get_mission_for_teacher(content_id, teacher_id)
         if mission is None or mission.status not in {MissionStatus.APPROVED, MissionStatus.PUBLISHED}:
             return None
-        if any(asset.approval_status != "approved" for asset in mission.assets):
+        if any(not _is_asset_ready_for_student_publish(asset) for asset in mission.assets):
             return None
         for content in self.db.mission_contents:
             if (
@@ -1401,6 +1403,14 @@ def _merge_choice_texts(existing_choices: Any, choice_texts: list[str]) -> list[
             merged.append(text)
 
     return merged
+
+
+def _is_asset_ready_for_teacher_approval(asset: ContentAsset) -> bool:
+    return bool(asset.storage_url or asset.preview_url) and asset.qa_status == "passed"
+
+
+def _is_asset_ready_for_student_publish(asset: ContentAsset) -> bool:
+    return asset.approval_status == "approved" and _is_asset_ready_for_teacher_approval(asset)
 
 
 def _build_korean_review_summary_text(

@@ -449,6 +449,7 @@ function getClientGenerationErrorMessage(error: unknown) {
 
 function isGeneratedMediaReady(asset?: MissionContent["assets"][number] | null) {
   const url = asset?.previewUrl || asset?.storageUrl;
+  if (asset?.qaStatus !== "passed") return false;
   if (!url) return false;
   return /^https?:\/\//.test(url) || url.startsWith("/generated/");
 }
@@ -1621,7 +1622,7 @@ export default function DashboardPage() {
   };
 
   const handleApproveReview = async () => {
-    if (!openReview || reviewActionId) return;
+    if (!openReview || openReviewNeedsMediaGeneration || reviewActionId) return;
 
     setReviewActionId(openReview.id);
     try {
@@ -1645,7 +1646,15 @@ export default function DashboardPage() {
   };
 
   const handlePublishMaterial = async (item: MaterialReviewItem) => {
-    if (isMaterialApplied(item) || !isMaterialApproved(item) || isMaterialRejected(item) || reviewActionId) return;
+    if (
+      isMaterialApplied(item) ||
+      !isMaterialApproved(item) ||
+      isMaterialRejected(item) ||
+      hasMissingGeneratedMedia(item.content) ||
+      reviewActionId
+    ) {
+      return;
+    }
 
     setReviewActionId(item.id);
     try {
@@ -2145,11 +2154,17 @@ export default function DashboardPage() {
                             )}
                             <button
                               onClick={() => handlePublishMaterial(item)}
-                              disabled={materialApplied || !materialApproved || materialRejected || isActionRunning}
+                              disabled={
+                                materialApplied ||
+                                !materialApproved ||
+                                materialRejected ||
+                                needsMediaGeneration ||
+                                isActionRunning
+                              }
                               className={`rounded-md px-3 py-2 text-sm font-bold ${
                                 materialApplied
                                   ? "bg-[#dcfce7] text-[#15803d]"
-                                  : materialApproved
+                                  : materialApproved && !needsMediaGeneration
                                     ? "bg-[#1f3a5f] text-white"
                                     : "bg-[#e2e8f0] text-[#64748b]"
                               }`}
@@ -2746,8 +2761,8 @@ export default function DashboardPage() {
               </button>
               <button
                 onClick={handleApproveReview}
-                disabled={reviewActionId === openReview.id}
-                className="rounded-md bg-[#1f3a5f] px-5 py-3 text-sm font-bold text-white"
+                disabled={reviewActionId === openReview.id || openReviewNeedsMediaGeneration}
+                className="rounded-md bg-[#1f3a5f] px-5 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
               >
                 {reviewActionId === openReview.id ? "저장 중" : "사용 승인"}
               </button>
