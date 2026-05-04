@@ -29,6 +29,7 @@ Return strict JSON only.
   - `learning_focus`: concept anchor -> basic problem -> applied problem -> realtime explain-back.
 - Image prompts describe visual scenes only and do not ask for worksheet cards, empty cards, UI panels, answer-choice layouts, problem text, buttons, or speech bubbles.
 - Image prompts visually match the concrete objects or setting used in the stage problem. If the UI text mentions a poster, paper cups, a tumbler, a schedule, a route, a shelf, a clock, or a measuring object, the corresponding image prompt must make that scene recognizable without rendering answer text.
+- Image prompts make the learning evidence visually dominant enough to inspect. People, mascots, or decorative classroom atmosphere may support the scene, but they must not become the repeated main subject across the package.
 - Student-facing Korean is short, concrete, and age-appropriate.
 
 ## Repair Triggers
@@ -38,6 +39,8 @@ Return `verdict: "repair"` if any of these happen:
 - The content feels bland, generic, or disconnected from the student's context.
 - The content feels emotionally flat: it has definitions and choices but no clear reason the student is looking at this scene or why the next step matters.
 - The image prompt and the stage question do not share concrete objects, place, or action anchors.
+- Image prompts are mostly portraits or generic people-looking-at-materials shots, while the actual learning evidence is small, vague, or decorative.
+- The image package does not vary camera distance or composition across hero/stage images.
 - Stage audio does not bridge the image and the task, leaving the student to infer why the picture matters.
 - The mission ignores the explicit topic in `orchestratorPlan.sessionGoal` and falls back to the stored case goal instead.
 - The content is developmentally too young for the student's grade, even if the reading load is low.

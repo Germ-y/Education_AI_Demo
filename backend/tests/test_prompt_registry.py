@@ -28,6 +28,8 @@ def test_prompts_keep_image_text_and_ui_text_separate() -> None:
     assert '"contentId"' not in content_prompt
     assert "The frontend renders all text from `templateJson`" in image_prompt
     assert "Do not ask the image model to render" in image_prompt
+    assert "The learning object is the hero of the frame" in image_prompt
+    assert "Human figures are optional context" in image_prompt
 
 
 def test_generation_prompts_lock_stage_labels_and_profile_based_templates() -> None:
@@ -52,6 +54,7 @@ def test_generation_prompts_require_concrete_playable_micro_scenarios() -> None:
     assert "concrete playable micro-scenario" in content_prompt
     assert "concrete playable micro-scenario" in critique_prompt
     assert "source of truth" in critique_prompt
+    assert "learning evidence visually dominant" in critique_prompt
     assert "grade-level dignity" in orchestrator_prompt
     assert "grade-level dignity" in content_prompt
     assert "grade-level dignity" in critique_prompt

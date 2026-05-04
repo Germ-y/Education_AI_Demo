@@ -1,6 +1,8 @@
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -17,6 +19,7 @@ from app.services.store import DemoStore, SessionPrincipal
 
 router = APIRouter(prefix="/api/contents", tags=["contents"])
 logger = logging.getLogger(__name__)
+IMAGE_PACKAGE_PARALLELISM = 5
 
 UI_LIKE_IMAGE_PROMPT_TERMS = (
     "빈 카드",
@@ -165,6 +168,8 @@ def generate_content_asset_package(
 
     package_started_at = time.perf_counter()
     sorted_assets = sorted(content.assets, key=lambda item: (item.asset_type, item.asset_role, item.id))
+    image_assets = [asset for asset in sorted_assets if asset.asset_type == AssetType.IMAGE]
+    audio_assets = [asset for asset in sorted_assets if asset.asset_type == AssetType.AUDIO]
     total_assets = len(sorted_assets)
     logger.info(
         "contents.assets.package_started content_id=%s student_id=%s asset_count=%s",
@@ -173,7 +178,17 @@ def generate_content_asset_package(
         total_assets,
     )
     generated = []
-    for index, asset in enumerate(sorted_assets, start=1):
+    if image_assets:
+        logger.info(
+            "contents.assets.image_parallel_started content_id=%s image_count=%s max_workers=%s",
+            content.id,
+            len(image_assets),
+            min(IMAGE_PACKAGE_PARALLELISM, len(image_assets)),
+        )
+        generated.extend(_generate_image_assets_in_parallel(content_id, image_assets, total_assets=total_assets))
+        demo_store.save_generated_mission_content(content)
+
+    for index, asset in enumerate(audio_assets, start=len(image_assets) + 1):
         logger.info(
             "contents.assets.generating content_id=%s progress=%s/%s asset_id=%s type=%s role=%s stage_id=%s",
             content.id,
@@ -204,6 +219,31 @@ def generate_content_asset_package(
         time.perf_counter() - package_started_at,
     )
     return ok({"contentId": content.id, "generatedCount": len(generated), "assets": generated})
+
+
+def _generate_image_assets_in_parallel(content_id: str, image_assets: list, *, total_assets: int) -> list[dict]:
+    generated_by_id: dict[str, dict] = {}
+    with ThreadPoolExecutor(max_workers=min(IMAGE_PACKAGE_PARALLELISM, len(image_assets))) as executor:
+        futures = {}
+        for index, asset in enumerate(image_assets, start=1):
+            logger.info(
+                "contents.assets.generating content_id=%s progress=%s/%s asset_id=%s type=%s role=%s stage_id=%s",
+                content_id,
+                index,
+                total_assets,
+                asset.id,
+                asset.asset_type,
+                asset.asset_role,
+                asset.stage_id,
+            )
+            futures[executor.submit(_generate_asset_or_raise, content_id, asset)] = asset
+
+        for future in as_completed(futures):
+            asset = futures[future]
+            future.result()
+            generated_by_id[asset.id] = asset.model_dump(by_alias=True)
+
+    return [generated_by_id[asset.id] for asset in image_assets]
 
 
 @router.post("/{content_id}/review-summary")
@@ -386,12 +426,18 @@ def _uses_image_brief_prompt(prompt_json: dict | None) -> bool:
 
 
 def _image_brief_input_snapshot(content, image_assets: list) -> dict:
+    stages = sorted(content.stages, key=lambda item: item.step)
     return {
         "contentId": content.id,
         "contentType": content.content_type,
         "title": content.title,
         "sessionGoal": content.session_goal,
         "briefJson": content.brief_json,
+        "scenarioVisualGuidance": {
+            "goal": "Make the learning evidence visually dominant, not the person.",
+            "cameraVariety": "Use distinct hero/stage shots in one coherent scenario.",
+            "humanPresencePolicy": "People are optional and secondary unless the task is social expression or realtime role practice.",
+        },
         "stages": [
             {
                 "id": stage.id,
@@ -402,8 +448,9 @@ def _image_brief_input_snapshot(content, image_assets: list) -> dict:
                 "studentInstruction": stage.student_instruction,
                 "templateJson": stage.template_json,
                 "realtimeSpec": stage.realtime_spec.model_dump(by_alias=True) if stage.realtime_spec else None,
+                "learningEvidence": _stage_learning_evidence(stage),
             }
-            for stage in sorted(content.stages, key=lambda item: item.step)
+            for stage in stages
         ],
         "imageAssets": [
             {
@@ -411,6 +458,7 @@ def _image_brief_input_snapshot(content, image_assets: list) -> dict:
                 "assetRole": asset.asset_role,
                 "stageId": asset.stage_id,
                 "currentPromptJson": asset.prompt_json,
+                "stageEvidence": _asset_stage_evidence(asset, stages),
             }
             for asset in image_assets
         ],
@@ -462,11 +510,158 @@ def _apply_image_brief_output(content, output_json: dict) -> None:
             "promptVersion": "image_brief_v1",
             "prompt": prompt.strip(),
             "negativePromptRules": brief.get("negativePromptRules", []),
+            "learningEvidence": brief.get("learningEvidence", {}),
+            "compositionPlan": brief.get("compositionPlan", {}),
             "ocrRequired": ocr_required,
             "sceneTextLines": brief.get("sceneTextLines", []),
             "qaChecklist": brief.get("qaChecklist", []),
             "textRenderingPolicy": text_rendering_policy,
         }
+
+
+def _asset_stage_evidence(asset, stages: list) -> dict[str, Any] | None:
+    if asset.asset_role == AssetRole.HERO:
+        return {
+            "purpose": "대표 장면",
+            "contentTitle": "mission overview",
+            "sharedAnchors": _brief_visual_anchors_from_stages(stages),
+        }
+    stage = next((candidate for candidate in stages if candidate.id == asset.stage_id), None)
+    if stage is None:
+        return None
+    return _stage_learning_evidence(stage)
+
+
+def _stage_learning_evidence(stage) -> dict[str, Any]:
+    template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
+    evidence: dict[str, Any] = {
+        "step": stage.step,
+        "studentTitle": stage.student_title,
+        "stageRole": stage.stage_role,
+        "templateType": stage.template_type,
+        "studentInstruction": stage.student_instruction,
+        "taskPrompt": _first_text_value(template_json, ("prompt", "question", "title", "situation")),
+        "taskBody": _first_text_value(template_json, ("body", "description", "context", "sentence")),
+        "sourceTextLines": _string_list(template_json.get("sourceTextLines")) + _string_list(template_json.get("sceneTextLines")),
+        "choiceTexts": _extract_choice_texts(template_json),
+        "matchingTexts": _extract_matching_texts(template_json),
+        "sequenceTexts": _extract_sequence_texts(template_json),
+        "visualAnchors": _extract_visual_anchors(template_json),
+    }
+    if stage.realtime_spec:
+        spec = stage.realtime_spec.model_dump(by_alias=True)
+        evidence["realtime"] = {
+            "scenario": spec.get("scenario"),
+            "openingLine": spec.get("openingLine"),
+            "targetBehavior": spec.get("targetBehavior"),
+            "rubric": spec.get("rubric"),
+        }
+    return evidence
+
+
+def _brief_visual_anchors_from_stages(stages: list) -> list[str]:
+    anchors: list[str] = []
+    for stage in stages:
+        for value in _stage_learning_evidence(stage).get("visualAnchors", []):
+            if value not in anchors:
+                anchors.append(value)
+    return anchors[:8]
+
+
+def _first_text_value(data: dict[str, Any], keys: tuple[str, ...]) -> str | None:
+    for key in keys:
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+
+
+def _extract_choice_texts(template_json: dict[str, Any]) -> list[str]:
+    choices = template_json.get("choices")
+    if not isinstance(choices, list):
+        return []
+    texts: list[str] = []
+    for choice in choices:
+        if isinstance(choice, str) and choice.strip():
+            texts.append(choice.strip())
+        elif isinstance(choice, dict):
+            for key in ("text", "label", "value"):
+                value = choice.get(key)
+                if isinstance(value, str) and value.strip():
+                    texts.append(value.strip())
+                    break
+    return texts[:6]
+
+
+def _extract_matching_texts(template_json: dict[str, Any]) -> list[str]:
+    pairs = template_json.get("matchingPairs") or template_json.get("pairs")
+    if not isinstance(pairs, list):
+        pairs = _pairs_from_left_right_cards(template_json)
+    if not isinstance(pairs, list):
+        return []
+    texts: list[str] = []
+    for pair in pairs:
+        if not isinstance(pair, dict):
+            continue
+        for key in ("left", "right", "leftText", "rightText"):
+            value = pair.get(key)
+            if isinstance(value, str) and value.strip():
+                texts.append(value.strip())
+    return texts[:8]
+
+
+def _pairs_from_left_right_cards(template_json: dict[str, Any]) -> list[dict[str, Any]]:
+    left_cards = template_json.get("leftCards")
+    right_cards = template_json.get("rightCards")
+    matches = template_json.get("matches")
+    if not isinstance(left_cards, list) or not isinstance(right_cards, list) or not isinstance(matches, list):
+        return []
+    right_by_id = {card.get("id"): card for card in right_cards if isinstance(card, dict)}
+    pairs: list[dict[str, Any]] = []
+    for match in matches:
+        if not isinstance(match, dict):
+            continue
+        left_id = match.get("leftId")
+        right_id = match.get("rightId")
+        left = next((card for card in left_cards if isinstance(card, dict) and card.get("id") == left_id), None)
+        right = right_by_id.get(right_id)
+        if isinstance(left, dict) and isinstance(right, dict):
+            pairs.append({"left": left.get("text") or left.get("label"), "right": right.get("text") or right.get("label")})
+    return pairs
+
+
+def _extract_sequence_texts(template_json: dict[str, Any]) -> list[str]:
+    items = template_json.get("sequenceItems") or template_json.get("cards") or template_json.get("items")
+    if not isinstance(items, list):
+        return []
+    texts: list[str] = []
+    for item in items:
+        if isinstance(item, str) and item.strip():
+            texts.append(item.strip())
+        elif isinstance(item, dict):
+            for key in ("label", "text", "caption", "title"):
+                value = item.get(key)
+                if isinstance(value, str) and value.strip():
+                    texts.append(value.strip())
+                    break
+    return texts[:6]
+
+
+def _extract_visual_anchors(template_json: dict[str, Any]) -> list[str]:
+    anchors: list[str] = []
+    for key in ("visualAnchors", "objects", "materials", "sourceTextLines", "sceneTextLines"):
+        anchors.extend(_string_list(template_json.get(key)))
+    for key in ("situation", "context", "body", "prompt", "question"):
+        value = template_json.get(key)
+        if isinstance(value, str) and value.strip():
+            anchors.append(value.strip())
+    return anchors[:8]
 
 
 def _generated_asset_relative_path(content_id: str, asset) -> str:

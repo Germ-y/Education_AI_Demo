@@ -1,5 +1,7 @@
 import copy
 import os
+import threading
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -539,6 +541,8 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     invalid_generated_content["stages"][3]["studentTitle"] = "realtime practice"
     content_generation_calls = {"count": 0}
     image_brief_calls = {"count": 0}
+    image_parallel_probe = {"active": 0, "max": 0}
+    image_parallel_lock = threading.Lock()
 
     def fake_json_response(self, *, model, instructions, input_snapshot, timeout_sec=90):
         if "Image Prompt Builder" in instructions:
@@ -556,6 +560,17 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
                                 "고품질 한국 교육 일러스트로 보여주고, 문제 문장, 선택지, 정답, 힌트 텍스트는 넣지 않습니다."
                             ),
                             "negativePromptRules": ["no problem statements", "no answer choices", "no UI cards", "no speech bubbles"],
+                            "learningEvidence": {
+                                "primaryObject": "피자 조각",
+                                "mustBeReadableOrCountable": ["전체 피자", "한 조각"],
+                                "whyItMattersForThisStage": "분수의 전체와 부분을 눈으로 확인합니다.",
+                            },
+                            "compositionPlan": {
+                                "camera": "tabletop",
+                                "subjectPriority": "learning_object_first",
+                                "humanPresence": "hands-only",
+                                "negativeComposition": ["portrait-first framing", "generic classroom scene"],
+                            },
                             "ocrRequired": False,
                             "qaChecklist": ["scene matches stage purpose", "no UI text embedded", "student-safe tone"],
                         }
@@ -643,9 +658,17 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
         )
 
     def fake_image_file(self, *, prompt, output_path, model, size="1536x1024", timeout_sec=180):
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_bytes(b"png")
-        return output_path
+        with image_parallel_lock:
+            image_parallel_probe["active"] += 1
+            image_parallel_probe["max"] = max(image_parallel_probe["max"], image_parallel_probe["active"])
+        try:
+            time.sleep(0.02)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"png")
+            return output_path
+        finally:
+            with image_parallel_lock:
+                image_parallel_probe["active"] -= 1
 
     def fake_speech_file(self, *, source_text, output_path, timeout_sec=60):
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -718,10 +741,16 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     package_data = package.json()["data"]
     assert package_data["generatedCount"] == 10
     assert image_brief_calls["count"] == 1
+    assert image_parallel_probe["max"] >= 2
     assert all(asset["storageUrl"].startswith("/generated/assets/content_generated_contract_001/") for asset in package_data["assets"])
     assert all(asset["qaStatus"] == "passed" for asset in package_data["assets"])
     assert all(
         asset["promptJson"].get("promptVersion") == "image_brief_v1"
+        for asset in package_data["assets"]
+        if asset["assetType"] == "image"
+    )
+    assert all(
+        asset["promptJson"].get("compositionPlan", {}).get("subjectPriority") == "learning_object_first"
         for asset in package_data["assets"]
         if asset["assetType"] == "image"
     )

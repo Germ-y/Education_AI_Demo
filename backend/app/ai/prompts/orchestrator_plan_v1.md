@@ -93,6 +93,9 @@ You receive a JSON object with:
 7. Produce visual brief intent for hero and each stage.
    - `mustShow` must include concrete scene objects that correspond to the UI examples. If the problem uses paper cups, a tumbler, a bus stop, a library shelf, a schedule board, or a measuring object, the image intent must show those objects as visual anchors.
    - If exact text or numbers are needed for correctness, keep them in `templateJson` later. The image intent should show matching objects and setting, not unreadable generic decoration.
+   - For each image intent, identify the learning object that should dominate the frame: poster, schedule, clock face, bus stop sign, fraction model, measuring tools, map, shelf, receipt, or other evidence object. People may appear only to show use, scale, or attention.
+   - Do not make a student's face, full-body pose, or mascot the main subject unless the requested learning target is social expression or role practice.
+   - Write image intent as a mini shot plan: foreground evidence object, midground context, optional human use, and what must remain uncluttered for the student UI.
 8. Produce narration intent for hero and each stage.
 9. Produce validation warnings for teacher review.
 10. Before returning, self-check:
@@ -163,6 +166,8 @@ Return only JSON matching this shape.
       "assetRole": "hero | stage_1 | stage_2 | stage_3 | stage_4_realtime",
       "scenePurpose": "string",
       "mustShow": ["string"],
+      "learningObject": "string",
+      "compositionHint": "string",
       "mustNotShow": ["problem text", "choices", "answer", "hint"]
     }
   ],
