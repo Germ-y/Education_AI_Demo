@@ -455,14 +455,17 @@ def _apply_image_brief_output(content, output_json: dict) -> None:
                     },
                 )
         existing = asset.prompt_json if isinstance(asset.prompt_json, dict) else {}
+        ocr_required = bool(brief.get("ocrRequired", False))
+        text_rendering_policy = "short_scene_text_allowed_no_problem_ui" if ocr_required else "scene_only_no_problem_text"
         asset.prompt_json = {
             **existing,
             "promptVersion": "image_brief_v1",
             "prompt": prompt.strip(),
             "negativePromptRules": brief.get("negativePromptRules", []),
-            "ocrRequired": bool(brief.get("ocrRequired", False)),
+            "ocrRequired": ocr_required,
+            "sceneTextLines": brief.get("sceneTextLines", []),
             "qaChecklist": brief.get("qaChecklist", []),
-            "textRenderingPolicy": "scene_only_no_problem_text",
+            "textRenderingPolicy": text_rendering_policy,
         }
 
 

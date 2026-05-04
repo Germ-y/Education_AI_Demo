@@ -8,6 +8,8 @@ Convert approved mission content and image asset placeholders into five high-qua
 
 Images are visual context only. They must not contain the actual problem UI.
 
+Important nuance: if the learning task is to read a real-world poster, sign, notice, label, clock, bus number, menu, schedule, or other source material, the image may include the exact short source text needed in that real-world object. That is scene text, not problem UI.
+
 Do not ask the image model to render:
 
 - problem statements
@@ -16,12 +18,12 @@ Do not ask the image model to render:
 - worksheet cards, empty cards, UI panels, button-like areas, or speech bubbles
 - hints
 - correct answers
-- long Korean text
+- long Korean text beyond the short source material needed in the scene
 - complex formulas
 - dense labels
 - UI buttons
 
-The frontend renders all text from `templateJson`.
+The frontend renders all text from `templateJson` when the text is problem UI: problem statements, instructions, choices, feedback, hints, and answers. Real-world source text may be rendered inside the image only when it is pedagogically necessary.
 
 ## Five Required Image Roles
 
@@ -56,8 +58,14 @@ Set `ocrRequired=true` only when the visual scene must include short real-world 
 - simple sign
 - clock face
 - short map marker
+- short poster or notice sentences that the student must read
 
-Even when OCR is required, do not include answer choices or problem statements.
+When OCR is required:
+
+- Include only the short source text that would naturally exist in the object.
+- Do not include answer choices, category labels, hints, feedback, explanation text, or problem instructions.
+- Add `sceneTextLines` with the exact intended visible source text.
+- Use `textRenderingPolicy="short_scene_text_allowed_no_problem_ui"`.
 
 ## Output JSON Shape
 
@@ -80,6 +88,8 @@ Return only JSON.
         "no watermark"
       ],
       "ocrRequired": false,
+      "sceneTextLines": [],
+      "textRenderingPolicy": "scene_only_no_problem_text | short_scene_text_allowed_no_problem_ui",
       "qaChecklist": [
         "scene matches stage purpose",
         "no UI text embedded",

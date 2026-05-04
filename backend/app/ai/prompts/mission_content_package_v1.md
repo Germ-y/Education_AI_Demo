@@ -20,7 +20,8 @@ Generate a complete MissionContent JSON package from an approved OrchestratorPla
 - Do not expose raw internal terms such as `realtime`, `teach-back`, `teach_back`, `roleplay`, `template`, or `stage_` in visible prose.
 - Student-facing content must describe what the student will do. Do not use teacher proposal phrases such as "수업이 좋겠어요" or "콘텐츠가 좋겠어요" in student content.
 - Keep the student's grade-level dignity. Short text and easy choices are scaffolds, not permission to make the scenario babyish. A grade 6 or middle-school student can receive very short instructions inside a mature everyday situation.
-- Do not place problem text, choices, answer, hints, or feedback inside image prompts.
+- Do not place problem instructions, answer choices, answer labels, hints, explanations, feedback, or UI text inside image prompts.
+- If the task requires reading a real-world poster, sign, notice, schedule, bus number, clock face, or label, short source text may appear inside that object in the image. This is allowed only as scene text.
 - All problem text lines must live in `templateJson`.
 - All visual context must reference image assets by role/id.
 - All stage entry narration must reference audio assets by role/id.
@@ -31,7 +32,7 @@ Generate a complete MissionContent JSON package from an approved OrchestratorPla
 - Do not rename, translate, or substitute internal stage/template values. In particular, keep `scene_observation`, `highlight_clue`, `action_choice`, `sequence_ordering`, `scene_question`, and `applied_question` exactly when the plan uses them.
 - The package must contain real `assets` records, not placeholders. Asset files may use an empty `storageUrl` until the provider generation endpoint fills it.
 - Every image asset must have a rich `promptJson.prompt` optimized for `gpt-image-2`.
-- Every image asset must include a `promptJson.textRenderingPolicy` or `promptJson.ocrPolicy` value that clearly means `scene_only_no_problem_text`.
+- Every image asset must include a `promptJson.textRenderingPolicy` or `promptJson.ocrPolicy` value that clearly means either `scene_only_no_problem_text` or `short_scene_text_allowed_no_problem_ui`.
 - Every audio asset must have `sourceText` that can be sent directly to ElevenLabs.
 - `studentTitle` values are fixed product labels. Copy the fixed label for the content type and step; do not use custom lesson titles as `studentTitle`.
 - Treat the mission like one emotionally coherent mini-scenario, not four independent worksheets. The student should understand why the scene matters and why each next task naturally follows from the previous one.
@@ -76,13 +77,14 @@ Asset role to stage mapping:
 
 Image prompt requirements:
 
-- Use Korean educational context, but avoid rendering problem text, answer text, choices, hints, or long labels inside the image.
+- Use Korean educational context, but avoid rendering problem instructions, answer text, answer choices, hints, explanations, or long labels inside the image.
 - The visual should show the scene only: objects, characters, emotion, relationship, route, or manipulatives.
 - If the orchestrator image intent asks for blank cards, worksheet cards, UI panels, answer areas, or speech bubbles, ignore that part and translate the intent into a real-world scene or learning material object instead.
 - Each of the 5 image assets must be visually distinct and match its role.
 - Every image prompt must visibly support the exact stage activity. If `templateJson` mentions concrete objects, places, or actions such as paper cups, tumblers, bus numbers, a center entrance, a library shelf, a schedule board, measuring cups, or a poster board, the matching image prompt must include those visual anchors.
 - Do not use a generic decorative image for a specific problem. If the UI asks the student to judge poster sentences, the image should clearly feel like a poster-reading scene; if the UI asks for an action order, the image should show the situation where that order matters.
-- Exact problem sentences, choices, and answers still belong only in `templateJson`. Show the real-world objects and relationship in the image, not the answer text.
+- Exact problem instructions, choices, answers, and feedback still belong only in `templateJson`.
+- For literacy tasks that ask the student to read a poster, notice, sign, or label, put the short source text in `templateJson.sourceTextLines` and ask the image prompt to render those same lines on the real-world object. Do not put category labels such as "사실", "의견", "정답", or matching answers in the image.
 - Put visual constraints in `promptJson.prompt`, plus optional structured fields such as `visualRole`, `scene`, `style`, `avoid`, and `ocrPolicy`.
 
 Audio requirements:

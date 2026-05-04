@@ -98,6 +98,8 @@ VISIBLE_TEMPLATE_TEXT_KEYS = {
     "text",
     "label",
     "sentence",
+    "sourceTextLines",
+    "sceneTextLines",
 }
 
 RAW_ENGLISH_TERMS = (
@@ -430,6 +432,12 @@ def _validate_visible_content_text(
 
 
 def _validate_image_prompt_policy(mission: MissionContent, issues: list[str]) -> None:
+    allowed_scene_texts = {
+        text
+        for stage in mission.stages
+        for text in _iter_scene_source_text(stage.template_json)
+        if _meaningful_prompt_overlap_text(text)
+    }
     visible_texts = [
         text
         for stage in mission.stages
@@ -444,14 +452,19 @@ def _validate_image_prompt_policy(mission: MissionContent, issues: list[str]) ->
         if not isinstance(prompt, str):
             continue
         text_policy = str(prompt_json.get("textRenderingPolicy") or prompt_json.get("ocrPolicy") or "")
-        if "scene_only" not in text_policy and "no_problem_text" not in text_policy:
+        allows_scene_text = bool(prompt_json.get("ocrRequired")) and "short_scene_text_allowed" in text_policy
+        if "scene_only" not in text_policy and "no_problem_text" not in text_policy and not allows_scene_text:
             issues.append(f"{asset.id}.promptJson에는 이미지 안에 문제/선택지/정답을 넣지 않는 정책이 필요합니다.")
+        if allows_scene_text:
+            scene_text_lines = _iter_prompt_scene_text(prompt_json)
+            if not scene_text_lines:
+                issues.append(f"{asset.id}.promptJson은 짧은 장면 텍스트 허용 시 sceneTextLines를 함께 제공해야 합니다.")
         for term in UI_LIKE_IMAGE_PROMPT_TERMS:
             if term in prompt:
                 issues.append(f"{asset.id}.promptJson.prompt가 UI형 이미지 요소를 요청합니다: {term}")
                 break
         for text in visible_texts:
-            if text and text in prompt:
+            if text and text in prompt and not (allows_scene_text and text in allowed_scene_texts):
                 issues.append(f"{asset.id}.promptJson.prompt에 UI 문구가 그대로 들어갔습니다: {text[:20]}")
                 break
 
@@ -493,6 +506,23 @@ def _iter_named_visible_text(value: Any, prefix: str) -> list[tuple[str, str]]:
 
     walk(value, prefix)
     return items
+
+
+def _iter_scene_source_text(template_json: dict[str, Any]) -> list[str]:
+    lines: list[str] = []
+    for key in ("sourceTextLines", "sceneTextLines"):
+        value = template_json.get(key)
+        if isinstance(value, list):
+            lines.extend(item.strip() for item in value if isinstance(item, str) and item.strip())
+    return lines
+
+
+def _iter_prompt_scene_text(prompt_json: dict[str, Any]) -> list[str]:
+    lines: list[str] = []
+    value = prompt_json.get("sceneTextLines")
+    if isinstance(value, list):
+        lines.extend(item.strip() for item in value if isinstance(item, str) and item.strip())
+    return lines
 
 
 def _validate_choice_limit(template_json: dict[str, Any], template_type: str, limit: int, path: str, issues: list[str]) -> None:
