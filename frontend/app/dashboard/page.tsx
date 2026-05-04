@@ -1003,6 +1003,7 @@ export default function DashboardPage() {
   const isOpenReportReused = openReport ? reusedReportContentIds.includes(openReport.contentId) : false;
   const openReview = selectedReviewItems.find((item) => item.id === openReviewId);
   const openReviewStages = openReview ? (reviewStageDrafts[openReview.id] ?? mapContentToReviewStages(openReview.content)) : reviewStagePreviews;
+  const openReviewSelectedStages = openReviewStages.filter((stage) => stage.step === reviewPreviewStep);
   const openReviewNeedsMediaGeneration = openReview ? hasMissingGeneratedMedia(openReview.content) : false;
   const isReviewEditing = openReview ? editingReviewIds.includes(openReview.id) : false;
   const activePublishedContentIds = getActivePublishedContentIds(activeCaseFile?.recentContents);
@@ -2530,7 +2531,7 @@ export default function DashboardPage() {
                 </div>
               </section>
               <div className="min-h-0 space-y-4 overflow-y-auto pr-2">
-                {openReviewStages.map((stage, index) => {
+                {openReviewSelectedStages.map((stage) => {
                   const assetStatus = getStageAssetStatus(openReview.content, stage.step);
                   return (
                     <section key={stage.step} className="rounded-lg border border-[#e5e9f0] bg-[#fbfcfe] p-5">
@@ -2541,7 +2542,7 @@ export default function DashboardPage() {
                           </span>
                           <h4 className="text-lg font-black text-[#172033]">{stage.title}</h4>
                         </div>
-                        {index === 0 && (
+                        {!stage.isRealtimeStage && (
                           <span className="rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-1 text-xs font-bold text-[#15803d]">
                             정답 포함
                           </span>
