@@ -13,6 +13,7 @@ Do not ask the image model to render:
 - problem statements
 - answer choices
 - card text
+- worksheet cards, empty cards, UI panels, button-like areas, or speech bubbles
 - hints
 - correct answers
 - long Korean text
@@ -41,6 +42,7 @@ The frontend renders all text from `templateJson`.
 - Avoid decorative gradient blobs.
 - No stock-photo feeling.
 - No watermark or logo.
+- No worksheet-like composition. Do not create blank cards, speech bubbles, answer panels, selection areas, or UI frames inside the image.
 
 ## OCR Policy
 

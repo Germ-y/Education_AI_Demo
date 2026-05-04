@@ -540,7 +540,7 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
                             "stageId": asset["stageId"],
                             "prompt": (
                                 f"{asset['assetRole']} 전용 장면. 학생이 볼 수 있는 구체적인 피자 조각 상황만 "
-                                "고품질 한국 교육 일러스트로 보여주고, 카드 UI, 말풍선, 문제 문장, 선택지, 정답, 힌트 텍스트는 넣지 않습니다."
+                                "고품질 한국 교육 일러스트로 보여주고, 문제 문장, 선택지, 정답, 힌트 텍스트는 넣지 않습니다."
                             ),
                             "negativePromptRules": ["no problem statements", "no answer choices", "no UI cards", "no speech bubbles"],
                             "ocrRequired": False,

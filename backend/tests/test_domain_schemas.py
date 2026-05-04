@@ -377,6 +377,19 @@ def test_mission_quality_rejects_ui_text_inside_image_prompt() -> None:
         )
 
 
+def test_mission_quality_rejects_ui_like_image_prompt_layout() -> None:
+    content = _generated_fraction_content()
+    content["assets"][1]["promptJson"]["prompt"] += " 빈 카드와 말풍선, 선택지 영역을 함께 배치합니다."
+    mission = MissionContent.model_validate(content)
+
+    with pytest.raises(ContentQualityError, match="UI형 이미지"):
+        validate_mission_content_quality(
+            mission,
+            case_file=_fraction_case_file(),
+            orchestrator_plan=_valid_learning_plan(),
+        )
+
+
 def _valid_learning_plan() -> dict:
     return {
         "planVersion": "orchestrator_plan_v1",

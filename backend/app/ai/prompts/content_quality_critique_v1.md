@@ -19,7 +19,7 @@ Return strict JSON only.
 - The content type matches the scenario:
   - `life_support`: everyday situation -> clue -> action -> realtime role practice.
   - `learning_focus`: concept anchor -> basic problem -> applied problem -> realtime explain-back.
-- Image prompts describe visual scenes only and do not ask for worksheet cards, empty UI panels, answer-choice layouts, problem text, or speech bubbles.
+- Image prompts describe visual scenes only and do not ask for worksheet cards, empty cards, UI panels, answer-choice layouts, problem text, buttons, or speech bubbles.
 - Student-facing Korean is short, concrete, and age-appropriate.
 
 ## Repair Triggers
@@ -31,7 +31,7 @@ Return `verdict: "repair"` if any of these happen:
 - A structured template such as `sequence_ordering` only rehearses a method but the mission never applies it to a concrete object/value/situation.
 - A learning-focused mission is actually an everyday life roleplay with no academic concept.
 - A life-support mission becomes an academic worksheet.
-- Image prompts ask the image model to draw UI-like cards, blank panels, answer areas, speech bubbles, or problem layouts.
+- Image prompts ask the image model to draw UI-like cards, blank panels, answer areas, buttons, speech bubbles, or problem layouts.
 
 ## Output JSON Shape
 

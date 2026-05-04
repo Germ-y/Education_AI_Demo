@@ -141,6 +141,19 @@ STRUCTURED_INTERACTION_TEMPLATES = {
     TemplateType.BLANK_FILL.value,
 }
 
+UI_LIKE_IMAGE_PROMPT_TERMS = (
+    "빈 카드",
+    "카드형",
+    "카드 UI",
+    "카드 레이아웃",
+    "말풍선",
+    "선택지 영역",
+    "정답 영역",
+    "문제 영역",
+    "UI 패널",
+    "버튼",
+)
+
 
 class ContentQualityError(ValueError):
     def __init__(self, issues: list[str]) -> None:
@@ -429,6 +442,10 @@ def _validate_image_prompt_policy(mission: MissionContent, issues: list[str]) ->
         text_policy = str(prompt_json.get("textRenderingPolicy") or prompt_json.get("ocrPolicy") or "")
         if "scene_only" not in text_policy and "no_problem_text" not in text_policy:
             issues.append(f"{asset.id}.promptJson에는 이미지 안에 문제/선택지/정답을 넣지 않는 정책이 필요합니다.")
+        for term in UI_LIKE_IMAGE_PROMPT_TERMS:
+            if term in prompt:
+                issues.append(f"{asset.id}.promptJson.prompt가 UI형 이미지 요소를 요청합니다: {term}")
+                break
         for text in visible_texts:
             if text and text in prompt:
                 issues.append(f"{asset.id}.promptJson.prompt에 UI 문구가 그대로 들어갔습니다: {text[:20]}")

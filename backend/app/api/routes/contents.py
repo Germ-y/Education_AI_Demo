@@ -18,6 +18,19 @@ from app.services.store import DemoStore, SessionPrincipal
 router = APIRouter(prefix="/api/contents", tags=["contents"])
 logger = logging.getLogger(__name__)
 
+UI_LIKE_IMAGE_PROMPT_TERMS = (
+    "빈 카드",
+    "카드형",
+    "카드 UI",
+    "카드 레이아웃",
+    "말풍선",
+    "선택지 영역",
+    "정답 영역",
+    "문제 영역",
+    "UI 패널",
+    "버튼",
+)
+
 
 @router.get("/{content_id}")
 def get_content(
@@ -431,6 +444,16 @@ def _apply_image_brief_output(content, output_json: dict) -> None:
                     "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "assetId": asset.id},
                 },
             )
+        for term in UI_LIKE_IMAGE_PROMPT_TERMS:
+            if term in prompt:
+                raise HTTPException(
+                    status_code=424,
+                    detail={
+                        "code": "IMAGE_BRIEF_UI_LIKE_PROMPT",
+                        "message": f"{asset.asset_role} 이미지 프롬프트가 UI형 요소를 요청합니다: {term}",
+                        "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "assetId": asset.id},
+                    },
+                )
         existing = asset.prompt_json if isinstance(asset.prompt_json, dict) else {}
         asset.prompt_json = {
             **existing,
