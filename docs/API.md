@@ -53,7 +53,7 @@
 - `POST /api/contents/{contentId}/reject`: 반려 및 수정 요청 저장
 - `POST /api/contents/{contentId}/publish`: 준비·승인된 asset만 학생에게 배포하고 대시보드 단계를 `learning`으로 이동
 - `POST /api/contents/{contentId}/assets/{assetId}/generate`: 단일 asset 생성
-- `POST /api/contents/{contentId}/assets/generate-package`: 이미지/오디오 asset batch 생성. 서버 생성 로그에 `progress=1/10` 같은 asset 진행률을 남긴다.
+- `POST /api/contents/{contentId}/assets/generate-package`: 이미지/오디오 asset batch 생성. 이미지 생성 전 `image_brief`로 5개 prompt를 재작성하고, 서버 생성 로그에 `progress=1/10` 같은 asset 진행률을 남긴다.
 - `GET /api/contents/{contentId}/review-summary`: 최신 attempt 기반 리뷰 요약 조회
 - `POST /api/contents/{contentId}/review-summary`: 최신 attempt 기반 리뷰 요약 생성
 - `POST /api/review-summaries/{reviewId}/apply-to-memory`: 교사 확인 후 리뷰 요약을 메모리에 반영
