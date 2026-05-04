@@ -233,10 +233,23 @@ def test_teacher_and_student_demo_flows() -> None:
         },
     )
     assert approve.status_code == 200
-    assert approve.json()["data"]["status"] == "approved"
+    expected_approved_status = "published" if content_payload["status"] == "published" else "approved"
+    assert approve.json()["data"]["status"] == expected_approved_status
     publish = client.post("/api/contents/content_fraction_001/publish", headers={"authorization": f"Bearer {teacher_token}"})
     assert publish.status_code == 200
     assert publish.json()["data"]["status"] == "published"
+    reapprove = client.post(
+        "/api/contents/content_fraction_001/approve",
+        headers={"authorization": f"Bearer {teacher_token}"},
+        json={
+            "approvedStageIds": [stage["id"] for stage in content_payload["stages"]],
+            "approvedAssetIds": [asset["id"] for asset in content_payload["assets"]],
+            "reviewNote": "배포 후 재검수",
+        },
+    )
+    assert reapprove.status_code == 200
+    assert reapprove.json()["data"]["status"] == "published"
+    assert reapprove.json()["data"]["publishedAt"] is not None
     students_after_publish = client.get("/api/teacher/students", headers={"authorization": f"Bearer {teacher_token}"})
     assert students_after_publish.status_code == 200
     fraction_student_after_publish = next(

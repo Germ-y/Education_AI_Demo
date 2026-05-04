@@ -490,7 +490,8 @@ class DemoStore:
             return None
         for asset in mission.assets:
             asset.approval_status = "approved"
-        mission.status = MissionStatus.APPROVED
+        if mission.status != MissionStatus.PUBLISHED:
+            mission.status = MissionStatus.APPROVED
         mission.teacher_review_summary = review_note
         mission.approved_by_user_id = teacher_id
         mission.approved_at = _now()
