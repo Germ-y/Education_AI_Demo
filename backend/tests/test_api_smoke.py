@@ -525,8 +525,33 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     invalid_generated_content = copy.deepcopy(generated_content)
     invalid_generated_content["stages"][3]["studentTitle"] = "realtime practice"
     content_generation_calls = {"count": 0}
+    image_brief_calls = {"count": 0}
 
     def fake_json_response(self, *, model, instructions, input_snapshot, timeout_sec=90):
+        if "Image Prompt Builder" in instructions:
+            image_brief_calls["count"] += 1
+            return (
+                {
+                    "promptVersion": "image_brief_v1",
+                    "contentId": generated_content["id"],
+                    "imageBriefs": [
+                        {
+                            "assetRole": asset["assetRole"],
+                            "stageId": asset["stageId"],
+                            "prompt": (
+                                f"{asset['assetRole']} 전용 장면. 학생이 볼 수 있는 구체적인 피자 조각 상황만 "
+                                "고품질 한국 교육 일러스트로 보여주고, 카드 UI, 말풍선, 문제 문장, 선택지, 정답, 힌트 텍스트는 넣지 않습니다."
+                            ),
+                            "negativePromptRules": ["no problem statements", "no answer choices", "no UI cards", "no speech bubbles"],
+                            "ocrRequired": False,
+                            "qaChecklist": ["scene matches stage purpose", "no UI text embedded", "student-safe tone"],
+                        }
+                        for asset in generated_content["assets"]
+                        if asset["assetType"] == "image"
+                    ],
+                },
+                {"input_tokens": 3, "output_tokens": 5},
+            )
         if "MissionContent" in instructions:
             content_generation_calls["count"] += 1
             if content_generation_calls["count"] == 1:
@@ -669,8 +694,14 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     assert package.status_code == 200
     package_data = package.json()["data"]
     assert package_data["generatedCount"] == 10
+    assert image_brief_calls["count"] == 1
     assert all(asset["storageUrl"].startswith("/generated/assets/content_generated_contract_001/") for asset in package_data["assets"])
     assert all(asset["qaStatus"] == "passed" for asset in package_data["assets"])
+    assert all(
+        asset["promptJson"].get("promptVersion") == "image_brief_v1"
+        for asset in package_data["assets"]
+        if asset["assetType"] == "image"
+    )
 
     reviewable = client.get("/api/contents/content_generated_contract_001")
     assert reviewable.status_code == 200

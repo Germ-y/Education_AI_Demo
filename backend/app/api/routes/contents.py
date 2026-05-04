@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.ai.elevenlabs_provider import ElevenLabsProvider
 from app.ai.openai_provider import OpenAiProvider
+from app.ai.prompt_registry import load_prompt
 from app.ai.provider_errors import AiProviderError
 from app.api.deps import get_store, require_teacher
 from app.api.response import ok
@@ -119,6 +120,8 @@ def generate_content_asset(
     if asset is None:
         raise HTTPException(status_code=404, detail={"code": "ASSET_NOT_FOUND", "message": "생성할 asset을 찾을 수 없습니다."})
 
+    if asset.asset_type == AssetType.IMAGE:
+        _refresh_image_prompts_or_raise(content)
     _generate_asset_or_raise(content_id, asset)
 
     demo_store.save_generated_mission_content(content)
@@ -145,6 +148,7 @@ def generate_content_asset_package(
 
     _validate_required_asset_package(content)
     _preflight_provider_keys(content)
+    _refresh_image_prompts_or_raise(content)
 
     package_started_at = time.perf_counter()
     sorted_assets = sorted(content.assets, key=lambda item: (item.asset_type, item.asset_role, item.id))
@@ -328,6 +332,115 @@ def _generate_asset_or_raise(content_id: str, asset) -> None:
                 "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "assetId": asset.id},
             },
         ) from exc
+
+
+def _refresh_image_prompts_or_raise(content) -> None:
+    image_assets = [asset for asset in content.assets if asset.asset_type == AssetType.IMAGE]
+    if not image_assets or all(_uses_image_brief_prompt(asset.prompt_json) for asset in image_assets):
+        return
+
+    settings = get_settings()
+    started_at = time.perf_counter()
+    logger.info("contents.image_brief.started content_id=%s image_asset_count=%s", content.id, len(image_assets))
+    try:
+        output_json, _ = OpenAiProvider(settings).create_json_response(
+            model=settings.openai_reasoning_model,
+            instructions=load_prompt("image_brief"),
+            input_snapshot=_image_brief_input_snapshot(content, image_assets),
+        )
+        _apply_image_brief_output(content, output_json)
+    except AiProviderError as exc:
+        logger.warning(
+            "contents.image_brief.failed content_id=%s code=%s elapsed_sec=%.1f message=%s",
+            content.id,
+            exc.code,
+            time.perf_counter() - started_at,
+            exc.message,
+        )
+        raise HTTPException(
+            status_code=424,
+            detail={
+                "code": exc.code,
+                "message": exc.message,
+                "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "contentId": content.id},
+            },
+        ) from exc
+    logger.info("contents.image_brief.succeeded content_id=%s elapsed_sec=%.1f", content.id, time.perf_counter() - started_at)
+
+
+def _uses_image_brief_prompt(prompt_json: dict | None) -> bool:
+    return isinstance(prompt_json, dict) and prompt_json.get("promptVersion") == "image_brief_v1"
+
+
+def _image_brief_input_snapshot(content, image_assets: list) -> dict:
+    return {
+        "contentId": content.id,
+        "contentType": content.content_type,
+        "title": content.title,
+        "sessionGoal": content.session_goal,
+        "briefJson": content.brief_json,
+        "stages": [
+            {
+                "id": stage.id,
+                "step": stage.step,
+                "stageRole": stage.stage_role,
+                "templateType": stage.template_type,
+                "studentTitle": stage.student_title,
+                "studentInstruction": stage.student_instruction,
+                "templateJson": stage.template_json,
+                "realtimeSpec": stage.realtime_spec.model_dump(by_alias=True) if stage.realtime_spec else None,
+            }
+            for stage in sorted(content.stages, key=lambda item: item.step)
+        ],
+        "imageAssets": [
+            {
+                "id": asset.id,
+                "assetRole": asset.asset_role,
+                "stageId": asset.stage_id,
+                "currentPromptJson": asset.prompt_json,
+            }
+            for asset in image_assets
+        ],
+    }
+
+
+def _apply_image_brief_output(content, output_json: dict) -> None:
+    briefs = output_json.get("imageBriefs")
+    if not isinstance(briefs, list):
+        raise HTTPException(
+            status_code=424,
+            detail={
+                "code": "IMAGE_BRIEF_OUTPUT_INVALID",
+                "message": "이미지 프롬프트 빌더 응답에 imageBriefs가 없습니다.",
+                "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "contentId": content.id},
+            },
+        )
+
+    briefs_by_role = {brief.get("assetRole"): brief for brief in briefs if isinstance(brief, dict)}
+    for asset in content.assets:
+        if asset.asset_type != AssetType.IMAGE:
+            continue
+        brief = briefs_by_role.get(asset.asset_role)
+        prompt = brief.get("prompt") if isinstance(brief, dict) else None
+        if not isinstance(prompt, str) or len(prompt.strip()) < 80:
+            raise HTTPException(
+                status_code=424,
+                detail={
+                    "code": "IMAGE_BRIEF_PROMPT_INVALID",
+                    "message": f"{asset.asset_role} 이미지 프롬프트가 충분하지 않습니다.",
+                    "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "assetId": asset.id},
+                },
+            )
+        existing = asset.prompt_json if isinstance(asset.prompt_json, dict) else {}
+        asset.prompt_json = {
+            **existing,
+            "promptVersion": "image_brief_v1",
+            "prompt": prompt.strip(),
+            "negativePromptRules": brief.get("negativePromptRules", []),
+            "ocrRequired": bool(brief.get("ocrRequired", False)),
+            "qaChecklist": brief.get("qaChecklist", []),
+            "textRenderingPolicy": "scene_only_no_problem_text",
+        }
 
 
 def _generated_asset_relative_path(content_id: str, asset) -> str:
