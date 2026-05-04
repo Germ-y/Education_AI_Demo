@@ -89,12 +89,14 @@
 
 ```text
 backend/data/eduyj_demo_dump.sql
+backend/data/eduyj_demo.db
 backend/data/README.md
+backend/generated/assets/
 ```
 
-로컬 SQLite 원본인 `backend/data/eduyj_demo.db`는 `.gitignore` 대상이다.
+현재 MVP 확인 단계에서는 실제 생성 이미지/음성과 승인된 SQLite 상태를 팀원이 바로 확인할 수 있도록 `backend/data/eduyj_demo.db`와 `backend/generated/assets/`를 추적한다.
 
-주의: 로컬에서 자료 생성/승인/학생 완료 테스트를 하면 `eduyj_demo.db`는 추적 dump와 달라진다. 팀원이 같은 기준에서 시작해야 하면 아래 dump 복원 명령으로 먼저 맞춘다.
+주의: 로컬에서 자료 생성/승인/학생 완료 테스트를 하면 `eduyj_demo.db`는 추적 dump와 달라진다. 깨끗한 seed 기준이 필요하면 아래 dump 복원 명령으로 먼저 맞춘다.
 
 SQL dump 복원:
 
