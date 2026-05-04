@@ -50,6 +50,20 @@ def test_generation_prompts_require_concrete_playable_micro_scenarios() -> None:
     assert "Honor the teacher requested topic" in orchestrator_prompt
     assert "concrete playable micro-scenario" in content_prompt
     assert "concrete playable micro-scenario" in critique_prompt
+    assert "grade-level dignity" in orchestrator_prompt
+    assert "grade-level dignity" in content_prompt
+    assert "grade-level dignity" in critique_prompt
+    assert "Lower the reading burden, not the student's social age." in content_prompt
     assert "Stage 2 must be the easiest success step" in content_prompt
     assert "Stage 3 must be a meaningful transfer" in content_prompt
     assert "very low reading load or a 2-choice limit" in orchestrator_prompt
+    assert "trivial color/object recall question" in critique_prompt
+
+
+def test_generation_prompts_require_teacher_like_audio_and_core_realtime_rubric() -> None:
+    content_prompt = load_prompt("mission_content_package")
+
+    assert "calm teacher speaking beside the student" in content_prompt
+    assert "Do not sound like a system notification" in content_prompt
+    assert "single core target behavior" in content_prompt
+    assert "찾는 자료 단서를 말하며 도움을 요청한다" in content_prompt

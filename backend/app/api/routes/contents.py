@@ -313,7 +313,7 @@ def _generate_asset_or_raise(content_id: str, asset) -> None:
                     asset.stage_id,
                     output_path,
                 )
-            _apply_generated_asset_metadata(asset, relative_path, provider="elevenlabs", model="eleven_multilingual_v2")
+            _apply_generated_asset_metadata(asset, relative_path, provider="elevenlabs", model=settings.elevenlabs_model_id)
         else:
             raise HTTPException(status_code=400, detail={"code": "ASSET_TYPE_NOT_SUPPORTED", "message": "지원하지 않는 assetType입니다."})
         logger.info(

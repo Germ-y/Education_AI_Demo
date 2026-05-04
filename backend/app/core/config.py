@@ -23,6 +23,13 @@ class Settings(BaseSettings):
     openai_realtime_voice_speed: float = 0.92
     elevenlabs_api_key: str | None = None
     elevenlabs_voice_id: str | None = None
+    elevenlabs_model_id: str = "eleven_v3"
+    elevenlabs_stability: float = 0.42
+    elevenlabs_similarity_boost: float = 0.82
+    elevenlabs_style: float = 0.32
+    elevenlabs_speed: float = 0.94
+    elevenlabs_use_speaker_boost: bool = True
+    elevenlabs_enable_audio_tags: bool = True
     neis_api_key: str | None = None
     public_data_api_key: str | None = Field(
         default=None,

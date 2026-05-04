@@ -19,6 +19,7 @@ Generate a complete MissionContent JSON package from an approved OrchestratorPla
 - Every visible title, instruction, question, choice, feedback, narration, rubric label, reflection choice, and teacher review summary must be written in Korean.
 - Do not expose raw internal terms such as `realtime`, `teach-back`, `teach_back`, `roleplay`, `template`, or `stage_` in visible prose.
 - Student-facing content must describe what the student will do. Do not use teacher proposal phrases such as "수업이 좋겠어요" or "콘텐츠가 좋겠어요" in student content.
+- Keep the student's grade-level dignity. Short text and easy choices are scaffolds, not permission to make the scenario babyish. A grade 6 or middle-school student can receive very short instructions inside a mature everyday situation.
 - Do not place problem text, choices, answer, hints, or feedback inside image prompts.
 - All problem text lines must live in `templateJson`.
 - All visual context must reference image assets by role/id.
@@ -81,6 +82,7 @@ Image prompt requirements:
 Audio requirements:
 
 - `sourceText` should be short, warm, and stage-specific.
+- Write `sourceText` like a calm teacher speaking beside the student: gentle, reassuring, and natural in Korean. Prefer one short sentence. Do not sound like a system notification.
 - Stage audio is pre-generated narration played before the student interacts.
 - Stage 4 audio is only the opening narration before realtime starts, not the live conversation.
 
@@ -95,10 +97,13 @@ For `learning_focus`, stages 2 and 3 should normally include one structured inte
 Every mission must be a concrete playable micro-scenario, not a generic worksheet:
 
 - Honor the teacher requested topic. If the teacher asks for discounts, percent, reading comprehension, data, or another non-fraction topic, do not import fraction language unless the teacher explicitly asked for it.
+- Match the scenario maturity to the student's grade and context. Lower the reading burden, not the student's social age.
+- For older `life_support` students, prefer practical participation goals: finding a resource for a task, asking staff for help, checking a route, handling a schedule change, choosing a safe next action, or explaining what help is needed.
+- Avoid trivial clue questions such as "what color is it?" when that is the whole task. The clue question should support an actual later action, such as what information to tell a helper.
 - Stage 1 must introduce one clear anchor example with concrete numbers, objects, or labels that the student will reuse.
-- Stage 2 must be the easiest success step using that same anchor example.
-- Stage 3 must be a meaningful transfer or one-step deeper version, not a sudden jump to a much harder calculation.
-- Stage 4 must ask the student to explain the exact reasoning pattern practiced in stages 1~3.
+- Stage 2 must be the easiest success step using that same anchor example, but it should still feel purposeful rather than a throwaway obvious answer.
+- Stage 3 must be a meaningful transfer or one-step deeper version, not a sudden jump to a much harder calculation or a generic order sort.
+- Stage 4 must ask the student to explain or act out the exact reasoning/behavior practiced in stages 1~3.
 - `sequence_ordering` may rehearse a method, but it must not be the whole learning task. Pair it with a concrete value/object scenario and make the next stage apply the method.
 - Prefer friendly classroom or daily-life values that can be solved mentally. Avoid awkward numbers, hidden arithmetic, or operations that were not taught in stages 1~2.
 - The correct answer should be educationally checkable from the visible UI text alone; do not rely on information hidden only in the image.
@@ -403,7 +408,10 @@ Stage 4 realtime practice is not an exact-answer quiz:
 - Design it as open-ended concept talk or role practice that invites the student to explain in their own words.
 - `studentGoal` should describe what the student may try to explain, not a strict answer.
 - `rubric` labels are gentle conversation hints for the teacher/AI partner; they must not be treated as all-required pass/fail criteria.
-- Prefer `required: false` unless a criterion is only "student made a meaningful attempt".
+- Include 3~5 observable rubric items.
+- Mark the meaningful attempt as required.
+- Also mark the single core target behavior as required. For help-request practice, the core target should combine the useful clue and the help request, such as "찾는 자료 단서를 말하며 도움을 요청한다".
+- Keep required criteria supportive and observable, not keyword-perfect pass/fail checks.
 - `allowedFeedback` must affirm partial attempts first and then ask one simple follow-up.
 - Never make the AI partner reject a student because they missed a keyword, used different wording, or gave a short sentence.
 
@@ -483,7 +491,7 @@ Return only JSON matching this shape.
       "assetRole": "stage_1",
       "assetType": "audio",
       "provider": "elevenlabs",
-      "model": "eleven_multilingual_v2",
+      "model": "eleven_v3",
       "promptJson": null,
       "sourceText": "string",
       "storageUrl": "",

@@ -46,6 +46,7 @@
 - 이미지 생성 전에는 `image_brief`가 5개 이미지 prompt를 다시 작성한다. `gpt-image-2`에는 이 재작성된 장면 prompt만 전달한다.
 - 이미지 prompt는 장면만 설명해야 하며 빈 카드, 말풍선, UI 패널, 선택지 영역, 버튼 같은 학습지형 구성을 요청하면 실패 처리한다.
 - OpenAI Realtime 음성은 ElevenLabs 안내 음성과 별도다. 기본값은 `OPENAI_REALTIME_VOICE=marin`, `OPENAI_REALTIME_VOICE_SPEED=0.92`다.
+- ElevenLabs 안내 음성은 선생님이 옆에서 말해주는 듯한 부드러운 톤을 목표로 한다. 기본값은 `ELEVENLABS_MODEL_ID=eleven_v3`이며, v3 사용 시 짧은 교사 톤 오디오 태그와 `stability/style/speed/speaker_boost` 설정을 함께 적용한다.
 
 일상생활 지원형 단계명:
 

@@ -16,6 +16,9 @@ Return strict JSON only.
 - Stage 2 is the easiest success step.
 - Stage 3 is a controlled transfer or one-step deeper problem, not a sudden difficulty jump.
 - Stage 4 asks the student to practice the exact reasoning or real-life behavior used in stages 1-3.
+- The scenario respects the student's grade-level dignity. Scaffolding may be easy, but older students should not receive babyish situations or toy-like goals unless the teacher asked for them.
+- For `life_support`, the clue step helps the student act or communicate in the situation. It is not just a trivial color/object recall question.
+- For `life_support`, the action step asks for a meaningful next action or help-request quality that would matter outside the screen.
 - The content type matches the scenario:
   - `life_support`: everyday situation -> clue -> action -> realtime role practice.
   - `learning_focus`: concept anchor -> basic problem -> applied problem -> realtime explain-back.
@@ -27,6 +30,8 @@ Return strict JSON only.
 Return `verdict: "repair"` if any of these happen:
 
 - The content feels bland, generic, or disconnected from the student's context.
+- The content is developmentally too young for the student's grade, even if the reading load is low.
+- The mission reduces an everyday situation to a single obvious label such as a color, shape, or object name without using that clue for a later action.
 - Stage 2 and stage 3 do not build on the same anchor example.
 - A structured template such as `sequence_ordering` only rehearses a method but the mission never applies it to a concrete object/value/situation.
 - A learning-focused mission is actually an everyday life roleplay with no academic concept.
