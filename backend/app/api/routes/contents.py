@@ -1,6 +1,7 @@
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -224,6 +225,66 @@ def generate_content_asset_package(
     return ok({"contentId": content.id, "generatedCount": len(generated), "assets": generated})
 
 
+@router.post("/{content_id}/stages/{stage_id}/preview-realtime-session")
+def create_preview_realtime_session(
+    content_id: str,
+    stage_id: str,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    content = demo_store.get_mission_for_teacher(content_id, teacher_id=principal.id if principal.role == "teacher" else None)
+    stage = next((candidate for candidate in content.stages if candidate.id == stage_id), None) if content else None
+    if content is None or stage is None or stage.step != 4 or stage.realtime_spec is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "PREVIEW_REALTIME_NOT_ALLOWED", "message": "검토할 4단계 실시간 연습 구성이 필요합니다."},
+        )
+
+    settings = get_settings()
+    try:
+        secret = OpenAiProvider(settings).create_realtime_client_secret(
+            instructions=_realtime_instructions(stage.realtime_spec.model_dump(by_alias=True)),
+            model=settings.openai_realtime_model,
+        )
+    except AiProviderError as exc:
+        raise HTTPException(
+            status_code=424,
+            detail={
+                "code": exc.code,
+                "message": exc.message,
+                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+            },
+        ) from exc
+
+    session = demo_store.create_preview_realtime_session(content_id, principal.id if principal.role == "teacher" else None, stage_id)
+    if session is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "PREVIEW_REALTIME_NOT_ALLOWED", "message": "검토할 4단계 실시간 연습 구성이 필요합니다."},
+        )
+    spec = session.spec_snapshot_json
+    image_asset = next((asset for asset in content.assets if asset.id == spec.get("imageAssetId")), None)
+    audio_asset = next((asset for asset in content.assets if asset.asset_role == "stage_4_realtime" and asset.asset_type == "audio"), None)
+    return ok(
+        {
+            "sessionId": session.id,
+            "provider": session.provider,
+            "model": session.model,
+            "clientSecret": secret["value"],
+            "expiresAt": datetime.fromtimestamp(int(secret["expiresAt"]), UTC).isoformat(),
+            "webrtcUrl": "https://api.openai.com/v1/realtime/calls",
+            "practiceSpec": {
+                "practiceTitle": spec.get("practiceTitle"),
+                "imageAssetUrl": image_asset.preview_url if image_asset else None,
+                "openingAudioUrl": audio_asset.preview_url if audio_asset else None,
+                "openingLine": spec.get("openingLine"),
+                "maxTurns": spec.get("maxTurns"),
+                "maxDurationSec": spec.get("maxDurationSec"),
+            },
+        }
+    )
+
+
 def _generate_image_assets_in_parallel(content_id: str, image_assets: list, *, total_assets: int) -> list[dict]:
     generated_by_id: dict[str, dict] = {}
     with ThreadPoolExecutor(max_workers=min(IMAGE_PACKAGE_PARALLELISM, len(image_assets))) as executor:
@@ -247,6 +308,33 @@ def _generate_image_assets_in_parallel(content_id: str, image_assets: list, *, t
             generated_by_id[asset.id] = asset.model_dump(by_alias=True)
 
     return [generated_by_id[asset.id] for asset in image_assets]
+
+
+def _realtime_instructions(spec: dict) -> str:
+    rubric_labels = [
+        str(item.get("label"))
+        for item in spec.get("rubric", [])
+        if isinstance(item, dict) and isinstance(item.get("label"), str)
+    ]
+    return "\n".join(
+        [
+            "You are the EduYJ teacher-review realtime practice partner.",
+            "Speak in short, warm Korean sentences.",
+            "This is a teacher preview of an unpublished or reviewable mission.",
+            "Let the teacher verify voice tone, pacing, and instructional flow.",
+            "Do not expose hidden rubrics or diagnostic labels.",
+            "Accept partial, short, hesitant, or grammatically imperfect Korean as a useful attempt.",
+            "If the speaker says anything related, affirm it first, then ask one gentle follow-up question.",
+            "If the speaker is silent or says they do not know, offer one simple sentence starter.",
+            f"Role: {spec.get('aiRole')}",
+            f"Situation: {spec.get('situationText')}",
+            f"Opening line: {spec.get('openingLine')}",
+            f"Practice goal: {spec.get('studentGoal')}",
+            f"Possible ideas to gently invite, not required answers: {rubric_labels}",
+            f"Allowed feedback examples: {spec.get('allowedFeedback')}",
+            f"Forbidden rules: {spec.get('forbidden')}",
+        ]
+    )
 
 
 @router.post("/{content_id}/review-summary")

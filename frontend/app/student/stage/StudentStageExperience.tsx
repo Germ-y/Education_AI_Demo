@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   completeRealtimeSession,
   completeStudentMission,
+  createPreviewRealtimeSession,
   createRealtimeSession,
   saveStudentMissionEvent,
   saveStudentMissionReflection,
@@ -1011,6 +1012,7 @@ function RealtimePracticeRoom({
   attemptId,
   token,
   accessCode,
+  previewMode = false,
   onRuntimeReady,
   onComplete,
   onFinish,
@@ -1024,6 +1026,7 @@ function RealtimePracticeRoom({
   attemptId?: string | null;
   token?: string | null;
   accessCode?: string | null;
+  previewMode?: boolean;
   onRuntimeReady: (nextToken: string, nextAttemptId: string) => void;
   onComplete: () => void;
   onFinish: () => void;
@@ -1206,6 +1209,16 @@ function RealtimePracticeRoom({
       let activeToken = token;
       let activeAttemptId = attemptId;
 
+      if (previewMode) {
+        setStatusMessage("검토용 실시간 대화를 준비하고 있어요.");
+        const session = await createPreviewRealtimeSession(contentId, stageId);
+        realtimeTokenRef.current = null;
+        realtimeSessionIdRef.current = session.sessionId;
+        startedAtRef.current = Date.now();
+        await connectRealtimeSession(session);
+        return;
+      }
+
       if ((!activeToken || !activeAttemptId) && accessCode) {
         setStatusMessage("학습 기록을 준비하고 있어요.");
         const access = await studentAccess({ accessCode });
@@ -1223,58 +1236,7 @@ function RealtimePracticeRoom({
       const session = await createRealtimeSession(contentId, stageId, { attemptId: activeAttemptId }, { token: activeToken });
       realtimeSessionIdRef.current = session.sessionId;
       startedAtRef.current = Date.now();
-
-      const peerConnection = new RTCPeerConnection();
-      peerConnectionRef.current = peerConnection;
-      peerConnection.ontrack = (event) => {
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = event.streams[0];
-        }
-      };
-
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = mediaStream;
-      mediaStream.getAudioTracks().forEach((track) => peerConnection.addTrack(track, mediaStream));
-
-      const dataChannel = peerConnection.createDataChannel("oai-events");
-      dataChannelRef.current = dataChannel;
-      dataChannel.addEventListener("open", () => {
-        setConnectionState("connected");
-        setStatusMessage("연결됐어요. 마이크로 말하거나 아래에 문장을 입력해도 돼요.");
-        appendMessage("system", "실시간 대화가 연결됐어요. 말하거나 채팅을 보내세요.");
-        sendSessionEvent("realtime_session_connected", { provider: session.provider, model: session.model });
-      });
-      dataChannel.addEventListener("message", (event) => {
-        try {
-          handleRealtimeEvent(JSON.parse(event.data));
-        } catch {
-          // Ignore non-JSON diagnostic frames.
-        }
-      });
-      dataChannel.addEventListener("error", () => {
-        setConnectionState("error");
-        setStatusMessage("대화 채널 연결에 실패했어요.");
-      });
-
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-      const sdpResponse = await fetch(session.webrtcUrl, {
-        method: "POST",
-        body: offer.sdp,
-        headers: {
-          Authorization: `Bearer ${session.clientSecret}`,
-          "Content-Type": "application/sdp",
-        },
-      });
-
-      if (!sdpResponse.ok) {
-        throw new Error(await sdpResponse.text());
-      }
-
-      await peerConnection.setRemoteDescription({
-        type: "answer",
-        sdp: await sdpResponse.text(),
-      });
+      await connectRealtimeSession(session);
     } catch (error) {
       const message = error instanceof Error ? error.message : "알 수 없는 오류";
       console.error("Realtime conversation failed", error);
@@ -1283,6 +1245,60 @@ function RealtimePracticeRoom({
       setStatusMessage(`실시간 대화를 시작하지 못했어요. ${message.slice(0, 140)}`);
       appendMessage("system", `실시간 대화를 시작하지 못했어요. ${message.slice(0, 140)}`);
     }
+  };
+
+  const connectRealtimeSession = async (session: Awaited<ReturnType<typeof createRealtimeSession>>) => {
+    const peerConnection = new RTCPeerConnection();
+    peerConnectionRef.current = peerConnection;
+    peerConnection.ontrack = (event) => {
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = event.streams[0];
+      }
+    };
+
+    const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaStreamRef.current = mediaStream;
+    mediaStream.getAudioTracks().forEach((track) => peerConnection.addTrack(track, mediaStream));
+
+    const dataChannel = peerConnection.createDataChannel("oai-events");
+    dataChannelRef.current = dataChannel;
+    dataChannel.addEventListener("open", () => {
+      setConnectionState("connected");
+      setStatusMessage("연결됐어요. 마이크로 말하거나 아래에 문장을 입력해도 돼요.");
+      appendMessage("system", previewMode ? "검토용 실시간 대화가 연결됐어요." : "실시간 대화가 연결됐어요. 말하거나 채팅을 보내세요.");
+      sendSessionEvent("realtime_session_connected", { provider: session.provider, model: session.model, preview: Boolean(previewMode) });
+    });
+    dataChannel.addEventListener("message", (event) => {
+      try {
+        handleRealtimeEvent(JSON.parse(event.data));
+      } catch {
+        // Ignore non-JSON diagnostic frames.
+      }
+    });
+    dataChannel.addEventListener("error", () => {
+      setConnectionState("error");
+      setStatusMessage("대화 채널 연결에 실패했어요.");
+    });
+
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    const sdpResponse = await fetch(session.webrtcUrl, {
+      method: "POST",
+      body: offer.sdp,
+      headers: {
+        Authorization: `Bearer ${session.clientSecret}`,
+        "Content-Type": "application/sdp",
+      },
+    });
+
+    if (!sdpResponse.ok) {
+      throw new Error(await sdpResponse.text());
+    }
+
+    await peerConnection.setRemoteDescription({
+      type: "answer",
+      sdp: await sdpResponse.text(),
+    });
   };
 
   const submitMessage = (text: string) => {
@@ -2269,6 +2285,7 @@ export function StudentStageExperience({
                         attemptId={attemptId}
                         token={studentAccessToken}
                         accessCode={student.accessCode}
+                        previewMode={previewMode}
                         onRuntimeReady={(nextToken, nextAttemptId) => {
                           setStudentAccessToken(nextToken);
                           setAttemptId(nextAttemptId);

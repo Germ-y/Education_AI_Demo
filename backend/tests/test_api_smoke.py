@@ -225,6 +225,13 @@ def test_teacher_and_student_demo_flows() -> None:
     assert package_generation.status_code == 424
     assert package_generation.json()["error"]["code"] == "OPENAI_API_KEY_MISSING"
     assert package_generation.json()["error"]["details"] == {"reviewRequired": True, "fallbackPolicy": "disabled"}
+    preview_realtime = client.post(
+        "/api/contents/content_fraction_001/stages/stage_fraction_4/preview-realtime-session",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert preview_realtime.status_code == 424
+    assert preview_realtime.json()["error"]["code"] == "OPENAI_API_KEY_MISSING"
+    assert preview_realtime.json()["error"]["details"] == {"reviewRequired": True, "fallbackPolicy": "disabled"}
     approve = client.post(
         "/api/contents/content_fraction_001/approve",
         headers={"authorization": f"Bearer {teacher_token}"},

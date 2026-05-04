@@ -917,6 +917,40 @@ class DemoStore:
         self.persist()
         return session
 
+    def create_preview_realtime_session(self, content_id: str, teacher_id: str | None, stage_id: str) -> RealtimePracticeSession | None:
+        self.refresh()
+        mission = self.get_mission_for_teacher(content_id, teacher_id)
+        stage = next((candidate for candidate in mission.stages if candidate.id == stage_id), None) if mission else None
+        if mission is None or stage is None or stage.step != 4 or stage.realtime_spec is None:
+            return None
+
+        attempt = ContentAttempt(
+            id=f"attempt_preview_{uuid4()}",
+            studentId=mission.student_id,
+            missionContentId=mission.id,
+            status="in_progress",
+            currentStep=4,
+            startedAt=_now(),
+            scoreJson={"preview": True, "teacherId": teacher_id},
+        )
+        session = RealtimePracticeSession(
+            id=f"rt_preview_session_{uuid4()}",
+            attemptId=attempt.id,
+            missionContentId=mission.id,
+            stageId=stage.id,
+            studentId=mission.student_id,
+            provider="openai",
+            model=get_settings().openai_realtime_model,
+            status="created",
+            specSnapshotJson=stage.realtime_spec.model_dump(by_alias=True),
+            turnCount=0,
+            durationSec=0,
+        )
+        self.db.attempts.append(attempt)
+        self.db.realtime_sessions.append(session)
+        self.persist()
+        return session
+
     def save_reflection(self, student_id: str, content_id: str, attempt_id: str, reflection_choice: str, short_text: str | None) -> dict | None:
         self.refresh()
         attempt = self.get_attempt(attempt_id)
