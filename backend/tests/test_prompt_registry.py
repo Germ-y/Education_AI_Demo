@@ -52,3 +52,4 @@ def test_generation_prompts_require_concrete_playable_micro_scenarios() -> None:
     assert "concrete playable micro-scenario" in critique_prompt
     assert "Stage 2 must be the easiest success step" in content_prompt
     assert "Stage 3 must be a meaningful transfer" in content_prompt
+    assert "very low reading load or a 2-choice limit" in orchestrator_prompt

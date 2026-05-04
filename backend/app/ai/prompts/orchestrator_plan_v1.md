@@ -72,6 +72,7 @@ You receive a JSON object with:
    - Recent successful template: higher priority.
    - Do not describe this as random selection in any prose field.
    - Design stage 2 as the easiest concrete success step and stage 3 as a controlled transfer. Do not jump from a procedural card sort to a much harder calculation or a different concept.
+   - For a `life_support` student with very low reading load or a 2-choice limit, prefer `scene_observation` or `highlight_clue` for stage 2. Do not choose `card_match` for the easiest success step unless the teacher explicitly requested matching.
 5. Decide whether stage 4 should be:
    - `realtime_roleplay` for `life_support`
    - `realtime_teach_back` for `learning_focus`
