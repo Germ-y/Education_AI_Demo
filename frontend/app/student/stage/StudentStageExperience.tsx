@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   completeRealtimeSession,
@@ -1635,6 +1635,8 @@ export function StudentStageExperience({
   };
 
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { student, scene } = context;
   const theme = scene.theme;
   const initialStageIndex = Math.max(
@@ -1753,6 +1755,18 @@ export function StudentStageExperience({
     if (!previewMode) return;
     window.parent.postMessage({ type: "student-preview-stage", step: activeStage.step }, window.location.origin);
   }, [activeStage.step, previewMode]);
+
+  useEffect(() => {
+    if (initialMode === "complete" || isFinished) return;
+
+    const stepParam = String(activeStage.step);
+    if (searchParams.get("step") === stepParam) return;
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("step", stepParam);
+    nextParams.delete("complete");
+    router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
+  }, [activeStage.step, initialMode, isFinished, pathname, router, searchParams]);
 
   const progressPercent = Math.round((completedSteps.length / scene.stages.length) * 100);
   const activeVisual = {
