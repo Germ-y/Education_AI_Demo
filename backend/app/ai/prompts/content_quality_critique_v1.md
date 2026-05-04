@@ -11,6 +11,8 @@ Return strict JSON only.
 ## Pass Only If
 
 - The teacher requested topic is honored and not replaced by a different topic.
+- If `orchestratorPlan.sessionGoal` or the teacher request clearly sets a new topic, that topic is the source of truth. Do not reject the mission merely because the stored case goal or previous lesson is about a different subject.
+- Student case context should be used to judge scaffolding, reading load, interaction pattern, age fit, and support strategy, not to override a clearly requested safe topic.
 - The mission feels like a concrete playable micro-scenario, not a generic worksheet.
 - Stage 1 opens a clear situation or concept anchor that stages 2 and 3 reuse.
 - Stage 2 is the easiest success step.
@@ -31,6 +33,7 @@ Return strict JSON only.
 Return `verdict: "repair"` if any of these happen:
 
 - The content feels bland, generic, or disconnected from the student's context.
+- The mission ignores the explicit topic in `orchestratorPlan.sessionGoal` and falls back to the stored case goal instead.
 - The content is developmentally too young for the student's grade, even if the reading load is low.
 - The mission reduces an everyday situation to a single obvious label such as a color, shape, or object name without using that clue for a later action.
 - Audio `sourceText` is too short, generic, or merely repeats the stage title without guiding what the student should notice or try.

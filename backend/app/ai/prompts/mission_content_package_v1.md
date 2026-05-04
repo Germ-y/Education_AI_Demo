@@ -76,6 +76,7 @@ Image prompt requirements:
 
 - Use Korean educational context, but avoid rendering problem text, answer text, choices, hints, or long labels inside the image.
 - The visual should show the scene only: objects, characters, emotion, relationship, route, or manipulatives.
+- If the orchestrator image intent asks for blank cards, worksheet cards, UI panels, answer areas, or speech bubbles, ignore that part and translate the intent into a real-world scene or learning material object instead.
 - Each of the 5 image assets must be visually distinct and match its role.
 - Put visual constraints in `promptJson.prompt`, plus optional structured fields such as `visualRole`, `scene`, `style`, `avoid`, and `ocrPolicy`.
 
@@ -98,6 +99,7 @@ For `learning_focus`, stages 2 and 3 should normally include one structured inte
 Every mission must be a concrete playable micro-scenario, not a generic worksheet:
 
 - Honor the teacher requested topic. If the teacher asks for discounts, percent, reading comprehension, data, or another non-fraction topic, do not import fraction language unless the teacher explicitly asked for it.
+- When the requested topic differs from the stored case goal, keep the requested topic as the source of truth. Use the stored student context only for scaffolding, reading load, interaction style, and emotional support.
 - Match the scenario maturity to the student's grade and context. Lower the reading burden, not the student's social age.
 - For older `life_support` students, prefer practical participation goals: finding a resource for a task, asking staff for help, checking a route, handling a schedule change, choosing a safe next action, or explaining what help is needed.
 - Avoid trivial clue questions such as "what color is it?" when that is the whole task. The clue question should support an actual later action, such as what information to tell a helper.

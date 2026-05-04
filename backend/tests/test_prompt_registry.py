@@ -48,8 +48,10 @@ def test_generation_prompts_require_concrete_playable_micro_scenarios() -> None:
     critique_prompt = load_prompt("content_quality_critique")
 
     assert "Honor the teacher requested topic" in orchestrator_prompt
+    assert "new subject that differs from the stored case goal" in orchestrator_prompt
     assert "concrete playable micro-scenario" in content_prompt
     assert "concrete playable micro-scenario" in critique_prompt
+    assert "source of truth" in critique_prompt
     assert "grade-level dignity" in orchestrator_prompt
     assert "grade-level dignity" in content_prompt
     assert "grade-level dignity" in critique_prompt
