@@ -257,6 +257,10 @@ const learningStatus: Record<CaseStatus, { label: string; progress: number; curr
 
 const workflowSteps = ["자료 제안", "제안 검토", "학습", "학습 피드백"];
 const reportFeedbackNotePrefix = "review_summary_feedback:";
+const studentPreviewViewport = {
+  width: 1024,
+  height: 900,
+};
 
 const reviewStagePreviews: ReviewStageDraft[] = [];
 
@@ -1695,7 +1699,13 @@ export default function DashboardPage() {
 
     const updateScale = () => {
       const { width, height } = frame.getBoundingClientRect();
-      setReviewPreviewScale(Math.min(1, Math.max(0.1, (width - 24) / 1024), Math.max(0.1, (height - 24) / 768)));
+      setReviewPreviewScale(
+        Math.min(
+          1,
+          Math.max(0.1, (width - 24) / studentPreviewViewport.width),
+          Math.max(0.1, (height - 24) / studentPreviewViewport.height),
+        ),
+      );
     };
 
     updateScale();
@@ -1716,7 +1726,13 @@ export default function DashboardPage() {
 
     const updateScale = () => {
       const { width, height } = frame.getBoundingClientRect();
-      setReportPreviewScale(Math.min(1, Math.max(0.1, (width - 24) / 1024), Math.max(0.1, (height - 24) / 768)));
+      setReportPreviewScale(
+        Math.min(
+          1,
+          Math.max(0.1, (width - 24) / studentPreviewViewport.width),
+          Math.max(0.1, (height - 24) / studentPreviewViewport.height),
+        ),
+      );
     };
 
     updateScale();
@@ -2364,8 +2380,12 @@ export default function DashboardPage() {
                   <iframe
                     title={`학습 리포트 자료 스테이지 ${openReportStageStep}`}
                     src={`/student/stage?caseId=${encodeURIComponent(openReport.caseId)}&contentId=${encodeURIComponent(openReport.contentId)}&step=${openReportStageStep}&preview=1`}
-                    className="absolute left-1/2 top-1/2 h-[768px] w-[1024px] origin-center border-0"
-                    style={{ transform: `translate(-50%, -50%) scale(${reportPreviewScale})` }}
+                    className="absolute left-1/2 top-1/2 origin-center border-0"
+                    style={{
+                      width: studentPreviewViewport.width,
+                      height: studentPreviewViewport.height,
+                      transform: `translate(-50%, -50%) scale(${reportPreviewScale})`,
+                    }}
                   />
                 </div>
               </section>
@@ -2485,8 +2505,12 @@ export default function DashboardPage() {
                     key={`${openReview.id}-${reviewPreviewStep}-${reviewPreviewRefreshKey}`}
                     title={`학생 화면 스테이지 ${reviewPreviewStep}`}
                     src={`/student/stage?caseId=${encodeURIComponent(openReview.caseId)}&contentId=${encodeURIComponent(openReview.contentId)}&step=${reviewPreviewStep}&preview=1`}
-                    className="absolute left-1/2 top-1/2 h-[768px] w-[1024px] origin-center border-0"
-                    style={{ transform: `translate(-50%, -50%) scale(${reviewPreviewScale})` }}
+                    className="absolute left-1/2 top-1/2 origin-center border-0"
+                    style={{
+                      width: studentPreviewViewport.width,
+                      height: studentPreviewViewport.height,
+                      transform: `translate(-50%, -50%) scale(${reviewPreviewScale})`,
+                    }}
                   />
                 </div>
               </section>
