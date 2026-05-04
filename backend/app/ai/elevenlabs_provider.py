@@ -16,7 +16,7 @@ def build_teacher_narration_text(source_text: str, *, model_id: str, enable_audi
         return text
     if text.startswith("["):
         return text
-    return f"[warmly] [slowly] {text} [short pause]"
+    return f"[warmly] {text}"
 
 
 class ElevenLabsProvider:

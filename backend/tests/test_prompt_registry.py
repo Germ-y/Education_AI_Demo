@@ -65,5 +65,7 @@ def test_generation_prompts_require_teacher_like_audio_and_core_realtime_rubric(
 
     assert "calm teacher speaking beside the student" in content_prompt
     assert "Do not sound like a system notification" in content_prompt
+    assert "45~90 Korean characters" in content_prompt
+    assert "audio carry the context" in content_prompt
     assert "single core target behavior" in content_prompt
     assert "찾는 자료 단서를 말하며 도움을 요청한다" in content_prompt

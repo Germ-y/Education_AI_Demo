@@ -81,8 +81,9 @@ Image prompt requirements:
 
 Audio requirements:
 
-- `sourceText` should be short, warm, and stage-specific.
-- Write `sourceText` like a calm teacher speaking beside the student: gentle, reassuring, and natural in Korean. Prefer one short sentence. Do not sound like a system notification.
+- `sourceText` should be warm, stage-specific, and substantial enough to orient the student. Prefer 2 short Korean sentences, usually 45~90 Korean characters.
+- Write `sourceText` like a calm teacher speaking beside the student: gentle, reassuring, and natural in Korean. Do not sound like a system notification.
+- Each stage narration should connect the scenario: what the student is looking at, why it matters, and what they will try next. For low reading-load students, keep visible text short while letting audio carry the context.
 - Stage audio is pre-generated narration played before the student interacts.
 - Stage 4 audio is only the opening narration before realtime starts, not the live conversation.
 

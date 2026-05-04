@@ -15,7 +15,7 @@ Generate short Korean narration scripts for the five audio assets in a mission p
 ## Rules
 
 - The narration plays before the child interacts with the stage.
-- Keep each line short and clear.
+- Keep each line clear and supportive, but not so thin that it feels like a label.
 - Use natural Korean.
 - Avoid diagnosis labels or sensitive student information.
 - Do not mention backend, AI generation, prompt, schema, or template.
@@ -25,11 +25,12 @@ Generate short Korean narration scripts for the five audio assets in a mission p
 
 ## Length Guide
 
-- `hero`: 1-2 short sentences.
-- `stage_1`: 1 short sentence.
-- `stage_2`: 1 short sentence.
-- `stage_3`: 1 short sentence.
-- `stage_4_realtime`: 1-2 short sentences.
+- `hero`: 2 short sentences.
+- `stage_1`: 2 short sentences.
+- `stage_2`: 2 short sentences.
+- `stage_3`: 2 short sentences.
+- `stage_4_realtime`: 2 short sentences.
+- Most scripts should be 45~90 Korean characters and should say what to look at, why it matters, and what to try next.
 
 ## Output JSON Shape
 
