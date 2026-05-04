@@ -346,21 +346,29 @@ function StageMedia({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-[20px] border bg-white shadow-sm ${full ? "flex h-full min-h-[280px] flex-col p-3" : compact ? "p-2" : "p-3"}`}
+      className={`relative overflow-hidden rounded-[20px] border bg-white shadow-sm ${
+        full
+          ? "flex h-full min-h-[280px] flex-col p-3"
+          : compact
+            ? dense
+              ? "mx-auto w-fit max-w-full p-2"
+              : "p-2"
+            : "p-3"
+      }`}
       style={{ borderColor: theme.border }}
     >
       {question.imageUrl && (
         <Image
           src={question.imageUrl}
           alt={question.prompt}
-          width={1120}
-          height={720}
-          className={`w-full rounded-[16px] bg-[#f8fafc] ${dense ? "object-cover" : "object-contain"} ${
+          width={1536}
+          height={1024}
+          className={`rounded-[16px] bg-[#f8fafc] ${dense ? "object-contain" : "w-full object-contain"} ${
             full
               ? "min-h-0 flex-1"
               : compact
                 ? dense
-                  ? "h-[clamp(72px,10vh,92px)]"
+                  ? "h-[clamp(140px,18vh,170px)] w-auto max-w-full"
                   : featured
                     ? "h-[clamp(150px,20vh,190px)]"
                     : "h-[clamp(190px,28vh,280px)]"
@@ -770,7 +778,7 @@ function CardMatchingTemplate({
 
   return (
     <div
-      className={`grid h-full min-h-0 gap-3 overflow-y-auto rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-4 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)] ${
+      className={`grid h-full min-h-0 content-start gap-3 overflow-y-auto rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-4 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)] ${
         question.imageUrl || question.audioUrl ? "grid-rows-[auto_auto_auto]" : "grid-rows-[auto_auto]"
       }`}
     >
