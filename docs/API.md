@@ -48,9 +48,10 @@
 - `POST /api/ai/content-generations`: 4단계 미션 콘텐츠 생성
 - `GET /api/ai/agent-runs/{agentRunId}`: AI 실행 기록 조회
 - `GET /api/contents/{contentId}`: 교사용 콘텐츠 상세 조회
-- `POST /api/contents/{contentId}/approve`: 모든 stage/asset 검수 후 승인
+- `PATCH /api/contents/{contentId}/review`: 교사가 stage instruction/question/choice/realtime goal을 직접 수정
+- `POST /api/contents/{contentId}/approve`: 모든 stage/asset 검수 후 승인. asset은 URL이 있고 `qaStatus=passed`여야 한다.
 - `POST /api/contents/{contentId}/reject`: 반려 및 수정 요청 저장
-- `POST /api/contents/{contentId}/publish`: 학생에게 배포하고 대시보드 단계를 `learning`으로 이동
+- `POST /api/contents/{contentId}/publish`: 준비·승인된 asset만 학생에게 배포하고 대시보드 단계를 `learning`으로 이동
 - `POST /api/contents/{contentId}/assets/{assetId}/generate`: 단일 asset 생성
 - `POST /api/contents/{contentId}/assets/generate-package`: 이미지/오디오 asset batch 생성. 서버 생성 로그에 `progress=1/10` 같은 asset 진행률을 남긴다.
 - `GET /api/contents/{contentId}/review-summary`: 최신 attempt 기반 리뷰 요약 조회
@@ -87,10 +88,12 @@
 콘텐츠 상태:
 
 - `draft`
+- `generating`
 - `teacher_review`
+- `revision_requested`
 - `approved`
 - `published`
-- `rejected`
+- `archived`
 
 교사 대시보드 단계:
 

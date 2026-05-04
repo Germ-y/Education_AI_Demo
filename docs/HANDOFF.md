@@ -1,12 +1,10 @@
 # EduYJ Handoff
 
-확인 기준일: 2026-05-03
+확인 기준일: 2026-05-04
 
 기준 브랜치: `dev`
 
 이 문서는 팀원이 바로 이어받기 위한 단일 인수인계 문서다. 상세 API는 [API.md](API.md), DB 복원은 [../backend/data/README.md](../backend/data/README.md)를 기준으로 한다.
-
-2026-05-03 작업 인수인계는 [2026-05-03_HANDOFF.md](2026-05-03_HANDOFF.md)를 함께 확인한다.
 
 ## 현재 완성된 흐름
 
@@ -21,6 +19,10 @@
 - 학생 미션은 published 콘텐츠만 조회하고, 시작/제출/회고/완료 이벤트를 API에 저장한다.
 - 학생이 완료하면 최신 attempt 기반 리뷰 요약이 자동 생성되고, 교사 대시보드 단계가 학습 피드백으로 이동한다.
 - 검토 모달의 학생 화면 미리보기 iframe 높이는 잘림이 없도록 보정했다.
+- 검토 모달에서 이미지/음성 asset이 준비되지 않은 자료는 `사용 승인`과 `수업에 적용하기`가 막힌다.
+- 학생 화면에서 다음 단계로 이동하면 URL의 `step` query가 함께 갱신된다.
+- 교사 메모는 `POST /api/teacher/students/{studentId}/notes`로 저장되고, 새로고침 후에도 최근 메모가 복원된다.
+- 교사 학습 기록 리포트는 `session` note로 저장되고, `POST /api/review-summaries/{reviewId}/apply-to-memory`로 메모리에 반영된다.
 
 ## 데모 학생
 
@@ -88,6 +90,8 @@ backend/data/README.md
 
 로컬 SQLite 원본인 `backend/data/eduyj_demo.db`는 `.gitignore` 대상이다.
 
+주의: 로컬에서 자료 생성/승인/학생 완료 테스트를 하면 `eduyj_demo.db`는 추적 dump와 달라진다. 팀원이 같은 기준에서 시작해야 하면 아래 dump 복원 명령으로 먼저 맞춘다.
+
 SQL dump 복원:
 
 ```bash
@@ -149,8 +153,6 @@ git diff --check
 - 실제 OpenAI 이미지/TTS 생성 환경에서 학생 3명 각각 콘텐츠를 새로 만들고 품질을 비교한다.
 - 학생별로 한 번씩 더 생성해 메모리/이전 수업 맥락 활용이 잘 되는지 확인한다.
 - 학생 UI의 4단계 실시간 발화 연습을 실제 WebRTC Realtime 연결로 완성한다.
-- 교사 메모 저장 UI를 `POST /api/teacher/students/{studentId}/notes`와 완전히 연결한다.
-- 교사 피드백을 `POST /api/review-summaries/{reviewId}/apply-to-memory`로 반영하는 화면 흐름을 붙인다.
 - 교사 승인부터 학생 완료, 교사 리포트 확인까지 E2E 회귀 테스트를 추가한다.
 - 운영 PostgreSQL/Alembic 마이그레이션을 확정한다.
 - 공모전 MVP 이후 회원가입, 학생 등록, 보호자 동의 흐름을 확장한다.
