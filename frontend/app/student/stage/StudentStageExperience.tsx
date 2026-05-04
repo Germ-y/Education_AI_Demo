@@ -355,7 +355,7 @@ function StageMedia({
           alt={question.prompt}
           width={1120}
           height={720}
-          className={`w-full rounded-[16px] bg-[#f8fafc] object-contain ${
+          className={`w-full rounded-[16px] bg-[#f8fafc] ${dense ? "object-cover" : "object-contain"} ${
             full
               ? "min-h-0 flex-1"
               : compact
@@ -750,8 +750,8 @@ function CardMatchingTemplate({
   const items = question.matchingPairs ?? [];
   const rightItems = [...items].reverse();
   const matchedCount = Object.keys(pairs).length;
-  const matchingRowHeight = 72;
-  const matchingGap = 12;
+  const matchingRowHeight = 64;
+  const matchingGap = 10;
   const matchingLaneHeight = items.length * matchingRowHeight + Math.max(0, items.length - 1) * matchingGap;
   const laneConnections = items
     .map((item, index) => {
@@ -770,14 +770,14 @@ function CardMatchingTemplate({
 
   return (
     <div
-      className={`grid min-h-0 gap-4 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-5 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)] ${
+      className={`grid h-full min-h-0 gap-3 overflow-y-auto rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-4 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)] ${
         question.imageUrl || question.audioUrl ? "grid-rows-[auto_auto_auto]" : "grid-rows-[auto_auto]"
       }`}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-2xl font-black leading-8">서로 맞는 카드를 연결해보세요</p>
-          <p className="mt-1 text-sm font-bold leading-6 text-[#596157]">{question.body ?? "왼쪽 카드를 누르고 맞는 오른쪽 카드를 눌러요."}</p>
+          <p className="text-[1.45rem] font-black leading-7">서로 맞는 카드를 연결해보세요</p>
+          <p className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-[#596157]">{question.body ?? "왼쪽 카드를 누르고 맞는 오른쪽 카드를 눌러요."}</p>
         </div>
         <div className="rounded-full bg-white px-4 py-2 text-sm font-black shadow-sm" style={{ color: theme.accentStrong }}>
           {matchedCount} / {items.length}
@@ -785,16 +785,16 @@ function CardMatchingTemplate({
       </div>
 
       {(question.imageUrl || question.audioUrl) && (
-        <div className="mx-auto min-h-0 w-full max-w-[920px]">
-          <StageMedia question={question} theme={theme} compact featured />
+        <div className="mx-auto min-h-0 w-full max-w-[780px]">
+          <StageMedia question={question} theme={theme} compact dense />
         </div>
       )}
 
       <div
-        className="grid grid-cols-[minmax(220px,1fr)_minmax(220px,0.62fr)_minmax(220px,1fr)] items-start gap-3 overflow-hidden"
-        style={{ minHeight: matchingLaneHeight }}
+        className="grid grid-cols-[minmax(220px,1fr)_minmax(190px,0.52fr)_minmax(220px,1fr)] items-start gap-3 overflow-hidden"
+        style={{ height: matchingLaneHeight }}
       >
-        <div className="grid min-h-0 content-start gap-3">
+        <div className="grid min-h-0 content-start gap-2.5">
           {items.map((item) => {
             const picked = selectedLeft === item.leftId;
             const matched = Boolean(pairs[item.leftId]);
@@ -803,7 +803,7 @@ function CardMatchingTemplate({
                 key={item.leftId}
                 onClick={() => onLeft(item.leftId)}
                 disabled={matched}
-                className={`relative z-10 flex h-[72px] items-center rounded-[18px] border bg-white px-5 text-left text-base font-black leading-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:hover:translate-y-0 ${
+                className={`relative z-10 flex h-16 items-center rounded-[18px] border bg-white px-4 text-left text-[0.98rem] font-black leading-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:hover:translate-y-0 ${
                   picked ? "scale-[1.015] shadow-[0_16px_30px_rgba(39,174,96,0.16)]" : ""
                 }`}
                 style={{
@@ -868,7 +868,7 @@ function CardMatchingTemplate({
           </div>
         </div>
 
-        <div className="grid min-h-0 content-start gap-3">
+        <div className="grid min-h-0 content-start gap-2.5">
           {rightItems.map((item) => {
             const used = Object.values(pairs).includes(item.rightId);
             return (
@@ -876,7 +876,7 @@ function CardMatchingTemplate({
                 key={item.rightId}
                 onClick={() => onRight(item.rightId)}
                 disabled={!selectedLeft || used}
-                className="relative z-10 flex h-[72px] items-center rounded-[18px] border bg-white px-5 text-left text-base font-black leading-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
+                className="relative z-10 flex h-16 items-center rounded-[18px] border bg-white px-4 text-left text-[0.98rem] font-black leading-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
                 style={{ borderColor: used ? theme.accent : "#dde6ee", backgroundColor: used ? theme.accentSoft : "#ffffff" }}
               >
                 <span className="flex-1">{item.right}</span>
@@ -2182,7 +2182,7 @@ export function StudentStageExperience({
 
                 <div
                   key={`stage-board-${activeStage.step}-${activeQuestion.kind}`}
-                  className="relative mt-5 min-h-0 flex-1 animate-[stagePopIn_360ms_cubic-bezier(0.16,1,0.3,1)_both]"
+                  className="relative mt-5 min-h-0 flex-1 overflow-hidden animate-[stagePopIn_360ms_cubic-bezier(0.16,1,0.3,1)_both]"
                 >
                   {isFinished ? (
                     <div
