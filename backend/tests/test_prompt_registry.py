@@ -22,3 +22,15 @@ def test_prompts_keep_image_text_and_ui_text_separate() -> None:
     assert '"contentId"' not in content_prompt
     assert "The frontend renders all text from `templateJson`" in image_prompt
     assert "Do not ask the image model to render" in image_prompt
+
+
+def test_generation_prompts_lock_stage_labels_and_profile_based_templates() -> None:
+    orchestrator_prompt = load_prompt("orchestrator_plan")
+    content_prompt = load_prompt("mission_content_package")
+
+    assert "Template selection is profile-based, not random" in orchestrator_prompt
+    assert "Template selection must be based on the orchestrator plan and student context, never arbitrary randomness." in content_prompt
+
+    for label in ["상황 만나기", "단서 찾기", "행동 고르기", "한 번 해보기", "개념 열기", "문제 1", "문제 2", "설명해보기"]:
+        assert label in orchestrator_prompt
+        assert label in content_prompt
