@@ -452,6 +452,7 @@ export type SeedContext = {
     studentId: string;
     caseId: string;
     contentId: string;
+    title?: string;
     status?: MissionStatus | string;
     updatedAt?: string | null;
     latestAttemptStatus?: "in_progress" | "completed" | "abandoned" | null;

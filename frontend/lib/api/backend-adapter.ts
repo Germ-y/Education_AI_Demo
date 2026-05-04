@@ -36,6 +36,7 @@ type BackendSeedContext = {
     contentId: string;
     studentId: string;
     caseId: string;
+    title?: string;
     status?: string;
     totalSteps?: number;
     updatedAt?: string | null;
@@ -146,6 +147,7 @@ function normalizeSeedContext(seed: BackendSeedContext): SeedContext {
       studentId: mapping.studentId,
       caseId: mapping.caseId,
       contentId: mapping.contentId,
+      title: mapping.title,
       status: mapping.status,
       updatedAt: mapping.updatedAt,
       latestAttemptStatus: mapping.latestAttemptStatus,

@@ -9,20 +9,13 @@ const teacherRole = {
   accent: "bg-[#1f3a5f]",
 };
 
-function toStudentActivityDescription(primaryNeed: string) {
-  if (primaryNeed.includes("시간 읽기 기초")) {
-    return "시간 읽기 기초를 짧은 시각 단서와 2개 선택지로 익혀요.";
-  }
+function toStudentActivityDescription(primaryNeed: string, contentTitle?: string) {
+  if (contentTitle) return contentTitle;
 
-  if (primaryNeed.includes("분수의 전체-부분 관계")) {
-    return "분수의 전체-부분 관계를 단계적으로 익혀요.";
-  }
-
-  if (primaryNeed.includes("생활 상황에서 순서 확인")) {
-    return "생활 상황에서 순서 확인과 도움 요청 표현을 연습해요.";
-  }
-
-  return primaryNeed.replace(/(수업|콘텐츠)이 좋겠어요\.?$/, "").trim();
+  return primaryNeed
+    .replace(/(하는|익히는|보완하는)?\s*(개념 보완|의사소통)?\s*(수업|콘텐츠)이 좋겠어요\.?$/, "")
+    .replace(/해보면 좋겠어요\.?$/, "해보기")
+    .trim();
 }
 
 function findLatestStudentMapping(mappings: SeedContext["mappings"], studentId: string) {
@@ -50,7 +43,7 @@ export default async function Home() {
       studentName: student.displayName,
       grade: student.gradeLabel ?? student.grade,
       label: student.trackLabel ?? student.studentTypeLabel ?? (student.studentType === "learning_focus" ? "학습지원형" : "일상생활 지원형"),
-      description: toStudentActivityDescription(student.primaryNeed),
+      description: toStudentActivityDescription(student.primaryNeed, mapping?.title),
     };
   });
 
