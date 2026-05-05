@@ -8,6 +8,7 @@ description: EduYJ 백엔드 API, DB 스키마, seed 데이터, 공공데이터 
 먼저 볼 문서:
 
 - `docs/HANDOFF.md`
+- `docs/ISSUES.md`
 - `docs/API.md`
 - `backend/data/README.md`
 

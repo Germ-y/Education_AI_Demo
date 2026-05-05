@@ -18,7 +18,8 @@ git status --short --branch
 
 - [AGENTS.md](AGENTS.md): 새 작업자가 먼저 읽는 실행 규칙
 - [GOAL.md](GOAL.md): 현재 데모 목표와 남은 일
-- [docs/HANDOFF.md](docs/HANDOFF.md): 진행상황, 설정, DB 복원, 검증, 다음 작업
+- [docs/HANDOFF.md](docs/HANDOFF.md): 현재 작동 흐름, 설정, 검증, 인수인계 요약
+- [docs/ISSUES.md](docs/ISSUES.md): 남은 이슈, 병목, 우선순위, 다음 커밋 순서
 - [docs/API.md](docs/API.md): 최신 REST API 요약
 - [backend/data/README.md](backend/data/README.md): 데모 DB dump/seed 복원 방법
 
@@ -46,7 +47,7 @@ npm run dev
 
 ## 데모 DB
 
-로컬 DB는 git에 올리지 않고, 재현 가능한 SQL dump만 추적합니다.
+현재 MVP 확인 단계에서는 팀원이 같은 화면을 바로 볼 수 있도록 `backend/data/eduyj_demo.db`, `backend/data/eduyj_demo_dump.sql`, `backend/generated/assets/`를 추적합니다. 로컬에서 생성 테스트를 하면 DB와 asset이 달라지므로 공유 기준을 갱신할 때만 커밋합니다.
 
 ```bash
 cd backend

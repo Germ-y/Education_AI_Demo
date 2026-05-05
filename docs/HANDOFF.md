@@ -1,10 +1,10 @@
 # EduYJ Handoff
 
-확인 기준일: 2026-05-04
+확인 기준일: 2026-05-05
 
 기준 브랜치: `dev`
 
-이 문서는 팀원이 바로 이어받기 위한 단일 인수인계 문서다. 상세 API는 [API.md](API.md), DB 복원은 [../backend/data/README.md](../backend/data/README.md)를 기준으로 한다.
+이 문서는 팀원이 바로 이어받기 위한 현재 상태 요약이다. 남은 이슈와 병목은 [ISSUES.md](ISSUES.md), 상세 API는 [API.md](API.md), DB 복원은 [../backend/data/README.md](../backend/data/README.md)를 기준으로 한다.
 
 ## 현재 완성된 흐름
 
@@ -23,6 +23,10 @@
 - 학생 화면에서 다음 단계로 이동하면 URL의 `step` query가 함께 갱신된다.
 - 교사 메모는 `POST /api/teacher/students/{studentId}/notes`로 저장되고, 새로고침 후에도 최근 메모가 복원된다.
 - 교사 학습 기록 리포트는 `session` note로 저장되고, `POST /api/review-summaries/{reviewId}/apply-to-memory`로 메모리에 반영된다.
+- `GET /api/public-data/schools/search`는 실제 NEIS `schoolInfo` 조회로 학교를 검색하고 캐시에 저장한다.
+- `POST /api/teacher/students`는 학교검색 결과를 기반으로 학생, 케이스, 메모리카드, 다음 목표, 학생 access code를 만든다.
+- 이미지 프롬프트 생성은 별도 LLM 호출 없이 `briefJson.stageVisualSpecs`와 `templateJson` 기반 deterministic builder를 사용한다.
+- 이미지 5장은 `gpt-image-2`로 병렬 생성한다. 다만 asset package endpoint는 아직 HTTP 요청 안에서 동기 실행한다.
 
 ## 데모 학생
 
@@ -42,7 +46,7 @@
 - 대표 이미지 1장, 단계별 이미지 4장, 대표/단계별 안내 음성 5개를 asset으로 가진다.
 - 생성된 콘텐츠는 `teacher_review`로 저장되고, 교사 승인 후 `approved`, 배포 후 `published`가 된다.
 - provider key가 없거나 생성/검증에 실패하면 대체 seed 콘텐츠를 저장하지 않고 실패 run과 검수 필요 상태를 남긴다.
-- 콘텐츠 생성은 작성자와 검수자를 분리한다. `mission_content_package` 출력은 schema/계약 검증 뒤 `content_quality_critique`가 한 번 더 보고, `repair` 판정이면 저장하지 않고 재생성한다.
+- 콘텐츠 생성은 `mission_content_package` 출력 뒤 schema/계약 검증을 통과해야 저장된다. LLM 기반 `content_quality_critique`는 선택 설정이며 기본 병목을 줄이기 위해 현재 기본값은 비활성화다.
 - 이미지 생성 전에는 별도 LLM을 다시 호출하지 않고, 완성된 `MissionContent`의 `briefJson.stageVisualSpecs`와 단계별 `templateJson`을 조합해 5개 이미지 prompt를 만든다. `gpt-image-2`에는 이 장면 prompt만 전달한다.
 - 이미지 prompt는 장면만 설명해야 하며 빈 카드, 말풍선, UI 패널, 선택지 영역, 버튼 같은 학습지형 구성을 요청하면 실패 처리한다.
 - OpenAI Realtime 음성은 ElevenLabs 안내 음성과 별도다. 기본값은 `OPENAI_REALTIME_VOICE=marin`, `OPENAI_REALTIME_VOICE_SPEED=0.92`다.
@@ -157,9 +161,12 @@ git diff --check
 
 ## 남은 개선사항
 
-- 실제 OpenAI 이미지/TTS 생성 환경에서 학생 3명 각각 콘텐츠를 새로 만들고 품질을 비교한다.
-- 학생별로 한 번씩 더 생성해 메모리/이전 수업 맥락 활용이 잘 되는지 확인한다.
-- 학생 UI의 4단계 실시간 발화 연습을 실제 WebRTC Realtime 연결로 완성한다.
-- 교사 승인부터 학생 완료, 교사 리포트 확인까지 E2E 회귀 테스트를 추가한다.
-- 운영 PostgreSQL/Alembic 마이그레이션을 확정한다.
-- 공모전 MVP 이후 회원가입, 학생 등록, 보호자 동의 흐름을 확장한다.
+자세한 우선순위와 병목은 [ISSUES.md](ISSUES.md)를 기준으로 한다.
+
+최우선:
+
+1. 학생등록 프론트 연결
+2. asset 생성 job을 background/polling 구조로 분리
+3. 콘텐츠 생성 구조를 scenario/stage/visual spec 단위로 분리
+4. 검토 preview와 realtime preview/runtime 안정화
+5. 교사 승인부터 학생 완료, 교사 리포트 확인까지 E2E 회귀 테스트 추가

@@ -9,8 +9,9 @@ description: EduYJ 레포에서 프론트엔드와 백엔드가 함께 바뀌는
 
 1. `AGENTS.md`
 2. `docs/HANDOFF.md`
-3. `docs/API.md`
-4. `backend/data/README.md`
+3. `docs/ISSUES.md`
+4. `docs/API.md`
+5. `backend/data/README.md`
 
 ## 작업 영역
 
@@ -18,7 +19,8 @@ description: EduYJ 레포에서 프론트엔드와 백엔드가 함께 바뀌는
 - 백엔드 작업: `backend/`
 - API 계약: `docs/API.md`, `backend/app/domain/schemas.py`, `frontend/lib/api/contracts.ts`
 - DB/seed 인수인계: `backend/data/README.md`, `backend/data/eduyj_demo_dump.sql`
-- 진행상황/예정사항: `docs/HANDOFF.md`
+- 진행상황: `docs/HANDOFF.md`
+- 예정사항/병목: `docs/ISSUES.md`
 - 작업 규칙: `AGENTS.md`, `GOAL.md`, `.agents/skills/`
 
 프론트와 백엔드가 같이 바뀌면 API 계약과 seed 데이터가 먼저 맞아야 한다.

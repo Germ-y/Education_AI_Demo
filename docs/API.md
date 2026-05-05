@@ -18,6 +18,7 @@
 ## Teacher
 
 - `GET /api/teacher/students`: 학생 목록, 한국어 label, `dashboardStage`, 최신 콘텐츠 상태 조회
+- `POST /api/teacher/students`: 신규 학생 등록. 학교는 `schoolCode` 또는 `schoolName`으로 확인하고, 캐시에 없으면 NEIS 학교검색을 수행한다.
 - `GET /api/teacher/students/{studentId}`: 학생 상세, 대시보드 프로필, 학교 맥락, context bundle 조회
 - `GET /api/teacher/students/{studentId}/history`: 사례 메모, 콘텐츠, 시도, 이벤트, realtime 세션 이력 조회
 - `GET /api/teacher/students/{studentId}/context-bundle`: AI 생성 전 학생 맥락 bundle 조회
@@ -29,6 +30,7 @@
 
 - `GET /api/public-data/sources`: 공공데이터 source registry 조회
 - `GET /api/public-data/schools`: seed 학교 목록 조회
+- `GET /api/public-data/schools/search`: 학교명 검색. `q`, `officeCode`, `syncIfMissing`를 받으며, 캐시에 없고 `NEIS_API_KEY`가 있으면 NEIS `schoolInfo`를 조회해 학교 캐시에 저장한다.
 - `GET /api/public-data/schools/{schoolCode}/context`: 학교 일정/시간표 맥락 조회
 - `GET /api/public-data/schools/{schoolCode}/timetable`: 저장된 시간표 snapshot 조회
 - `POST /api/public-data/sources/{sourceCode}/sync`: source 동기화 시도
@@ -42,6 +44,25 @@
 
 `syncIfMissing=true`는 필수 query와 `NEIS_API_KEY`가 있을 때만 실제 동기화를 시도한다.
 
+학생등록 payload 예시:
+
+```json
+{
+  "displayName": "최하늘",
+  "schoolName": "풍기초등학교",
+  "officeCode": "R10",
+  "grade": "초4",
+  "gradeNumber": "4",
+  "className": "1",
+  "studentType": "learning_focus",
+  "currentGoal": "영어 단어를 그림 카드와 연결하기",
+  "observationNote": "그림 단서가 있으면 먼저 손으로 가리키며 반응합니다.",
+  "strengths": ["그림 단서를 잘 찾음"],
+  "weaknesses": ["긴 문장 지시가 부담됨"],
+  "preferredSupports": ["그림 카드", "2개 선택지"]
+}
+```
+
 ## AI/Content
 
 - `POST /api/ai/orchestrator-runs`: 학생 맥락 기반 생성 계획 생성
@@ -53,7 +74,7 @@
 - `POST /api/contents/{contentId}/reject`: 반려 및 수정 요청 저장
 - `POST /api/contents/{contentId}/publish`: 준비·승인된 asset만 학생에게 배포하고 대시보드 단계를 `learning`으로 이동
 - `POST /api/contents/{contentId}/assets/{assetId}/generate`: 단일 asset 생성
-- `POST /api/contents/{contentId}/assets/generate-package`: 이미지/오디오 asset batch 생성. 이미지 생성 전 `image_brief`로 5개 prompt를 재작성하고, 서버 생성 로그에 `progress=1/10` 같은 asset 진행률을 남긴다.
+- `POST /api/contents/{contentId}/assets/generate-package`: 이미지/오디오 asset batch 생성. 현재는 HTTP 요청 안에서 동기 실행한다. 이미지 prompt는 `briefJson.stageVisualSpecs`와 단계별 `templateJson`을 조합해 결정적으로 만들고, 이미지 5장은 병렬 생성한다. 다음 개선은 이 endpoint를 background job + polling 구조로 분리하는 것이다.
 - `GET /api/contents/{contentId}/review-summary`: 최신 attempt 기반 리뷰 요약 조회
 - `POST /api/contents/{contentId}/review-summary`: 최신 attempt 기반 리뷰 요약 생성
 - `POST /api/review-summaries/{reviewId}/apply-to-memory`: 교사 확인 후 리뷰 요약을 메모리에 반영

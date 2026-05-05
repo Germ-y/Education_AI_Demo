@@ -4,14 +4,15 @@
 
 1. [GOAL.md](GOAL.md)
 2. [docs/HANDOFF.md](docs/HANDOFF.md)
-3. [docs/API.md](docs/API.md)
-4. [backend/data/README.md](backend/data/README.md)
+3. [docs/ISSUES.md](docs/ISSUES.md)
+4. API 작업이면 [docs/API.md](docs/API.md)
+5. DB/asset 작업이면 [backend/data/README.md](backend/data/README.md)
 
 ## Repository Layout
 
 - `frontend/`: Next.js 학생/교사 화면
 - `backend/`: FastAPI API 서버, 도메인 스키마, seed, AI workflow
-- `docs/`: 인수인계와 API 요약만 유지
+- `docs/`: 인수인계, 남은 이슈, API 요약만 유지
 - `.agents/`: 프로젝트 전용 Codex 스킬
 
 ## Current Working Rule

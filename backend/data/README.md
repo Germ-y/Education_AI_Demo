@@ -2,14 +2,24 @@
 
 이 폴더는 데모 DB를 팀원이 같은 상태로 재현하기 위한 파일을 둔다.
 
-로컬 실행 중 생성/승인/학생 완료를 테스트하면 `eduyj_demo.db`는 바로 달라진다. 현재 MVP 확인 단계에서는 실제 생성 콘텐츠와 승인 상태를 팀원이 바로 볼 수 있어야 하므로 `eduyj_demo.db`도 추적한다. DB가 이상해 보이면 dump로 복원한다.
+로컬 실행 중 생성/승인/학생 완료를 테스트하면 `eduyj_demo.db`는 바로 달라진다. 현재 MVP 확인 단계에서는 실제 생성 콘텐츠와 승인 상태를 팀원이 바로 볼 수 있어야 하므로 `eduyj_demo.db`와 `backend/generated/assets/`도 추적한다. 개인 테스트 결과는 공유 기준으로 확정할 때만 커밋한다. DB가 이상해 보이면 dump로 복원한다.
 
 ## 파일
 
 ```text
 eduyj_demo_dump.sql  추적되는 SQLite SQL dump
 eduyj_demo.db        실제 생성/승인 상태가 포함된 로컬 실행용 SQLite DB
+../generated/assets  학생별/콘텐츠별 생성 이미지와 안내 음성
 ```
+
+asset 경로 규칙:
+
+```text
+backend/generated/assets/students/{studentId}/{contentId}/{assetId}.png
+backend/generated/assets/students/{studentId}/{contentId}/{assetId}.mp3
+```
+
+현재 로컬에서 새 콘텐츠 생성을 테스트하면 위 경로에 새 폴더가 생긴다. 팀원에게 공유할 데모 콘텐츠로 확정하기 전까지는 DB와 asset을 같이 커밋하지 않는다.
 
 ## seed로 재생성
 

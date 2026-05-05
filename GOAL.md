@@ -4,7 +4,7 @@
 
 ## 현재 상태
 
-최신 진행상황은 [docs/HANDOFF.md](docs/HANDOFF.md)를 기준으로 본다.
+최신 진행상황은 [docs/HANDOFF.md](docs/HANDOFF.md), 남은 이슈와 병목은 [docs/ISSUES.md](docs/ISSUES.md)를 기준으로 본다.
 
 완성된 큰 흐름:
 
@@ -16,12 +16,16 @@
 - 검토 화면 iframe 높이 보정
 - 교사 화면에서 내부 AI 참고 맥락 노출 제거
 - 학생 유형별 단계명과 템플릿 선택 기준 고정
+- NEIS 학교검색 기반 학생등록 백엔드 API
+- 이미지 생성용 LLM brief 병목 제거와 gpt-image-2 병렬 생성
 
 ## 남은 주요 작업
 
-- 실제 OpenAI 이미지/TTS 생성 환경에서 학생 3명 콘텐츠를 반복 생성하고 품질 검증
-- 4단계 실시간 발화 연습을 WebRTC Realtime 연결까지 완성
-- 교사 메모 저장 UI와 메모리 반영 UI 완전 연결
+- 학생등록 프론트 연결
+- asset 생성 job을 background/polling 구조로 분리
+- 콘텐츠 생성 구조를 scenario/stage/visual spec 단위로 분리
+- 생성 품질 기준을 "탈락 후 전체 재생성"이 아니라 "작성 전 설계 기준"으로 전환
+- 4단계 실시간 발화 연습 preview/runtime 안정화
 - 교사 검토부터 학생 완료, 교사 리포트 확인까지 E2E 테스트 추가
 - 운영 DB 기준 Alembic/PostgreSQL 마이그레이션 확정
 - 공모전 이후 회원가입, 학생 등록, 보호자 동의 흐름 확장
