@@ -52,6 +52,7 @@ type MaterialReviewItem = {
   state: string;
   contentId: string;
   content: MissionContent;
+  generatedAtLabel: string | null;
 };
 
 type GenerationStatus = {
@@ -502,19 +503,16 @@ function describeMissionStatus(status: MissionContent["status"]) {
   return "초안";
 }
 
-function mapContentToReviewItem(content: MissionContent, lessonProposalTitle?: string): MaterialReviewItem {
-  const title = lessonProposalTitle?.trim()
-    ? `${lessonProposalTitle.trim()} 자료 제안`
-    : "검토할 수업 자료 제안";
-
+function mapContentToReviewItem(content: MissionContent): MaterialReviewItem {
   return {
     id: content.id,
     caseId: content.caseId,
-    title,
+    title: content.title.trim() || "검토할 수업 자료 제안",
     type: `수업 전 검토 제안 · ${describeContentType(content)}`,
     state: describeMissionStatus(content.status),
     contentId: content.id,
     content,
+    generatedAtLabel: formatContentGeneratedAt(content),
   };
 }
 
@@ -523,6 +521,27 @@ function getContentActivityTime(content: MissionContent) {
   const timestamp = content.publishedAt ?? content.approvedAt ?? (typeof generatedAt === "string" ? generatedAt : "");
   const value = timestamp ? new Date(timestamp).getTime() : 0;
   return Number.isFinite(value) ? value : 0;
+}
+
+function hasGeneratedAt(content: MissionContent) {
+  return typeof content.briefJson.generatedAt === "string" && content.briefJson.generatedAt.trim().length > 0;
+}
+
+function isReviewQueueContent(content: MissionContent) {
+  return hasGeneratedAt(content) && (content.status === "teacher_review" || content.status === "approved");
+}
+
+function formatContentGeneratedAt(content: MissionContent) {
+  const generatedAt = content.briefJson.generatedAt;
+  if (typeof generatedAt !== "string") return null;
+  const date = new Date(generatedAt);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function getActivePublishedContentIds(contents: MissionContent[] = []) {
@@ -945,7 +964,9 @@ export default function DashboardPage() {
   const completedContentIds = new Set((activeReport?.reports ?? []).map((record) => record.contentId));
   const selectedReviewItems = (activeCaseFile?.recentContents ?? [])
     .filter((content) => !completedContentIds.has(content.id))
-    .map((content) => mapContentToReviewItem(content, dashboardProfile?.primaryNeedTitle));
+    .filter(isReviewQueueContent)
+    .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left))
+    .map((content) => mapContentToReviewItem(content));
   const selectedRecords: SessionLog[] = (activeReport?.reports ?? []).map((record) => {
     const durationMinutes = Math.max(1, Math.round((record.durationSec ?? 0) / 60));
     const attemptCount = Math.max(1, record.answerCount);
@@ -1522,47 +1543,6 @@ export default function DashboardPage() {
     );
   };
 
-  const handleGenerateReviewAssets = async (item: MaterialReviewItem) => {
-    if (reviewActionId) return;
-
-    setReviewActionId(item.id);
-    setGenerationStatuses((current) => ({
-      ...current,
-      [item.caseId]: {
-        state: "running",
-        message: "검수 자료의 이미지와 음성을 실제 생성하는 중입니다.",
-      },
-    }));
-
-    try {
-      const assetPackage = await generateContentAssetPackage(item.contentId);
-      const assetsById = new Map(assetPackage.assets.map((asset) => [asset.id, asset]));
-      const updatedContent: MissionContent = {
-        ...item.content,
-        assets: item.content.assets.map((asset) => assetsById.get(asset.id) ?? asset),
-      };
-      updateCurrentContent(updatedContent);
-      setReviewPreviewRefreshKey((current) => current + 1);
-      setGenerationStatuses((current) => ({
-        ...current,
-        [item.caseId]: {
-          state: "succeeded",
-          message: "검수 자료에 이미지와 음성이 연결되었습니다.",
-        },
-      }));
-    } catch (error) {
-      setGenerationStatuses((current) => ({
-        ...current,
-        [item.caseId]: {
-          state: "failed",
-          message: `이미지/음성 생성에 실패했습니다. ${getClientGenerationErrorMessage(error)}`,
-        },
-      }));
-    } finally {
-      setReviewActionId(null);
-    }
-  };
-
   const setReviewActionError = (message: string) => {
     if (!selectedCase.id) return;
     setGenerationStatuses((current) => ({
@@ -2104,6 +2084,9 @@ export default function DashboardPage() {
                             <div className="min-w-0">
                               <p className="truncate text-base font-black">{item.title}</p>
                               <p className="mt-1 truncate text-sm font-semibold text-[#64748b]">{item.type}</p>
+                              {item.generatedAtLabel && (
+                                <p className="mt-1 text-xs font-black text-[#94a3b8]">생성 {item.generatedAtLabel}</p>
+                              )}
                             </div>
                             <span
                               className={`shrink-0 rounded-full border px-3 py-1 text-xs font-bold ${
@@ -2129,11 +2112,6 @@ export default function DashboardPage() {
                                       : item.state}
                             </span>
                           </div>
-                          {needsMediaGeneration && (
-                            <div className="mt-3 rounded-md border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm font-bold leading-6 text-[#9a3412]">
-                              이미지나 음성 파일이 아직 연결되지 않았습니다. 생성 설정을 확인한 뒤 다시 자료를 만들면 검수 화면에 함께 표시됩니다.
-                            </div>
-                          )}
                           <div className="mt-3 flex flex-wrap gap-2">
                             <button
                               onClick={() => {
@@ -2144,15 +2122,6 @@ export default function DashboardPage() {
                             >
                               제안 검토하기
                             </button>
-                            {needsMediaGeneration && (
-                              <button
-                                onClick={() => handleGenerateReviewAssets(item)}
-                                disabled={isActionRunning}
-                                className="rounded-md border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm font-bold text-[#9a3412] disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {isActionRunning ? "생성 중" : "이미지·음성 생성하기"}
-                              </button>
-                            )}
                             <button
                               onClick={() => handlePublishMaterial(item)}
                               disabled={
@@ -2475,10 +2444,8 @@ export default function DashboardPage() {
                 <p className="mt-1 text-sm font-semibold text-[#64748b]">
                   4개 스테이지를 확인하고 선생님 판단으로 필요한 부분만 조정합니다.
                 </p>
-                {openReviewNeedsMediaGeneration && (
-                  <p className="mt-3 rounded-md border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm font-bold leading-6 text-[#9a3412]">
-                    이 자료는 이미지나 음성 파일이 아직 모두 연결되지 않았습니다. 생성 설정이 준비된 상태에서 다시 만들면 학생 화면 미리보기와 음성 재생이 함께 확인됩니다.
-                  </p>
+                {openReview.generatedAtLabel && (
+                  <p className="mt-2 text-xs font-black text-[#94a3b8]">생성 {openReview.generatedAtLabel}</p>
                 )}
               </div>
               <button
@@ -2531,9 +2498,7 @@ export default function DashboardPage() {
                 </div>
               </section>
               <div className="min-h-0 space-y-4 overflow-y-auto pr-2">
-                {openReviewSelectedStages.map((stage) => {
-                  const assetStatus = getStageAssetStatus(openReview.content, stage.step);
-                  return (
+                {openReviewSelectedStages.map((stage) => (
                     <section key={stage.step} className="rounded-lg border border-[#e5e9f0] bg-[#fbfcfe] p-5">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
@@ -2652,30 +2617,6 @@ export default function DashboardPage() {
                             </div>
                           )}
 
-                          <div className="rounded-md bg-white p-4">
-                            <p className="text-xs font-black text-[#64748b]">이미지·음성</p>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <span
-                                className={`rounded-full border px-3 py-1 text-xs font-black ${
-                                  assetStatus.imageReady
-                                    ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
-                                    : "border-[#fed7aa] bg-[#fff7ed] text-[#9a3412]"
-                                }`}
-                              >
-                                {assetStatus.imageReady ? "이미지 연결됨" : "이미지 생성 필요"}
-                              </span>
-                              <span
-                                className={`rounded-full border px-3 py-1 text-xs font-black ${
-                                  assetStatus.audioReady
-                                    ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
-                                    : "border-[#fed7aa] bg-[#fff7ed] text-[#9a3412]"
-                                }`}
-                              >
-                                {assetStatus.audioReady ? "음성 연결됨" : "음성 생성 필요"}
-                              </span>
-                            </div>
-                          </div>
-
                           {!stage.isRealtimeStage && (
                           <div className="rounded-md bg-white p-4">
                             <p className="text-xs font-black text-[#64748b]">선택지</p>
@@ -2714,21 +2655,11 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     </section>
-                  );
-                })}
+                ))}
               </div>
             </div>
 
             <div className="flex flex-wrap justify-end gap-3 border-t border-[#e5e9f0] px-6 py-4">
-              {openReviewNeedsMediaGeneration && (
-                <button
-                  onClick={() => handleGenerateReviewAssets(openReview)}
-                  disabled={reviewActionId === openReview.id}
-                  className="rounded-md border border-[#fed7aa] bg-[#fff7ed] px-5 py-3 text-sm font-bold text-[#9a3412] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {reviewActionId === openReview.id ? "생성 중" : "이미지·음성 생성하기"}
-                </button>
-              )}
               <button
                 onClick={handleRejectReview}
                 disabled={reviewActionId === openReview.id}
