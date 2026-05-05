@@ -3,6 +3,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -21,6 +22,8 @@ from app.services.store import DemoStore, SessionPrincipal
 router = APIRouter(prefix="/api/contents", tags=["contents"])
 logger = logging.getLogger(__name__)
 IMAGE_PACKAGE_PARALLELISM = 5
+_asset_package_locks: dict[str, Lock] = {}
+_asset_package_locks_guard = Lock()
 
 PROBLEM_ANSWER_IMAGE_PROMPT_TERMS = (
     "문제 문장",
@@ -165,8 +168,35 @@ def generate_content_asset_package(
         raise HTTPException(status_code=404, detail={"code": "CONTENT_NOT_FOUND", "message": "콘텐츠를 찾을 수 없습니다."})
     _ensure_asset_generation_allowed(content)
 
-    _validate_required_asset_package(content)
-    _preflight_provider_keys(content)
+    package_lock = _get_asset_package_lock(content.id)
+    package_lock.acquire()
+    try:
+        content = demo_store.get_mission_for_teacher(content_id, teacher_id=principal.id if principal.role == "teacher" else None)
+        if content is None:
+            raise HTTPException(status_code=404, detail={"code": "CONTENT_NOT_FOUND", "message": "콘텐츠를 찾을 수 없습니다."})
+        _ensure_asset_generation_allowed(content)
+        _validate_required_asset_package(content)
+        _preflight_provider_keys(content)
+        if _is_required_asset_package_ready(content):
+            assets = [asset.model_dump(by_alias=True) for asset in _get_package_assets(content)]
+            logger.info(
+                "contents.assets.package_skipped_existing content_id=%s generated_count=0 asset_count=%s",
+                content.id,
+                len(assets),
+            )
+            return ok({"contentId": content.id, "generatedCount": 0, "assets": assets})
+
+        return _generate_content_asset_package_locked(content, principal=principal, demo_store=demo_store)
+    finally:
+        package_lock.release()
+
+
+def _generate_content_asset_package_locked(
+    content,
+    *,
+    principal: SessionPrincipal,
+    demo_store: DemoStore,
+) -> dict:
     _refresh_image_prompts_or_raise(content)
 
     package_started_at = time.perf_counter()
@@ -222,6 +252,34 @@ def generate_content_asset_package(
         time.perf_counter() - package_started_at,
     )
     return ok({"contentId": content.id, "generatedCount": len(generated), "assets": generated})
+
+
+def _get_asset_package_lock(content_id: str) -> Lock:
+    with _asset_package_locks_guard:
+        if content_id not in _asset_package_locks:
+            _asset_package_locks[content_id] = Lock()
+        return _asset_package_locks[content_id]
+
+
+def _get_package_assets(content) -> list:
+    required_roles = {role.value for role in AssetRole}
+    return [
+        asset
+        for asset in content.assets
+        if asset.asset_role in required_roles and asset.asset_type in {AssetType.IMAGE, AssetType.AUDIO}
+    ]
+
+
+def _is_required_asset_package_ready(content) -> bool:
+    assets = _get_package_assets(content)
+    image_roles = {asset.asset_role for asset in assets if asset.asset_type == AssetType.IMAGE and _is_asset_ready(asset)}
+    audio_roles = {asset.asset_role for asset in assets if asset.asset_type == AssetType.AUDIO and _is_asset_ready(asset)}
+    required_roles = {role.value for role in AssetRole}
+    return required_roles.issubset(image_roles) and required_roles.issubset(audio_roles)
+
+
+def _is_asset_ready(asset) -> bool:
+    return bool(asset.storage_url or asset.preview_url) and asset.qa_status == "passed"
 
 
 def _ensure_asset_generation_allowed(content) -> None:
@@ -846,9 +904,19 @@ def _blocked_visible_text_in_image_prompt(content, asset, prompt: str) -> str | 
             continue
         if cleaned in allowed_scene_texts:
             continue
-        if cleaned in prompt:
+        if _contains_non_negated_prompt_text(prompt, cleaned):
             return cleaned
     return None
+
+
+def _contains_non_negated_prompt_text(prompt: str, text: str) -> bool:
+    index = prompt.find(text)
+    while index != -1:
+        window = prompt[max(0, index - 80) : index + len(text) + 120]
+        if not _is_negated_image_prompt_term(window):
+            return True
+        index = prompt.find(text, index + len(text))
+    return False
 
 
 def _is_meaningful_image_ui_text(text: str) -> bool:
@@ -860,24 +928,37 @@ def _is_negated_image_prompt_term(text: str) -> bool:
         "넣지 마세요",
         "넣지 않는다",
         "넣지 않",
+        "넣지 않습니다",
         "포함하지 마세요",
         "포함하지 않",
         "포함하지 않는",
+        "포함하지 않습니다",
+        "표시하지 않",
+        "표시하지 않습니다",
         "보이지 않",
         "보이지 않는",
+        "보이지 않습니다",
         "노출하지",
         "노출되지",
+        "노출하지 않습니다",
+        "노출되지 않습니다",
         "드러나지",
         "렌더링하지",
+        "렌더링하지 않습니다",
         "쓰지",
+        "쓰지 않습니다",
         "사용하지",
+        "사용하지 않습니다",
         "요청하지",
+        "요청하지 않습니다",
         "피하고",
         "피합니다",
         "제외",
+        "제외합니다",
         "금지",
         "없이",
         "없는",
+        "없습니다",
         "없게",
         "아닌",
         "no ",

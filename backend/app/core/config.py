@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     elevenlabs_stability: float = 0.42
     elevenlabs_similarity_boost: float = 0.82
     elevenlabs_style: float = 0.32
-    elevenlabs_speed: float = 1.03
+    elevenlabs_speed: float = 1.08
     elevenlabs_use_speaker_boost: bool = True
     elevenlabs_enable_audio_tags: bool = False
     neis_api_key: str | None = None

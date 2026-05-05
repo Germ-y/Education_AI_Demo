@@ -497,6 +497,39 @@ function isPendingGenerationContentComplete(content: MissionContent | null): con
   return isPendingGenerationContentUsable(content) && !hasMissingGeneratedMedia(content);
 }
 
+function mergeGeneratedAssets(content: MissionContent, assets: MissionContent["assets"]) {
+  const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
+  return {
+    ...content,
+    assets: content.assets.map((asset) => assetsById.get(asset.id) ?? asset),
+  };
+}
+
+async function generateAssetPackageWithRecovery(content: MissionContent) {
+  let generatedContent = content;
+  let assetGenerationErrorMessage: string | null = null;
+
+  try {
+    const assetPackage = await generateContentAssetPackage(generatedContent.id);
+    generatedContent = mergeGeneratedAssets(generatedContent, assetPackage.assets);
+  } catch (assetError) {
+    assetGenerationErrorMessage = getClientGenerationErrorMessage(assetError);
+  }
+
+  const refreshedContent = await getReviewableContent(generatedContent.id).catch(() => null);
+  if (isPendingGenerationContentComplete(refreshedContent)) {
+    return {
+      content: refreshedContent,
+      errorMessage: null,
+    };
+  }
+
+  return {
+    content: refreshedContent ?? generatedContent,
+    errorMessage: assetGenerationErrorMessage,
+  };
+}
+
 function describeMissionStatus(status: MissionContent["status"]) {
   if (status === "teacher_review") return "검토 대기";
   if (status === "revision_requested") return "사용 안 함";
@@ -1151,17 +1184,9 @@ export default function DashboardPage() {
         return;
       }
 
-      let assetGenerationErrorMessage: string | null = null;
-      try {
-        const assetPackage = await generateContentAssetPackage(generatedContent.id);
-        const assetsById = new Map(assetPackage.assets.map((asset) => [asset.id, asset]));
-        generatedContent = {
-          ...generatedContent,
-          assets: generatedContent.assets.map((asset) => assetsById.get(asset.id) ?? asset),
-        };
-      } catch (assetError) {
-        assetGenerationErrorMessage = getClientGenerationErrorMessage(assetError);
-      }
+      const assetGenerationResult = await generateAssetPackageWithRecovery(generatedContent);
+      generatedContent = assetGenerationResult.content;
+      const assetGenerationErrorMessage = assetGenerationResult.errorMessage;
 
       setSelectedCaseFile((current) =>
         current && current.profile.id === generatedContent.studentId
@@ -1316,17 +1341,9 @@ export default function DashboardPage() {
         failJob("이 자료는 이미 사용 안 함 상태라 생성 이어가기를 중단했습니다. 새 자료 제안을 다시 실행해 주세요.");
         return;
       }
-      let assetGenerationErrorMessage: string | null = null;
-      try {
-        const assetPackage = await generateContentAssetPackage(generatedContent.id);
-        const assetsById = new Map(assetPackage.assets.map((asset) => [asset.id, asset]));
-        generatedContent = {
-          ...generatedContent,
-          assets: generatedContent.assets.map((asset) => assetsById.get(asset.id) ?? asset),
-        };
-      } catch (assetError) {
-        assetGenerationErrorMessage = getClientGenerationErrorMessage(assetError);
-      }
+      const assetGenerationResult = await generateAssetPackageWithRecovery(generatedContent);
+      generatedContent = assetGenerationResult.content;
+      const assetGenerationErrorMessage = assetGenerationResult.errorMessage;
 
       setSelectedCaseFile((current) =>
         current && current.profile.id === generatedContent.studentId

@@ -1049,6 +1049,7 @@ function RealtimePracticeRoom({
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const connectionAttemptIdRef = useRef(0);
   const realtimeSessionIdRef = useRef<string | null>(null);
   const realtimeTokenRef = useRef<string | null>(null);
   const startedAtRef = useRef<number | null>(null);
@@ -1069,6 +1070,7 @@ function RealtimePracticeRoom({
   useEffect(() => () => closeRealtimeConnection(), []);
 
   function closeRealtimeConnection() {
+    connectionAttemptIdRef.current += 1;
     dataChannelRef.current?.close();
     peerConnectionRef.current?.close();
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -1248,8 +1250,15 @@ function RealtimePracticeRoom({
   };
 
   const connectRealtimeSession = async (session: Awaited<ReturnType<typeof createRealtimeSession>>) => {
+    const connectionAttemptId = connectionAttemptIdRef.current + 1;
+    connectionAttemptIdRef.current = connectionAttemptId;
     const peerConnection = new RTCPeerConnection();
     peerConnectionRef.current = peerConnection;
+    const isActiveConnection = () =>
+      connectionAttemptIdRef.current === connectionAttemptId &&
+      peerConnectionRef.current === peerConnection &&
+      peerConnection.signalingState !== "closed";
+
     peerConnection.ontrack = (event) => {
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = event.streams[0];
@@ -1257,6 +1266,10 @@ function RealtimePracticeRoom({
     };
 
     const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (!isActiveConnection()) {
+      mediaStream.getTracks().forEach((track) => track.stop());
+      return;
+    }
     mediaStreamRef.current = mediaStream;
     mediaStream.getAudioTracks().forEach((track) => peerConnection.addTrack(track, mediaStream));
 
@@ -1281,7 +1294,9 @@ function RealtimePracticeRoom({
     });
 
     const offer = await peerConnection.createOffer();
+    if (!isActiveConnection()) return;
     await peerConnection.setLocalDescription(offer);
+    if (!isActiveConnection()) return;
     const sdpResponse = await fetch(session.webrtcUrl, {
       method: "POST",
       body: offer.sdp,
@@ -1294,10 +1309,12 @@ function RealtimePracticeRoom({
     if (!sdpResponse.ok) {
       throw new Error(await sdpResponse.text());
     }
+    const answerSdp = await sdpResponse.text();
+    if (!isActiveConnection()) return;
 
     await peerConnection.setRemoteDescription({
       type: "answer",
-      sdp: await sdpResponse.text(),
+      sdp: answerSdp,
     });
   };
 
