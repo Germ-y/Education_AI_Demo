@@ -568,6 +568,81 @@ def test_teacher_can_search_neis_school_and_register_student(monkeypatch) -> Non
     assert search_calls["count"] == 1
 
 
+def test_asset_generation_job_persists_partial_failure_and_retries(monkeypatch, tmp_path) -> None:
+    os.environ["OPENAI_API_KEY"] = "test-openai-key"
+    os.environ["ELEVENLABS_API_KEY"] = "test-elevenlabs-key"
+    os.environ["ELEVENLABS_VOICE_ID"] = "test-voice-id"
+    os.environ["GENERATED_ASSETS_DIR"] = str(tmp_path / "generated")
+    get_settings.cache_clear()
+
+    client = TestClient(create_app())
+    content_id = "content_fraction_001"
+    store = get_store_instance()
+    mission = store.get_mission_for_teacher(content_id)
+    assert mission is not None
+    for asset in mission.assets:
+        asset.storage_url = ""
+        asset.preview_url = None
+        asset.qa_status = "pending"
+        asset.approval_status = "pending"
+    store.save_generated_mission_content(mission)
+
+    content = client.get(f"/api/contents/{content_id}").json()["data"]
+    failing_asset_id = next(
+        asset["id"]
+        for asset in content["assets"]
+        if asset["assetType"] == "image" and asset["assetRole"] == "stage_2"
+    )
+    fail_stage_2_image = {"enabled": True}
+
+    def fake_image_file(self, *, prompt, output_path, model, size="1536x1024", timeout_sec=180):
+        if fail_stage_2_image["enabled"] and output_path.stem == failing_asset_id:
+            raise RuntimeError("stage 2 image failed")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"png")
+        return output_path
+
+    def fake_speech_file(self, *, source_text, output_path, timeout_sec=60):
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"mp3")
+        return output_path
+
+    monkeypatch.setattr(OpenAiProvider, "create_image_file", fake_image_file)
+    monkeypatch.setattr(ElevenLabsProvider, "create_speech_file", fake_speech_file)
+
+    created = client.post(f"/api/contents/{content_id}/assets/generation-jobs")
+    assert created.status_code == 200, created.json()
+    job_id = created.json()["data"]["jobId"]
+
+    partial = client.get(f"/api/contents/{content_id}/assets/generation-jobs/{job_id}")
+    assert partial.status_code == 200, partial.json()
+    partial_job = partial.json()["data"]
+    assert partial_job["status"] == "partial_failed"
+    assert partial_job["failedCount"] == 1
+    failed_asset = next(asset for asset in partial_job["assets"] if asset["status"] == "failed")
+    assert failed_asset["assetId"] == failing_asset_id
+    assert partial_job["generatedCount"] == 9
+
+    reviewable_after_partial = client.get(f"/api/contents/{content_id}")
+    assets_after_partial = reviewable_after_partial.json()["data"]["assets"]
+    assert next(asset for asset in assets_after_partial if asset["id"] == failing_asset_id)["qaStatus"] == "failed"
+    assert sum(1 for asset in assets_after_partial if asset["qaStatus"] == "passed") == 9
+
+    fail_stage_2_image["enabled"] = False
+    retried = client.post(f"/api/contents/{content_id}/assets/generation-jobs")
+    assert retried.status_code == 200, retried.json()
+    retry_job_id = retried.json()["data"]["jobId"]
+    retry_status = client.get(f"/api/contents/{content_id}/assets/generation-jobs/{retry_job_id}")
+    assert retry_status.status_code == 200, retry_status.json()
+    retry_job = retry_status.json()["data"]
+    assert retry_job["status"] == "succeeded"
+    assert retry_job["generatedCount"] == 1
+    assert next(asset for asset in retry_job["assets"] if asset["assetId"] == failing_asset_id)["status"] == "succeeded"
+
+    reviewable_after_retry = client.get(f"/api/contents/{content_id}")
+    assert all(asset["qaStatus"] == "passed" for asset in reviewable_after_retry.json()["data"]["assets"])
+
+
 def test_completed_mission_stays_completed_after_restart() -> None:
     client = TestClient(create_app())
     student_login = client.post("/api/auth/student-access", json={"accessCode": "STAR-003"})

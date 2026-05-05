@@ -6,10 +6,11 @@ import {
   approveContent,
   applyReviewSummaryToMemory,
   createAgentRun,
+  createContentAssetGenerationJob,
   createContentGeneration,
   createTeacherStudentNote,
-  generateContentAssetPackage,
   getAgentRun,
+  getContentAssetGenerationJob,
   getReviewableContent,
   getTeacherStudent,
   getTeacherStudentReport,
@@ -19,6 +20,7 @@ import {
   rejectContent,
   updateContentReview,
   type AgentRun,
+  type AssetGenerationJob,
   type CaseNote,
   type MissionContent,
   type StudentCaseFile,
@@ -71,12 +73,14 @@ type PendingGenerationJob = {
   orchestratorRunId?: string;
   contentRunId?: string;
   contentId?: string;
+  assetJobId?: string;
   startedAt: string;
 };
 
 const PENDING_GENERATION_STORAGE_KEY = "eduyj:pending-generation-jobs";
 const GENERATION_RUNNING_TIMEOUT_MS = 30 * 60 * 1000;
 const ASSET_GENERATION_RUNNING_TIMEOUT_MS = 60 * 60 * 1000;
+const ASSET_GENERATION_POLL_INTERVAL_MS = 3000;
 
 function readPendingGenerationJobs(): Record<string, PendingGenerationJob> {
   if (typeof window === "undefined") return {};
@@ -499,21 +503,49 @@ function isPendingGenerationContentComplete(content: MissionContent | null): con
   return isPendingGenerationContentUsable(content) && !hasMissingGeneratedMedia(content);
 }
 
-function mergeGeneratedAssets(content: MissionContent, assets: MissionContent["assets"]) {
-  const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
-  return {
-    ...content,
-    assets: content.assets.map((asset) => assetsById.get(asset.id) ?? asset),
-  };
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-async function generateAssetPackageWithRecovery(content: MissionContent) {
-  let generatedContent = content;
+function isAssetGenerationJobRunning(job: AssetGenerationJob) {
+  return job.status === "queued" || job.status === "running";
+}
+
+function getAssetGenerationJobMessage(job: AssetGenerationJob) {
+  const progress = `${Math.min(job.completedCount + job.failedCount, job.totalCount)}/${job.totalCount}`;
+  if (job.status === "queued") return `이미지와 음성 asset 생성 job을 준비 중입니다. (${progress})`;
+  if (job.status === "running") return `이미지와 음성 asset을 생성하는 중입니다. (${progress})`;
+  if (job.status === "partial_failed") return `일부 asset 생성에 실패했습니다. 성공한 asset은 유지했고 실패 ${job.failedCount}개만 다시 생성할 수 있습니다.`;
+  if (job.status === "failed") return job.errorMessage ?? "이미지와 음성 asset 생성에 실패했습니다.";
+  return "이미지와 음성까지 포함한 검토용 수업 자료가 만들어졌습니다.";
+}
+
+async function generateAssetPackageWithRecovery(
+  content: MissionContent,
+  options: {
+    assetJobId?: string;
+    onJobUpdate?: (job: AssetGenerationJob) => void;
+  } = {},
+) {
+  const generatedContent = content;
+  let job: AssetGenerationJob | null = null;
   let assetGenerationErrorMessage: string | null = null;
 
   try {
-    const assetPackage = await generateContentAssetPackage(generatedContent.id);
-    generatedContent = mergeGeneratedAssets(generatedContent, assetPackage.assets);
+    job = options.assetJobId
+      ? await getContentAssetGenerationJob(generatedContent.id, options.assetJobId)
+      : await createContentAssetGenerationJob(generatedContent.id);
+    options.onJobUpdate?.(job);
+
+    while (isAssetGenerationJobRunning(job)) {
+      await wait(ASSET_GENERATION_POLL_INTERVAL_MS);
+      job = await getContentAssetGenerationJob(generatedContent.id, job.jobId);
+      options.onJobUpdate?.(job);
+    }
+
+    if (job.status === "partial_failed" || job.status === "failed") {
+      assetGenerationErrorMessage = getAssetGenerationJobMessage(job);
+    }
   } catch (assetError) {
     assetGenerationErrorMessage = getClientGenerationErrorMessage(assetError);
   }
@@ -523,12 +555,14 @@ async function generateAssetPackageWithRecovery(content: MissionContent) {
     return {
       content: refreshedContent,
       errorMessage: null,
+      job,
     };
   }
 
   return {
     content: refreshedContent ?? generatedContent,
     errorMessage: assetGenerationErrorMessage,
+    job,
   };
 }
 
@@ -1187,7 +1221,28 @@ export default function DashboardPage() {
         return;
       }
 
-      const assetGenerationResult = await generateAssetPackageWithRecovery(generatedContent);
+      const assetGenerationResult = await generateAssetPackageWithRecovery(generatedContent, {
+        assetJobId: assetJob.assetJobId,
+        onJobUpdate: (jobStatus) => {
+          updatePendingGenerationJobs((current) => ({
+            ...current,
+            [assetJob.caseId]: {
+              ...(current[assetJob.caseId] ?? assetJob),
+              phase: "assets",
+              contentId: generatedContent.id,
+              assetJobId: jobStatus.jobId,
+              startedAt: jobStatus.startedAt ?? jobStatus.queuedAt,
+            },
+          }));
+          setGenerationStatuses((current) => ({
+            ...current,
+            [assetJob.caseId]: {
+              state: isAssetGenerationJobRunning(jobStatus) ? "running" : jobStatus.status === "succeeded" ? "succeeded" : "failed",
+              message: getAssetGenerationJobMessage(jobStatus),
+            },
+          }));
+        },
+      });
       generatedContent = assetGenerationResult.content;
       const assetGenerationErrorMessage = assetGenerationResult.errorMessage;
 
@@ -1344,7 +1399,28 @@ export default function DashboardPage() {
         failJob("이 자료는 이미 사용 안 함 상태라 생성 이어가기를 중단했습니다. 새 자료 제안을 다시 실행해 주세요.");
         return;
       }
-      const assetGenerationResult = await generateAssetPackageWithRecovery(generatedContent);
+      const assetGenerationResult = await generateAssetPackageWithRecovery(generatedContent, {
+        assetJobId: job.assetJobId,
+        onJobUpdate: (jobStatus) => {
+          updatePendingGenerationJobs((current) => ({
+            ...current,
+            [job.caseId]: {
+              ...(current[job.caseId] ?? job),
+              phase: "assets",
+              contentId: generatedContent.id,
+              assetJobId: jobStatus.jobId,
+              startedAt: jobStatus.startedAt ?? jobStatus.queuedAt,
+            },
+          }));
+          setGenerationStatuses((current) => ({
+            ...current,
+            [job.caseId]: {
+              state: isAssetGenerationJobRunning(jobStatus) ? "running" : jobStatus.status === "succeeded" ? "succeeded" : "failed",
+              message: getAssetGenerationJobMessage(jobStatus),
+            },
+          }));
+        },
+      });
       generatedContent = assetGenerationResult.content;
       const assetGenerationErrorMessage = assetGenerationResult.errorMessage;
 
@@ -1476,6 +1552,33 @@ export default function DashboardPage() {
         },
       }));
     }
+  };
+
+  const handleRetryMaterialAssets = (item: MaterialReviewItem) => {
+    if (isGeneratingContent || !hasMissingGeneratedMedia(item.content)) return;
+
+    const job: PendingGenerationJob = {
+      caseId: item.caseId,
+      studentId: item.content.studentId,
+      requestedGoal: item.content.sessionGoal,
+      contentType: item.content.contentType,
+      phase: "assets",
+      contentId: item.contentId,
+      startedAt: new Date().toISOString(),
+    };
+    setActiveTab("materials");
+    setGenerationStatuses((current) => ({
+      ...current,
+      [job.caseId]: {
+        state: "running",
+        message: "실패했거나 비어 있는 이미지와 음성 asset만 다시 생성합니다.",
+      },
+    }));
+    updatePendingGenerationJobs((current) => ({
+      ...current,
+      [job.caseId]: job,
+    }));
+    void continueGenerationJob(job);
   };
 
   const refreshStudentData = async (studentId: string) => {
@@ -2166,6 +2269,15 @@ export default function DashboardPage() {
                             >
                               제안 검토하기
                             </button>
+                            {needsMediaGeneration && (
+                              <button
+                                onClick={() => handleRetryMaterialAssets(item)}
+                                disabled={isGeneratingContent}
+                                className="rounded-md border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm font-bold text-[#9a3412] disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                이미지/음성 다시 생성
+                              </button>
+                            )}
                             <button
                               onClick={() => handlePublishMaterial(item)}
                               disabled={

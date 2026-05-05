@@ -632,3 +632,35 @@ export type AssetPackageGenerationResponse = {
   generatedCount: number;
   assets: ContentAsset[];
 };
+
+export type AssetGenerationJobAsset = {
+  assetId: string;
+  assetRole: AssetRole;
+  assetType: "image" | "audio";
+  stageId?: string | null;
+  status: "queued" | "running" | "succeeded" | "skipped" | "failed";
+  storageUrl?: string | null;
+  previewUrl?: string | null;
+  qaStatus: "pending" | "passed" | "failed";
+  approvalStatus: "pending" | "approved" | "rejected";
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  updatedAt?: string | null;
+};
+
+export type AssetGenerationJob = {
+  jobId: string;
+  contentId: string;
+  teacherId?: string | null;
+  status: "queued" | "running" | "partial_failed" | "succeeded" | "failed";
+  queuedAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  totalCount: number;
+  completedCount: number;
+  failedCount: number;
+  generatedCount: number;
+  assets: AssetGenerationJobAsset[];
+  errorCode?: string | null;
+  errorMessage?: string | null;
+};

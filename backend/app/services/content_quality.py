@@ -636,7 +636,8 @@ def _is_generic_life_support_sequence(cards: list[str], question: str) -> bool:
         return False
     combined_cards = " ".join(cards)
     generic_hits = sum(1 for term in ("멈추", "주변 확인", "도움 요청", "말하기") if term in combined_cards)
-    return generic_hits >= 3 and not _contains_any(combined_cards + " " + question, ("국물", "바닥", "식판", "공", "버스", "정류장", "센터", "도서관", "안내문", "직원", "친구"))
+    concrete_terms = ("국물", "바닥", "식판", "공", "버스", "정류장", "센터", "도서관", "안내문", "직원", "친구")
+    return generic_hits >= 3 and not _contains_any(combined_cards + " " + question, concrete_terms)
 
 
 def _contains_any(text: str, terms: tuple[str, ...]) -> bool:

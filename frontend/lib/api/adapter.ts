@@ -1,5 +1,6 @@
 import type {
   AssetPackageGenerationResponse,
+  AssetGenerationJob,
   AgentRun,
   AgentRunRequest,
   ContentGenerationRequest,
@@ -55,4 +56,6 @@ export type ApiAdapter = {
   createAgentRun(payload: AgentRunRequest, options?: ApiAdapterOptions): Promise<OrchestratorRunResponse>;
   createContentGeneration(payload: ContentGenerationRequest, options?: ApiAdapterOptions): Promise<ContentGenerationResponse>;
   generateContentAssetPackage(contentId: string, options?: ApiAdapterOptions): Promise<AssetPackageGenerationResponse>;
+  createContentAssetGenerationJob(contentId: string, options?: ApiAdapterOptions): Promise<AssetGenerationJob>;
+  getContentAssetGenerationJob(contentId: string, jobId: string, options?: ApiAdapterOptions): Promise<AssetGenerationJob>;
 };

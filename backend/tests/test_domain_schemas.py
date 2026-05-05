@@ -759,7 +759,10 @@ def _generated_life_support_content() -> dict:
         asset["id"] = f"asset_{content['id']}_{asset['assetRole']}{'_audio' if asset['assetType'] == 'audio' else ''}"
         if asset["assetType"] == "image":
             asset["promptJson"] = {
-                "prompt": f"{asset['assetRole']} 장면. 버스 정류장에서 센터행 버스 번호를 확인하는 실제 생활 장면을 보여주고 문제 문장, 선택지, 정답, 힌트 텍스트는 넣지 않습니다.",
+                "prompt": (
+                    f"{asset['assetRole']} 장면. 버스 정류장에서 센터행 버스 번호를 확인하는 실제 생활 장면을 보여주고 "
+                    "문제 문장, 선택지, 정답, 힌트 텍스트는 넣지 않습니다."
+                ),
                 "textRenderingPolicy": "scene_only_no_problem_text",
             }
         if asset["assetType"] == "audio":

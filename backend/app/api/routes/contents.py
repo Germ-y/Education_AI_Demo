@@ -5,8 +5,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 from typing import Any
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from app.ai.elevenlabs_provider import ElevenLabsProvider
 from app.ai.openai_provider import OpenAiProvider
@@ -21,6 +22,8 @@ from app.services.store import DemoStore, SessionPrincipal
 router = APIRouter(prefix="/api/contents", tags=["contents"])
 logger = logging.getLogger(__name__)
 IMAGE_PACKAGE_PARALLELISM = 5
+ASSET_GENERATION_JOBS_KEY = "assetGenerationJobs"
+ASSET_GENERATION_JOB_HISTORY_LIMIT = 8
 _asset_package_locks: dict[str, Lock] = {}
 _asset_package_locks_guard = Lock()
 
@@ -154,6 +157,48 @@ def generate_content_asset(
         payload_json={"contentId": content.id, "assetType": asset.asset_type, "assetRole": asset.asset_role},
     )
     return ok(asset.model_dump(by_alias=True))
+
+
+@router.post("/{content_id}/assets/generation-jobs")
+def create_content_asset_generation_job(
+    content_id: str,
+    background_tasks: BackgroundTasks,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    content = demo_store.get_mission_for_teacher(content_id, teacher_id=principal.id if principal.role == "teacher" else None)
+    if content is None:
+        raise HTTPException(status_code=404, detail={"code": "CONTENT_NOT_FOUND", "message": "콘텐츠를 찾을 수 없습니다."})
+    _ensure_asset_generation_allowed(content)
+    _validate_required_asset_package(content)
+
+    active_job = _get_active_asset_generation_job(content)
+    if active_job is not None:
+        return ok(active_job)
+
+    job = _create_asset_generation_job(content, teacher_id=principal.id)
+    demo_store.save_generated_mission_content(content)
+
+    if job["status"] == "queued":
+        background_tasks.add_task(_run_asset_generation_job, content.id, job["jobId"], principal.id, demo_store)
+
+    return ok(job)
+
+
+@router.get("/{content_id}/assets/generation-jobs/{job_id}")
+def get_content_asset_generation_job(
+    content_id: str,
+    job_id: str,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    content = demo_store.get_mission_for_teacher(content_id, teacher_id=principal.id if principal.role == "teacher" else None)
+    if content is None:
+        raise HTTPException(status_code=404, detail={"code": "CONTENT_NOT_FOUND", "message": "콘텐츠를 찾을 수 없습니다."})
+    job = _get_asset_generation_job(content, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail={"code": "ASSET_GENERATION_JOB_NOT_FOUND", "message": "asset 생성 job을 찾을 수 없습니다."})
+    return ok(job)
 
 
 @router.post("/{content_id}/assets/generate-package")
@@ -291,6 +336,362 @@ def _ensure_asset_generation_allowed(content) -> None:
                 "details": {"contentId": content.id, "status": content.status},
             },
         )
+
+
+def _run_asset_generation_job(content_id: str, job_id: str, teacher_id: str, demo_store: DemoStore) -> None:
+    package_lock = _get_asset_package_lock(content_id)
+    package_lock.acquire()
+    try:
+        content = demo_store.get_mission_for_teacher(content_id, teacher_id=teacher_id)
+        if content is None:
+            return
+        job = _get_asset_generation_job(content, job_id)
+        if job is None or job["status"] not in {"queued", "running"}:
+            return
+
+        _set_asset_generation_job_status(content, job_id, "running", started_at=_now_iso())
+        demo_store.save_generated_mission_content(content)
+
+        try:
+            _ensure_asset_generation_allowed(content)
+            _validate_required_asset_package(content)
+        except HTTPException as exc:
+            _fail_asset_generation_job(content, job_id, *_error_from_http_exception(exc))
+            demo_store.save_generated_mission_content(content)
+            return
+
+        target_assets = _get_job_target_assets(content, job_id)
+        if not target_assets:
+            _set_asset_generation_job_status(content, job_id, "succeeded", completed_at=_now_iso())
+            demo_store.save_generated_mission_content(content)
+            return
+
+        image_assets = [asset for asset in target_assets if asset.asset_type == AssetType.IMAGE]
+        audio_assets = [asset for asset in target_assets if asset.asset_type == AssetType.AUDIO]
+
+        if image_assets:
+            try:
+                _refresh_image_prompts_or_raise(content)
+            except HTTPException as exc:
+                code, message = _error_from_http_exception(exc)
+                for asset in image_assets:
+                    _mark_asset_generation_failed(content, job_id, asset, code, message)
+                demo_store.save_generated_mission_content(content)
+            else:
+                _run_image_asset_generation_job(content, job_id, image_assets, demo_store)
+
+        for asset in audio_assets:
+            _run_single_asset_generation_job(content, job_id, asset, demo_store)
+
+        final_job = _finalize_asset_generation_job(content, job_id)
+        demo_store.save_generated_mission_content(content)
+        demo_store.record_audit(
+            actor_user_id=teacher_id,
+            student_id=content.student_id,
+            action="generate_asset_package_job",
+            resource_type="mission_content",
+            resource_id=content.id,
+            payload_json={
+                "jobId": job_id,
+                "status": final_job["status"],
+                "generatedCount": final_job["generatedCount"],
+                "failedCount": final_job["failedCount"],
+            },
+        )
+    finally:
+        package_lock.release()
+
+
+def _run_image_asset_generation_job(content, job_id: str, image_assets: list, demo_store: DemoStore) -> None:
+    with ThreadPoolExecutor(max_workers=min(IMAGE_PACKAGE_PARALLELISM, len(image_assets))) as executor:
+        futures = {}
+        for asset in image_assets:
+            if _is_asset_ready(asset):
+                _mark_asset_generation_skipped(content, job_id, asset)
+                continue
+            _mark_asset_generation_running(content, job_id, asset)
+            futures[executor.submit(_generate_asset_or_raise, content, asset)] = asset
+
+        demo_store.save_generated_mission_content(content)
+        for future in as_completed(futures):
+            asset = futures[future]
+            try:
+                future.result()
+            except HTTPException as exc:
+                _mark_asset_generation_failed(content, job_id, asset, *_error_from_http_exception(exc))
+            except Exception as exc:  # noqa: BLE001 - provider wrappers can surface unexpected runtime errors.
+                logger.exception("contents.asset.job_unhandled_failed content_id=%s job_id=%s asset_id=%s", content.id, job_id, asset.id)
+                _mark_asset_generation_failed(content, job_id, asset, "ASSET_GENERATION_FAILED", str(exc) or "asset 생성에 실패했습니다.")
+            else:
+                _mark_asset_generation_succeeded(content, job_id, asset)
+            demo_store.save_generated_mission_content(content)
+
+
+def _run_single_asset_generation_job(content, job_id: str, asset, demo_store: DemoStore) -> None:
+    if _is_asset_ready(asset):
+        _mark_asset_generation_skipped(content, job_id, asset)
+        demo_store.save_generated_mission_content(content)
+        return
+
+    _mark_asset_generation_running(content, job_id, asset)
+    demo_store.save_generated_mission_content(content)
+    try:
+        _generate_asset_or_raise(content, asset)
+    except HTTPException as exc:
+        _mark_asset_generation_failed(content, job_id, asset, *_error_from_http_exception(exc))
+    except Exception as exc:  # noqa: BLE001 - provider wrappers can surface unexpected runtime errors.
+        logger.exception("contents.asset.job_unhandled_failed content_id=%s job_id=%s asset_id=%s", content.id, job_id, asset.id)
+        _mark_asset_generation_failed(content, job_id, asset, "ASSET_GENERATION_FAILED", str(exc) or "asset 생성에 실패했습니다.")
+    else:
+        _mark_asset_generation_succeeded(content, job_id, asset)
+    demo_store.save_generated_mission_content(content)
+
+
+def _create_asset_generation_job(content, *, teacher_id: str) -> dict[str, Any]:
+    now = _now_iso()
+    assets = [_asset_generation_job_item(asset, "skipped" if _is_asset_ready(asset) else "queued") for asset in _sorted_package_assets(content)]
+    queued_count = sum(1 for asset in assets if asset["status"] == "queued")
+    job = {
+        "jobId": f"asset_job_{uuid4().hex}",
+        "contentId": content.id,
+        "teacherId": teacher_id,
+        "status": "queued" if queued_count else "succeeded",
+        "queuedAt": now,
+        "startedAt": None,
+        "completedAt": now if queued_count == 0 else None,
+        "totalCount": len(assets),
+        "completedCount": len(assets) - queued_count,
+        "failedCount": 0,
+        "generatedCount": 0,
+        "assets": assets,
+        "errorCode": None,
+        "errorMessage": None,
+    }
+    _append_asset_generation_job(content, job)
+    return job
+
+
+def _append_asset_generation_job(content, job: dict[str, Any]) -> None:
+    jobs = _asset_generation_jobs(content)
+    content.brief_json = {
+        **content.brief_json,
+        ASSET_GENERATION_JOBS_KEY: [*jobs, job][-ASSET_GENERATION_JOB_HISTORY_LIMIT:],
+    }
+
+
+def _asset_generation_jobs(content) -> list[dict[str, Any]]:
+    jobs = content.brief_json.get(ASSET_GENERATION_JOBS_KEY)
+    return [job for job in jobs if isinstance(job, dict)] if isinstance(jobs, list) else []
+
+
+def _get_asset_generation_job(content, job_id: str) -> dict[str, Any] | None:
+    return next((job for job in _asset_generation_jobs(content) if job.get("jobId") == job_id), None)
+
+
+def _get_active_asset_generation_job(content) -> dict[str, Any] | None:
+    return next((job for job in reversed(_asset_generation_jobs(content)) if job.get("status") in {"queued", "running"}), None)
+
+
+def _replace_asset_generation_job(content, updated_job: dict[str, Any]) -> dict[str, Any]:
+    jobs = _asset_generation_jobs(content)
+    next_jobs = [updated_job if job.get("jobId") == updated_job.get("jobId") else job for job in jobs]
+    content.brief_json = {**content.brief_json, ASSET_GENERATION_JOBS_KEY: next_jobs[-ASSET_GENERATION_JOB_HISTORY_LIMIT:]}
+    return updated_job
+
+
+def _set_asset_generation_job_status(
+    content,
+    job_id: str,
+    status: str,
+    *,
+    started_at: str | None = None,
+    completed_at: str | None = None,
+    error_code: str | None = None,
+    error_message: str | None = None,
+) -> dict[str, Any]:
+    job = _get_asset_generation_job(content, job_id)
+    if job is None:
+        raise RuntimeError(f"asset generation job not found: {job_id}")
+    updated = {
+        **job,
+        "status": status,
+        "startedAt": started_at if started_at is not None else job.get("startedAt"),
+        "completedAt": completed_at if completed_at is not None else job.get("completedAt"),
+        "errorCode": error_code,
+        "errorMessage": error_message,
+    }
+    return _replace_asset_generation_job(content, _refresh_asset_generation_job_counts(updated))
+
+
+def _fail_asset_generation_job(content, job_id: str, error_code: str, error_message: str) -> dict[str, Any]:
+    job = _get_asset_generation_job(content, job_id)
+    if job is None:
+        raise RuntimeError(f"asset generation job not found: {job_id}")
+    now = _now_iso()
+    assets = [
+        {**asset, "status": "failed", "errorCode": error_code, "errorMessage": error_message, "updatedAt": now}
+        if asset.get("status") in {"queued", "running"}
+        else asset
+        for asset in job["assets"]
+    ]
+    updated = {
+        **job,
+        "status": "failed",
+        "completedAt": now,
+        "assets": assets,
+        "errorCode": error_code,
+        "errorMessage": error_message,
+    }
+    return _replace_asset_generation_job(content, _refresh_asset_generation_job_counts(updated))
+
+
+def _finalize_asset_generation_job(content, job_id: str) -> dict[str, Any]:
+    job = _get_asset_generation_job(content, job_id)
+    if job is None:
+        raise RuntimeError(f"asset generation job not found: {job_id}")
+    refreshed_assets = []
+    for item in job["assets"]:
+        asset = _find_content_asset(content, str(item.get("assetId")))
+        if asset is not None and item.get("status") in {"queued", "running"}:
+            refreshed_assets.append(_asset_generation_job_item(asset, "skipped" if _is_asset_ready(asset) else "failed"))
+        elif asset is not None:
+            refreshed_assets.append({**item, **_asset_generation_metadata(asset)})
+        else:
+            refreshed_assets.append(item)
+
+    failed_count = sum(1 for asset in refreshed_assets if asset.get("status") == "failed")
+    generated_count = sum(1 for asset in refreshed_assets if asset.get("status") == "succeeded")
+    if failed_count == 0:
+        status = "succeeded"
+        error_code = None
+        error_message = None
+    elif generated_count > 0 or any(asset.get("status") == "skipped" for asset in refreshed_assets):
+        status = "partial_failed"
+        error_code = "ASSET_GENERATION_PARTIAL_FAILED"
+        error_message = "일부 이미지 또는 음성 asset 생성에 실패했습니다. 실패한 asset만 다시 생성할 수 있습니다."
+    else:
+        status = "failed"
+        error_code = "ASSET_GENERATION_FAILED"
+        error_message = "이미지와 음성 asset 생성에 실패했습니다."
+
+    updated = {
+        **job,
+        "status": status,
+        "completedAt": _now_iso(),
+        "assets": refreshed_assets,
+        "errorCode": error_code,
+        "errorMessage": error_message,
+    }
+    return _replace_asset_generation_job(content, _refresh_asset_generation_job_counts(updated))
+
+
+def _mark_asset_generation_running(content, job_id: str, asset) -> None:
+    _update_asset_generation_item(content, job_id, asset, "running")
+
+
+def _mark_asset_generation_skipped(content, job_id: str, asset) -> None:
+    _update_asset_generation_item(content, job_id, asset, "skipped")
+
+
+def _mark_asset_generation_succeeded(content, job_id: str, asset) -> None:
+    _update_asset_generation_item(content, job_id, asset, "succeeded")
+
+
+def _mark_asset_generation_failed(content, job_id: str, asset, error_code: str, error_message: str) -> None:
+    asset.qa_status = "failed"
+    _update_asset_generation_item(content, job_id, asset, "failed", error_code=error_code, error_message=error_message)
+
+
+def _update_asset_generation_item(
+    content,
+    job_id: str,
+    asset,
+    status: str,
+    *,
+    error_code: str | None = None,
+    error_message: str | None = None,
+) -> None:
+    job = _get_asset_generation_job(content, job_id)
+    if job is None:
+        raise RuntimeError(f"asset generation job not found: {job_id}")
+    assets = []
+    for item in job["assets"]:
+        if item.get("assetId") != asset.id:
+            assets.append(item)
+            continue
+        assets.append(
+            {
+                **item,
+                **_asset_generation_metadata(asset),
+                "status": status,
+                "errorCode": error_code,
+                "errorMessage": error_message,
+                "updatedAt": _now_iso(),
+            }
+        )
+    _replace_asset_generation_job(content, _refresh_asset_generation_job_counts({**job, "assets": assets}))
+
+
+def _refresh_asset_generation_job_counts(job: dict[str, Any]) -> dict[str, Any]:
+    assets = job.get("assets") if isinstance(job.get("assets"), list) else []
+    completed_count = sum(1 for asset in assets if isinstance(asset, dict) and asset.get("status") in {"succeeded", "skipped"})
+    failed_count = sum(1 for asset in assets if isinstance(asset, dict) and asset.get("status") == "failed")
+    generated_count = sum(1 for asset in assets if isinstance(asset, dict) and asset.get("status") == "succeeded")
+    return {
+        **job,
+        "totalCount": len(assets),
+        "completedCount": completed_count,
+        "failedCount": failed_count,
+        "generatedCount": generated_count,
+    }
+
+
+def _get_job_target_assets(content, job_id: str) -> list:
+    job = _get_asset_generation_job(content, job_id)
+    if job is None:
+        return []
+    target_ids = {str(asset.get("assetId")) for asset in job.get("assets", []) if asset.get("status") in {"queued", "failed"}}
+    return [asset for asset in _sorted_package_assets(content) if asset.id in target_ids and not _is_asset_ready(asset)]
+
+
+def _asset_generation_job_item(asset, status: str) -> dict[str, Any]:
+    return {
+        "assetId": asset.id,
+        "assetRole": _as_asset_role_value(asset.asset_role),
+        "assetType": _as_asset_role_value(asset.asset_type),
+        "stageId": asset.stage_id,
+        "status": status,
+        "errorCode": None,
+        "errorMessage": None,
+        "updatedAt": _now_iso(),
+        **_asset_generation_metadata(asset),
+    }
+
+
+def _asset_generation_metadata(asset) -> dict[str, Any]:
+    return {
+        "storageUrl": asset.storage_url,
+        "previewUrl": asset.preview_url,
+        "qaStatus": asset.qa_status,
+        "approvalStatus": asset.approval_status,
+    }
+
+
+def _sorted_package_assets(content) -> list:
+    return sorted(_get_package_assets(content), key=lambda item: (item.asset_type, item.asset_role, item.id))
+
+
+def _find_content_asset(content, asset_id: str):
+    return next((asset for asset in content.assets if asset.id == asset_id), None)
+
+
+def _error_from_http_exception(exc: HTTPException) -> tuple[str, str]:
+    detail = exc.detail if isinstance(exc.detail, dict) else {}
+    return str(detail.get("code") or "ASSET_GENERATION_FAILED"), str(detail.get("message") or "asset 생성에 실패했습니다.")
+
+
+def _now_iso() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 @router.post("/{content_id}/stages/{stage_id}/preview-realtime-session")
@@ -629,7 +1030,8 @@ def _build_image_brief_for_asset(content, asset, stages: list, stage_visual_spec
     else:
         prompt_parts.append("No readable text is needed inside the image.")
     prompt_parts.append(
-        "Avoid app UI, worksheet layout, answer panels, scoring marks, feedback bubbles, category labels, long labels, watermarks, logos, and decorative generic scenes."
+        "Avoid app UI, worksheet layout, answer panels, scoring marks, feedback bubbles, "
+        "category labels, long labels, watermarks, logos, and decorative generic scenes."
     )
 
     return {

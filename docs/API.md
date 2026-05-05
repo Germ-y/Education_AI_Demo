@@ -74,7 +74,9 @@
 - `POST /api/contents/{contentId}/reject`: 반려 및 수정 요청 저장
 - `POST /api/contents/{contentId}/publish`: 준비·승인된 asset만 학생에게 배포하고 대시보드 단계를 `learning`으로 이동
 - `POST /api/contents/{contentId}/assets/{assetId}/generate`: 단일 asset 생성
-- `POST /api/contents/{contentId}/assets/generate-package`: 이미지/오디오 asset batch 생성. 현재는 HTTP 요청 안에서 동기 실행한다. 이미지 prompt는 `briefJson.stageVisualSpecs`와 단계별 `templateJson`을 조합해 결정적으로 만들고, 이미지 5장은 병렬 생성한다. 다음 개선은 이 endpoint를 background job + polling 구조로 분리하는 것이다.
+- `POST /api/contents/{contentId}/assets/generation-jobs`: 이미지/오디오 asset package background job 생성. 응답은 `jobId`, `status`, `totalCount`, `completedCount`, `failedCount`, asset별 상태를 포함한다.
+- `GET /api/contents/{contentId}/assets/generation-jobs/{jobId}`: asset generation job 상태 조회. job 상태는 `queued`, `running`, `partial_failed`, `succeeded`, `failed`다.
+- `POST /api/contents/{contentId}/assets/generate-package`: 기존 호환용 동기 batch 생성 endpoint. 프론트는 사용하지 않으며 새 작업은 `generation-jobs`와 polling을 사용한다.
 - `GET /api/contents/{contentId}/review-summary`: 최신 attempt 기반 리뷰 요약 조회
 - `POST /api/contents/{contentId}/review-summary`: 최신 attempt 기반 리뷰 요약 생성
 - `POST /api/review-summaries/{reviewId}/apply-to-memory`: 교사 확인 후 리뷰 요약을 메모리에 반영
@@ -128,3 +130,30 @@
 - 학생 API는 `published` 콘텐츠만 반환한다.
 - 학생 플레이 중 1~3단계 콘텐츠는 AI가 새로 생성하거나 바꾸지 않는다.
 - 4단계 realtime 세션은 승인된 `RealtimePracticeSpec`이 있는 stage에서만 만든다.
+
+Asset generation job 응답 예시:
+
+```json
+{
+  "jobId": "asset_job_abc123",
+  "contentId": "content_student_learning_fraction_001",
+  "status": "running",
+  "queuedAt": "2026-05-05T12:00:00+00:00",
+  "startedAt": "2026-05-05T12:00:01+00:00",
+  "completedAt": null,
+  "totalCount": 10,
+  "completedCount": 4,
+  "failedCount": 0,
+  "generatedCount": 4,
+  "assets": [
+    {
+      "assetId": "asset_content_001_stage_2",
+      "assetRole": "stage_2",
+      "assetType": "image",
+      "status": "running",
+      "qaStatus": "pending",
+      "approvalStatus": "pending"
+    }
+  ]
+}
+```

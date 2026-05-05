@@ -2,6 +2,7 @@ import { apiFetch } from "./api-fetch";
 import type { ApiAdapter } from "./adapter";
 import type {
   AssetPackageGenerationResponse,
+  AssetGenerationJob,
   AgentRun,
   ContentGenerationResponse,
   ContextMe,
@@ -120,6 +121,18 @@ export const backendAdapter: ApiAdapter = {
       method: "POST",
       token: options?.token,
     }),
+
+  createContentAssetGenerationJob: (contentId, options) =>
+    apiFetch<AssetGenerationJob>(`/api/contents/${encodeURIComponent(contentId)}/assets/generation-jobs`, {
+      method: "POST",
+      token: options?.token,
+    }),
+
+  getContentAssetGenerationJob: (contentId, jobId, options) =>
+    apiFetch<AssetGenerationJob>(
+      `/api/contents/${encodeURIComponent(contentId)}/assets/generation-jobs/${encodeURIComponent(jobId)}`,
+      { token: options?.token },
+    ),
 };
 
 function normalizeSeedContext(seed: BackendSeedContext): SeedContext {

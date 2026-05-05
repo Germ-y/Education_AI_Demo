@@ -13,34 +13,26 @@
 | 교사 대시보드 데이터 연결 | 75% | seed 학생, context bundle, 리포트, 콘텐츠 상태는 연결됨. 학생등록 UI와 생성 job 상태 UX가 남음. |
 | 백엔드 API 기반 | 82% | 교사/학생/콘텐츠/공공데이터/NEIS 학교검색/학생등록 백엔드가 있음. 운영 migration과 job queue는 미완성. |
 | 콘텐츠 생성 품질 | 60% | 4단계 생성은 되지만 시나리오 깊이, 문제-이미지 정합성, retry 구조가 아직 불안정함. |
-| 이미지/음성 asset 파이프라인 | 68% | gpt-image-2 5장 병렬과 ElevenLabs TTS 연결됨. HTTP 동기 요청과 상태 job 분리가 필요함. |
+| 이미지/음성 asset 파이프라인 | 82% | background job 생성/polling과 asset별 성공·실패 상태 저장이 연결됨. provider 실패 UX와 운영 queue 전환이 남음. |
 | 학생 런타임/realtime | 70% | published 미션, 제출, 회고, 완료 기록은 됨. preview/runtime 경계와 WebRTC 안정화가 남음. |
 | 학생등록 UX | 88% | 교사 대시보드 모달에서 학교검색, 학교 선택, 강점/약점/지원 입력, 등록 후 목록/상세 갱신과 access code 확인까지 연결됨. 브라우저 통합 회귀만 남음. |
 | 문서/인수인계 | 70% | 문서는 축소됨. DB dump와 generated asset 정책을 최신 상태로 반복 관리해야 함. |
 
 ## 우선순위
 
-### P0. 생성 작업을 background job으로 분리
+### 완료. 생성 작업을 background job으로 분리
 
-현재 병목:
+현재 상태:
 
-- `POST /api/contents/{contentId}/assets/generate-package`가 이미지 5장과 음성 5개를 한 HTTP 요청에서 끝까지 수행한다.
-- 실제 로그 기준 asset package는 보통 168~193초, 과거에는 764초까지 걸렸다.
-- 프론트는 이 요청을 `await`하기 때문에 로딩이 사라지거나 502/timeout처럼 보일 수 있다.
+- 프론트는 `POST /api/contents/{contentId}/assets/generation-jobs`로 job을 만들고 `GET /api/contents/{contentId}/assets/generation-jobs/{jobId}`를 polling한다.
+- job 상태는 `queued`, `running`, `partial_failed`, `succeeded`, `failed`다.
+- job과 asset별 상태는 `MissionContent.briefJson.assetGenerationJobs`에 저장되어 브라우저를 닫아도 조회할 수 있다.
+- 이미지 일부 실패 시 성공 asset은 유지되고 실패 asset만 새 job에서 재시도한다.
+- 기존 `generate-package` endpoint는 백엔드 호환용 동기 endpoint로 남겼고 프론트는 사용하지 않는다.
 
-해야 할 일:
+남은 운영 전환:
 
-- `POST /api/contents/{contentId}/assets/generation-jobs` 형태로 job 생성.
-- `GET /api/contents/{contentId}/assets/generation-jobs/{jobId}`로 상태 조회.
-- job 상태: `queued`, `running`, `partial_failed`, `succeeded`, `failed`.
-- asset별 진행률과 오류를 저장.
-- 프론트는 polling만 하고 긴 생성 요청을 직접 기다리지 않는다.
-
-완료 기준:
-
-- 브라우저가 닫혀도 job 상태가 남는다.
-- 이미지 일부 실패 시 성공 asset은 유지되고 실패 asset만 재시도할 수 있다.
-- 생성 완료 후 교사 검토 모달이 자동으로 최신 콘텐츠를 다시 읽는다.
+- 지금 job 실행은 FastAPI background task 기반이다. 운영에서는 별도 durable worker/queue로 승격할 수 있다.
 
 ### 완료. 학생등록 프론트 연결
 
@@ -198,7 +190,7 @@ backend/generated/assets/students/{studentId}/{contentId}/{assetId}.mp3
 
 - `frontend/lib/api/contracts.ts`와 `backend/app/domain/schemas.py`의 신규 학생등록 계약 동기화.
 - `docs/API.md`에 학생등록 payload 예시 추가.
-- asset generation job 전환 후 기존 `generate-package` API는 deprecated 또는 내부 호환 endpoint로 정리.
+- asset generation job 계약은 `frontend/lib/api/contracts.ts`와 `docs/API.md`에 반영됨. P2에서는 최종 E2E 기준으로 남은 field/상태명을 다시 정리한다.
 
 ### P2. E2E 회귀 테스트
 
@@ -224,15 +216,14 @@ backend/generated/assets/students/{studentId}/{contentId}/{assetId}.mp3
 | 콘텐츠 agent | `backend/app/api/routes/ai.py` | MissionContent 전체 생성과 전체 retry | stage별 draft와 부분 repair |
 | 품질 검수 | `backend/app/services/content_quality.py` | 탈락 조건 중심 | 작성 전 품질 기준으로 이동 |
 | 이미지 prompt | `backend/app/api/routes/contents.py` | deterministic으로 개선됨 | 앞단 visual spec 품질 강화 |
-| 이미지 생성 | `backend/app/api/routes/contents.py` | 5장 병렬이어도 가장 느린 이미지에 묶임 | background job과 partial retry |
+| 이미지 생성 | `backend/app/api/routes/contents.py` | background job과 partial retry는 연결됨 | 운영 queue와 provider 재시도 정책 고도화 |
 | 음성 생성 | `backend/app/ai/elevenlabs_provider.py` | 속도 병목은 작음 | sourceText 품질과 speed 테스트 |
 | 검토/승인 | `backend/app/services/store.py` | asset 실패 시 상태 설명이 거칠다 | asset job 상태 UI 추가 |
 | 학생 runtime | `backend/app/api/routes/student.py` | preview/published 경계 혼동 가능 | URL/상태 분리 |
 
 ## 다음 커밋 추천 순서
 
-1. `feat : asset 생성 job 상태 분리`
-2. `fix : 콘텐츠 생성 stage draft 구조화`
-3. `fix : 검토 preview 템플릿별 프레임 안정화`
-4. `test : 교사 생성부터 학생 완료까지 e2e 추가`
-5. `docs : 공유 DB와 asset 기준 갱신`
+1. `fix : 콘텐츠 생성 stage draft 구조화`
+2. `fix : 검토 preview 템플릿별 프레임 안정화`
+3. `test : 교사 생성부터 학생 완료까지 e2e 추가`
+4. `docs : 공유 DB와 asset 기준 갱신`

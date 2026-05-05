@@ -24,3 +24,15 @@ export function createContentGeneration(payload: ContentGenerationRequest, optio
 export function generateContentAssetPackage(contentId: string, options?: ApiAdapterOptions & { source?: ApiDataSource }) {
   return getApiAdapter(options?.source).generateContentAssetPackage(contentId, options);
 }
+
+export function createContentAssetGenerationJob(contentId: string, options?: ApiAdapterOptions & { source?: ApiDataSource }) {
+  return getApiAdapter(options?.source).createContentAssetGenerationJob(contentId, options);
+}
+
+export function getContentAssetGenerationJob(
+  contentId: string,
+  jobId: string,
+  options?: ApiAdapterOptions & { source?: ApiDataSource },
+) {
+  return getApiAdapter(options?.source).getContentAssetGenerationJob(contentId, jobId, options);
+}
