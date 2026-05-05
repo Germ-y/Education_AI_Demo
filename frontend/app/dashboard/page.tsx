@@ -489,8 +489,12 @@ function findPendingGenerationContent(job: PendingGenerationJob, caseFile?: Stud
   return caseFile.recentContents.find((content) => content.id === job.contentId) ?? null;
 }
 
+function isPendingGenerationContentUsable(content: MissionContent | null): content is MissionContent {
+  return content !== null && content.status === "teacher_review";
+}
+
 function isPendingGenerationContentComplete(content: MissionContent | null): content is MissionContent {
-  return content !== null && !hasMissingGeneratedMedia(content);
+  return isPendingGenerationContentUsable(content) && !hasMissingGeneratedMedia(content);
 }
 
 function describeMissionStatus(status: MissionContent["status"]) {
@@ -753,7 +757,7 @@ export default function DashboardPage() {
             const contentId = getGeneratedContentId(run);
             if (!contentId) continue;
             const content = await getReviewableContent(contentId).catch(() => null);
-            if (content && hasMissingGeneratedMedia(content)) {
+            if (isPendingGenerationContentUsable(content) && hasMissingGeneratedMedia(content)) {
               restorableRun = run;
               break;
             }
@@ -1127,6 +1131,10 @@ export default function DashboardPage() {
       }
 
       const localContent = findPendingGenerationContent(assetJob, activeCaseFile);
+      if (localContent && !isPendingGenerationContentUsable(localContent)) {
+        failJob("이 자료는 이미 사용 안 함 상태라 생성 이어가기를 중단했습니다. 새 자료 제안을 다시 실행해 주세요.");
+        return;
+      }
       if (isPendingGenerationContentComplete(localContent)) {
         completeJob(localContent);
         return;
@@ -1134,6 +1142,10 @@ export default function DashboardPage() {
 
       setRunningMessage("이미지와 음성 asset을 연결하는 중입니다.");
       let generatedContent = await getReviewableContent(assetJob.contentId);
+      if (!isPendingGenerationContentUsable(generatedContent)) {
+        failJob("이 자료는 이미 사용 안 함 상태라 생성 이어가기를 중단했습니다. 새 자료 제안을 다시 실행해 주세요.");
+        return;
+      }
       if (!hasMissingGeneratedMedia(generatedContent)) {
         completeJob(generatedContent);
         return;
@@ -1300,6 +1312,10 @@ export default function DashboardPage() {
 
       setRunningMessage("이미지와 음성 asset을 연결하는 중입니다.");
       let generatedContent = await getReviewableContent(job.contentId);
+      if (!isPendingGenerationContentUsable(generatedContent)) {
+        failJob("이 자료는 이미 사용 안 함 상태라 생성 이어가기를 중단했습니다. 새 자료 제안을 다시 실행해 주세요.");
+        return;
+      }
       let assetGenerationErrorMessage: string | null = null;
       try {
         const assetPackage = await generateContentAssetPackage(generatedContent.id);

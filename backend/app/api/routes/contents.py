@@ -14,7 +14,7 @@ from app.ai.provider_errors import AiProviderError
 from app.api.deps import get_store, require_teacher
 from app.api.response import ok
 from app.core.config import get_settings
-from app.domain.enums import AssetRole, AssetType
+from app.domain.enums import AssetRole, AssetType, MissionStatus
 from app.domain.schemas import ContentApprovalRequest, ContentRejectRequest, ContentReviewUpdateRequest
 from app.services.store import DemoStore, SessionPrincipal
 
@@ -133,6 +133,7 @@ def generate_content_asset(
     content = demo_store.get_mission_for_teacher(content_id, teacher_id=principal.id if principal.role == "teacher" else None)
     if content is None:
         raise HTTPException(status_code=404, detail={"code": "CONTENT_NOT_FOUND", "message": "콘텐츠를 찾을 수 없습니다."})
+    _ensure_asset_generation_allowed(content)
     asset = next((candidate for candidate in content.assets if candidate.id == asset_id), None)
     if asset is None:
         raise HTTPException(status_code=404, detail={"code": "ASSET_NOT_FOUND", "message": "생성할 asset을 찾을 수 없습니다."})
@@ -162,6 +163,7 @@ def generate_content_asset_package(
     content = demo_store.get_mission_for_teacher(content_id, teacher_id=principal.id if principal.role == "teacher" else None)
     if content is None:
         raise HTTPException(status_code=404, detail={"code": "CONTENT_NOT_FOUND", "message": "콘텐츠를 찾을 수 없습니다."})
+    _ensure_asset_generation_allowed(content)
 
     _validate_required_asset_package(content)
     _preflight_provider_keys(content)
@@ -220,6 +222,18 @@ def generate_content_asset_package(
         time.perf_counter() - package_started_at,
     )
     return ok({"contentId": content.id, "generatedCount": len(generated), "assets": generated})
+
+
+def _ensure_asset_generation_allowed(content) -> None:
+    if content.status in {MissionStatus.REVISION_REQUESTED, MissionStatus.ARCHIVED}:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "CONTENT_ASSET_GENERATION_NOT_ALLOWED",
+                "message": "사용 안 함 또는 보관 상태의 콘텐츠는 이미지와 음성을 생성할 수 없습니다.",
+                "details": {"contentId": content.id, "status": content.status},
+            },
+        )
 
 
 @router.post("/{content_id}/stages/{stage_id}/preview-realtime-session")
