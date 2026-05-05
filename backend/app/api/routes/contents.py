@@ -488,7 +488,7 @@ def _refresh_image_prompts_or_raise(content) -> None:
     logger.info("contents.image_brief.started content_id=%s image_asset_count=%s", content.id, len(image_assets))
     try:
         output_json, _ = OpenAiProvider(settings).create_json_response(
-            model=settings.openai_reasoning_model,
+            model=settings.openai_image_brief_model,
             instructions=load_prompt("image_brief"),
             input_snapshot=_image_brief_input_snapshot(content, image_assets),
         )

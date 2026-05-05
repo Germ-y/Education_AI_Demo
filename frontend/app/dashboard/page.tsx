@@ -722,27 +722,6 @@ export default function DashboardPage() {
   }, [pendingGenerationJobs]);
 
   useEffect(() => {
-    const failedCaseIds = Object.entries(generationStatuses)
-      .filter(([, status]) => status.state === "failed")
-      .map(([caseId]) => caseId);
-    if (failedCaseIds.length === 0) return;
-
-    const timer = window.setTimeout(() => {
-      setGenerationStatuses((current) => {
-        const next = { ...current };
-        failedCaseIds.forEach((caseId) => {
-          if (next[caseId]?.state === "failed") {
-            delete next[caseId];
-          }
-        });
-        return next;
-      });
-    }, 7000);
-
-    return () => window.clearTimeout(timer);
-  }, [generationStatuses]);
-
-  useEffect(() => {
     if (!selectedStudentId) return;
 
     let ignore = false;

@@ -50,7 +50,7 @@ def create_orchestrator_run(
         prompt_version=spec.version,
         output_schema_name=spec.output_schema_name,
         input_snapshot=input_snapshot,
-        model=settings.openai_reasoning_model,
+        model=settings.openai_orchestrator_model,
     )
     logger.info(
         "ai.orchestrator.queued run_id=%s student_id=%s case_id=%s content_type=%s goal=%r",
@@ -118,7 +118,7 @@ def create_content_generation(
         prompt_version=spec.version,
         output_schema_name=spec.output_schema_name,
         input_snapshot=input_snapshot,
-        model=settings.openai_reasoning_model,
+        model=settings.openai_content_model,
     )
     logger.info(
         "ai.content.queued run_id=%s student_id=%s case_id=%s orchestrator_run_id=%s",
@@ -196,9 +196,10 @@ def _run_orchestrator_agent(
     )
     try:
         output_json, token_usage = OpenAiProvider(settings).create_json_response(
-            model=settings.openai_reasoning_model,
+            model=settings.openai_orchestrator_model,
             instructions=load_prompt("orchestrator_plan"),
             input_snapshot=input_snapshot,
+            timeout_sec=settings.openai_orchestrator_timeout_sec,
         )
         validate_orchestrator_plan_quality(
             output_json,
@@ -392,9 +393,10 @@ def _generate_valid_mission_content(
             MAX_CONTENT_GENERATION_ATTEMPTS,
         )
         output_json, token_usage = provider.create_json_response(
-            model=settings.openai_reasoning_model,
+            model=settings.openai_content_model,
             instructions=instructions,
             input_snapshot=generation_snapshot,
+            timeout_sec=settings.openai_content_timeout_sec,
         )
         logger.info(
             "ai.content.attempt_model_returned student_id=%s case_id=%s attempt=%s elapsed_sec=%.1f",
@@ -408,15 +410,16 @@ def _generate_valid_mission_content(
         try:
             mission = _mission_from_generation(output_json, student_id=student_id, case_id=case_id)
             validate_mission_content_quality(mission, case_file=case_file, orchestrator_plan=orchestrator_plan)
-            critique = _critique_mission_content_quality(
-                provider=provider,
-                settings=settings,
-                case_file=case_file,
-                orchestrator_plan=orchestrator_plan,
-                mission=mission,
-            )
-            if critique["verdict"] != "pass":
-                raise ContentQualityError(_critique_issues(critique))
+            if settings.openai_content_critique_enabled:
+                critique = _critique_mission_content_quality(
+                    provider=provider,
+                    settings=settings,
+                    case_file=case_file,
+                    orchestrator_plan=orchestrator_plan,
+                    mission=mission,
+                )
+                if critique["verdict"] != "pass":
+                    raise ContentQualityError(_critique_issues(critique))
             logger.info(
                 "ai.content.attempt_validated student_id=%s case_id=%s attempt=%s content_id=%s",
                 student_id,
@@ -474,13 +477,14 @@ def _critique_mission_content_quality(
     mission: MissionContent,
 ) -> dict[str, Any]:
     output_json, _ = provider.create_json_response(
-        model=settings.openai_reasoning_model,
+        model=settings.openai_critique_model,
         instructions=load_prompt("content_quality_critique"),
         input_snapshot={
             "caseFile": case_file,
             "orchestratorPlan": orchestrator_plan,
             "missionContent": mission.model_dump(by_alias=True),
         },
+        timeout_sec=settings.openai_critique_timeout_sec,
     )
     verdict = output_json.get("verdict")
     if verdict not in {"pass", "repair"}:
