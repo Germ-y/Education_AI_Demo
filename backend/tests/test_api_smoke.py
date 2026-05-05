@@ -51,6 +51,137 @@ def assert_no_teacher_raw_terms(payload: object) -> None:
             assert_no_teacher_raw_terms(value)
 
 
+def _pizza_scenario_spine() -> dict:
+    return {
+        "situation": "피자 조각 그림을 보고 전체와 부분을 구분합니다.",
+        "studentTask": "전체 조각 수와 고른 조각 수를 차례로 말합니다.",
+        "learningOrBehaviorTarget": "분모와 분자의 의미 연결",
+        "evidenceSource": "네 조각으로 나뉜 피자 그림",
+        "commonMistakeOrImpulse": "고른 조각만 보고 전체 수를 놓칠 수 있습니다.",
+        "whyThisMatters": "전체와 부분을 함께 말해야 분수 의미를 일상 그림에 연결할 수 있습니다.",
+        "studentLikelyImpulseOrMisconception": "고른 한 조각만 보고 전체 네 조각을 빠뜨릴 수 있습니다.",
+        "stage2FirstSuccess": "전체 네 조각을 먼저 세며 성공 경험을 만듭니다.",
+        "stage3Transfer": "고른 한 조각과 전체 네 조각을 빈칸 문장으로 옮깁니다.",
+        "stage4Reuse": "왜 1/4인지 전체와 부분을 넣어 설명합니다.",
+    }
+
+
+def _pizza_stage_visual_specs() -> list[dict]:
+    return [
+        {
+            "assetRole": "hero",
+            "step": 0,
+            "visualPurpose": "전체와 부분을 배울 피자 조각 장면을 소개합니다.",
+            "sceneSummary": "네 조각 피자가 놓인 책상 장면",
+            "primaryEvidenceObject": "네 조각 피자",
+            "evidenceLocation": "책상 가운데 네 조각 피자 경계",
+            "mustShow": ["네 조각 피자"],
+            "allowedSceneText": [],
+            "doNotRenderText": ["문제", "선택지", "정답", "힌트"],
+            "composition": "피자 조각이 중심에 크게 보입니다.",
+        },
+        {
+            "assetRole": "stage_1",
+            "step": 1,
+            "visualPurpose": "전체 피자가 몇 조각인지 확인하게 합니다.",
+            "sceneSummary": "네 조각으로 나뉜 피자 전체",
+            "primaryEvidenceObject": "전체 피자",
+            "evidenceLocation": "화면 중심의 전체 피자 조각 경계",
+            "mustShow": ["네 조각", "전체 피자"],
+            "allowedSceneText": [],
+            "doNotRenderText": ["문제", "선택지", "정답", "힌트"],
+            "composition": "전체 피자 윤곽이 한눈에 보입니다.",
+        },
+        {
+            "assetRole": "stage_2",
+            "step": 2,
+            "visualPurpose": "전체 조각 수를 세는 근거를 보여줍니다.",
+            "sceneSummary": "네 조각 피자 중 한 조각이 살짝 강조된 장면",
+            "primaryEvidenceObject": "네 조각 피자",
+            "evidenceLocation": "강조된 한 조각 주변의 네 조각 경계",
+            "mustShow": ["네 조각", "한 조각 강조"],
+            "allowedSceneText": [],
+            "doNotRenderText": ["전체는 몇 조각인가요?", "1개", "2개", "4개", "정답"],
+            "composition": "조각 경계가 분명하게 보입니다.",
+        },
+        {
+            "assetRole": "stage_3",
+            "step": 3,
+            "visualPurpose": "고른 조각과 전체 조각을 연결해 분수로 말하게 합니다.",
+            "sceneSummary": "고른 한 조각과 전체 네 조각이 함께 보이는 장면",
+            "primaryEvidenceObject": "강조된 한 조각",
+            "evidenceLocation": "왼쪽의 한 조각과 오른쪽의 전체 네 조각 비교 위치",
+            "mustShow": ["한 조각", "네 조각 전체"],
+            "allowedSceneText": [],
+            "doNotRenderText": ["분수", "빈칸", "정답", "힌트"],
+            "composition": "한 조각과 전체가 동시에 비교됩니다.",
+        },
+        {
+            "assetRole": "stage_4_realtime",
+            "step": 4,
+            "visualPurpose": "학생이 전체와 부분을 말로 설명하는 상황을 준비합니다.",
+            "sceneSummary": "피자 조각을 보며 설명을 준비하는 책상 장면",
+            "primaryEvidenceObject": "피자 조각 그림",
+            "evidenceLocation": "설명 카드 옆 피자 조각 그림",
+            "mustShow": ["피자 조각 그림"],
+            "allowedSceneText": [],
+            "doNotRenderText": ["말하기 정답", "힌트", "채점"],
+            "composition": "설명할 그림이 중심에 있고 사람은 손 정도만 보입니다.",
+        },
+    ]
+
+
+def _generated_learning_focus_content_payload(student_id: str, case_id: str) -> dict:
+    seed = create_demo_database()
+    base_content = next(content for content in seed.mission_contents if content.student_id == "student_learning_fraction")
+    generated_content = base_content.model_dump(by_alias=True)
+    generated_content["studentId"] = student_id
+    generated_content["caseId"] = case_id
+    generated_content["status"] = "teacher_review"
+    generated_content["approvedByUserId"] = None
+    generated_content["approvedAt"] = None
+    generated_content["publishedAt"] = None
+    generated_content["briefJson"] = {
+        **generated_content.get("briefJson", {}),
+        "difficulty": "기초",
+        "scenarioSpine": _pizza_scenario_spine(),
+        "stageVisualSpecs": _pizza_stage_visual_specs(),
+    }
+    for asset in generated_content["assets"]:
+        asset["storageUrl"] = ""
+        asset["previewUrl"] = None
+        asset["qaStatus"] = "pending"
+        asset["approvalStatus"] = "pending"
+        if asset["assetType"] == "image":
+            asset["promptJson"] = {
+                "prompt": (
+                    f"{asset['assetRole']} 장면. 따뜻한 교실 책상 위 피자 조각과 전체-부분 근거만 보여줍니다. "
+                    "문제 문장, 선택지, 정답, 버튼, 말풍선, 학습지 UI 텍스트는 넣지 않습니다."
+                ),
+                "textRenderingPolicy": "scene_only_no_problem_text",
+            }
+    return generated_content
+
+
+def _correct_answer_for_stage(stage: dict) -> dict:
+    template = stage["templateJson"]
+    expected = template.get("answer")
+    if isinstance(expected, str):
+        return {"choiceId": expected}
+    if isinstance(expected, dict):
+        return {"matches": expected}
+    if isinstance(expected, list):
+        return {"order": expected}
+    if isinstance(template.get("matches"), dict):
+        return {"matches": template["matches"]}
+    if isinstance(template.get("answerOrder"), list):
+        return {"order": template["answerOrder"]}
+    if isinstance(template.get("acceptedAnswers"), list) and template["acceptedAnswers"]:
+        accepted = template["acceptedAnswers"][0]
+        return accepted if isinstance(accepted, dict) else {"answer": accepted}
+    return {"acknowledged": True}
+
+
 def test_teacher_and_student_demo_flows() -> None:
     client = TestClient(create_app())
 
@@ -641,6 +772,367 @@ def test_asset_generation_job_persists_partial_failure_and_retries(monkeypatch, 
 
     reviewable_after_retry = client.get(f"/api/contents/{content_id}")
     assert all(asset["qaStatus"] == "passed" for asset in reviewable_after_retry.json()["data"]["assets"])
+
+
+def test_registered_student_generation_review_student_completion_e2e(monkeypatch, tmp_path) -> None:
+    os.environ["NEIS_API_KEY"] = "test-neis-key"
+    os.environ["OPENAI_API_KEY"] = "test-openai-key"
+    os.environ["ELEVENLABS_API_KEY"] = "test-elevenlabs-key"
+    os.environ["ELEVENLABS_VOICE_ID"] = "test-voice-id"
+    os.environ["GENERATED_ASSETS_DIR"] = str(tmp_path / "generated")
+    get_settings.cache_clear()
+
+    def fake_search_schools(self, *, office_code, school_name=None, school_code=None):
+        assert office_code == "R10"
+        assert school_name == "풍기초등학교" or school_code == "8888001"
+        return [
+            {
+                "id": "school_8888001",
+                "officeCode": "R10",
+                "schoolCode": "8888001",
+                "schoolName": "풍기초등학교",
+                "schoolKind": "초등학교",
+                "regionName": "경상북도 영주시",
+                "roadAddress": "경상북도 영주시 풍기로 1",
+                "sourceCode": "neis_open_api",
+            }
+        ]
+
+    monkeypatch.setattr(NeisClient, "search_schools", fake_search_schools)
+
+    client = TestClient(create_app())
+    teacher_login = client.post(
+        "/api/auth/demo-login",
+        json={"role": "teacher", "email": "teacher.demo@eduyj.local"},
+    )
+    assert teacher_login.status_code == 200
+    teacher_token = teacher_login.json()["data"]["session"]["accessToken"]
+    teacher_headers = {"authorization": f"Bearer {teacher_token}"}
+
+    dashboard = client.get("/api/teacher/students", headers=teacher_headers)
+    assert dashboard.status_code == 200
+    assert len(dashboard.json()["data"]) == 3
+
+    school_search = client.get(
+        "/api/public-data/schools/search?q=풍기초등학교&officeCode=R10",
+        headers=teacher_headers,
+    )
+    assert school_search.status_code == 200
+    assert school_search.json()["data"]["schools"][0]["schoolCode"] == "8888001"
+
+    created_student = client.post(
+        "/api/teacher/students",
+        headers=teacher_headers,
+        json={
+            "displayName": "최하늘",
+            "schoolCode": "8888001",
+            "schoolName": "풍기초등학교",
+            "officeCode": "R10",
+            "grade": "초4",
+            "gradeNumber": "4",
+            "className": "1",
+            "studentType": "learning_focus",
+            "currentGoal": "피자 그림에서 전체와 부분을 보고 분수로 말하기",
+            "observationNote": "그림 단서가 있으면 먼저 손으로 가리키며 반응합니다.",
+            "strengths": ["그림 단서를 잘 찾음"],
+            "weaknesses": ["긴 문장 지시가 부담됨"],
+            "preferredSupports": ["그림 카드", "2개 선택지"],
+        },
+    )
+    assert created_student.status_code == 200, created_student.json()
+    registration = created_student.json()["data"]
+    assert registration["created"] is True
+    access_code = registration["accessCode"]
+    student_id = registration["student"]["profile"]["id"]
+    case_id = registration["student"]["openCase"]["id"]
+    assert registration["student"]["contextBundle"]["caseSummary"]["caseId"] == case_id
+
+    registered_list = client.get("/api/teacher/students?q=최하늘", headers=teacher_headers)
+    assert registered_list.status_code == 200
+    assert registered_list.json()["data"][0]["studentId"] == student_id
+    registered_detail = client.get(f"/api/teacher/students/{student_id}", headers=teacher_headers)
+    assert registered_detail.status_code == 200
+    assert registered_detail.json()["data"]["recentContents"] == []
+    context_bundle = client.get(f"/api/teacher/students/{student_id}/context-bundle", headers=teacher_headers)
+    assert context_bundle.status_code == 200
+    assert context_bundle.json()["data"]["student"]["displayName"] == "최하늘"
+
+    scenario_spine = _pizza_scenario_spine()
+    stage_visual_specs = _pizza_stage_visual_specs()
+    generated_content = _generated_learning_focus_content_payload(student_id, case_id)
+    content_generation_calls = {"count": 0}
+
+    def fake_json_response(self, *, model, instructions, input_snapshot, timeout_sec=90):
+        if "Content Quality Critic" in instructions:
+            return (
+                {
+                    "critiqueVersion": "content_quality_critique_v1",
+                    "verdict": "pass",
+                    "issues": [],
+                    "repairInstruction": "",
+                },
+                {"input_tokens": 4, "output_tokens": 4},
+            )
+        if "MissionContent" in instructions:
+            content_generation_calls["count"] += 1
+            assert input_snapshot["studentId"] == student_id
+            assert input_snapshot["caseId"] == case_id
+            assert input_snapshot["generationPlan"]["unitVersion"] == "content_generation_units_v1"
+            assert len(input_snapshot["generationPlan"]["stagePlans"]) == 4
+            assert len(input_snapshot["generationPlan"]["visualSpecDrafts"]) == 5
+            return copy.deepcopy(generated_content), {"input_tokens": 12, "output_tokens": 24}
+        return (
+            {
+                "planVersion": "orchestrator_plan_v1",
+                "studentId": student_id,
+                "caseId": case_id,
+                "contentType": "learning_focus",
+                "sessionGoal": input_snapshot["requestedGoal"],
+                "targetSkill": "분모와 분자의 의미 연결",
+                "difficultyPolicy": {"level": "easy_success", "reason": "시각 자료로 쉬운 성공 경험부터 시작합니다."},
+                "selectedStrategy": ["짧은 시각 설명", "말로 설명하기"],
+                "scenarioSpine": scenario_spine,
+                "stagePlan": [
+                    {
+                        "step": 1,
+                        "stageRole": "concept_intro",
+                        "templateType": "concept_intro",
+                        "studentTitle": "개념 열기",
+                        "purpose": "전체와 부분을 그림으로 확인합니다.",
+                        "templateRationale": "개념 소개 화면이 전체와 부분 용어를 부담 없이 열 수 있습니다.",
+                    },
+                    {
+                        "step": 2,
+                        "stageRole": "basic_problem",
+                        "templateType": "partition_picker",
+                        "studentTitle": "문제 1",
+                        "purpose": "전체 조각 수를 먼저 세게 합니다.",
+                        "templateRationale": "partition_picker가 전체 조각을 손으로 확인하는 첫 성공에 맞습니다.",
+                    },
+                    {
+                        "step": 3,
+                        "stageRole": "applied_problem",
+                        "templateType": "blank_fill",
+                        "studentTitle": "문제 2",
+                        "purpose": "고른 수와 전체 수를 분수 자리에 연결합니다.",
+                        "templateRationale": "blank_fill이 전체와 부분을 문장으로 옮기는 전이에 맞습니다.",
+                    },
+                    {
+                        "step": 4,
+                        "stageRole": "realtime_practice",
+                        "templateType": "realtime_teach_back",
+                        "studentTitle": "설명해보기",
+                        "purpose": "왜 1/4인지 짧게 말해봅니다.",
+                        "templateRationale": "말로 설명하기 활동이 같은 근거를 다시 사용하게 합니다.",
+                    },
+                ],
+                "imagePackageIntent": [
+                    {"assetRole": "hero", "scenePurpose": "시작 장면", "mustShow": ["피자 조각"], "mustNotShow": ["문제 문장"]},
+                    {"assetRole": "stage_1", "scenePurpose": "전체 확인", "mustShow": ["전체 피자"], "mustNotShow": ["문제 문장"]},
+                    {"assetRole": "stage_2", "scenePurpose": "조각 세기", "mustShow": ["네 조각"], "mustNotShow": ["문제 문장"]},
+                    {"assetRole": "stage_3", "scenePurpose": "분수 연결", "mustShow": ["한 조각 강조"], "mustNotShow": ["문제 문장"]},
+                    {"assetRole": "stage_4_realtime", "scenePurpose": "설명 상황", "mustShow": ["피자 그림"], "mustNotShow": ["문제 문장"]},
+                ],
+                "stageVisualSpecs": stage_visual_specs,
+                "ttsNarrationIntent": [
+                    {"assetRole": "hero", "voicePurpose": "시작 안내", "tone": "밝고 차분하게"},
+                    {"assetRole": "stage_1", "voicePurpose": "전체 보기", "tone": "천천히"},
+                    {"assetRole": "stage_2", "voicePurpose": "전체 세기", "tone": "차분하게"},
+                    {"assetRole": "stage_3", "voicePurpose": "분수 넣기", "tone": "차근차근"},
+                    {"assetRole": "stage_4_realtime", "voicePurpose": "말하기 준비", "tone": "안심되게"},
+                ],
+                "teacherReviewFocus": ["전체를 먼저 세는 흐름이 잘 보이는지 확인합니다."],
+                "safetyNotes": ["학생에게 진단 표현을 노출하지 않습니다."],
+            },
+            {"input_tokens": 6, "output_tokens": 9},
+        )
+
+    def fake_image_file(self, *, prompt, output_path, model, size="1536x1024", timeout_sec=180):
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"png")
+        return output_path
+
+    def fake_speech_file(self, *, source_text, output_path, timeout_sec=60):
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"mp3")
+        return output_path
+
+    def fake_realtime_client_secret(self, *, instructions, model, ttl_seconds=600, timeout_sec=30):
+        assert "전체" in instructions
+        return {"value": "test-realtime-client-secret", "expiresAt": 1893456000, "raw": {}}
+
+    monkeypatch.setattr(OpenAiProvider, "create_json_response", fake_json_response)
+    monkeypatch.setattr(OpenAiProvider, "create_image_file", fake_image_file)
+    monkeypatch.setattr(OpenAiProvider, "create_realtime_client_secret", fake_realtime_client_secret)
+    monkeypatch.setattr(ElevenLabsProvider, "create_speech_file", fake_speech_file)
+
+    orchestrator = client.post(
+        "/api/ai/orchestrator-runs",
+        headers=teacher_headers,
+        json={
+            "studentId": student_id,
+            "caseId": case_id,
+            "requestedGoal": "피자 그림에서 전체 4조각 중 1조각을 1/4로 말한다.",
+            "contentType": "learning_focus",
+        },
+    )
+    assert orchestrator.status_code == 200, orchestrator.json()
+    orchestrator_run = orchestrator.json()["data"]["agentRun"]
+    orchestrator_detail = client.get(f"/api/ai/agent-runs/{orchestrator_run['id']}", headers=teacher_headers)
+    assert orchestrator_detail.status_code == 200
+    orchestrator_run = orchestrator_detail.json()["data"]
+    assert orchestrator_run["status"] == "succeeded"
+    assert orchestrator_run["outputJson"]["scenarioSpine"]["stage4Reuse"]
+
+    content_generation = client.post(
+        "/api/ai/content-generations",
+        headers=teacher_headers,
+        json={"orchestratorRunId": orchestrator_run["id"], "studentId": student_id, "caseId": case_id},
+    )
+    assert content_generation.status_code == 200, content_generation.json()
+    content_run = content_generation.json()["data"]["agentRun"]
+    content_run_detail = client.get(f"/api/ai/agent-runs/{content_run['id']}", headers=teacher_headers)
+    assert content_run_detail.status_code == 200
+    content_run_payload = content_run_detail.json()["data"]
+    assert content_run_payload["status"] == "succeeded", content_run_payload
+    assert content_generation_calls["count"] == 1
+    content_payload = content_run_payload["outputJson"].get("missionContent", content_run_payload["outputJson"])
+    content_id = content_payload["id"]
+    assert content_id.startswith(f"content_{student_id}_")
+
+    reviewable = client.get(f"/api/contents/{content_id}", headers=teacher_headers)
+    assert reviewable.status_code == 200
+    reviewable_content = reviewable.json()["data"]
+    assert reviewable_content["status"] == "teacher_review"
+    assert reviewable_content["briefJson"]["generationUnits"]["unitVersion"] == "content_generation_units_v1"
+
+    student_login = client.post("/api/auth/student-access", json={"accessCode": access_code})
+    assert student_login.status_code == 200
+    student_token = student_login.json()["data"]["session"]["accessToken"]
+    student_headers = {"authorization": f"Bearer {student_token}"}
+    hidden_before_publish = client.get(f"/api/student/missions/{content_id}", headers=student_headers)
+    assert hidden_before_publish.status_code == 404
+
+    asset_job = client.post(f"/api/contents/{content_id}/assets/generation-jobs", headers=teacher_headers)
+    assert asset_job.status_code == 200, asset_job.json()
+    asset_job_id = asset_job.json()["data"]["jobId"]
+    asset_job_status = client.get(f"/api/contents/{content_id}/assets/generation-jobs/{asset_job_id}", headers=teacher_headers)
+    assert asset_job_status.status_code == 200
+    asset_job_payload = asset_job_status.json()["data"]
+    assert asset_job_payload["status"] == "succeeded"
+    assert asset_job_payload["generatedCount"] == 10
+    expected_asset_prefix = f"/generated/assets/students/{student_id}/{content_id}/"
+    assert all(asset.get("storageUrl", "").startswith(expected_asset_prefix) for asset in asset_job_payload["assets"])
+
+    content_after_assets = client.get(f"/api/contents/{content_id}", headers=teacher_headers).json()["data"]
+    stage4 = next(stage for stage in content_after_assets["stages"] if stage["step"] == 4)
+    preview_realtime = client.post(
+        f"/api/contents/{content_id}/stages/{stage4['id']}/preview-realtime-session",
+        headers=teacher_headers,
+    )
+    assert preview_realtime.status_code == 200, preview_realtime.json()
+    assert preview_realtime.json()["data"]["clientSecret"] == "test-realtime-client-secret"
+    assert preview_realtime.json()["data"]["practiceSpec"]["imageAssetUrl"].startswith(expected_asset_prefix)
+
+    approve = client.post(
+        f"/api/contents/{content_id}/approve",
+        headers=teacher_headers,
+        json={
+            "approvedStageIds": [stage["id"] for stage in content_after_assets["stages"]],
+            "approvedAssetIds": [asset["id"] for asset in content_after_assets["assets"]],
+            "reviewNote": "등록 학생용 E2E 검수 완료",
+        },
+    )
+    assert approve.status_code == 200, approve.json()
+    assert approve.json()["data"]["status"] == "approved"
+    publish = client.post(f"/api/contents/{content_id}/publish", headers=teacher_headers)
+    assert publish.status_code == 200, publish.json()
+    assert publish.json()["data"]["status"] == "published"
+
+    students_after_publish = client.get("/api/teacher/students?q=최하늘", headers=teacher_headers)
+    assert students_after_publish.status_code == 200
+    assert students_after_publish.json()["data"][0]["dashboardStage"] == "learning"
+    today = client.get("/api/student/missions/today", headers=student_headers)
+    assert today.status_code == 200
+    assert [mission["contentId"] for mission in today.json()["data"]] == [content_id]
+    mission_detail = client.get(f"/api/student/missions/{content_id}", headers=student_headers)
+    assert mission_detail.status_code == 200
+    mission = mission_detail.json()["data"]
+    assert mission["status"] == "published"
+    assert [stage["step"] for stage in mission["stages"]] == [1, 2, 3, 4]
+
+    started = client.post(f"/api/student/missions/{content_id}/start", headers=student_headers)
+    assert started.status_code == 200
+    attempt_id = started.json()["data"]["id"]
+    entered = client.post(
+        f"/api/student/missions/{content_id}/events",
+        headers=student_headers,
+        json={"attemptId": attempt_id, "stageId": mission["stages"][0]["id"], "eventType": "stage_entered", "payloadJson": {"step": 1}},
+    )
+    assert entered.status_code == 200
+
+    for stage in mission["stages"][:3]:
+        submitted = client.post(
+            f"/api/student/missions/{content_id}/stages/{stage['id']}/submit",
+            headers=student_headers,
+            json={"attemptId": attempt_id, "answer": _correct_answer_for_stage(stage)},
+        )
+        assert submitted.status_code == 200, submitted.json()
+        assert submitted.json()["data"]["nextStep"] == min(4, stage["step"] + 1)
+
+    realtime = client.post(
+        f"/api/student/missions/{content_id}/stages/{stage4['id']}/realtime-session",
+        headers=student_headers,
+        json={"attemptId": attempt_id},
+    )
+    assert realtime.status_code == 200, realtime.json()
+    realtime_payload = realtime.json()["data"]
+    assert realtime_payload["clientSecret"] == "test-realtime-client-secret"
+    assert realtime_payload["practiceSpec"]["openingAudioUrl"].startswith(expected_asset_prefix)
+
+    realtime_event = client.post(
+        f"/api/student/realtime-sessions/{realtime_payload['sessionId']}/events",
+        headers=student_headers,
+        json={"eventType": "student_transcript", "payloadJson": {"text": "전체 4조각 중 1조각이라서 1/4이에요."}},
+    )
+    assert realtime_event.status_code == 200
+    realtime_complete = client.post(
+        f"/api/student/realtime-sessions/{realtime_payload['sessionId']}/complete",
+        headers=student_headers,
+        json={
+            "turnCount": 2,
+            "durationSec": 28,
+            "rubricResult": {"usesEvidence": True, "needsTeacherReview": False},
+            "transcriptSummary": "학생이 전체 4조각과 고른 1조각을 연결해 설명했습니다.",
+        },
+    )
+    assert realtime_complete.status_code == 200
+    assert realtime_complete.json()["data"]["status"] == "completed"
+
+    reflection = client.post(
+        f"/api/student/missions/{content_id}/post-practice-reflection",
+        headers=student_headers,
+        json={"attemptId": attempt_id, "reflectionChoice": "잘 말했어요", "shortText": "전체를 먼저 세니 쉬웠어요."},
+    )
+    assert reflection.status_code == 200
+    completed = client.post(
+        f"/api/student/missions/{content_id}/complete",
+        headers=student_headers,
+        json={"attemptId": attempt_id},
+    )
+    assert completed.status_code == 200
+    assert completed.json()["data"]["status"] == "completed"
+
+    report = client.get(f"/api/teacher/students/{student_id}/report", headers=teacher_headers)
+    assert report.status_code == 200
+    latest_report = report.json()["data"]["reports"][0]
+    assert latest_report["contentId"] == content_id
+    assert latest_report["attemptId"] == attempt_id
+    assert latest_report["answerCount"] == 3
+    assert latest_report["realtimeTranscriptSummary"] == "학생이 전체 4조각과 고른 1조각을 연결해 설명했습니다."
+    students_after_complete = client.get("/api/teacher/students?q=최하늘", headers=teacher_headers)
+    assert students_after_complete.status_code == 200
+    assert students_after_complete.json()["data"][0]["dashboardStage"] == "feedback"
 
 
 def test_completed_mission_stays_completed_after_restart() -> None:

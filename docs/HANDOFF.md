@@ -26,6 +26,7 @@ API/프론트 계약은 `docs/API.md`의 계약 기준 표와 `frontend/lib/api/
 - 학생 preview의 카드매칭, 순서배열, blank fill 템플릿은 고정 캔버스 안에서 자체 높이/스크롤을 갖는다.
 - 검토 모달에서 이미지/음성 asset이 준비되지 않은 자료는 `사용 승인`과 `수업에 적용하기`가 막힌다.
 - 학생 화면에서 다음 단계로 이동하면 URL의 `step` query가 함께 갱신된다.
+- `backend/tests/test_api_smoke.py::test_registered_student_generation_review_student_completion_e2e`는 교사 대시보드 진입, NEIS 학교검색, 학생등록, context bundle, 등록 학생 콘텐츠 생성, background asset job, 교사 realtime preview, 승인/배포, 학생 완료, 교사 리포트 반영까지 API E2E로 검증한다.
 - 교사 메모는 `POST /api/teacher/students/{studentId}/notes`로 저장되고, 새로고침 후에도 최근 메모가 복원된다.
 - 교사 학습 기록 리포트는 `session` note로 저장되고, `POST /api/review-summaries/{reviewId}/apply-to-memory`로 메모리에 반영된다.
 - `GET /api/public-data/schools/search`는 실제 NEIS `schoolInfo` 조회로 학교를 검색하고 캐시에 저장한다.
@@ -156,6 +157,7 @@ Backend:
 cd backend
 .venv/bin/ruff check app tests
 .venv/bin/python -m pytest
+.venv/bin/python -m pytest tests/test_api_smoke.py::test_registered_student_generation_review_student_completion_e2e
 DATABASE_URL=sqlite+pysqlite:///./data/eduyj_demo.db .venv/bin/python -m app.data.seed_demo
 ```
 
@@ -179,5 +181,5 @@ git diff --check
 
 최우선:
 
-1. 교사 승인부터 학생 완료, 교사 리포트 확인까지 E2E 회귀 테스트 추가
+1. 최종 push 전 전체 검증과 브라우저 핵심 플로우 확인
 2. 최종 push 전 DB/generated asset 공유 기준 확정 여부 재확인

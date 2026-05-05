@@ -6,17 +6,17 @@
 
 ## 현재 완성도
 
-전체 완성도는 약 72%로 본다.
+전체 완성도는 약 86%로 본다.
 
 | 영역 | 완성도 | 판단 |
 | --- | ---: | --- |
-| 교사 대시보드 데이터 연결 | 75% | seed 학생, context bundle, 리포트, 콘텐츠 상태는 연결됨. 학생등록 UI와 생성 job 상태 UX가 남음. |
+| 교사 대시보드 데이터 연결 | 88% | seed/등록 학생, context bundle, 리포트, 콘텐츠 상태가 연결됨. 최종 브라우저 통합 확인만 남음. |
 | 백엔드 API 기반 | 82% | 교사/학생/콘텐츠/공공데이터/NEIS 학교검색/학생등록 백엔드가 있음. 운영 migration과 job queue는 미완성. |
-| 콘텐츠 생성 품질 | 76% | scenario/stage/visual unit과 작성 전 설계 필드가 검증됨. 실제 생성 샘플 반복 품질 확인은 E2E에서 남음. |
+| 콘텐츠 생성 품질 | 76% | scenario/stage/visual unit과 작성 전 설계 필드가 검증됨. 실제 provider 반복 샘플 품질 확인은 남음. |
 | 이미지/음성 asset 파이프라인 | 82% | background job 생성/polling과 asset별 성공·실패 상태 저장이 연결됨. provider 실패 UX와 운영 queue 전환이 남음. |
-| 학생 런타임/realtime | 82% | published 미션, 제출, 회고, 완료 기록은 됨. preview/runtime 경계와 WebRTC 취소/재시작 방어가 연결됨. provider 실연결 E2E가 남음. |
-| 학생등록 UX | 88% | 교사 대시보드 모달에서 학교검색, 학교 선택, 강점/약점/지원 입력, 등록 후 목록/상세 갱신과 access code 확인까지 연결됨. 브라우저 통합 회귀만 남음. |
-| 문서/인수인계 | 78% | DB dump와 generated asset 공유 기준이 정리됨. E2E 결과와 최종 push 전 상태만 갱신하면 됨. |
+| 학생 런타임/realtime | 88% | published 미션, 제출, 회고, 완료, realtime preview/runtime API 성공 경로가 E2E로 고정됨. 실제 provider 음성 송수신 확인은 남음. |
+| 학생등록 UX | 90% | 교사 대시보드 모달에서 학교검색, 학교 선택, 강점/약점/지원 입력, 등록 후 목록/상세 갱신과 access code 확인까지 연결됨. 브라우저 통합 회귀만 남음. |
+| 문서/인수인계 | 84% | DB dump와 generated asset 공유 기준, API/프론트 계약, E2E 범위가 정리됨. 최종 검증 결과만 갱신하면 됨. |
 
 ## 우선순위
 
@@ -48,7 +48,7 @@
 
 남은 확인:
 
-- 최종 E2E에서 대시보드 진입부터 실제 등록, context-bundle, 자료 생성 시작까지 브라우저로 다시 확인한다.
+- 최종 브라우저 확인에서 대시보드 진입부터 실제 등록, context-bundle, 자료 생성 시작까지 다시 확인한다.
 
 ### 완료. 콘텐츠 생성 구조를 작은 단위로 분리
 
@@ -92,7 +92,7 @@
 
 남은 확인:
 
-- 최종 E2E에서 검토 모달 4개 stage를 다시 확인한다.
+- 최종 브라우저 확인에서 검토 모달 4개 stage를 다시 확인한다.
 - 현재 로컬 DB에는 stale content mapping이 있어 대시보드 진입 시 `content_generated_001`, `content_prepared_notice_magnifier_001` 404가 찍힌다. DB/asset 정책 정리 단계에서 공유 기준 DB와 함께 정리한다.
 
 ### 완료. Realtime 안정화
@@ -110,7 +110,7 @@
 남은 확인:
 
 - 2026-05-05 브라우저 확인: provider 응답 대기 중 preview 시작 후 즉시 `연결 중단`해도 콘솔 오류 없이 대기 상태로 돌아왔다.
-- 실제 provider client secret, 마이크 권한, WebRTC 음성 송수신, 완료 저장은 최종 E2E에서 한 번 더 확인한다.
+- 실제 provider client secret, 마이크 권한, WebRTC 음성 송수신은 최종 브라우저/provider 확인에서 한 번 더 본다.
 
 ### 완료. DB dump와 generated asset 정책 정리
 
@@ -152,23 +152,21 @@ backend/generated/assets/students/{studentId}/{contentId}/{assetId}.mp3
 
 남은 확인:
 
-- 최종 E2E를 작성하면서 실제 브라우저 흐름에서 추가 field가 필요하면 이 섹션과 `docs/API.md`를 마지막으로 갱신한다.
+- 최종 브라우저 확인에서 실제 화면 흐름에 추가 field가 필요하면 이 섹션과 `docs/API.md`를 마지막으로 갱신한다.
 
-### P2. E2E 회귀 테스트
+### 완료. E2E 회귀 테스트
 
-필수 시나리오:
+현재 상태:
 
-1. 교사 대시보드 진입.
-2. NEIS 학교검색.
-3. 학생등록.
-4. 등록 학생으로 콘텐츠 생성.
-5. asset generation job 완료.
-6. 교사 검토/승인/배포.
-7. 학생 홈에서 최신 콘텐츠 진입.
-8. 1~3단계 제출.
-9. 4단계 realtime preview/runtime 확인.
-10. 회고/완료.
-11. 교사 대시보드 학습 기록/리포트 반영 확인.
+- `backend/tests/test_api_smoke.py::test_registered_student_generation_review_student_completion_e2e`를 추가했다.
+- 테스트는 교사 대시보드 진입, NEIS 학교검색, 학생등록, 등록 학생 context-bundle, 콘텐츠 생성, background asset generation job, 교사 검토 realtime preview, 승인/배포, 학생 published guard, 학생 홈 최신 콘텐츠, 1~3단계 제출, 4단계 realtime session/event/complete, 회고/완료, 교사 리포트와 dashboard feedback 반영을 검증한다.
+- provider는 mock으로 고정하고 generated asset 파일은 `tmp_path` 아래에 만든다. 로컬 `backend/data/eduyj_demo.db`와 기존 `backend/generated/assets` 공유 후보는 건드리지 않는다.
+- 2026-05-05 targeted 검증: `cd backend && .venv/bin/python -m pytest tests/test_api_smoke.py::test_registered_student_generation_review_student_completion_e2e`.
+
+남은 확인:
+
+- 최종 전체 검증에서 backend/frontend 전체 gate를 다시 실행한다.
+- 브라우저로 핵심 교사/학생 플로우를 한 번 더 확인한다.
 
 ## 생성 파이프라인 병목 위치
 
@@ -185,6 +183,5 @@ backend/generated/assets/students/{studentId}/{contentId}/{assetId}.mp3
 
 ## 다음 커밋 추천 순서
 
-1. `docs : API 프론트 계약 최종 정리`
-2. `test : 교사 생성부터 학생 완료까지 e2e 추가`
-3. `docs : 최종 검증 결과 반영`
+1. `test : 등록 학생 e2e 회귀 추가`
+2. `docs : 최종 검증 결과 반영`
