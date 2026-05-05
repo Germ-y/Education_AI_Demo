@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import random
 import time
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,9 @@ from app.ai.provider_errors import ProviderConfigurationError, ProviderOutputErr
 from app.core.config import Settings
 
 logger = logging.getLogger(__name__)
+TRANSIENT_OPENAI_STATUS_CODES = {408, 409, 429, 500, 502, 503, 504}
+OPENAI_POST_MAX_ATTEMPTS = 3
+OPENAI_POST_BASE_BACKOFF_SEC = 0.8
 
 
 class OpenAiProvider:
@@ -131,21 +135,44 @@ class OpenAiProvider:
         return output_path
 
     def _post(self, path: str, payload: dict[str, Any], *, timeout_sec: float) -> dict[str, Any]:
-        try:
-            with httpx.Client(timeout=timeout_sec) as client:
-                response = client.post(
-                    f"https://api.openai.com{path}",
-                    headers={
-                        "Authorization": f"Bearer {self.settings.openai_api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json=payload,
-                )
-        except httpx.HTTPError as exc:
-            raise ProviderRequestError("OPENAI_REQUEST_FAILED", f"OpenAI 요청 실패: {exc}") from exc
+        last_request_error: httpx.HTTPError | None = None
+        last_response: httpx.Response | None = None
+
+        for attempt in range(1, OPENAI_POST_MAX_ATTEMPTS + 1):
+            try:
+                with httpx.Client(timeout=timeout_sec) as client:
+                    response = client.post(
+                        f"https://api.openai.com{path}",
+                        headers={
+                            "Authorization": f"Bearer {self.settings.openai_api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json=payload,
+                    )
+            except httpx.HTTPError as exc:
+                last_request_error = exc
+                if attempt >= OPENAI_POST_MAX_ATTEMPTS:
+                    raise ProviderRequestError("OPENAI_REQUEST_FAILED", f"OpenAI 요청 실패: {exc}") from exc
+                _sleep_before_retry(path, attempt, reason=exc.__class__.__name__)
+                continue
+
+            if response.status_code < 400:
+                break
+
+            last_response = response
+            if response.status_code not in TRANSIENT_OPENAI_STATUS_CODES or attempt >= OPENAI_POST_MAX_ATTEMPTS:
+                break
+            _sleep_before_retry(path, attempt, reason=f"HTTP {response.status_code}")
+        else:
+            if last_request_error:
+                raise ProviderRequestError("OPENAI_REQUEST_FAILED", f"OpenAI 요청 실패: {last_request_error}") from last_request_error
+            response = last_response
 
         if response.status_code >= 400:
-            raise ProviderRequestError("OPENAI_HTTP_ERROR", f"OpenAI HTTP {response.status_code}: {response.text[:500]}")
+            raise ProviderRequestError(
+                "OPENAI_HTTP_ERROR",
+                f"OpenAI HTTP {response.status_code} after {OPENAI_POST_MAX_ATTEMPTS} attempt(s): {response.text[:500]}",
+            )
         try:
             data = response.json()
         except json.JSONDecodeError as exc:
@@ -153,6 +180,12 @@ class OpenAiProvider:
         if not isinstance(data, dict):
             raise ProviderOutputError("OPENAI_RESPONSE_NOT_OBJECT", "OpenAI HTTP 응답 최상위 값은 object여야 합니다.")
         return data
+
+
+def _sleep_before_retry(path: str, attempt: int, *, reason: str) -> None:
+    backoff = OPENAI_POST_BASE_BACKOFF_SEC * (2 ** (attempt - 1)) + random.uniform(0, 0.25)
+    logger.warning("openai.post.retrying path=%s attempt=%s reason=%s sleep_sec=%.2f", path, attempt, reason, backoff)
+    time.sleep(backoff)
 
 
 def _extract_output_text(response: dict[str, Any]) -> str:

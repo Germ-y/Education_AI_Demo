@@ -22,20 +22,17 @@ router = APIRouter(prefix="/api/contents", tags=["contents"])
 logger = logging.getLogger(__name__)
 IMAGE_PACKAGE_PARALLELISM = 5
 
-UI_LIKE_IMAGE_PROMPT_TERMS = (
-    "빈 카드",
-    "카드형",
-    "카드 UI",
-    "카드 레이아웃",
-    "말풍선",
-    "선택지 영역",
-    "정답 영역",
-    "문제 영역",
-    "UI 패널",
-    "UI 버튼",
-    "클릭 버튼",
-    "버튼형 UI",
-    "버튼처럼",
+PROBLEM_ANSWER_IMAGE_PROMPT_TERMS = (
+    "문제 문장",
+    "문제 텍스트",
+    "문항",
+    "선택지",
+    "정답",
+    "답안",
+    "풀이",
+    "힌트",
+    "채점",
+    "오답",
 )
 
 
@@ -583,13 +580,13 @@ def _apply_image_brief_output(content, output_json: dict) -> None:
                     "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "assetId": asset.id},
                 },
             )
-        for term in UI_LIKE_IMAGE_PROMPT_TERMS:
-            if term in prompt:
+        for term in PROBLEM_ANSWER_IMAGE_PROMPT_TERMS:
+            if _requests_problem_answer_image_text(prompt, term):
                 raise HTTPException(
                     status_code=424,
                     detail={
-                        "code": "IMAGE_BRIEF_UI_LIKE_PROMPT",
-                        "message": f"{asset.asset_role} 이미지 프롬프트가 UI형 요소를 요청합니다: {term}",
+                        "code": "IMAGE_BRIEF_PROBLEM_ANSWER_TEXT",
+                        "message": f"{asset.asset_role} 이미지 프롬프트가 문제/정답/선택지 텍스트를 이미지에 넣도록 요청합니다: {term}",
                         "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "assetId": asset.id},
                     },
                 )
@@ -608,6 +605,39 @@ def _apply_image_brief_output(content, output_json: dict) -> None:
             "qaChecklist": brief.get("qaChecklist", []),
             "textRenderingPolicy": text_rendering_policy,
         }
+
+
+def _requests_problem_answer_image_text(prompt: str, term: str) -> bool:
+    index = prompt.find(term)
+    while index != -1:
+        window = prompt[max(0, index - 24) : index + len(term) + 56]
+        if not _is_negated_image_prompt_term(window):
+            return True
+        index = prompt.find(term, index + len(term))
+    return False
+
+
+def _is_negated_image_prompt_term(text: str) -> bool:
+    negation_markers = (
+        "넣지 마세요",
+        "넣지 않는다",
+        "넣지 않",
+        "포함하지 마세요",
+        "포함하지 않",
+        "보이지 않",
+        "피하고",
+        "피합니다",
+        "제외",
+        "금지",
+        "없이",
+        "없게",
+        "no ",
+        "not include",
+        "avoid",
+        "without",
+    )
+    lowered = text.lower()
+    return any(marker in lowered for marker in negation_markers)
 
 
 def _asset_stage_evidence(asset, stages: list) -> dict[str, Any] | None:

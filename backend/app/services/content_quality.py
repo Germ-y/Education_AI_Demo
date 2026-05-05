@@ -143,22 +143,6 @@ STRUCTURED_INTERACTION_TEMPLATES = {
     TemplateType.BLANK_FILL.value,
 }
 
-UI_LIKE_IMAGE_PROMPT_TERMS = (
-    "빈 카드",
-    "카드형",
-    "카드 UI",
-    "카드 레이아웃",
-    "말풍선",
-    "선택지 영역",
-    "정답 영역",
-    "문제 영역",
-    "UI 패널",
-    "UI 버튼",
-    "클릭 버튼",
-    "버튼형 UI",
-    "버튼처럼",
-)
-
 SOURCE_MATERIAL_TERMS = (
     "안내문",
     "포스터",

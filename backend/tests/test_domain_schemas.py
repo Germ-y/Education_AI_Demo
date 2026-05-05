@@ -1,6 +1,7 @@
 import pytest
 
 from app.api.routes.ai import _mission_from_generation
+from app.api.routes.contents import _requests_problem_answer_image_text
 from app.data.demo_data import create_demo_database
 from app.domain.schemas import ContentAsset, ContentStage, MissionContent
 from app.services.content_quality import ContentQualityError, validate_mission_content_quality, validate_orchestrator_plan_quality
@@ -13,6 +14,11 @@ def test_accepts_demo_4_stage_missions() -> None:
         MissionContent.model_validate(content.model_dump(by_alias=True))
         assert content.total_steps == 4
         assert sorted(stage.step for stage in content.stages) == [1, 2, 3, 4]
+
+
+def test_image_prompt_checker_only_blocks_requested_problem_answer_text() -> None:
+    assert not _requests_problem_answer_image_text("문제 문장이나 선택지는 넣지 마세요.", "문제 문장")
+    assert _requests_problem_answer_image_text("이미지 중앙에 정답을 크게 보여주세요.", "정답")
 
 
 def test_rejects_fifth_stage() -> None:

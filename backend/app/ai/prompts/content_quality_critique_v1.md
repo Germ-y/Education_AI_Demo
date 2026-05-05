@@ -28,7 +28,7 @@ Return strict JSON only.
 - The content type matches the scenario:
   - `life_support`: everyday situation -> clue -> action -> realtime role practice.
   - `learning_focus`: concept anchor -> basic problem -> applied problem -> realtime explain-back.
-- Image prompts describe visual scenes only and do not ask for worksheet cards, empty cards, UI panels, answer-choice layouts, problem text, buttons, or speech bubbles.
+- Image prompts describe visual scenes and source material, not problem UI. They may include natural scene text such as a poster, sign, notice, label, sticky note, card, or short speech bubble when that text is the evidence students must inspect. They must not ask for answer-choice layouts, problem statements, hints, correct answers, scoring labels, feedback, or app-like buttons inside the image.
 - Image prompts visually match the concrete objects or setting used in the stage problem. If the UI text mentions a poster, paper cups, a tumbler, a schedule, a route, a shelf, a clock, or a measuring object, the corresponding image prompt must make that scene recognizable without rendering answer text.
 - Image prompts make the learning evidence visually dominant enough to inspect. People, mascots, or decorative classroom atmosphere may support the scene, but they must not become the repeated main subject across the package.
 - If the task asks the student to read or inspect a notice, poster, sign, label, schedule, bus number, or similar source, the source material must be explicit in `templateJson.sourceTextLines` or `templateJson.sceneTextLines` and reflected in the image prompt as short scene text when needed. Do not pass a blank/icon-only source when the learning target is reading evidence.
@@ -57,7 +57,7 @@ Return `verdict: "repair"` if any of these happen:
 - A structured template such as `sequence_ordering` only rehearses a method but the mission never applies it to a concrete object/value/situation.
 - A learning-focused mission is actually an everyday life roleplay with no academic concept.
 - A life-support mission becomes an academic worksheet.
-- Image prompts ask the image model to draw UI-like cards, blank panels, answer areas, buttons, speech bubbles, or problem layouts.
+- Image prompts ask the image model to draw problem UI, answer areas, scoring widgets, app-like buttons, answer choices, hints, correct answers, feedback, or worksheet problem layouts.
 
 ## Output JSON Shape
 

@@ -80,7 +80,8 @@ Image prompt requirements:
 
 - Use Korean educational context, but avoid rendering problem instructions, answer text, answer choices, hints, explanations, or long labels inside the image.
 - The visual should show the scene only: objects, characters, emotion, relationship, route, or manipulatives.
-- If the orchestrator image intent asks for blank cards, worksheet cards, UI panels, answer areas, or speech bubbles, ignore that part and translate the intent into a real-world scene or learning material object instead.
+- If the orchestrator image intent asks for app-like UI panels, answer areas, scoring widgets, or button-like controls, ignore that part and translate the intent into a real-world scene or learning material object instead.
+- Scene text is allowed when it is the actual source material students must read or inspect, such as a poster sentence, sign, bus number, shelf label, notice, short speech bubble, sticky note, or card in the real scene. Do not put problem statements, answer choices, correct answers, hints, or feedback into the image.
 - Each of the 5 image assets must be visually distinct and match its role.
 - Every image prompt must visibly support the exact stage activity. If `templateJson` mentions concrete objects, places, or actions such as paper cups, tumblers, bus numbers, a center entrance, a library shelf, a schedule board, measuring cups, or a poster board, the matching image prompt must include those visual anchors.
 - Do not use a generic decorative image for a specific problem. If the UI asks the student to judge poster sentences, the image should clearly feel like a poster-reading scene; if the UI asks for an action order, the image should show the situation where that order matters.

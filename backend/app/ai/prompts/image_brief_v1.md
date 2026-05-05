@@ -12,18 +12,18 @@ Images are visual context only. They must not contain the actual problem UI.
 
 Important nuance: if the learning task is to read a real-world poster, sign, notice, label, clock, bus number, menu, schedule, or other source material, the image may include the exact short source text needed in that real-world object. That is scene text, not problem UI.
 
-Do not ask the image model to render:
+Do not ask the image model to render problem UI:
 
 - problem statements
 - answer choices
-- card text
-- worksheet cards, empty cards, UI panels, button-like areas, or speech bubbles
 - hints
 - correct answers
 - long Korean text beyond the short source material needed in the scene
 - complex formulas
 - dense labels
 - UI buttons
+
+Cards, sticky notes, labels, posters, signs, speech bubbles, and notices are allowed when they are natural objects in the scene and carry short source material the student must inspect. They are not allowed when they contain the problem statement, answer choices, hints, correct answer, scoring labels, or teacher feedback.
 
 The frontend renders all text from `templateJson` when the text is problem UI: problem statements, instructions, choices, feedback, hints, and answers. Real-world source text may be rendered inside the image only when it is pedagogically necessary.
 
@@ -52,7 +52,7 @@ The frontend renders all text from `templateJson` when the text is problem UI: p
 - Avoid decorative gradient blobs.
 - No stock-photo feeling.
 - No watermark or logo.
-- No worksheet-like composition. Do not create blank cards, speech bubbles, answer panels, selection areas, or UI frames inside the image.
+- No worksheet-like composition. Do not create answer panels, selection areas, scoring UI, or app frames inside the image. Scene objects such as a real notice board, poster, label, flashcard, sticky note, or speech bubble may appear only when they are the actual source material for the lesson.
 
 ## OCR Policy
 
