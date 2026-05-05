@@ -11,11 +11,13 @@ import type {
   PublicContextBundle,
   RealtimeSessionResponse,
   ReviewableContent,
+  SchoolSearchResponse,
   SeedContext,
   StudentAccessResponse,
   StudentCaseFile,
   StudentListItem,
   StudentMissionSummary,
+  StudentRegistrationResponse,
   StudentReport,
 } from "./contracts";
 
@@ -59,11 +61,24 @@ export const backendAdapter: ApiAdapter = {
 
   getTeacherStudents: (options) => apiFetch<StudentListItem[]>("/api/teacher/students", { token: options?.token }),
 
+  createTeacherStudent: (payload, options) =>
+    apiFetch<StudentRegistrationResponse>("/api/teacher/students", { method: "POST", body: payload, token: options?.token }),
+
   getTeacherStudent: (studentId, options) =>
     apiFetch<StudentCaseFile>(`/api/teacher/students/${encodeURIComponent(studentId)}`, { token: options?.token }),
 
   getTeacherStudentReport: (studentId, options) =>
     apiFetch<StudentReport>(`/api/teacher/students/${encodeURIComponent(studentId)}/report`, { token: options?.token }),
+
+  searchSchools: (params, options) => {
+    const searchParams = new URLSearchParams();
+    searchParams.set("q", params.q);
+    if (params.officeCode) searchParams.set("officeCode", params.officeCode);
+    if (params.syncIfMissing !== undefined) searchParams.set("syncIfMissing", String(params.syncIfMissing));
+    return apiFetch<SchoolSearchResponse>(`/api/public-data/schools/search?${searchParams.toString()}`, {
+      token: options?.token,
+    });
+  },
 
   getSchoolContext: (schoolId, options) =>
     apiFetch<PublicContextBundle>(`/api/public-data/schools/${encodeURIComponent(schoolId)}/context`, { token: options?.token }),

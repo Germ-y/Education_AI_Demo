@@ -141,6 +141,22 @@ export type SchoolProfile = {
   sourceCode?: string;
 };
 
+export type SchoolSearchRequest = {
+  q: string;
+  officeCode?: string;
+  syncIfMissing?: boolean;
+};
+
+export type SchoolSearchResponse = {
+  schools: SchoolProfile[];
+  source: {
+    provider: string;
+    cacheStatus: string;
+    neisStatus?: string;
+    counts?: Record<string, unknown>;
+  };
+};
+
 export type ContextMe = {
   user: UserProfile;
   organization: Organization;
@@ -213,6 +229,24 @@ export type StudentListItem = {
   summaryLine?: string;
   aiContextSummary?: string;
   nextSessionSuggestion: string;
+};
+
+export type StudentRegistrationRequest = {
+  displayName: string;
+  schoolCode?: string | null;
+  schoolName?: string | null;
+  officeCode?: string;
+  grade: string;
+  gradeNumber?: string | null;
+  className?: string | null;
+  studentType: ContentType;
+  trackLabel?: string | null;
+  currentGoal: string;
+  observationNote?: string | null;
+  strengths: string[];
+  weaknesses: string[];
+  preferredSupports: string[];
+  timetableDate?: string | null;
 };
 
 export type SupportCaseSummary = {
@@ -324,6 +358,12 @@ export type StudentCaseFile = {
   recentContents: MissionContent[];
   plannerItems: PlannerItem[];
   publicContextSummary?: Record<string, unknown>;
+};
+
+export type StudentRegistrationResponse = {
+  student: StudentCaseFile | null;
+  created: boolean;
+  accessCode: string | null;
 };
 
 export type StudentReportItem = {

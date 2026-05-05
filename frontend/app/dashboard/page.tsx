@@ -23,8 +23,10 @@ import {
   type MissionContent,
   type StudentCaseFile,
   type StudentListItem,
+  type StudentRegistrationResponse,
   type StudentReport,
 } from "@/lib/api";
+import { StudentRegistrationModal } from "./StudentRegistrationModal";
 
 type DashboardTab = "info" | "materials" | "records";
 type CaseStatus = "intake" | "structured" | "goal_set" | "scene_review" | "follow_up";
@@ -714,6 +716,7 @@ export default function DashboardPage() {
   const [teacherStudentItems, setTeacherStudentItems] = useState<StudentListItem[]>([]);
   const [selectedCaseFile, setSelectedCaseFile] = useState<StudentCaseFile | null>(null);
   const [selectedReport, setSelectedReport] = useState<StudentReport | null>(null);
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState<DashboardTab>("info");
   const [openReportId, setOpenReportId] = useState<string | null>(null);
@@ -1475,17 +1478,42 @@ export default function DashboardPage() {
     }
   };
 
-  const refreshSelectedStudentData = async () => {
-    if (!selectedCase.studentId) return;
-
+  const refreshStudentData = async (studentId: string) => {
     const [items, caseFile, report] = await Promise.all([
       getTeacherStudents(),
-      getTeacherStudent(selectedCase.studentId),
-      getTeacherStudentReport(selectedCase.studentId),
+      getTeacherStudent(studentId),
+      getTeacherStudentReport(studentId),
     ]);
     setTeacherStudentItems(items);
+    setSelectedStudentId(studentId);
     setSelectedCaseFile(caseFile);
     setSelectedReport(report);
+  };
+
+  const refreshSelectedStudentData = async () => {
+    if (!selectedCase.studentId) return;
+    await refreshStudentData(selectedCase.studentId);
+  };
+
+  const handleRegisteredStudent = async (response: StudentRegistrationResponse) => {
+    const studentId = response.student?.profile.id;
+    const items = await getTeacherStudents();
+    setTeacherStudentItems(items);
+    setQuery("");
+    setActiveTab("info");
+    if (!studentId) return;
+    setSelectedStudentId(studentId);
+    const [caseFile, report] = await Promise.all([getTeacherStudent(studentId), getTeacherStudentReport(studentId)]);
+    setSelectedCaseFile(caseFile);
+    setSelectedReport(report);
+  };
+
+  const handleStartRegisteredStudentMaterials = async (response: StudentRegistrationResponse) => {
+    const studentId = response.student?.profile.id;
+    if (studentId && selectedStudentId !== studentId) {
+      await refreshStudentData(studentId);
+    }
+    setActiveTab("materials");
   };
 
   const handleSaveMemo = async () => {
@@ -1771,7 +1799,11 @@ export default function DashboardPage() {
                 placeholder="학생 이름, 학교, 학습 이슈 검색"
               />
             </label>
-            <button className="w-full rounded-md bg-[#1f3a5f] px-4 py-3 text-sm font-bold text-white">
+            <button
+              type="button"
+              onClick={() => setIsRegistrationOpen(true)}
+              className="w-full rounded-md bg-[#1f3a5f] px-4 py-3 text-sm font-bold text-white"
+            >
               학생 등록
             </button>
           </div>
@@ -2329,6 +2361,14 @@ export default function DashboardPage() {
           </article>
         </section>
       </div>
+      {isRegistrationOpen && (
+        <StudentRegistrationModal
+          open={isRegistrationOpen}
+          onClose={() => setIsRegistrationOpen(false)}
+          onRegistered={handleRegisteredStudent}
+          onStartMaterials={handleStartRegisteredStudentMaterials}
+        />
+      )}
       {openReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/45 p-6">
           <section className="flex h-[min(90vh,900px)] w-[min(94vw,1320px)] flex-col rounded-xl bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">

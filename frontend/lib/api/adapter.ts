@@ -14,11 +14,15 @@ import type {
   RealtimeSessionResponse,
   ReviewableContent,
   SeedContext,
+  SchoolSearchRequest,
+  SchoolSearchResponse,
   StudentAccessRequest,
   StudentAccessResponse,
   StudentCaseFile,
   StudentListItem,
   StudentMissionSummary,
+  StudentRegistrationRequest,
+  StudentRegistrationResponse,
   StudentReport,
 } from "./contracts";
 
@@ -32,8 +36,10 @@ export type ApiAdapter = {
   getContextSeed(options?: ApiAdapterOptions): Promise<SeedContext>;
   getContextMe(options?: ApiAdapterOptions): Promise<ContextMe>;
   getTeacherStudents(options?: ApiAdapterOptions): Promise<StudentListItem[]>;
+  createTeacherStudent(payload: StudentRegistrationRequest, options?: ApiAdapterOptions): Promise<StudentRegistrationResponse>;
   getTeacherStudent(studentId: string, options?: ApiAdapterOptions): Promise<StudentCaseFile>;
   getTeacherStudentReport(studentId: string, options?: ApiAdapterOptions): Promise<StudentReport>;
+  searchSchools(params: SchoolSearchRequest, options?: ApiAdapterOptions): Promise<SchoolSearchResponse>;
   getSchoolContext(schoolId: string, options?: ApiAdapterOptions): Promise<PublicContextBundle>;
   getTodayStudentMissions(options?: ApiAdapterOptions): Promise<StudentMissionSummary[]>;
   getStudentMission(contentId: string, options?: ApiAdapterOptions): Promise<MissionContent>;

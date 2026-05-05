@@ -25,6 +25,7 @@
 - 교사 학습 기록 리포트는 `session` note로 저장되고, `POST /api/review-summaries/{reviewId}/apply-to-memory`로 메모리에 반영된다.
 - `GET /api/public-data/schools/search`는 실제 NEIS `schoolInfo` 조회로 학교를 검색하고 캐시에 저장한다.
 - `POST /api/teacher/students`는 학교검색 결과를 기반으로 학생, 케이스, 메모리카드, 다음 목표, 학생 access code를 만든다.
+- 교사 대시보드의 `학생 등록` 버튼은 학교검색, 학교 선택, 학생 강점/약점/지원 입력, 등록 후 access code 확인과 자료 생성 탭 이동까지 연결되어 있다.
 - 이미지 프롬프트 생성은 별도 LLM 호출 없이 `briefJson.stageVisualSpecs`와 `templateJson` 기반 deterministic builder를 사용한다.
 - 이미지 5장은 `gpt-image-2`로 병렬 생성한다. 다만 asset package endpoint는 아직 HTTP 요청 안에서 동기 실행한다.
 
@@ -165,8 +166,7 @@ git diff --check
 
 최우선:
 
-1. 학생등록 프론트 연결
-2. asset 생성 job을 background/polling 구조로 분리
-3. 콘텐츠 생성 구조를 scenario/stage/visual spec 단위로 분리
-4. 검토 preview와 realtime preview/runtime 안정화
-5. 교사 승인부터 학생 완료, 교사 리포트 확인까지 E2E 회귀 테스트 추가
+1. asset 생성 job을 background/polling 구조로 분리
+2. 콘텐츠 생성 구조를 scenario/stage/visual spec 단위로 분리
+3. 검토 preview와 realtime preview/runtime 안정화
+4. 교사 승인부터 학생 완료, 교사 리포트 확인까지 E2E 회귀 테스트 추가
