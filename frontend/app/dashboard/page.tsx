@@ -2441,11 +2441,8 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm font-bold text-[#64748b]">자료 제안 검토</p>
                 <h3 className="mt-1 text-2xl font-black">{openReview.title}</h3>
-                <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                  4개 스테이지를 확인하고 선생님 판단으로 필요한 부분만 조정합니다.
-                </p>
                 {openReview.generatedAtLabel && (
-                  <p className="mt-2 text-xs font-black text-[#94a3b8]">생성 {openReview.generatedAtLabel}</p>
+                  <p className="mt-1 text-xs font-black text-[#94a3b8]">생성 {openReview.generatedAtLabel}</p>
                 )}
               </div>
               <button
