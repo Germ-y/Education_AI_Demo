@@ -39,7 +39,7 @@ Generate a complete MissionContent JSON package from an approved OrchestratorPla
 - Use student memory for emotional support, scaffolding, and interaction style. Do not let older stored unit memories override the teacher-requested topic or make the content feel like a compromise between two unrelated subjects.
 - Short visible instructions are allowed, but thin content is not. Keep `studentInstruction` short while making `storyText`, `missionText`, feedback, source text, image prompts, and audio narration carry a concrete scenario.
 - Preserve the orchestrator's production brief. `briefJson` must include `scenarioSpine` and `stageVisualSpecs` copied from `orchestratorPlan`. You may add `contentNotes`, but do not drop or rewrite the scenario/visual specs.
-- The image asset `promptJson` may be a temporary placeholder before image brief generation, but it must not override `briefJson.stageVisualSpecs`. The later image prompt builder will use `stageVisualSpecs` as the source of truth.
+- The image asset `promptJson` may be a temporary placeholder before asset generation, but it must not override `briefJson.stageVisualSpecs`. The backend image prompt builder will combine `stageVisualSpecs` and the final `templateJson` as the source of truth.
 
 ## Content Package Requirements
 
@@ -80,7 +80,7 @@ Asset role to stage mapping:
 
 Image prompt requirements:
 
-- `briefJson.stageVisualSpecs` is the source of truth for image generation. The final image brief agent will translate those specs into provider prompts.
+- `briefJson.stageVisualSpecs` is the source of truth for image generation. The backend image prompt builder will translate those specs and the final stage problem JSON into provider prompts.
 - Use Korean educational context, but avoid rendering problem instructions, answer text, answer choices, hints, explanations, or long labels inside the image.
 - The visual should show the scene only: objects, characters, emotion, relationship, route, or manipulatives.
 - If the orchestrator image intent asks for app-like UI panels, answer areas, scoring widgets, or button-like controls, ignore that part and translate the intent into a real-world scene or learning material object instead.

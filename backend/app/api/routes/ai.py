@@ -20,6 +20,92 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 MAX_CONTENT_GENERATION_ATTEMPTS = 2
 logger = logging.getLogger(__name__)
 
+ORCHESTRATOR_STAGE_CONTRACTS: dict[str, dict[int, dict[str, Any]]] = {
+    "learning_focus": {
+        1: {
+            "stageRole": "concept_intro",
+            "studentTitle": "개념 열기",
+            "defaultTemplate": "concept_intro",
+            "allowedTemplates": {"concept_intro"},
+        },
+        2: {
+            "stageRole": "basic_problem",
+            "studentTitle": "문제 1",
+            "defaultTemplate": "scene_question",
+            "allowedTemplates": {
+                "image_quiz",
+                "card_match",
+                "sequence_ordering",
+                "blank_fill",
+                "scene_question",
+                "clue_question",
+                "partition_picker",
+            },
+        },
+        3: {
+            "stageRole": "applied_problem",
+            "studentTitle": "문제 2",
+            "defaultTemplate": "applied_question",
+            "allowedTemplates": {
+                "image_quiz",
+                "card_match",
+                "sequence_ordering",
+                "blank_fill",
+                "applied_question",
+                "mini_simulation",
+                "explanation_choice",
+                "wrong_explanation_fix",
+            },
+            "templateAliases": {
+                "scene_question": "applied_question",
+                "clue_question": "applied_question",
+                "action_choice": "applied_question",
+                "decision_card": "applied_question",
+            },
+        },
+        4: {
+            "stageRole": "realtime_practice",
+            "studentTitle": "설명해보기",
+            "defaultTemplate": "realtime_teach_back",
+            "allowedTemplates": {"realtime_teach_back"},
+            "templateAliases": {"realtime_roleplay": "realtime_teach_back"},
+        },
+    },
+    "life_support": {
+        1: {
+            "stageRole": "scenario_intro",
+            "studentTitle": "상황 만나기",
+            "defaultTemplate": "scenario_intro",
+            "allowedTemplates": {"scenario_intro"},
+        },
+        2: {
+            "stageRole": "clue_identification",
+            "studentTitle": "단서 찾기",
+            "defaultTemplate": "highlight_clue",
+            "allowedTemplates": {"scene_observation", "highlight_clue", "image_quiz", "card_match"},
+            "templateAliases": {"scene_question": "highlight_clue", "clue_question": "highlight_clue"},
+        },
+        3: {
+            "stageRole": "action_selection",
+            "studentTitle": "행동 고르기",
+            "defaultTemplate": "action_choice",
+            "allowedTemplates": {"image_quiz", "card_match", "sequence_ordering", "action_choice", "decision_card"},
+            "templateAliases": {
+                "scene_question": "action_choice",
+                "clue_question": "action_choice",
+                "applied_question": "action_choice",
+            },
+        },
+        4: {
+            "stageRole": "realtime_practice",
+            "studentTitle": "한 번 해보기",
+            "defaultTemplate": "realtime_roleplay",
+            "allowedTemplates": {"realtime_roleplay"},
+            "templateAliases": {"realtime_teach_back": "realtime_roleplay"},
+        },
+    },
+}
+
 
 @router.post("/orchestrator-runs")
 def create_orchestrator_run(
@@ -201,6 +287,7 @@ def _run_orchestrator_agent(
             input_snapshot=input_snapshot,
             timeout_sec=settings.openai_orchestrator_timeout_sec,
         )
+        output_json = _normalize_orchestrator_plan_candidate(output_json, content_type=content_type)
         validate_orchestrator_plan_quality(
             output_json,
             student_id=student_id,
@@ -239,6 +326,66 @@ def _run_orchestrator_agent(
         agent_run_id,
         time.perf_counter() - started_at,
     )
+
+
+def _normalize_orchestrator_plan_candidate(plan: Any, *, content_type: str) -> dict:
+    if not isinstance(plan, dict):
+        return plan
+
+    normalized = dict(plan)
+    contracts = ORCHESTRATOR_STAGE_CONTRACTS.get(content_type)
+    if not contracts:
+        return normalized
+
+    stage_plan = normalized.get("stagePlan")
+    if not isinstance(stage_plan, list):
+        return normalized
+
+    normalized_stages: list[Any] = []
+    changes: list[dict[str, Any]] = []
+    for item in stage_plan:
+        if not isinstance(item, dict):
+            normalized_stages.append(item)
+            continue
+        stage = dict(item)
+        step = stage.get("step")
+        contract = contracts.get(step)
+        if not contract:
+            normalized_stages.append(stage)
+            continue
+
+        before = {
+            "stageRole": stage.get("stageRole"),
+            "studentTitle": stage.get("studentTitle"),
+            "templateType": stage.get("templateType"),
+        }
+        stage["stageRole"] = contract["stageRole"]
+        stage["studentTitle"] = contract["studentTitle"]
+
+        template_type = str(stage.get("templateType") or "")
+        allowed_templates = contract["allowedTemplates"]
+        template_aliases = contract.get("templateAliases", {})
+        if template_type not in allowed_templates:
+            template_type = template_aliases.get(template_type, contract["defaultTemplate"])
+        stage["templateType"] = template_type
+
+        after = {
+            "stageRole": stage.get("stageRole"),
+            "studentTitle": stage.get("studentTitle"),
+            "templateType": stage.get("templateType"),
+        }
+        if before != after:
+            changes.append({"step": step, "before": before, "after": after})
+        normalized_stages.append(stage)
+
+    normalized["stagePlan"] = normalized_stages
+    if changes:
+        normalized["normalizationNotes"] = [
+            "오케스트레이터 단계 라벨/템플릿 값을 제품 계약에 맞게 자동 정규화했습니다.",
+            *[f"{change['step']}단계: {change['before']} -> {change['after']}" for change in changes],
+        ]
+        logger.info("ai.orchestrator.normalized content_type=%s changes=%s", content_type, changes)
+    return normalized
 
 
 def _run_content_agent(

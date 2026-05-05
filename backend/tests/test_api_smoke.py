@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from app.ai.elevenlabs_provider import ElevenLabsProvider
 from app.ai.openai_provider import OpenAiProvider
 from app.api.deps import get_store_instance
+from app.api.routes.ai import _normalize_orchestrator_plan_candidate
 from app.core.config import get_settings
 from app.data.demo_data import create_demo_database
 from app.db.session import get_engine, get_session_maker
@@ -429,6 +430,30 @@ def test_http_errors_use_contract_envelope() -> None:
     }
 
 
+def test_orchestrator_plan_normalizer_maps_contract_aliases() -> None:
+    plan = {
+        "stagePlan": [
+            {"step": 1, "stageRole": "intro", "templateType": "concept_intro", "studentTitle": "시작"},
+            {"step": 2, "stageRole": "question", "templateType": "scene_question", "studentTitle": "문제"},
+            {"step": 3, "stageRole": "question", "templateType": "scene_question", "studentTitle": "문제"},
+            {"step": 4, "stageRole": "practice", "templateType": "realtime_roleplay", "studentTitle": "연습"},
+        ]
+    }
+
+    normalized = _normalize_orchestrator_plan_candidate(plan, content_type="learning_focus")
+
+    assert [stage["studentTitle"] for stage in normalized["stagePlan"]] == ["개념 열기", "문제 1", "문제 2", "설명해보기"]
+    assert [stage["stageRole"] for stage in normalized["stagePlan"]] == [
+        "concept_intro",
+        "basic_problem",
+        "applied_problem",
+        "realtime_practice",
+    ]
+    assert normalized["stagePlan"][2]["templateType"] == "applied_question"
+    assert normalized["stagePlan"][3]["templateType"] == "realtime_teach_back"
+    assert normalized["normalizationNotes"]
+
+
 def test_teacher_can_persist_content_review_edits() -> None:
     client = TestClient(create_app())
     teacher_login = client.post(
@@ -614,46 +639,10 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     invalid_generated_content = copy.deepcopy(generated_content)
     invalid_generated_content["stages"][3]["studentTitle"] = "realtime practice"
     content_generation_calls = {"count": 0}
-    image_brief_calls = {"count": 0}
     image_parallel_probe = {"active": 0, "max": 0}
     image_parallel_lock = threading.Lock()
 
     def fake_json_response(self, *, model, instructions, input_snapshot, timeout_sec=90):
-        if "Image Prompt Builder" in instructions:
-            image_brief_calls["count"] += 1
-            return (
-                {
-                    "promptVersion": "image_brief_v1",
-                    "contentId": generated_content["id"],
-                    "imageBriefs": [
-                        {
-                            "assetRole": asset["assetRole"],
-                            "stageId": asset["stageId"],
-                            "prompt": (
-                                f"{asset['assetRole']} 전용 장면. 학생이 볼 수 있는 구체적인 피자 조각 상황만 "
-                                "고품질 한국 교육 일러스트로 보여주고, 문제 문장, 선택지, 정답, 힌트 텍스트는 넣지 않습니다."
-                            ),
-                            "negativePromptRules": ["no problem statements", "no answer choices", "no UI cards", "no speech bubbles"],
-                            "learningEvidence": {
-                                "primaryObject": "피자 조각",
-                                "mustBeReadableOrCountable": ["전체 피자", "한 조각"],
-                                "whyItMattersForThisStage": "분수의 전체와 부분을 눈으로 확인합니다.",
-                            },
-                            "compositionPlan": {
-                                "camera": "tabletop",
-                                "subjectPriority": "learning_object_first",
-                                "humanPresence": "hands-only",
-                                "negativeComposition": ["portrait-first framing", "generic classroom scene"],
-                            },
-                            "ocrRequired": False,
-                            "qaChecklist": ["scene matches stage purpose", "no UI text embedded", "student-safe tone"],
-                        }
-                        for asset in generated_content["assets"]
-                        if asset["assetType"] == "image"
-                    ],
-                },
-                {"input_tokens": 3, "output_tokens": 5},
-            )
         if "Content Quality Critic" in instructions:
             return (
                 {
@@ -813,10 +802,9 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     assert latest_fraction_mapping["updatedAt"] == content["briefJson"]["generatedAt"]
 
     package = client.post("/api/contents/content_generated_contract_001/assets/generate-package")
-    assert package.status_code == 200
+    assert package.status_code == 200, package.json()
     package_data = package.json()["data"]
     assert package_data["generatedCount"] == 10
-    assert image_brief_calls["count"] == 1
     assert image_parallel_probe["max"] >= 2
     expected_asset_prefix = f"/generated/assets/students/{student_id}/content_generated_contract_001/"
     assert all(asset["storageUrl"].startswith(expected_asset_prefix) for asset in package_data["assets"])
@@ -828,6 +816,11 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     )
     assert all(
         asset["promptJson"].get("compositionPlan", {}).get("subjectPriority") == "learning_object_first"
+        for asset in package_data["assets"]
+        if asset["assetType"] == "image"
+    )
+    assert all(
+        "전체는 몇 조각인가요?" not in asset["promptJson"].get("prompt", "")
         for asset in package_data["assets"]
         if asset["assetType"] == "image"
     )

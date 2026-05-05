@@ -10,7 +10,6 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.ai.elevenlabs_provider import ElevenLabsProvider
 from app.ai.openai_provider import OpenAiProvider
-from app.ai.prompt_registry import load_prompt
 from app.ai.provider_errors import AiProviderError
 from app.api.deps import get_store, require_teacher
 from app.api.response import ok
@@ -552,32 +551,10 @@ def _refresh_image_prompts_or_raise(content) -> None:
     if not image_assets or all(_uses_image_brief_prompt(asset.prompt_json) for asset in image_assets):
         return
 
-    settings = get_settings()
     started_at = time.perf_counter()
-    logger.info("contents.image_brief.started content_id=%s image_asset_count=%s", content.id, len(image_assets))
-    try:
-        output_json, _ = OpenAiProvider(settings).create_json_response(
-            model=settings.openai_image_brief_model,
-            instructions=load_prompt("image_brief"),
-            input_snapshot=_image_brief_input_snapshot(content, image_assets),
-        )
-        _apply_image_brief_output(content, output_json)
-    except AiProviderError as exc:
-        logger.warning(
-            "contents.image_brief.failed content_id=%s code=%s elapsed_sec=%.1f message=%s",
-            content.id,
-            exc.code,
-            time.perf_counter() - started_at,
-            exc.message,
-        )
-        raise HTTPException(
-            status_code=424,
-            detail={
-                "code": exc.code,
-                "message": exc.message,
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "contentId": content.id},
-            },
-        ) from exc
+    logger.info("contents.image_brief.build_started content_id=%s image_asset_count=%s", content.id, len(image_assets))
+    output_json = _build_image_brief_output(content, image_assets)
+    _apply_image_brief_output(content, output_json)
     logger.info("contents.image_brief.succeeded content_id=%s elapsed_sec=%.1f", content.id, time.perf_counter() - started_at)
 
 
@@ -585,49 +562,151 @@ def _uses_image_brief_prompt(prompt_json: dict | None) -> bool:
     return isinstance(prompt_json, dict) and prompt_json.get("promptVersion") == "image_brief_v1"
 
 
-def _image_brief_input_snapshot(content, image_assets: list) -> dict:
+def _build_image_brief_output(content, image_assets: list) -> dict[str, Any]:
     stages = sorted(content.stages, key=lambda item: item.step)
-    scenario_spine = content.brief_json.get("scenarioSpine") if isinstance(content.brief_json, dict) else None
     stage_visual_specs = _stage_visual_specs_by_role(content)
     return {
+        "promptVersion": "image_brief_v1",
         "contentId": content.id,
-        "contentType": content.content_type,
-        "title": content.title,
-        "sessionGoal": content.session_goal,
-        "scenarioSpine": scenario_spine if isinstance(scenario_spine, dict) else {},
-        "stageVisualSpecs": list(stage_visual_specs.values()),
-        "scenarioVisualGuidance": {
-            "goal": "Make the learning evidence visually dominant, not the person.",
-            "cameraVariety": "Use distinct hero/stage shots in one coherent scenario.",
-            "humanPresencePolicy": "People are optional and secondary unless the task is social expression or realtime role practice.",
-            "textBoundary": "Only allowedSceneText may be visibly rendered in images. Problem UI text, choices, answer labels, feedback, and category buckets are doNotRenderText.",
-        },
-        "stages": [
-            {
-                "id": stage.id,
-                "step": stage.step,
-                "stageRole": stage.stage_role,
-                "templateType": stage.template_type,
-                "studentTitle": stage.student_title,
-                "visualSource": _stage_visual_source(stage),
-                "stageVisualSpec": _stage_visual_spec_for_stage(stage, stage_visual_specs),
-                "doNotRenderText": _stage_do_not_render_text(stage),
-            }
-            for stage in stages
-        ],
-        "imageAssets": [
-            {
-                "id": asset.id,
-                "assetRole": asset.asset_role,
-                "stageId": asset.stage_id,
-                "currentPromptJson": asset.prompt_json,
-                "stageVisualSpec": _stage_visual_spec_for_asset(content, asset, stages, stage_visual_specs),
-                "allowedSceneText": _allowed_scene_text_for_asset(content, asset, stages, stage_visual_specs),
-                "doNotRenderText": _do_not_render_text_for_asset(content, asset, stages, stage_visual_specs),
-            }
+        "imageBriefs": [
+            _build_image_brief_for_asset(content, asset, stages, stage_visual_specs)
             for asset in image_assets
         ],
     }
+
+
+def _build_image_brief_for_asset(content, asset, stages: list, stage_visual_specs: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    spec = _stage_visual_spec_for_asset(content, asset, stages, stage_visual_specs)
+    stage = next((candidate for candidate in stages if candidate.id == asset.stage_id), None)
+    visual_source = _stage_visual_source(stage) if stage else {"visualAnchors": _brief_visual_anchors_from_stages(stages)}
+    allowed_scene_text = _allowed_scene_text_for_asset(content, asset, stages, stage_visual_specs)
+    blocked_texts = _do_not_render_text_for_asset(content, asset, stages, stage_visual_specs)
+    candidate_anchors = _dedupe_strings(
+        _string_list(spec.get("mustShow"))
+        + _string_list(visual_source.get("visualAnchors"))
+        + [_as_text(spec.get("primaryEvidenceObject"))]
+    )
+    must_show = _filter_prompt_anchors(candidate_anchors, blocked_texts=blocked_texts, allowed_scene_text=allowed_scene_text)[:7]
+    spec_primary_object = _as_text(spec.get("primaryEvidenceObject"))
+    primary_object = (
+        spec_primary_object
+        if spec_primary_object and not _is_blocked_prompt_anchor(spec_primary_object, blocked_texts=blocked_texts, allowed_scene_text=allowed_scene_text)
+        else (must_show[0] if must_show else content.title)
+    )
+    scene_summary = _as_text(spec.get("sceneSummary")) or content.title
+    visual_purpose = _as_text(spec.get("visualPurpose")) or "학생이 확인할 장면 근거를 보여줍니다."
+    composition = _as_text(spec.get("composition")) or "학습 근거가 화면 중심에 보이도록 가까운 구도로 구성합니다."
+    camera = _camera_for_asset(asset.asset_role)
+    human_presence = _human_presence_for_asset(content, asset, stage)
+    ocr_required = bool(allowed_scene_text)
+    text_policy = "short_scene_text_allowed_no_problem_ui" if ocr_required else "scene_only_no_problem_text"
+
+    prompt_parts = [
+        "Premium Korean edtech illustration, warm but not childish, clean realistic classroom or daily-life detail.",
+        f"Asset role: {asset.asset_role}.",
+        f"Scene summary: {scene_summary}.",
+        f"Learning purpose: {visual_purpose}.",
+        f"Primary learning evidence object: {primary_object}.",
+    ]
+    if must_show:
+        prompt_parts.append(f"Must show these inspectable scene anchors: {', '.join(must_show)}.")
+    prompt_parts.extend(
+        [
+            f"Composition: {composition}",
+            f"Camera: {camera}; subject priority is learning_object_first; human presence: {human_presence}.",
+            "Make the evidence object large, clear, and easy to inspect. People, if present, stay secondary and never become portrait-first.",
+        ]
+    )
+    if allowed_scene_text:
+        prompt_parts.append(
+            "Readable real-world scene text is required only on the natural object in the scene. "
+            f"Render exactly these short source lines: {' / '.join(allowed_scene_text)}."
+        )
+    else:
+        prompt_parts.append("No readable text is needed inside the image.")
+    prompt_parts.append(
+        "Avoid app UI, worksheet layout, answer panels, scoring marks, feedback bubbles, category labels, long labels, watermarks, logos, and decorative generic scenes."
+    )
+
+    return {
+        "assetRole": asset.asset_role,
+        "stageId": asset.stage_id,
+        "prompt": " ".join(part for part in prompt_parts if part),
+        "negativePromptRules": [
+            "no app UI",
+            "no answer panels",
+            "no scoring marks",
+            "no feedback text",
+            "no category labels",
+            "no watermark",
+        ],
+        "learningEvidence": {
+            "primaryObject": primary_object,
+            "mustBeReadableOrCountable": allowed_scene_text or must_show,
+            "whyItMattersForThisStage": visual_purpose,
+        },
+        "compositionPlan": {
+            "camera": camera,
+            "subjectPriority": "learning_object_first",
+            "humanPresence": human_presence,
+            "negativeComposition": ["portrait-first framing", "generic decorative scene", "worksheet-like composition"],
+        },
+        "ocrRequired": ocr_required,
+        "sceneTextLines": allowed_scene_text,
+        "textRenderingPolicy": text_policy,
+        "qaChecklist": [
+            "scene matches stage purpose",
+            "learning evidence is visually dominant",
+            "no problem UI embedded",
+            "student-safe tone",
+        ],
+    }
+
+
+def _as_text(value: Any) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _filter_prompt_anchors(values: list[str], *, blocked_texts: list[str], allowed_scene_text: list[str]) -> list[str]:
+    return [
+        value
+        for value in _dedupe_strings(values)
+        if not _is_blocked_prompt_anchor(value, blocked_texts=blocked_texts, allowed_scene_text=allowed_scene_text)
+    ]
+
+
+def _is_blocked_prompt_anchor(value: str, *, blocked_texts: list[str], allowed_scene_text: list[str]) -> bool:
+    cleaned = value.strip()
+    if not cleaned or cleaned in allowed_scene_text:
+        return False
+    for blocked in blocked_texts:
+        blocked_cleaned = blocked.strip() if isinstance(blocked, str) else ""
+        if not blocked_cleaned or blocked_cleaned in allowed_scene_text:
+            continue
+        if cleaned == blocked_cleaned or cleaned in blocked_cleaned or blocked_cleaned in cleaned:
+            return True
+    return False
+
+
+def _camera_for_asset(asset_role: str) -> str:
+    if asset_role == AssetRole.HERO:
+        return "medium-close establishing shot"
+    if asset_role in {AssetRole.STAGE_2, AssetRole.STAGE_3}:
+        return "close-up or tabletop evidence shot"
+    if asset_role == AssetRole.STAGE_4_REALTIME:
+        return "medium-close role-practice shot"
+    return "medium-close evidence introduction shot"
+
+
+def _human_presence_for_asset(content, asset, stage) -> str:
+    content_type = _as_asset_role_value(content.content_type)
+    if asset.asset_role == AssetRole.STAGE_4_REALTIME:
+        return "secondary interaction context"
+    if content_type == "life_support":
+        return "secondary or hands-only, included only if it clarifies the action"
+    if stage and stage.step in {2, 3}:
+        return "none or hands-only"
+    return "small-background-context"
 
 
 def _stage_visual_specs_by_role(content) -> dict[str, dict[str, Any]]:

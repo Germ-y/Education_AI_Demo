@@ -111,7 +111,7 @@ You receive a JSON object with:
    - If the learning object is a poster, notice, sign, schedule, label, or other reading source, specify the exact short scene text that should appear as evidence. Do not leave it as a generic blank poster or icon-only notice unless the teacher explicitly asked for picture-only clues.
 8. Produce `scenarioSpine` and `stageVisualSpecs`.
    - `scenarioSpine` is the production brief for the whole mission: situation, learning or behavior target, evidence source, common mistake or realistic impulse, and how stage 4 reuses the same reasoning.
-   - `stageVisualSpecs` is the production brief for images. It is not the final image prompt. It tells the image prompt builder what each image must show and what text is allowed.
+   - `stageVisualSpecs` is the production brief for images. It is not the final image prompt. It tells the backend image prompt builder what each image must show and what text is allowed.
    - Every image asset role must have one `stageVisualSpecs` item.
    - `allowedSceneText` is the only text allowed to appear inside the generated image. Use it only for real-world source material such as poster sentences, sign text, bus numbers, clock times, labels, or schedule lines.
    - `doNotRenderText` must include UI-only text types and any likely problem labels such as problem, choice, answer, hint, feedback, fact/opinion category labels, scoring, and teacher explanations. If the plan uses card matching, answer bucket labels must be listed here.

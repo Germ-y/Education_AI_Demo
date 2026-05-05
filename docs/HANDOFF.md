@@ -43,7 +43,7 @@
 - 생성된 콘텐츠는 `teacher_review`로 저장되고, 교사 승인 후 `approved`, 배포 후 `published`가 된다.
 - provider key가 없거나 생성/검증에 실패하면 대체 seed 콘텐츠를 저장하지 않고 실패 run과 검수 필요 상태를 남긴다.
 - 콘텐츠 생성은 작성자와 검수자를 분리한다. `mission_content_package` 출력은 schema/계약 검증 뒤 `content_quality_critique`가 한 번 더 보고, `repair` 판정이면 저장하지 않고 재생성한다.
-- 이미지 생성 전에는 `image_brief`가 5개 이미지 prompt를 다시 작성한다. `gpt-image-2`에는 이 재작성된 장면 prompt만 전달한다.
+- 이미지 생성 전에는 별도 LLM을 다시 호출하지 않고, 완성된 `MissionContent`의 `briefJson.stageVisualSpecs`와 단계별 `templateJson`을 조합해 5개 이미지 prompt를 만든다. `gpt-image-2`에는 이 장면 prompt만 전달한다.
 - 이미지 prompt는 장면만 설명해야 하며 빈 카드, 말풍선, UI 패널, 선택지 영역, 버튼 같은 학습지형 구성을 요청하면 실패 처리한다.
 - OpenAI Realtime 음성은 ElevenLabs 안내 음성과 별도다. 기본값은 `OPENAI_REALTIME_VOICE=marin`, `OPENAI_REALTIME_VOICE_SPEED=0.92`다.
 - ElevenLabs 안내 음성은 선생님이 옆에서 또렷하게 말해주는 톤을 목표로 한다. 기본값은 `ELEVENLABS_MODEL_ID=eleven_v3`, `ELEVENLABS_SPEED=1.08`, `ELEVENLABS_ENABLE_AUDIO_TAGS=false`다. v3 오디오 태그는 한국어 말끝이 늘어지는 현상이 있어 기본 비활성화한다.
