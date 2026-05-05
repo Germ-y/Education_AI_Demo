@@ -586,16 +586,20 @@ def _build_image_brief_for_asset(content, asset, stages: list, stage_visual_spec
         + _string_list(visual_source.get("visualAnchors"))
         + [_as_text(spec.get("primaryEvidenceObject"))]
     )
-    must_show = _filter_prompt_anchors(candidate_anchors, blocked_texts=blocked_texts, allowed_scene_text=allowed_scene_text)[:7]
+    must_show = _dedupe_strings(
+        _sanitize_image_prompt_meta(value)
+        for value in _filter_prompt_anchors(candidate_anchors, blocked_texts=blocked_texts, allowed_scene_text=allowed_scene_text)
+    )[:7]
     spec_primary_object = _as_text(spec.get("primaryEvidenceObject"))
     primary_object = (
         spec_primary_object
         if spec_primary_object and not _is_blocked_prompt_anchor(spec_primary_object, blocked_texts=blocked_texts, allowed_scene_text=allowed_scene_text)
         else (must_show[0] if must_show else content.title)
     )
-    scene_summary = _as_text(spec.get("sceneSummary")) or content.title
-    visual_purpose = _as_text(spec.get("visualPurpose")) or "학생이 확인할 장면 근거를 보여줍니다."
-    composition = _as_text(spec.get("composition")) or "학습 근거가 화면 중심에 보이도록 가까운 구도로 구성합니다."
+    primary_object = _sanitize_image_prompt_meta(primary_object) or content.title
+    scene_summary = _sanitize_image_prompt_meta(_as_text(spec.get("sceneSummary"))) or content.title
+    visual_purpose = _sanitize_image_prompt_meta(_as_text(spec.get("visualPurpose"))) or "학생이 확인할 장면 근거를 보여줍니다."
+    composition = _sanitize_image_prompt_meta(_as_text(spec.get("composition"))) or "학습 근거가 화면 중심에 보이도록 가까운 구도로 구성합니다."
     camera = _camera_for_asset(asset.asset_role)
     human_presence = _human_presence_for_asset(content, asset, stage)
     ocr_required = bool(allowed_scene_text)
@@ -665,6 +669,27 @@ def _build_image_brief_for_asset(content, asset, stages: list, stage_visual_spec
 
 def _as_text(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
+
+
+def _sanitize_image_prompt_meta(value: str) -> str:
+    sanitized = value.strip()
+    replacements = {
+        "문제 문장": "학습 화면 문구",
+        "문제 텍스트": "학습 화면 문구",
+        "문항": "학습 활동",
+        "선택지": "보기",
+        "정답 후보": "목표 단서 후보",
+        "정답 표기": "맞는 내용 표시",
+        "정답": "맞는 내용",
+        "답안": "학생 응답",
+        "풀이": "생각 과정",
+        "힌트": "도움 단서",
+        "채점": "확인 표시",
+        "오답": "다른 응답",
+    }
+    for term, replacement in replacements.items():
+        sanitized = sanitized.replace(term, replacement)
+    return sanitized.strip()
 
 
 def _filter_prompt_anchors(values: list[str], *, blocked_texts: list[str], allowed_scene_text: list[str]) -> list[str]:

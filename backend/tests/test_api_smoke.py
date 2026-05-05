@@ -781,14 +781,15 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     assert content_generation_run["status"] == "succeeded"
     content_output = content_generation_run["outputJson"]
     content = content_output.get("missionContent", content_output)
-    assert content["id"] == "content_generated_contract_001"
+    content_id = content["id"]
+    assert content_id.startswith(f"content_{student_id}_")
     assert content["status"] == "teacher_review"
     assert content["totalSteps"] == 4
     assert content_generation_calls["count"] == 2
     assert [stage["step"] for stage in content["stages"]] == [1, 2, 3, 4]
     assert len([asset for asset in content["assets"] if asset["assetType"] == "image"]) == 5
     assert len([asset for asset in content["assets"] if asset["assetType"] == "audio"]) == 5
-    saved_content_response = client.get("/api/contents/content_generated_contract_001")
+    saved_content_response = client.get(f"/api/contents/{content_id}")
     assert saved_content_response.status_code == 200
     content = saved_content_response.json()["data"]
     assert content["briefJson"]["generatedAt"]
@@ -798,15 +799,15 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     latest_fraction_mapping = next(
         mapping for mapping in latest_seed.json()["data"]["missionMappings"] if mapping["studentId"] == student_id
     )
-    assert latest_fraction_mapping["contentId"] == "content_generated_contract_001"
+    assert latest_fraction_mapping["contentId"] == content_id
     assert latest_fraction_mapping["updatedAt"] == content["briefJson"]["generatedAt"]
 
-    package = client.post("/api/contents/content_generated_contract_001/assets/generate-package")
+    package = client.post(f"/api/contents/{content_id}/assets/generate-package")
     assert package.status_code == 200, package.json()
     package_data = package.json()["data"]
     assert package_data["generatedCount"] == 10
     assert image_parallel_probe["max"] >= 2
-    expected_asset_prefix = f"/generated/assets/students/{student_id}/content_generated_contract_001/"
+    expected_asset_prefix = f"/generated/assets/students/{student_id}/{content_id}/"
     assert all(asset["storageUrl"].startswith(expected_asset_prefix) for asset in package_data["assets"])
     assert all(asset["qaStatus"] == "passed" for asset in package_data["assets"])
     assert all(
@@ -825,7 +826,7 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
         if asset["assetType"] == "image"
     )
 
-    reviewable = client.get("/api/contents/content_generated_contract_001")
+    reviewable = client.get(f"/api/contents/{content_id}")
     assert reviewable.status_code == 200
     assert reviewable.json()["data"]["assets"][0]["previewUrl"].startswith(expected_asset_prefix)
     assert reviewable.json()["data"]["assets"][0]["qaStatus"] == "passed"

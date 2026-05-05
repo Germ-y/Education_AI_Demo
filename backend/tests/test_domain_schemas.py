@@ -183,8 +183,10 @@ def test_content_generation_output_accepts_direct_mission_content_schema() -> No
 
     mission = _mission_from_generation(content, student_id=base_content.student_id, case_id=base_content.case_id)
 
-    assert mission.id == "content_generated_schema_check"
+    assert mission.id.startswith(f"content_{base_content.student_id}_")
     assert mission.status == "teacher_review"
+    assert all(stage.mission_content_id == mission.id for stage in mission.stages)
+    assert all(asset.mission_content_id == mission.id for asset in mission.assets)
     assert len([asset for asset in mission.assets if asset.asset_type == "image"]) == 5
     assert len([asset for asset in mission.assets if asset.asset_type == "audio"]) == 5
 

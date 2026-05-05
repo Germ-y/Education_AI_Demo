@@ -1,6 +1,7 @@
 import logging
 import time
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import ValidationError
@@ -480,12 +481,100 @@ def _normalize_generated_mission_candidate(candidate: Any) -> Any:
         return candidate
 
     normalized = dict(candidate)
+    _rewrite_generated_mission_ids(normalized)
     stages = normalized.get("stages")
     if not isinstance(stages, list):
         return normalized
 
     normalized["stages"] = [_normalize_generated_stage(stage) for stage in stages]
     return normalized
+
+
+def _replace_output_mission_content(output_json: dict, mission: MissionContent) -> dict:
+    mission_payload = mission.model_dump(by_alias=True)
+    if isinstance(output_json, dict) and isinstance(output_json.get("missionContent"), dict):
+        return {**output_json, "missionContent": mission_payload}
+    return mission_payload
+
+
+def _rewrite_generated_mission_ids(mission: dict[str, Any]) -> None:
+    student_id = str(mission.get("studentId") or mission.get("student_id") or "student")
+    content_id = f"content_{_safe_generated_id_segment(student_id)}_{int(time.time())}_{uuid4().hex[:8]}"
+    mission["id"] = content_id
+
+    stages = mission.get("stages")
+    if not isinstance(stages, list):
+        stages = []
+    stage_id_by_step: dict[int, str] = {}
+    for stage in stages:
+        if not isinstance(stage, dict):
+            continue
+        step = stage.get("step")
+        if isinstance(step, int):
+            stage_id = f"stage_{content_id}_{step}"
+            stage["id"] = stage_id
+            stage["missionContentId"] = content_id
+            stage_id_by_step[step] = stage_id
+
+    assets = mission.get("assets")
+    if not isinstance(assets, list):
+        assets = []
+    image_asset_by_role: dict[str, str] = {}
+    audio_asset_by_role: dict[str, str] = {}
+    for asset in assets:
+        if not isinstance(asset, dict):
+            continue
+        role = str(asset.get("assetRole") or "")
+        asset_type = str(asset.get("assetType") or "")
+        if not role or not asset_type:
+            continue
+        suffix = "_audio" if asset_type == "audio" else ""
+        asset_id = f"asset_{content_id}_{role}{suffix}"
+        asset["id"] = asset_id
+        asset["missionContentId"] = content_id
+        asset["stageId"] = _stage_id_for_generated_asset_role(role, stage_id_by_step)
+        if asset_type == "image":
+            image_asset_by_role[role] = asset_id
+        elif asset_type == "audio":
+            audio_asset_by_role[role] = asset_id
+
+    for stage in stages:
+        if not isinstance(stage, dict):
+            continue
+        step = stage.get("step")
+        role = "stage_4_realtime" if step == 4 else f"stage_{step}"
+        template_json = stage.get("templateJson")
+        if isinstance(template_json, dict):
+            image_asset_id = image_asset_by_role.get(role)
+            audio_asset_id = audio_asset_by_role.get(role)
+            if image_asset_id:
+                template_json["imageAssetId"] = image_asset_id
+            if audio_asset_id:
+                template_json["audioAssetId"] = audio_asset_id
+            template_json["assetBundle"] = {"imageAssetId": image_asset_id, "audioAssetId": audio_asset_id}
+        realtime_spec = stage.get("realtimeSpec")
+        if isinstance(realtime_spec, dict):
+            realtime_spec["id"] = f"rt_spec_{content_id}"
+            realtime_spec["stageId"] = stage.get("id")
+            if image_asset_by_role.get(role):
+                realtime_spec["imageAssetId"] = image_asset_by_role[role]
+
+
+def _stage_id_for_generated_asset_role(role: str, stage_id_by_step: dict[int, str]) -> str | None:
+    if role == "hero":
+        return None
+    if role == "stage_4_realtime":
+        return stage_id_by_step.get(4)
+    if role.startswith("stage_"):
+        try:
+            return stage_id_by_step.get(int(role.removeprefix("stage_")))
+        except ValueError:
+            return None
+    return None
+
+
+def _safe_generated_id_segment(value: str) -> str:
+    return "".join(character if character.isalnum() or character in {"_", "-"} else "_" for character in value)[:48]
 
 
 def _normalize_generated_stage(stage: Any) -> Any:
@@ -567,6 +656,7 @@ def _generate_valid_mission_content(
                 )
                 if critique["verdict"] != "pass":
                     raise ContentQualityError(_critique_issues(critique))
+            output_json = _replace_output_mission_content(output_json, mission)
             logger.info(
                 "ai.content.attempt_validated student_id=%s case_id=%s attempt=%s content_id=%s",
                 student_id,
