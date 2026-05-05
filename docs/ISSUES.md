@@ -16,7 +16,7 @@
 | 이미지/음성 asset 파이프라인 | 82% | background job 생성/polling과 asset별 성공·실패 상태 저장이 연결됨. provider 실패 UX와 운영 queue 전환이 남음. |
 | 학생 런타임/realtime | 82% | published 미션, 제출, 회고, 완료 기록은 됨. preview/runtime 경계와 WebRTC 취소/재시작 방어가 연결됨. provider 실연결 E2E가 남음. |
 | 학생등록 UX | 88% | 교사 대시보드 모달에서 학교검색, 학교 선택, 강점/약점/지원 입력, 등록 후 목록/상세 갱신과 access code 확인까지 연결됨. 브라우저 통합 회귀만 남음. |
-| 문서/인수인계 | 70% | 문서는 축소됨. DB dump와 generated asset 정책을 최신 상태로 반복 관리해야 함. |
+| 문서/인수인계 | 78% | DB dump와 generated asset 공유 기준이 정리됨. E2E 결과와 최종 push 전 상태만 갱신하면 됨. |
 
 ## 우선순위
 
@@ -112,15 +112,18 @@
 - 2026-05-05 브라우저 확인: provider 응답 대기 중 preview 시작 후 즉시 `연결 중단`해도 콘솔 오류 없이 대기 상태로 돌아왔다.
 - 실제 provider client secret, 마이크 권한, WebRTC 음성 송수신, 완료 저장은 최종 E2E에서 한 번 더 확인한다.
 
-### P1. DB dump와 generated asset 정책 정리
+### 완료. DB dump와 generated asset 정책 정리
 
 현재 상태:
 
 - `backend/data/eduyj_demo.db`, `backend/data/eduyj_demo_dump.sql`, `backend/generated/assets/`가 추적 대상이다.
 - 실제 생성 테스트를 하면 로컬 DB와 generated asset이 계속 변한다.
 - 지금 로컬에는 커밋하지 않은 실제 생성 테스트 결과가 남아 있다.
+- 새 generated asset은 `.gitignore`로 기본 무시한다.
+- 공유 기준으로 확정한 콘텐츠만 `git add -f backend/generated/assets/students/{studentId}/{contentId}`로 명시 추가한다.
+- DB, dump, asset은 같은 커밋에 넣어야 한다.
 
-해야 할 일:
+운영 규칙:
 
 - "공유 기준 DB"와 "개인 테스트 결과"를 구분한다.
 - 팀원 공유용 DB를 만들 때만 dump와 asset을 함께 갱신한다.
@@ -133,10 +136,10 @@ backend/generated/assets/students/{studentId}/{contentId}/{assetId}.png
 backend/generated/assets/students/{studentId}/{contentId}/{assetId}.mp3
 ```
 
-완료 기준:
+남은 확인:
 
-- 팀원이 dump 복원 후 같은 콘텐츠와 asset을 볼 수 있다.
-- 개인 테스트 산출물이 실수로 공유 기준 DB에 섞이지 않는다.
+- 현재 로컬의 `backend/data/eduyj_demo.db` 변경과 untracked generated asset은 공유 기준으로 확정하지 않았다.
+- 최종 push 전 공유 기준 DB를 갱신할지, 현 추적 dump/asset 기준으로 둘지 다시 확인한다.
 
 ### P2. API/프론트 계약 정리
 
@@ -177,6 +180,6 @@ backend/generated/assets/students/{studentId}/{contentId}/{assetId}.mp3
 
 ## 다음 커밋 추천 순서
 
-1. `fix : realtime preview runtime 안정화`
-2. `docs : 공유 DB와 asset 기준 갱신`
-3. `test : 교사 생성부터 학생 완료까지 e2e 추가`
+1. `docs : API 프론트 계약 최종 정리`
+2. `test : 교사 생성부터 학생 완료까지 e2e 추가`
+3. `docs : 최종 검증 결과 반영`

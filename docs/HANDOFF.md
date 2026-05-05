@@ -109,7 +109,9 @@ backend/data/README.md
 backend/generated/assets/
 ```
 
-현재 MVP 확인 단계에서는 실제 생성 이미지/음성과 승인된 SQLite 상태를 팀원이 바로 확인할 수 있도록 `backend/data/eduyj_demo.db`와 `backend/generated/assets/`를 추적한다.
+현재 MVP 확인 단계에서는 실제 생성 이미지/음성과 승인된 SQLite 상태를 팀원이 바로 확인할 수 있도록 `backend/data/eduyj_demo.db`와 공유 기준 `backend/generated/assets/`를 추적한다.
+
+새로 생긴 `backend/generated/assets/**`는 `.gitignore`로 기본 무시한다. 팀 기준으로 확정한 콘텐츠만 `git add -f backend/generated/assets/students/{studentId}/{contentId}`로 명시 추가하고, DB/dump/asset을 같은 커밋에 넣는다.
 
 주의: 로컬에서 자료 생성/승인/학생 완료 테스트를 하면 `eduyj_demo.db`는 추적 dump와 달라진다. 깨끗한 seed 기준이 필요하면 아래 dump 복원 명령으로 먼저 맞춘다.
 
@@ -175,5 +177,5 @@ git diff --check
 
 최우선:
 
-1. DB dump와 generated asset 공유 기준 정리
-2. 교사 승인부터 학생 완료, 교사 리포트 확인까지 E2E 회귀 테스트 추가
+1. 교사 승인부터 학생 완료, 교사 리포트 확인까지 E2E 회귀 테스트 추가
+2. 최종 push 전 DB/generated asset 공유 기준 확정 여부 재확인

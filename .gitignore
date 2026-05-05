@@ -57,3 +57,6 @@ __pycache__/
 backend/*.err
 backend/*.log
 backend/logs/
+
+# Generated demo assets are tracked only when promoted to the shared baseline.
+backend/generated/assets/**
