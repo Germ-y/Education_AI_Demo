@@ -251,6 +251,26 @@ def test_orchestrator_plan_quality_requires_track_matching_four_stage_flow() -> 
         )
 
 
+def test_orchestrator_plan_quality_requires_upfront_design_criteria() -> None:
+    plan = _valid_learning_plan()
+    del plan["scenarioSpine"]["stage2FirstSuccess"]
+    del plan["stagePlan"][1]["templateRationale"]
+    del plan["stageVisualSpecs"][1]["evidenceLocation"]
+
+    with pytest.raises(ContentQualityError) as exc:
+        validate_orchestrator_plan_quality(
+            plan,
+            student_id="student_learning_fraction",
+            case_id="case_learning_fraction",
+            content_type="learning_focus",
+        )
+
+    message = str(exc.value)
+    assert "scenarioSpine.stage2FirstSuccess" in message
+    assert "stagePlan[2].templateRationale" in message
+    assert "stageVisualSpecs[1].evidenceLocation" in message
+
+
 def test_orchestrator_plan_quality_allows_choice_flow_for_very_low_reading_load() -> None:
     plan = _valid_learning_plan()
     plan["stagePlan"][1]["templateType"] = "scene_question"
@@ -541,6 +561,10 @@ def _valid_learning_plan() -> dict:
             "learningOrBehaviorTarget": "분모와 분자의 의미 연결",
             "evidenceSource": "네 조각으로 나뉜 피자 그림",
             "commonMistakeOrImpulse": "고른 조각만 보고 전체 수를 놓칠 수 있습니다.",
+            "whyThisMatters": "전체와 부분을 함께 말해야 분수 의미를 일상 그림에 연결할 수 있습니다.",
+            "studentLikelyImpulseOrMisconception": "고른 한 조각만 보고 전체 네 조각을 빠뜨릴 수 있습니다.",
+            "stage2FirstSuccess": "전체 네 조각을 먼저 세며 성공 경험을 만듭니다.",
+            "stage3Transfer": "고른 한 조각과 전체 네 조각을 빈칸 문장으로 옮깁니다.",
             "stage4Reuse": "왜 1/4인지 전체와 부분을 넣어 설명합니다.",
         },
         "stagePlan": [
@@ -550,6 +574,7 @@ def _valid_learning_plan() -> dict:
                 "templateType": "concept_intro",
                 "studentTitle": "개념 열기",
                 "purpose": "전체와 부분을 그림으로 확인합니다.",
+                "templateRationale": "개념 소개 화면이 전체와 부분 용어를 부담 없이 열 수 있습니다.",
             },
             {
                 "step": 2,
@@ -557,6 +582,7 @@ def _valid_learning_plan() -> dict:
                 "templateType": "partition_picker",
                 "studentTitle": "문제 1",
                 "purpose": "전체 조각 수를 먼저 세게 합니다.",
+                "templateRationale": "partition_picker가 전체 조각을 손으로 확인하는 첫 성공에 맞습니다.",
             },
             {
                 "step": 3,
@@ -564,6 +590,7 @@ def _valid_learning_plan() -> dict:
                 "templateType": "blank_fill",
                 "studentTitle": "문제 2",
                 "purpose": "고른 수와 전체 수를 분수 자리에 연결합니다.",
+                "templateRationale": "blank_fill이 전체와 부분을 문장으로 옮기는 전이에 맞습니다.",
             },
             {
                 "step": 4,
@@ -571,6 +598,7 @@ def _valid_learning_plan() -> dict:
                 "templateType": "realtime_teach_back",
                 "studentTitle": "설명해보기",
                 "purpose": "왜 1/4인지 짧게 말해봅니다.",
+                "templateRationale": "말로 설명하기 활동이 같은 근거를 다시 사용하게 합니다.",
             },
         ],
         "imagePackageIntent": [
@@ -627,6 +655,7 @@ def _fraction_stage_visual_specs() -> list[dict]:
             "visualPurpose": "전체와 부분을 배울 피자 조각 장면을 소개합니다.",
             "sceneSummary": "네 조각 피자가 놓인 책상 장면",
             "primaryEvidenceObject": "네 조각 피자",
+            "evidenceLocation": "책상 가운데 네 조각 피자 경계",
             "mustShow": ["네 조각 피자"],
             "allowedSceneText": [],
             "doNotRenderText": ["문제", "선택지", "정답", "힌트"],
@@ -638,6 +667,7 @@ def _fraction_stage_visual_specs() -> list[dict]:
             "visualPurpose": "전체 피자가 몇 조각인지 확인하게 합니다.",
             "sceneSummary": "네 조각으로 나뉜 피자 전체",
             "primaryEvidenceObject": "전체 피자",
+            "evidenceLocation": "화면 중심의 전체 피자 조각 경계",
             "mustShow": ["네 조각", "전체 피자"],
             "allowedSceneText": [],
             "doNotRenderText": ["문제", "선택지", "정답", "힌트"],
@@ -649,6 +679,7 @@ def _fraction_stage_visual_specs() -> list[dict]:
             "visualPurpose": "전체 조각 수를 세는 근거를 보여줍니다.",
             "sceneSummary": "네 조각 피자 중 한 조각이 살짝 강조된 장면",
             "primaryEvidenceObject": "네 조각 피자",
+            "evidenceLocation": "강조된 한 조각 주변의 네 조각 경계",
             "mustShow": ["네 조각", "한 조각 강조"],
             "allowedSceneText": [],
             "doNotRenderText": ["전체는 몇 조각인가요?", "1개", "2개", "4개", "정답"],
@@ -660,6 +691,7 @@ def _fraction_stage_visual_specs() -> list[dict]:
             "visualPurpose": "고른 조각과 전체 조각을 연결해 분수로 말하게 합니다.",
             "sceneSummary": "고른 한 조각과 전체 네 조각이 함께 보이는 장면",
             "primaryEvidenceObject": "강조된 한 조각",
+            "evidenceLocation": "왼쪽의 한 조각과 오른쪽의 전체 네 조각 비교 위치",
             "mustShow": ["한 조각", "네 조각 전체"],
             "allowedSceneText": [],
             "doNotRenderText": ["분수", "빈칸", "정답", "힌트"],
@@ -671,6 +703,7 @@ def _fraction_stage_visual_specs() -> list[dict]:
             "visualPurpose": "학생이 전체와 부분을 말로 설명하는 상황을 준비합니다.",
             "sceneSummary": "피자 조각을 보며 설명을 준비하는 책상 장면",
             "primaryEvidenceObject": "피자 조각 그림",
+            "evidenceLocation": "설명 카드 옆 피자 조각 그림",
             "mustShow": ["피자 조각 그림"],
             "allowedSceneText": [],
             "doNotRenderText": ["말하기 정답", "힌트", "채점"],

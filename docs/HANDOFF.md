@@ -51,6 +51,7 @@
 - 콘텐츠 생성은 `mission_content_package` 출력 뒤 schema/계약 검증을 통과해야 저장된다. LLM 기반 `content_quality_critique`는 선택 설정이며 기본 병목을 줄이기 위해 현재 기본값은 비활성화다.
 - 콘텐츠 생성 입력은 `generationPlan.scenarioPlan`, `stagePlans`, `visualSpecDrafts`로 분리되고, 저장된 콘텐츠는 `briefJson.generationUnits.stageContentDrafts`에 단계별 template/realtime/asset/visual draft를 남긴다.
 - 콘텐츠 품질/schema retry는 `qualityRepair.stageRepairTargets`와 이전 `stageContentDrafts`를 함께 전달해 실패 stage/visual unit 중심으로 고친다.
+- 오케스트레이터 plan은 작성 전 설계 기준을 포함해야 한다. `scenarioSpine`에는 `whyThisMatters`, `studentLikelyImpulseOrMisconception`, `stage2FirstSuccess`, `stage3Transfer`, `stage4Reuse`가 필요하고, `stagePlan[*].templateRationale`과 `stageVisualSpecs[*].evidenceLocation`도 검증한다.
 - 이미지 생성 전에는 별도 LLM을 다시 호출하지 않고, 완성된 `MissionContent`의 `briefJson.stageVisualSpecs`와 단계별 `templateJson`을 조합해 5개 이미지 prompt를 만든다. `gpt-image-2`에는 이 장면 prompt만 전달한다.
 - 이미지 prompt는 장면만 설명해야 하며 빈 카드, 말풍선, UI 패널, 선택지 영역, 버튼 같은 학습지형 구성을 요청하면 실패 처리한다.
 - OpenAI Realtime 음성은 ElevenLabs 안내 음성과 별도다. 기본값은 `OPENAI_REALTIME_VOICE=marin`, `OPENAI_REALTIME_VOICE_SPEED=0.92`다.

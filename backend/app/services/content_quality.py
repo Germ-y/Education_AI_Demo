@@ -251,6 +251,7 @@ def validate_orchestrator_plan_quality(
     _validate_korean_text(plan.get("sessionGoal"), "orchestrator.sessionGoal", issues)
     _validate_korean_text(plan.get("targetSkill"), "orchestrator.targetSkill", issues)
     _validate_korean_text(_nested(plan, "difficultyPolicy", "reason"), "orchestrator.difficultyPolicy.reason", issues)
+    _validate_scenario_spine(plan.get("scenarioSpine"), "orchestrator.scenarioSpine", issues)
     _validate_text_list(plan.get("teacherReviewFocus"), "orchestrator.teacherReviewFocus", issues)
     _validate_stage_plan(plan.get("stagePlan"), content_type, issues)
     _validate_stage_plan_template_variety(plan.get("stagePlan"), issues, reading_load=reading_load, choice_limit=choice_limit)
@@ -331,6 +332,7 @@ def _validate_stage_plan(stage_plan: Any, content_type: str, issues: list[str]) 
         if expected_title and item.get("studentTitle") != expected_title:
             issues.append(f"orchestrator.stagePlan[{step}].studentTitle은 '{expected_title}'이어야 합니다.")
         _validate_korean_text(item.get("purpose"), f"orchestrator.stagePlan[{step}].purpose", issues)
+        _validate_korean_text(item.get("templateRationale"), f"orchestrator.stagePlan[{step}].templateRationale", issues)
 
 
 def _validate_stage_plan_template_variety(stage_plan: Any, issues: list[str], *, reading_load: str = "default", choice_limit: int | None = None) -> None:
@@ -755,11 +757,25 @@ def _validate_stage_visual_specs(value: Any, path: str, issues: list[str]) -> No
         if not isinstance(item, dict):
             issues.append(f"{path}[{index}]는 object여야 합니다.")
             continue
-        for key in ("visualPurpose", "sceneSummary", "primaryEvidenceObject", "composition"):
+        for key in ("visualPurpose", "sceneSummary", "primaryEvidenceObject", "evidenceLocation", "composition"):
             _validate_korean_text(item.get(key), f"{path}[{index}].{key}", issues)
         for key in ("mustShow", "allowedSceneText", "doNotRenderText"):
             if not isinstance(item.get(key), list):
                 issues.append(f"{path}[{index}].{key}는 list여야 합니다.")
+
+
+def _validate_scenario_spine(value: Any, path: str, issues: list[str]) -> None:
+    if not isinstance(value, dict):
+        issues.append(f"{path}은 object여야 합니다.")
+        return
+    for key in (
+        "whyThisMatters",
+        "studentLikelyImpulseOrMisconception",
+        "stage2FirstSuccess",
+        "stage3Transfer",
+        "stage4Reuse",
+    ):
+        _validate_korean_text(value.get(key), f"{path}.{key}", issues)
 
 
 def _validate_mission_visual_brief_contract(

@@ -12,7 +12,7 @@
 | --- | ---: | --- |
 | 교사 대시보드 데이터 연결 | 75% | seed 학생, context bundle, 리포트, 콘텐츠 상태는 연결됨. 학생등록 UI와 생성 job 상태 UX가 남음. |
 | 백엔드 API 기반 | 82% | 교사/학생/콘텐츠/공공데이터/NEIS 학교검색/학생등록 백엔드가 있음. 운영 migration과 job queue는 미완성. |
-| 콘텐츠 생성 품질 | 68% | 생성 입력/출력이 scenario/stage/visual unit으로 나뉘고 retry target이 남음. 작성 전 품질 기준 강화가 다음 병목임. |
+| 콘텐츠 생성 품질 | 76% | scenario/stage/visual unit과 작성 전 설계 필드가 검증됨. 실제 생성 샘플 반복 품질 확인은 E2E에서 남음. |
 | 이미지/음성 asset 파이프라인 | 82% | background job 생성/polling과 asset별 성공·실패 상태 저장이 연결됨. provider 실패 UX와 운영 queue 전환이 남음. |
 | 학생 런타임/realtime | 70% | published 미션, 제출, 회고, 완료 기록은 됨. preview/runtime 경계와 WebRTC 안정화가 남음. |
 | 학생등록 UX | 88% | 교사 대시보드 모달에서 학교검색, 학교 선택, 강점/약점/지원 입력, 등록 후 목록/상세 갱신과 access code 확인까지 연결됨. 브라우저 통합 회귀만 남음. |
@@ -63,34 +63,18 @@
 
 - 지금은 단일 content agent 호출 안에서 unit을 분리하고 targeted repair snapshot을 보내는 구조다. 운영 최적화가 필요하면 stage별 agent run을 별도 durable job으로 승격한다.
 
-### P1. 콘텐츠 품질 기준을 검수 탈락이 아니라 작성 기준으로 전환
+### 완료. 콘텐츠 품질 기준을 검수 탈락이 아니라 작성 기준으로 전환
 
 현재 상태:
 
 - `content_quality.py`는 스키마, 단계명, 템플릿, 이미지 prompt 금지어, 유형 혼선을 잡는다.
-- 이 검수는 "저장해도 되는가"에는 유용하지만, "처음부터 좋은 수업인가"를 충분히 보장하지 못한다.
+- 오케스트레이터 prompt는 작성 전 설계 체크리스트를 앞쪽에 둔다.
+- `scenarioSpine`은 `whyThisMatters`, `studentLikelyImpulseOrMisconception`, `stage2FirstSuccess`, `stage3Transfer`, `stage4Reuse`를 필수로 가진다.
+- `stageVisualSpecs[*].evidenceLocation`은 문제 판단 근거가 장면 어디에 보이는지 설명한다.
+- `stagePlan[*].templateRationale`은 템플릿 선택 이유를 남긴다.
+- 위 필드는 `validate_orchestrator_plan_quality`에서 검증한다.
 
-주요 품질 이슈:
-
-- 학생 메모리가 scaffolding이 아니라 과거 주제 고정처럼 작동할 때가 있다.
-- 학습지원형에서 생활안전/도움요청 문제처럼 흐를 수 있다.
-- 카드매칭/순서배열이 교육적 이유 없이 UI 계약 때문에 들어가면 잘리거나 억지스럽다.
-- 이미지가 예뻐도 문제의 근거가 장면 안에 약하게 드러날 수 있다.
-- 안내문/포스터/표지판처럼 읽기 자료가 필요한 경우, 장면 텍스트를 허용해야 하는데 문제/정답/선택지와 구분해야 한다.
-
-해야 할 일:
-
-- 프롬프트에 "잘못 만들면 재시도"보다 "작성 전 설계 체크리스트"를 앞쪽에 둔다.
-- `scenarioSpine`에 아래 필드를 강제한다.
-  - `whyThisMatters`
-  - `studentLikelyImpulseOrMisconception`
-  - `stage2FirstSuccess`
-  - `stage3Transfer`
-  - `stage4Reuse`
-- `stageVisualSpecs`는 "무엇을 보여줄지"뿐 아니라 "문제 판단 근거가 어디에 보이는지"를 포함한다.
-- template 선택은 이유를 남긴다.
-
-완료 기준:
+남은 확인:
 
 - 같은 요청을 3회 생성해도 주제, 학생 유형, 단계 흐름이 크게 흔들리지 않는다.
 - 교사가 봤을 때 "문제는 맞지만 너무 유치함" 케이스가 줄어든다.
@@ -188,9 +172,9 @@ backend/generated/assets/students/{studentId}/{contentId}/{assetId}.mp3
 
 | 단계 | 코드 위치 | 현재 병목 | 다음 조치 |
 | --- | --- | --- | --- |
-| 오케스트레이터 | `backend/app/api/routes/ai.py` | 큰 JSON 계획을 한 번에 생성 | scenario/stage/visual plan 분리 |
+| 오케스트레이터 | `backend/app/api/routes/ai.py` | scenario/stage/visual plan과 작성 전 기준은 분리됨 | 반복 생성 샘플 품질 확인 |
 | 콘텐츠 agent | `backend/app/api/routes/ai.py` | stageContentDrafts와 targeted repair는 연결됨 | stage별 별도 agent run은 운영 최적화로 남김 |
-| 품질 검수 | `backend/app/services/content_quality.py` | 탈락 조건 중심 | 작성 전 품질 기준으로 이동 |
+| 품질 검수 | `backend/app/services/content_quality.py` | 작성 전 설계 필드 검증 연결됨 | 반복 생성 샘플 품질 확인 |
 | 이미지 prompt | `backend/app/api/routes/contents.py` | deterministic으로 개선됨 | 앞단 visual spec 품질 강화 |
 | 이미지 생성 | `backend/app/api/routes/contents.py` | background job과 partial retry는 연결됨 | 운영 queue와 provider 재시도 정책 고도화 |
 | 음성 생성 | `backend/app/ai/elevenlabs_provider.py` | 속도 병목은 작음 | sourceText 품질과 speed 테스트 |

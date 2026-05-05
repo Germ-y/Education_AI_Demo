@@ -111,11 +111,14 @@ You receive a JSON object with:
    - If the learning object is a poster, notice, sign, schedule, label, or other reading source, specify the exact short scene text that should appear as evidence. Do not leave it as a generic blank poster or icon-only notice unless the teacher explicitly asked for picture-only clues.
 8. Produce `scenarioSpine` and `stageVisualSpecs`.
    - `scenarioSpine` is the production brief for the whole mission: situation, learning or behavior target, evidence source, common mistake or realistic impulse, and how stage 4 reuses the same reasoning.
+   - `scenarioSpine` must include these planning fields before any stage writing: `whyThisMatters`, `studentLikelyImpulseOrMisconception`, `stage2FirstSuccess`, `stage3Transfer`, and `stage4Reuse`.
    - `stageVisualSpecs` is the production brief for images. It is not the final image prompt. It tells the backend image prompt builder what each image must show and what text is allowed.
    - Every image asset role must have one `stageVisualSpecs` item.
    - `allowedSceneText` is the only text allowed to appear inside the generated image. Use it only for real-world source material such as poster sentences, sign text, bus numbers, clock times, labels, or schedule lines.
    - `doNotRenderText` must include UI-only text types and any likely problem labels such as problem, choice, answer, hint, feedback, fact/opinion category labels, scoring, and teacher explanations. If the plan uses card matching, answer bucket labels must be listed here.
    - `visualPurpose` must explain why the image is needed for this stage, not merely name the setting.
+   - `evidenceLocation` must say where the student can inspect the evidence in the scene, such as "책상 가운데 네 조각 피자 경계" or "정류장 표지판 오른쪽 버스 번호".
+   - Every `stagePlan` item must include `templateRationale`: why this template fits the student, the goal, and the visual evidence.
 9. Produce narration intent for hero and each stage.
 10. Produce validation warnings for teacher review.
 11. Before returning, self-check:
@@ -126,6 +129,9 @@ You receive a JSON object with:
    - no raw internal labels in prose
    - stage 1, stage 2, stage 3, and stage 4 all feel like parts of one coherent mini-scenario
    - the stored student memory changed the support shape, not the teacher-requested topic
+   - scenarioSpine has the five required planning fields
+   - every stage has a templateRationale
+   - every stageVisualSpecs item has an evidenceLocation
 
 ## Allowed Stage Plan
 
@@ -178,6 +184,10 @@ Return only JSON matching this shape.
     "learningOrBehaviorTarget": "string",
     "evidenceSource": "string",
     "commonMistakeOrImpulse": "string",
+    "whyThisMatters": "string",
+    "studentLikelyImpulseOrMisconception": "string",
+    "stage2FirstSuccess": "string",
+    "stage3Transfer": "string",
     "stage4Reuse": "string"
   },
   "stagePlan": [
@@ -186,7 +196,8 @@ Return only JSON matching this shape.
       "stageRole": "string",
       "templateType": "string",
       "studentTitle": "string",
-      "purpose": "string"
+      "purpose": "string",
+      "templateRationale": "string"
     }
   ],
   "stageVisualSpecs": [
@@ -196,6 +207,7 @@ Return only JSON matching this shape.
       "visualPurpose": "string",
       "sceneSummary": "string",
       "primaryEvidenceObject": "string",
+      "evidenceLocation": "string",
       "mustShow": ["string"],
       "allowedSceneText": ["string"],
       "doNotRenderText": ["problem", "choices", "answer", "feedback"],
