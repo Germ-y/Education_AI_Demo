@@ -8,6 +8,19 @@
 
 API/프론트 계약은 `docs/API.md`의 계약 기준 표와 `frontend/lib/api/contracts.ts`를 함께 본다. 학생등록, 콘텐츠 검토 수정, 승인/반려, asset generation job, student runtime 요청/응답 타입은 프론트 계약 파일에 이름을 맞춰 둔다.
 
+## 최종 검증 기록
+
+2026-05-05 기준 `dev`에서 아래 검증을 완료했다.
+
+- `cd backend && .venv/bin/ruff check app tests`: 통과
+- `cd backend && .venv/bin/python -m pytest`: 57 passed
+- `cd frontend && npm run lint`: 통과
+- `cd frontend && npx tsc --noEmit`: 통과
+- `git diff --check`: 통과
+- Chrome headless 브라우저 확인: `localhost:3000`/`localhost:4000`에서 교사 대시보드, 학생등록 모달, published 학생 홈, 3단계 preview, 4단계 realtime preview 렌더링 확인. 가로 overflow와 치명적 콘솔 오류 없음.
+
+브라우저에서는 로컬 `backend/data/eduyj_demo.db` 변경을 더 늘리지 않기 위해 학생등록 최종 제출은 반복하지 않았다. 등록 제출부터 콘텐츠 생성, asset job, 승인/배포, 학생 완료, 교사 리포트 반영은 `backend/tests/test_api_smoke.py::test_registered_student_generation_review_student_completion_e2e`가 temp DB와 mock provider로 검증한다.
+
 ## 현재 완성된 흐름
 
 - 데모 학생 3명 seed가 교사 대시보드, 학생 홈, 학생 미션 화면에서 같은 데이터로 연결된다.
@@ -116,6 +129,8 @@ backend/generated/assets/
 
 새로 생긴 `backend/generated/assets/**`는 `.gitignore`로 기본 무시한다. 팀 기준으로 확정한 콘텐츠만 `git add -f backend/generated/assets/students/{studentId}/{contentId}`로 명시 추가하고, DB/dump/asset을 같은 커밋에 넣는다.
 
+이번 P0/P1/P2 마무리에서는 공유 기준 DB/dump/generated asset을 갱신하지 않았다. 현재 로컬 `backend/data/eduyj_demo.db` 변경은 개인 실행 결과로 남아 있으며 커밋 대상이 아니다.
+
 주의: 로컬에서 자료 생성/승인/학생 완료 테스트를 하면 `eduyj_demo.db`는 추적 dump와 달라진다. 깨끗한 seed 기준이 필요하면 아래 dump 복원 명령으로 먼저 맞춘다.
 
 SQL dump 복원:
@@ -179,7 +194,8 @@ git diff --check
 
 자세한 우선순위와 병목은 [ISSUES.md](ISSUES.md)를 기준으로 한다.
 
-최우선:
+다음 개선:
 
-1. 최종 push 전 전체 검증과 브라우저 핵심 플로우 확인
-2. 최종 push 전 DB/generated asset 공유 기준 확정 여부 재확인
+1. 운영 DB 기준 Alembic/PostgreSQL migration 확정
+2. asset generation job의 durable worker/queue 전환
+3. 실제 provider 샘플 반복 생성과 realtime 음성 송수신 확인
