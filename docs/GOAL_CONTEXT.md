@@ -613,7 +613,7 @@ Payload 예시:
 - `teacher_reports`에 확정 리포트를 남긴다.
 - 선택된 memory candidate는 장기 메모리 source로 기록한다.
 - 해당 학생의 `student_context_briefs`를 dirty 상태로 만든다.
-- 다음 콘텐츠 생성은 최신 ContextBrief가 없거나 dirty면 refresh job을 먼저 요청할 수 있다.
+- 다음 콘텐츠 생성 전 최신 ContextBrief가 없거나 dirty면 프론트/운영자가 refresh 요청을 먼저 보낼 수 있다.
 
 ### 학생 ContextBrief
 
