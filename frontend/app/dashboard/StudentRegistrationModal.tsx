@@ -87,6 +87,23 @@ function gradeNumberFromGrade(grade: string) {
   return match ? match[0] : null;
 }
 
+function supportIntakeFromForm(form: RegistrationFormState, strengths: string[], weaknesses: string[], preferredSupports: string[]) {
+  const choiceCountLimit = preferredSupports.some((support) => support.includes("2")) || form.studentType === "life_support" ? 2 : 3;
+  return {
+    learningResponse: {
+      preferredCues: preferredSupports,
+      readingLoad: weaknesses.some((weakness) => weakness.includes("긴 문장") || weakness.includes("읽기")) ? "low" : "medium",
+      choiceCountLimit,
+      strengths,
+    },
+    challengeBehaviorPriorities: [],
+    behaviorFunctionHypotheses: weaknesses.filter((weakness) => weakness.includes("회피") || weakness.includes("기다림")),
+    replacementSkills: form.studentType === "life_support" ? ["도움 요청하기", "순서 확인하기"] : ["다시 말해달라고 하기", "순서 확인하기"],
+    recommendedScaffolds: preferredSupports,
+    avoidGuidance: weaknesses,
+  };
+}
+
 function getRequestErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -188,6 +205,7 @@ export function StudentRegistrationModal({
         strengths,
         weaknesses,
         preferredSupports,
+        supportIntake: supportIntakeFromForm(form, strengths, weaknesses, preferredSupports),
       });
       setCreatedResponse(response);
       try {

@@ -18,9 +18,7 @@ git status --short --branch
 
 - [AGENTS.md](AGENTS.md): 새 작업자가 먼저 읽는 실행 규칙
 - [GOAL.md](GOAL.md): 현재 데모 목표와 남은 일
-- [docs/HANDOFF.md](docs/HANDOFF.md): 현재 작동 흐름, 설정, 검증, 인수인계 요약
-- [docs/ISSUES.md](docs/ISSUES.md): 남은 이슈, 병목, 우선순위, 다음 커밋 순서
-- [docs/API.md](docs/API.md): 최신 REST API 요약
+- [docs/GOAL_CONTEXT.md](docs/GOAL_CONTEXT.md): 현재 작동 흐름, 남은 이슈, API 계약, E2E 기준, `/goal` 프롬프트
 - [backend/data/README.md](backend/data/README.md): 데모 DB dump/seed 복원 방법
 
 ## 실행

@@ -28,6 +28,7 @@ class OpenAiProvider:
         instructions: str,
         input_snapshot: dict[str, Any],
         timeout_sec: float | None = None,
+        max_output_tokens: int | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any] | None]:
         if not self.settings.openai_api_key:
             raise ProviderConfigurationError("OPENAI_API_KEY_MISSING", "OPENAI_API_KEY가 없어 실제 AI 생성을 실행할 수 없습니다.")
@@ -41,6 +42,13 @@ class OpenAiProvider:
             "input": json.dumps(input_snapshot, ensure_ascii=False),
             "store": True,
         }
+        reasoning_effort = _reasoning_effort_for_model(model, self.settings.openai_reasoning_effort)
+        if reasoning_effort:
+            payload["reasoning"] = {"effort": reasoning_effort}
+        if _supports_text_verbosity(model) and self.settings.openai_text_verbosity:
+            payload["text"] = {"verbosity": self.settings.openai_text_verbosity}
+        if max_output_tokens:
+            payload["max_output_tokens"] = max_output_tokens
         response = self._post("/v1/responses", payload, timeout_sec=timeout_sec)
         logger.info("openai.responses.returned model=%s elapsed_sec=%.1f", model, time.perf_counter() - started_at)
         output_text = _extract_output_text(response)
@@ -186,6 +194,25 @@ def _sleep_before_retry(path: str, attempt: int, *, reason: str) -> None:
     backoff = OPENAI_POST_BASE_BACKOFF_SEC * (2 ** (attempt - 1)) + random.uniform(0, 0.25)
     logger.warning("openai.post.retrying path=%s attempt=%s reason=%s sleep_sec=%.2f", path, attempt, reason, backoff)
     time.sleep(backoff)
+
+
+def _reasoning_effort_for_model(model: str, effort: str | None) -> str | None:
+    if not effort:
+        return None
+    normalized = effort.strip().lower()
+    if not normalized:
+        return None
+    if normalized == "none" and not _supports_reasoning_none(model):
+        return "minimal"
+    return normalized
+
+
+def _supports_reasoning_none(model: str) -> bool:
+    return model.startswith(("gpt-5.1", "gpt-5.2"))
+
+
+def _supports_text_verbosity(model: str) -> bool:
+    return model.startswith("gpt-5")
 
 
 def _extract_output_text(response: dict[str, Any]) -> str:

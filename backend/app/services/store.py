@@ -22,7 +22,12 @@ from app.domain.models import (
     SchoolTimetableSlot,
     Student,
     StudentAccount,
+    StudentContextBrief,
+    StudentSupportIntakeSource,
+    StudentSupportProfile,
     SupportCase,
+    TeacherReport,
+    TeacherReportDraft,
 )
 from app.domain.schemas import ContentAsset, ContentStagePatch, MissionContent, StudentRegistrationRequest
 from app.repositories.demo_repository import DemoRepository
@@ -344,6 +349,26 @@ class DemoStore:
             checklistJson={"source": "student_registration", "preferredSupports": preferred_supports},
             status="planned",
         )
+        intake_source = StudentSupportIntakeSource(
+            id=f"support_intake_{student_id}_{uuid4().hex[:8]}",
+            studentId=student_id,
+            sourceType="teacher_registration",
+            payloadJson={
+                "registration": payload.model_dump(by_alias=True),
+                "supportIntake": _registration_support_intake(payload),
+                "school": school.model_dump(by_alias=True),
+            },
+            createdAt=_now(),
+        )
+        context_brief = _build_context_brief(
+            student=student,
+            open_case=support_case,
+            memory_card=memory_card,
+            support_profile=None,
+            reports=[],
+            status="dirty",
+            source_json={"trigger": "student_registration", "supportIntakeSourceId": intake_source.id},
+        )
         account = StudentAccount(
             id=f"student_account_{student_id}",
             studentId=student_id,
@@ -354,6 +379,8 @@ class DemoStore:
         self.db.support_cases.append(support_case)
         self.db.memory_cards.append(memory_card)
         self.db.planner_items.append(planner)
+        self.db.student_support_intake_sources.append(intake_source)
+        self.db.student_context_briefs.append(context_brief)
         self.db.student_accounts.append(account)
         self.persist()
         return {"student": self.get_student_case_file(student_id), "created": True, "accessCode": account.access_code}
@@ -368,6 +395,9 @@ class DemoStore:
         if student is None or open_case is None:
             return None
         memory_card = next((card for card in self.db.memory_cards if card.student_id == student_id and card.status == "active"), None)
+        support_profile = self.get_confirmed_support_profile(student_id)
+        latest_support_draft = self.get_latest_support_profile_draft(student_id)
+        context_brief = self.get_student_context_brief(student_id)
         school = self.get_school(student.school_code)
         profile = student.model_dump(by_alias=True)
         dashboard = _student_dashboard(student.profile_json)
@@ -388,8 +418,11 @@ class DemoStore:
             "profile": profile,
             "school": school.model_dump(by_alias=True) if school else None,
             "schoolContext": _school_context_bundle(school, self.db.school_calendar_events, timetable_slots) if school else None,
-            "dashboardProfile": _dashboard_profile(student, open_case, school, memory_card, context_bundle),
+            "dashboardProfile": _dashboard_profile(student, open_case, school, memory_card, context_bundle, support_profile),
             "contextBundle": context_bundle,
+            "supportProfileDraft": latest_support_draft.model_dump(by_alias=True) if latest_support_draft else None,
+            "supportProfile": support_profile.model_dump(by_alias=True) if support_profile else None,
+            "contextBrief": context_brief.model_dump(by_alias=True) if context_brief else None,
             "openCase": open_case.model_dump(by_alias=True),
             "memoryCard": memory_card.model_dump(by_alias=True) if memory_card else None,
             "weeklyRecords": [
@@ -434,6 +467,8 @@ class DemoStore:
         contents = [content for content in self.db.mission_contents if content.student_id == student.id]
         attempts = [attempt for attempt in self.db.attempts if attempt.student_id == student.id]
         reviews = [summary for summary in self.db.review_summaries if summary.student_id == student.id]
+        support_profile = self.get_confirmed_support_profile(student_id)
+        context_brief = self.get_student_context_brief(student_id)
         timetable_slots = self._latest_timetable_slots_for_student(student)
         calendar = _upcoming_calendar_for_school(self.db.school_calendar_events, student.school_code)
         dashboard = _student_dashboard(student.profile_json)
@@ -484,12 +519,18 @@ class DemoStore:
             "previousLessons": previous_lessons,
             "memoryCard": memory_card.model_dump(by_alias=True) if memory_card else None,
             "schoolContext": _school_context_bundle(school, calendar, timetable_slots) if school else None,
+            "supportProfile": support_profile.model_dump(by_alias=True) if support_profile else None,
+            "contextBrief": context_brief.model_dump(by_alias=True) if context_brief else None,
             "autoContext": auto_context,
             "aiReadyContext": {
-                "summary": _teacher_facing_text(dashboard.get("aiContextSummary") or student.primary_need),
+                "summary": _teacher_facing_text(
+                    context_brief.brief_text if context_brief and not context_brief.dirty else dashboard.get("aiContextSummary") or student.primary_need
+                ),
                 "mustUse": _teacher_facing_list(dashboard.get("nextSessionFocus") or []),
                 "avoid": _default_ai_avoid_list(student.student_type),
                 "evidenceSources": _evidence_sources(school, calendar, timetable_slots),
+                "contextBriefId": context_brief.id if context_brief else None,
+                "contextBriefDirty": context_brief.dirty if context_brief else True,
             },
         }
 
@@ -590,6 +631,16 @@ class DemoStore:
                     "realtimeResultJson": summary.realtime_result_json,
                     "realtimeTranscriptSummary": realtime_session.transcript_summary if realtime_session else None,
                     "reflection": reflection.payload_json if reflection else None,
+                    "aiReportDrafts": [
+                        draft.model_dump(by_alias=True)
+                        for draft in self.db.teacher_report_drafts
+                        if draft.review_summary_id == summary.id
+                    ],
+                    "teacherReports": [
+                        report.model_dump(by_alias=True)
+                        for report in self.db.teacher_reports
+                        if report.review_summary_id == summary.id
+                    ],
                 }
             )
 
@@ -804,9 +855,266 @@ class DemoStore:
                 }
             )
             self.db.memory_cards[index] = updated
+            self.mark_context_brief_dirty(summary.student_id, source={"trigger": "review_summary_memory", "reviewSummaryId": summary.id})
             self.persist()
             return updated
         return None
+
+    def get_latest_support_profile_draft(self, student_id: str) -> StudentSupportProfile | None:
+        self.refresh()
+        drafts = [
+            profile
+            for profile in self.db.student_support_profiles
+            if profile.student_id == student_id and profile.status == "draft"
+        ]
+        return sorted(drafts, key=lambda item: item.created_at, reverse=True)[0] if drafts else None
+
+    def get_confirmed_support_profile(self, student_id: str) -> StudentSupportProfile | None:
+        self.refresh()
+        confirmed = [
+            profile
+            for profile in self.db.student_support_profiles
+            if profile.student_id == student_id and profile.status == "confirmed"
+        ]
+        return sorted(confirmed, key=lambda item: item.confirmed_at or item.created_at, reverse=True)[0] if confirmed else None
+
+    def create_support_profile_draft(
+        self,
+        student_id: str,
+        *,
+        teacher_id: str,
+        support_intake: dict[str, Any] | None = None,
+        teacher_note: str | None = None,
+    ) -> StudentSupportProfile | None:
+        self.refresh()
+        student = next((candidate for candidate in self.db.students if candidate.id == student_id), None)
+        open_case = next((case for case in self.db.support_cases if case.student_id == student_id and case.case_status == "open"), None)
+        if student is None or open_case is None or open_case.owner_teacher_id != teacher_id:
+            return None
+        source = self._latest_support_intake_source(student_id)
+        if support_intake:
+            source = StudentSupportIntakeSource(
+                id=f"support_intake_{student_id}_{uuid4().hex[:8]}",
+                studentId=student_id,
+                sourceType="teacher_update",
+                payloadJson={"supportIntake": support_intake, "teacherNote": teacher_note},
+                createdAt=_now(),
+            )
+            self.db.student_support_intake_sources.append(source)
+        profile_json = _build_support_profile_draft_json(
+            student=student,
+            open_case=open_case,
+            intake_source=source,
+            teacher_note=teacher_note,
+        )
+        draft = StudentSupportProfile(
+            id=f"support_profile_draft_{student_id}_{uuid4().hex[:8]}",
+            studentId=student_id,
+            sourceIntakeId=source.id if source else None,
+            status="draft",
+            profileJson=profile_json,
+            generatedBy="local_demo_ai",
+            createdAt=_now(),
+        )
+        self.db.student_support_profiles.append(draft)
+        self.persist()
+        return draft
+
+    def confirm_support_profile(
+        self,
+        student_id: str,
+        *,
+        teacher_id: str,
+        draft_id: str | None,
+        profile_draft: dict[str, Any],
+        teacher_note: str | None = None,
+    ) -> StudentSupportProfile | None:
+        self.refresh()
+        student = next((candidate for candidate in self.db.students if candidate.id == student_id), None)
+        open_case = next((case for case in self.db.support_cases if case.student_id == student_id and case.case_status == "open"), None)
+        if student is None or open_case is None or open_case.owner_teacher_id != teacher_id:
+            return None
+        source_draft = next((profile for profile in self.db.student_support_profiles if profile.id == draft_id), None) if draft_id else None
+        now = _now()
+        self.db.student_support_profiles = [
+            profile.model_copy(update={"status": "superseded"})
+            if profile.student_id == student_id and profile.status == "confirmed"
+            else profile
+            for profile in self.db.student_support_profiles
+        ]
+        if source_draft is not None:
+            self.db.student_support_profiles = [
+                profile.model_copy(update={"status": "superseded"})
+                if profile.id == source_draft.id
+                else profile
+                for profile in self.db.student_support_profiles
+            ]
+        confirmed = StudentSupportProfile(
+            id=f"support_profile_{student_id}_{uuid4().hex[:8]}",
+            studentId=student_id,
+            sourceIntakeId=source_draft.source_intake_id if source_draft else None,
+            status="confirmed",
+            profileJson={**profile_draft, "teacherNote": teacher_note, "confirmedAt": now},
+            generatedBy=source_draft.generated_by if source_draft else "teacher_confirmed",
+            teacherConfirmedByUserId=teacher_id,
+            createdAt=source_draft.created_at if source_draft else now,
+            confirmedAt=now,
+        )
+        self.db.student_support_profiles.append(confirmed)
+        _apply_support_profile_to_student_dashboard(student, open_case, confirmed.profile_json)
+        memory_card = next((card for card in self.db.memory_cards if card.student_id == student_id and card.status == "active"), None)
+        if memory_card is not None:
+            _apply_support_profile_to_memory(memory_card, confirmed.profile_json)
+        self.mark_context_brief_dirty(student_id, source={"trigger": "support_profile_confirmed", "supportProfileId": confirmed.id})
+        self.persist()
+        return confirmed
+
+    def get_student_context_brief(self, student_id: str) -> StudentContextBrief | None:
+        self.refresh()
+        briefs = [brief for brief in self.db.student_context_briefs if brief.student_id == student_id]
+        return sorted(briefs, key=lambda item: item.created_at, reverse=True)[0] if briefs else None
+
+    def mark_context_brief_dirty(self, student_id: str, *, source: dict[str, Any] | None = None) -> StudentContextBrief | None:
+        briefs = [brief for brief in self.db.student_context_briefs if brief.student_id == student_id]
+        if not briefs:
+            return None
+        latest = sorted(briefs, key=lambda item: item.created_at, reverse=True)[0]
+        source_json = dict(latest.source_json)
+        if source:
+            source_json["lastDirtySource"] = source
+        updated = latest.model_copy(update={"dirty": True, "status": "dirty", "source_json": source_json})
+        self.db.student_context_briefs = [updated if brief.id == latest.id else brief for brief in self.db.student_context_briefs]
+        return updated
+
+    def refresh_student_context_brief(self, student_id: str, *, teacher_id: str | None = None) -> StudentContextBrief | None:
+        self.refresh()
+        student = next((candidate for candidate in self.db.students if candidate.id == student_id), None)
+        open_case = next((case for case in self.db.support_cases if case.student_id == student_id and case.case_status == "open"), None)
+        if student is None or open_case is None or (teacher_id is not None and open_case.owner_teacher_id != teacher_id):
+            return None
+        memory_card = next((card for card in self.db.memory_cards if card.student_id == student_id and card.status == "active"), None)
+        support_profile = self.get_confirmed_support_profile(student_id)
+        reports = [report for report in self.db.teacher_reports if report.student_id == student_id]
+        brief = _build_context_brief(
+            student=student,
+            open_case=open_case,
+            memory_card=memory_card,
+            support_profile=support_profile,
+            reports=reports,
+            status="refreshed",
+            source_json={"trigger": "manual_refresh", "reportCount": len(reports)},
+        )
+        self.db.student_context_briefs = [item for item in self.db.student_context_briefs if item.student_id != student_id]
+        self.db.student_context_briefs.append(brief)
+        self.persist()
+        return brief
+
+    def create_teacher_report_draft(self, review_id: str, *, teacher_id: str | None = None) -> TeacherReportDraft | None:
+        self.refresh()
+        snapshot = self._teacher_report_input_snapshot(review_id, teacher_id=teacher_id)
+        if snapshot is None:
+            return None
+        draft_body, suggestions, memory_candidates = _build_teacher_report_draft_text(snapshot)
+        draft = TeacherReportDraft(
+            id=f"report_draft_{uuid4()}",
+            reviewSummaryId=review_id,
+            studentId=snapshot["student"]["id"],
+            contentId=snapshot["content"]["id"],
+            status="completed",
+            bodyMarkdown=draft_body,
+            nextLearningSuggestions=suggestions,
+            memoryCandidates=memory_candidates,
+            inputSnapshotJson=snapshot,
+            model="local_demo_ai",
+            createdAt=_now(),
+            completedAt=_now(),
+        )
+        self.db.teacher_report_drafts.append(draft)
+        self.persist()
+        return draft
+
+    def save_teacher_report(
+        self,
+        *,
+        draft_id: str | None,
+        review_summary_id: str,
+        student_id: str,
+        content_id: str,
+        teacher_body: str,
+        selected_memory_candidates: list[str],
+        teacher_id: str,
+    ) -> TeacherReport | None:
+        self.refresh()
+        open_case = next((case for case in self.db.support_cases if case.student_id == student_id and case.case_status == "open"), None)
+        summary = next((candidate for candidate in self.db.review_summaries if candidate.id == review_summary_id), None)
+        if open_case is None or open_case.owner_teacher_id != teacher_id or summary is None or summary.student_id != student_id:
+            return None
+        report = TeacherReport(
+            id=f"teacher_report_{uuid4()}",
+            draftId=draft_id,
+            reviewSummaryId=review_summary_id,
+            studentId=student_id,
+            contentId=content_id,
+            teacherBody=teacher_body,
+            selectedMemoryCandidates=selected_memory_candidates,
+            createdByUserId=teacher_id,
+            createdAt=_now(),
+        )
+        self.db.teacher_reports.append(report)
+        memory_card = next((card for card in self.db.memory_cards if card.student_id == student_id and card.status == "active"), None)
+        if memory_card is not None:
+            _apply_teacher_report_to_memory(memory_card, report)
+        self.mark_context_brief_dirty(student_id, source={"trigger": "teacher_report_saved", "teacherReportId": report.id})
+        self.persist()
+        return report
+
+    def _latest_support_intake_source(self, student_id: str) -> StudentSupportIntakeSource | None:
+        sources = [source for source in self.db.student_support_intake_sources if source.student_id == student_id]
+        return sorted(sources, key=lambda item: item.created_at, reverse=True)[0] if sources else None
+
+    def _teacher_report_input_snapshot(self, review_id: str, *, teacher_id: str | None = None) -> dict[str, Any] | None:
+        summary = next((candidate for candidate in self.db.review_summaries if candidate.id == review_id), None)
+        if summary is None:
+            return None
+        student = next((candidate for candidate in self.db.students if candidate.id == summary.student_id), None)
+        open_case = next((case for case in self.db.support_cases if case.student_id == summary.student_id and case.case_status == "open"), None)
+        attempt = next((candidate for candidate in self.db.attempts if candidate.id == summary.attempt_id), None)
+        content = next((candidate for candidate in self.db.mission_contents if attempt and candidate.id == attempt.mission_content_id), None)
+        if student is None or open_case is None or attempt is None or content is None:
+            return None
+        if teacher_id is not None and open_case.owner_teacher_id != teacher_id:
+            return None
+        events = [event for event in self.db.activity_events if event.attempt_id == attempt.id]
+        realtime_session = next((session for session in self.db.realtime_sessions if session.attempt_id == attempt.id), None)
+        return {
+            "reviewSummary": summary.model_dump(by_alias=True),
+            "student": student.model_dump(by_alias=True),
+            "openCase": open_case.model_dump(by_alias=True),
+            "attempt": attempt.model_dump(by_alias=True),
+            "content": {
+                "id": content.id,
+                "title": content.title,
+                "sessionGoal": content.session_goal,
+                "stages": [
+                    {
+                        "step": stage.step,
+                        "studentTitle": stage.student_title,
+                        "studentInstruction": stage.student_instruction,
+                    }
+                    for stage in sorted(content.stages, key=lambda item: item.step)
+                ],
+            },
+            "activityEvents": [event.model_dump(by_alias=True) for event in events],
+            "realtimeSession": realtime_session.model_dump(by_alias=True) if realtime_session else None,
+            "contextBrief": self.get_student_context_brief(summary.student_id).model_dump(by_alias=True)
+            if self.get_student_context_brief(summary.student_id)
+            else None,
+            "teacherNotes": [
+                note.model_dump(by_alias=True)
+                for note in self.db.case_notes
+                if note.case_id == open_case.id
+            ][-5:],
+        }
 
     def add_student_note(self, student_id: str, author_id: str, payload: dict[str, Any]) -> CaseNote | None:
         open_case = next(
@@ -1334,8 +1642,11 @@ def _attendance_label(value: Any) -> str:
     return f"{value}%"
 
 
-def _dashboard_profile(student, open_case, school, memory_card, context_bundle: dict | None) -> dict[str, Any]:
+def _dashboard_profile(student, open_case, school, memory_card, context_bundle: dict | None, support_profile=None) -> dict[str, Any]:
     dashboard = _student_dashboard(student.profile_json)
+    confirmed_profile = support_profile.profile_json if support_profile is not None else {}
+    learning_response = confirmed_profile.get("learningResponsePattern") if isinstance(confirmed_profile, dict) else None
+    behavior_support = confirmed_profile.get("behaviorSupportProfile") if isinstance(confirmed_profile, dict) else None
     auto_context = _teacher_facing_context_items(context_bundle.get("autoContext", []) if context_bundle else [])
     school_name = school.school_name if school else "학교 정보 확인 중"
     grade_label = _teacher_facing_text(dashboard.get("gradeLabel") or _grade_label(student.grade))
@@ -1357,6 +1668,11 @@ def _dashboard_profile(student, open_case, school, memory_card, context_bundle: 
         "nextSessionFocus": _teacher_facing_list(dashboard.get("nextSessionFocus") or []),
         "aiContextSummary": _teacher_facing_text(dashboard.get("aiContextSummary") or student.primary_need),
         "autoContext": auto_context,
+        "supportProfileStatus": "confirmed" if support_profile is not None else "none",
+        "lessonDesignHints": _teacher_facing_list(confirmed_profile.get("lessonDesignHints") or []) if isinstance(confirmed_profile, dict) else [],
+        "learningResponsePattern": learning_response if isinstance(learning_response, dict) else None,
+        "behaviorSupportProfile": behavior_support if isinstance(behavior_support, dict) else None,
+        "supportCautions": _teacher_facing_list(confirmed_profile.get("supportCautions") or []) if isinstance(confirmed_profile, dict) else [],
     }
 
 
@@ -1465,6 +1781,289 @@ def _orchestrator_hints_from_subjects(subjects: list[str]) -> list[str]:
     if not hints:
         hints.append("저장된 시간표 snapshot을 참고하되 학생 개인 능력 판단에는 사용하지 않습니다.")
     return hints
+
+
+def _registration_support_intake(payload: StudentRegistrationRequest) -> dict[str, Any]:
+    if isinstance(payload.support_intake, dict):
+        return payload.support_intake
+    return {
+        "learningResponse": {
+            "preferredCues": payload.preferred_supports,
+            "readingLoad": "low",
+            "choiceCountLimit": 2 if payload.student_type == "life_support" else 3,
+        },
+        "challengeBehaviorPriorities": [],
+        "behaviorFunctionHypotheses": [],
+        "replacementSkills": [],
+        "recommendedScaffolds": payload.preferred_supports,
+        "avoidGuidance": payload.weaknesses,
+    }
+
+
+def _build_support_profile_draft_json(
+    *,
+    student: Student,
+    open_case: SupportCase,
+    intake_source: StudentSupportIntakeSource | None,
+    teacher_note: str | None,
+) -> dict[str, Any]:
+    intake = intake_source.payload_json if intake_source else {}
+    registration = intake.get("registration") if isinstance(intake.get("registration"), dict) else {}
+    support_intake = intake.get("supportIntake") if isinstance(intake.get("supportIntake"), dict) else {}
+    learning_response = support_intake.get("learningResponse") if isinstance(support_intake.get("learningResponse"), dict) else {}
+    preferred_cues = _list_value(learning_response.get("preferredCues")) or _list_value(registration.get("preferredSupports"))
+    strengths = _list_value(registration.get("strengths")) or _student_dashboard_list(student.profile_json, "strengths")
+    weaknesses = _list_value(registration.get("weaknesses")) or _student_dashboard_list(student.profile_json, "weaknesses")
+    recommended_scaffolds = _list_value(support_intake.get("recommendedScaffolds")) or preferred_cues
+    replacement_skills = _list_value(support_intake.get("replacementSkills"))
+    behavior_hypotheses = _list_value(support_intake.get("behaviorFunctionHypotheses"))
+    priority_behaviors = [
+        str(item.get("label"))
+        for item in _list_dict_value(support_intake.get("challengeBehaviorPriorities"))
+        if item.get("label")
+    ]
+
+    if not preferred_cues:
+        preferred_cues = ["짧은 지시", "그림 단서"]
+    if not recommended_scaffolds:
+        recommended_scaffolds = ["쉬운 첫 문항", "짧은 단계 안내"]
+    if not replacement_skills and student.student_type == "life_support":
+        replacement_skills = ["도움 요청하기", "순서 확인하기"]
+
+    choice_limit = learning_response.get("choiceCountLimit") or student.profile_json.get("choiceCountLimit") or 2
+    reading_load = learning_response.get("readingLoad") or student.profile_json.get("readingLoad") or "low"
+    can_be_hard = weaknesses[:3] or ["긴 설명 뒤 바로 시작하기"]
+
+    lesson_hint = (
+        f"{', '.join(preferred_cues[:2])}를 먼저 제시하고 선택지는 {choice_limit}개부터 시작하면 "
+        "학생이 첫 반응을 안정적으로 보일 가능성이 높습니다."
+    )
+    if teacher_note:
+        lesson_hint = f"{lesson_hint} 교사 메모: {teacher_note.strip()}"
+
+    return {
+        "profileVersion": "support_profile_v1",
+        "draftLabel": "수업 설계 초안",
+        "lessonDesignHints": [lesson_hint, f"현재 목표는 '{open_case.current_goal}'이며 수업 방식 조정에만 활용합니다."],
+        "learningResponsePattern": {
+            "worksWell": preferred_cues[:5],
+            "canBeHard": can_be_hard,
+            "choiceCountLimit": int(choice_limit) if str(choice_limit).isdigit() else 2,
+            "readingLoad": str(reading_load),
+            "explanationStyle": "짧은 문장으로 한 단계씩 확인",
+        },
+        "behaviorSupportProfile": {
+            "priorityBehaviors": priority_behaviors,
+            "functionHypotheses": behavior_hypotheses,
+            "replacementSkills": replacement_skills,
+            "recommendedScaffolds": recommended_scaffolds[:5],
+        },
+        "strengths": [_registration_sentence(item, positive=True) for item in strengths[:5]],
+        "supportCautions": [_registration_sentence(item, positive=False) for item in can_be_hard[:5]],
+        "source": {
+            "intakeSourceId": intake_source.id if intake_source else None,
+            "generatedBy": "local_demo_ai",
+            "rawRecordPreserved": True,
+        },
+    }
+
+
+def _apply_support_profile_to_student_dashboard(student: Student, open_case: SupportCase, profile_json: dict[str, Any]) -> None:
+    dashboard = dict(_student_dashboard(student.profile_json))
+    hints = _list_value(profile_json.get("lessonDesignHints"))
+    response_pattern = profile_json.get("learningResponsePattern") if isinstance(profile_json.get("learningResponsePattern"), dict) else {}
+    behavior_profile = profile_json.get("behaviorSupportProfile") if isinstance(profile_json.get("behaviorSupportProfile"), dict) else {}
+    strengths = _list_value(profile_json.get("strengths")) or dashboard.get("strengths") or []
+    cautions = _list_value(profile_json.get("supportCautions")) or dashboard.get("weaknesses") or []
+    scaffolds = _list_value(behavior_profile.get("recommendedScaffolds")) or _list_value(response_pattern.get("worksWell"))
+
+    dashboard.update(
+        {
+            "primaryNeedTitle": "현재 목표",
+            "primaryNeedDetail": _teacher_facing_text(open_case.current_goal),
+            "supportStrategyTitle": "학습 반응 패턴",
+            "supportStrategyDetail": hints[0] if hints else _teacher_facing_text(open_case.support_strategy),
+            "strengths": strengths,
+            "weaknesses": cautions,
+            "responsePattern": hints[0] if hints else dashboard.get("responsePattern"),
+            "nextSessionFocus": [_teacher_facing_text(open_case.current_goal), *scaffolds[:3]],
+            "aiContextSummary": _context_summary_from_support_profile(student, open_case, profile_json),
+            "supportProfileStatus": "confirmed",
+        }
+    )
+    student.profile_json = {**student.profile_json, "dashboard": dashboard, "supportProfile": profile_json}
+    open_case.support_strategy = hints[0] if hints else open_case.support_strategy
+    open_case.current_goal = _teacher_facing_text(open_case.current_goal)
+
+
+def _apply_support_profile_to_memory(memory_card: MemoryCard, profile_json: dict[str, Any]) -> None:
+    response_pattern = profile_json.get("learningResponsePattern") if isinstance(profile_json.get("learningResponsePattern"), dict) else {}
+    behavior_profile = profile_json.get("behaviorSupportProfile") if isinstance(profile_json.get("behaviorSupportProfile"), dict) else {}
+    memory_card.recent_4w_response_json = {
+        **memory_card.recent_4w_response_json,
+        "supportProfile": profile_json,
+        "supportProfileConfirmedAt": profile_json.get("confirmedAt"),
+    }
+    memory_card.effective_explanation_styles = _dedupe(
+        [*memory_card.effective_explanation_styles, *_list_value(response_pattern.get("worksWell")), *_list_value(behavior_profile.get("recommendedScaffolds"))]
+    )[-8:]
+    memory_card.next_session_cautions = _dedupe([*memory_card.next_session_cautions, *_list_value(profile_json.get("supportCautions"))])[-8:]
+    memory_card.teacher_verified_at = _now()
+
+
+def _context_summary_from_support_profile(student: Student, open_case: SupportCase, profile_json: dict[str, Any]) -> str:
+    response_pattern = profile_json.get("learningResponsePattern") if isinstance(profile_json.get("learningResponsePattern"), dict) else {}
+    works_well = _list_value(response_pattern.get("worksWell"))
+    can_be_hard = _list_value(response_pattern.get("canBeHard"))
+    return (
+        f"{student.display_name} 학생은 {', '.join(works_well[:2]) or '짧은 단서'}에서 시작이 안정적입니다. "
+        f"{', '.join(can_be_hard[:2]) or '긴 설명'}은 부담이 될 수 있어 현재 목표 '{open_case.current_goal}'의 방식 조정에만 반영합니다."
+    )
+
+
+def _build_context_brief(
+    *,
+    student: Student,
+    open_case: SupportCase,
+    memory_card: MemoryCard | None,
+    support_profile: StudentSupportProfile | None,
+    reports: list[TeacherReport],
+    status: str,
+    source_json: dict[str, Any],
+) -> StudentContextBrief:
+    profile_json = support_profile.profile_json if support_profile else student.profile_json.get("supportProfile", {})
+    response_pattern_candidate = profile_json.get("learningResponsePattern") if isinstance(profile_json, dict) else None
+    behavior_profile_candidate = profile_json.get("behaviorSupportProfile") if isinstance(profile_json, dict) else None
+    response_pattern = response_pattern_candidate if isinstance(response_pattern_candidate, dict) else {}
+    behavior_profile = behavior_profile_candidate if isinstance(behavior_profile_candidate, dict) else {}
+    reading_load = str(response_pattern.get("readingLoad") or student.profile_json.get("readingLoad") or "low")
+    choice_count_value = response_pattern.get("choiceCountLimit") or student.profile_json.get("choiceCountLimit") or 2
+    choice_count = int(choice_count_value) if str(choice_count_value).isdigit() else 2
+    recent_candidates = [candidate for report in reports[-3:] for candidate in report.selected_memory_candidates]
+    success_patterns = _dedupe([
+        *_list_value(response_pattern.get("worksWell")),
+        *(memory_card.effective_explanation_styles if memory_card else []),
+        *recent_candidates,
+    ])[:6]
+    difficulty_patterns = _dedupe([
+        *_list_value(response_pattern.get("canBeHard")),
+        *(memory_card.next_session_cautions if memory_card else []),
+    ])[:6]
+    scaffolds = _dedupe([
+        *_list_value(behavior_profile.get("recommendedScaffolds")),
+        *(memory_card.effective_explanation_styles if memory_card else []),
+    ])[:6]
+    avoid_topics = _dedupe([content for content in (memory_card.learning_problem_types if memory_card else []) if content != open_case.current_goal])[:4]
+    brief_text = (
+        f"{student.display_name} 학생은 {', '.join(success_patterns[:2]) or '짧은 단서'}에서 시작이 안정적입니다. "
+        f"읽기 부담은 {reading_load}, 선택지는 {choice_count}개 안팎이 적합합니다. "
+        f"최근 어려움은 {', '.join(difficulty_patterns[:2]) or '긴 설명 뒤 첫 행동 시작'}입니다. "
+        f"교사 요청 주제 '{open_case.current_goal}'를 우선하고, 지원 프로필은 수업 방식 조정에만 사용합니다."
+    )
+    now = _now()
+    return StudentContextBrief(
+        id=f"context_brief_{student.id}_{uuid4().hex[:8]}",
+        studentId=student.id,
+        briefText=brief_text[:1800],
+        studentType=_student_type_label(student.student_type),
+        readingLoad=reading_load,
+        choiceCount=choice_count,
+        recentSuccessPatterns=success_patterns,
+        recentDifficultyPatterns=difficulty_patterns,
+        recommendedScaffolds=scaffolds,
+        avoidTopicRegression=avoid_topics,
+        sourceWatermark=now,
+        dirty=status == "dirty",
+        status="dirty" if status == "dirty" else "refreshed",
+        sourceJson=source_json,
+        model="local_demo_ai",
+        refreshedAt=None if status == "dirty" else now,
+        createdAt=now,
+    )
+
+
+def _build_teacher_report_draft_text(snapshot: dict[str, Any]) -> tuple[str, list[str], list[str]]:
+    summary = snapshot["reviewSummary"]
+    student = snapshot["student"]
+    content = snapshot["content"]
+    realtime = snapshot.get("realtimeSession") or {}
+    context_brief = snapshot.get("contextBrief") or {}
+    reflection = _latest_reflection_from_snapshot(snapshot.get("activityEvents") or [])
+    accuracy = round(float(summary.get("accuracyRate") or 0) * 100)
+    completion = round(float(summary.get("completionRate") or 0) * 100)
+    transcript_summary = realtime.get("transcriptSummary") or "실시간 발화 요약은 아직 없습니다."
+    next_suggestion = f"다음 수업은 '{content['sessionGoal']}'에서 어려웠던 단서를 한 단계 줄여 다시 시작합니다."
+    memory_candidates = _dedupe(
+        [
+            *(context_brief.get("recommendedScaffolds") or []),
+            f"{student['displayName']} 학생은 정답률 {accuracy}%였고, 첫 단서를 짧게 제시하면 다음 시도에 연결하기 좋습니다.",
+            transcript_summary,
+        ]
+    )[:5]
+    body = "\n".join(
+        [
+            "## 수업 반응",
+            f"- {content['title']}을 완료했습니다. 완료율은 {completion}%, 정답률은 {accuracy}%입니다.",
+            f"- 학생 회고: {reflection or '저장된 회고가 없습니다.'}",
+            "",
+            "## 이해 변화",
+            f"- 자동 요약: {summary['shortSummary']}",
+            f"- 실시간 발화: {transcript_summary}",
+            "",
+            "## 다음 수업 제안",
+            f"- {next_suggestion}",
+            "",
+            "## 메모리 반영 후보",
+            *[f"- {candidate}" for candidate in memory_candidates],
+        ]
+    )
+    return body, [next_suggestion], memory_candidates
+
+
+def _latest_reflection_from_snapshot(events: list[dict[str, Any]]) -> str | None:
+    for event in reversed(events):
+        if event.get("eventType") != "post_practice_reflection":
+            continue
+        payload = event.get("payloadJson") if isinstance(event.get("payloadJson"), dict) else {}
+        if isinstance(payload.get("shortText"), str) and payload["shortText"]:
+            return payload["shortText"]
+        if isinstance(payload.get("reflectionChoice"), str) and payload["reflectionChoice"]:
+            return payload["reflectionChoice"]
+    return None
+
+
+def _apply_teacher_report_to_memory(memory_card: MemoryCard, report: TeacherReport) -> None:
+    candidates = [candidate for candidate in report.selected_memory_candidates if candidate.strip()]
+    memory_card.recent_4w_response_json = {
+        **memory_card.recent_4w_response_json,
+        "latestTeacherReportId": report.id,
+        "latestTeacherReportSummary": report.teacher_body[:500],
+        "selectedMemoryCandidates": candidates,
+    }
+    memory_card.next_session_cautions = _dedupe([*memory_card.next_session_cautions, *candidates])[-8:]
+    memory_card.teacher_verified_at = _now()
+
+
+def _list_value(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [_teacher_facing_text(str(item).strip()) for item in value if str(item).strip()]
+
+
+def _list_dict_value(value: Any) -> list[dict[str, Any]]:
+    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    seen = set()
+    result = []
+    for value in values:
+        text = _teacher_facing_text(str(value).strip())
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        result.append(text)
+    return result
 
 
 def _normalize_registration_grade(value: str) -> str:

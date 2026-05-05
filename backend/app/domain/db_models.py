@@ -273,6 +273,83 @@ class ReviewSummaryRow(Base):
     realtime_result_json: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
+class StudentSupportIntakeSourceRow(Base):
+    __tablename__ = "student_support_intake_sources"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    student_id: Mapped[str] = mapped_column(ForeignKey("students.id"), index=True)
+    source_type: Mapped[str] = mapped_column(String, index=True)
+    payload_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[str] = mapped_column(String)
+
+
+class StudentSupportProfileRow(Base):
+    __tablename__ = "student_support_profiles"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    student_id: Mapped[str] = mapped_column(ForeignKey("students.id"), index=True)
+    source_intake_id: Mapped[str | None] = mapped_column(String, index=True)
+    status: Mapped[str] = mapped_column(String, index=True, default="draft")
+    profile_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    generated_by: Mapped[str] = mapped_column(String, default="local_demo_ai")
+    teacher_confirmed_by_user_id: Mapped[str | None] = mapped_column(String, index=True)
+    created_at: Mapped[str] = mapped_column(String)
+    confirmed_at: Mapped[str | None] = mapped_column(String)
+
+
+class StudentContextBriefRow(Base):
+    __tablename__ = "student_context_briefs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    student_id: Mapped[str] = mapped_column(ForeignKey("students.id"), index=True)
+    brief_text: Mapped[str] = mapped_column(Text)
+    student_type: Mapped[str] = mapped_column(String)
+    reading_load: Mapped[str] = mapped_column(String)
+    choice_count: Mapped[int] = mapped_column(Integer)
+    recent_success_patterns: Mapped[list[str]] = mapped_column(JSON, default=list)
+    recent_difficulty_patterns: Mapped[list[str]] = mapped_column(JSON, default=list)
+    recommended_scaffolds: Mapped[list[str]] = mapped_column(JSON, default=list)
+    avoid_topic_regression: Mapped[list[str]] = mapped_column(JSON, default=list)
+    source_watermark: Mapped[str] = mapped_column(String)
+    dirty: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str] = mapped_column(String, index=True, default="dirty")
+    source_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    model: Mapped[str] = mapped_column(String, default="local_demo_ai")
+    refreshed_at: Mapped[str | None] = mapped_column(String)
+    created_at: Mapped[str] = mapped_column(String)
+
+
+class TeacherReportDraftRow(Base):
+    __tablename__ = "teacher_report_drafts"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    review_summary_id: Mapped[str] = mapped_column(ForeignKey("review_summaries.id"), index=True)
+    student_id: Mapped[str] = mapped_column(ForeignKey("students.id"), index=True)
+    content_id: Mapped[str] = mapped_column(ForeignKey("mission_contents.id"), index=True)
+    status: Mapped[str] = mapped_column(String, index=True, default="completed")
+    body_markdown: Mapped[str] = mapped_column(Text)
+    next_learning_suggestions: Mapped[list[str]] = mapped_column(JSON, default=list)
+    memory_candidates: Mapped[list[str]] = mapped_column(JSON, default=list)
+    input_snapshot_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    model: Mapped[str] = mapped_column(String, default="local_demo_ai")
+    created_at: Mapped[str] = mapped_column(String)
+    completed_at: Mapped[str | None] = mapped_column(String)
+
+
+class TeacherReportRow(Base):
+    __tablename__ = "teacher_reports"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    draft_id: Mapped[str | None] = mapped_column(String, index=True)
+    review_summary_id: Mapped[str] = mapped_column(ForeignKey("review_summaries.id"), index=True)
+    student_id: Mapped[str] = mapped_column(ForeignKey("students.id"), index=True)
+    content_id: Mapped[str] = mapped_column(ForeignKey("mission_contents.id"), index=True)
+    teacher_body: Mapped[str] = mapped_column(Text)
+    selected_memory_candidates: Mapped[list[str]] = mapped_column(JSON, default=list)
+    created_by_user_id: Mapped[str] = mapped_column(String, index=True)
+    created_at: Mapped[str] = mapped_column(String)
+
+
 class AgentRunRow(Base):
     __tablename__ = "agent_runs"
 

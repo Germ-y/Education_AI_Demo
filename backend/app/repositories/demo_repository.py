@@ -71,6 +71,26 @@ class DemoRepository:
                     "reviewSummaries": [
                         _review_summary(row) for row in session.scalars(select(rows.ReviewSummaryRow).order_by(rows.ReviewSummaryRow.id))
                     ],
+                    "studentSupportIntakeSources": [
+                        _student_support_intake_source(row)
+                        for row in session.scalars(select(rows.StudentSupportIntakeSourceRow).order_by(rows.StudentSupportIntakeSourceRow.created_at))
+                    ],
+                    "studentSupportProfiles": [
+                        _student_support_profile(row)
+                        for row in session.scalars(select(rows.StudentSupportProfileRow).order_by(rows.StudentSupportProfileRow.created_at))
+                    ],
+                    "studentContextBriefs": [
+                        _student_context_brief(row)
+                        for row in session.scalars(select(rows.StudentContextBriefRow).order_by(rows.StudentContextBriefRow.created_at))
+                    ],
+                    "teacherReportDrafts": [
+                        _teacher_report_draft(row)
+                        for row in session.scalars(select(rows.TeacherReportDraftRow).order_by(rows.TeacherReportDraftRow.created_at))
+                    ],
+                    "teacherReports": [
+                        _teacher_report(row)
+                        for row in session.scalars(select(rows.TeacherReportRow).order_by(rows.TeacherReportRow.created_at))
+                    ],
                     "auditLogs": [_audit_log(row) for row in session.scalars(select(rows.AuditLogRow).order_by(rows.AuditLogRow.created_at))],
                     "publicDataSources": [
                         _public_data_source(row) for row in session.scalars(select(rows.PublicDataSourceRow).order_by(rows.PublicDataSourceRow.id))
@@ -82,6 +102,11 @@ class DemoRepository:
 def _delete_all(session: Session, *, preserve_agent_runs: bool = False) -> None:
     models = [
         rows.AuditLogRow,
+        rows.TeacherReportRow,
+        rows.TeacherReportDraftRow,
+        rows.StudentContextBriefRow,
+        rows.StudentSupportProfileRow,
+        rows.StudentSupportIntakeSourceRow,
         rows.ReviewSummaryRow,
         rows.RealtimePracticeSessionRow,
         rows.ActivityEventRow,
@@ -359,6 +384,83 @@ def _insert_all(session: Session, db: DemoDatabase) -> None:
             realtime_result_json=item.realtime_result_json,
         )
         for item in db.review_summaries
+    )
+    session.add_all(
+        rows.StudentSupportIntakeSourceRow(
+            id=item.id,
+            student_id=item.student_id,
+            source_type=item.source_type,
+            payload_json=item.payload_json,
+            created_at=item.created_at,
+        )
+        for item in db.student_support_intake_sources
+    )
+    session.add_all(
+        rows.StudentSupportProfileRow(
+            id=item.id,
+            student_id=item.student_id,
+            source_intake_id=item.source_intake_id,
+            status=item.status,
+            profile_json=item.profile_json,
+            generated_by=item.generated_by,
+            teacher_confirmed_by_user_id=item.teacher_confirmed_by_user_id,
+            created_at=item.created_at,
+            confirmed_at=item.confirmed_at,
+        )
+        for item in db.student_support_profiles
+    )
+    session.add_all(
+        rows.StudentContextBriefRow(
+            id=item.id,
+            student_id=item.student_id,
+            brief_text=item.brief_text,
+            student_type=item.student_type,
+            reading_load=item.reading_load,
+            choice_count=item.choice_count,
+            recent_success_patterns=item.recent_success_patterns,
+            recent_difficulty_patterns=item.recent_difficulty_patterns,
+            recommended_scaffolds=item.recommended_scaffolds,
+            avoid_topic_regression=item.avoid_topic_regression,
+            source_watermark=item.source_watermark,
+            dirty=item.dirty,
+            status=item.status,
+            source_json=item.source_json,
+            model=item.model,
+            refreshed_at=item.refreshed_at,
+            created_at=item.created_at,
+        )
+        for item in db.student_context_briefs
+    )
+    session.add_all(
+        rows.TeacherReportDraftRow(
+            id=item.id,
+            review_summary_id=item.review_summary_id,
+            student_id=item.student_id,
+            content_id=item.content_id,
+            status=item.status,
+            body_markdown=item.body_markdown,
+            next_learning_suggestions=item.next_learning_suggestions,
+            memory_candidates=item.memory_candidates,
+            input_snapshot_json=item.input_snapshot_json,
+            model=item.model,
+            created_at=item.created_at,
+            completed_at=item.completed_at,
+        )
+        for item in db.teacher_report_drafts
+    )
+    session.add_all(
+        rows.TeacherReportRow(
+            id=item.id,
+            draft_id=item.draft_id,
+            review_summary_id=item.review_summary_id,
+            student_id=item.student_id,
+            content_id=item.content_id,
+            teacher_body=item.teacher_body,
+            selected_memory_candidates=item.selected_memory_candidates,
+            created_by_user_id=item.created_by_user_id,
+            created_at=item.created_at,
+        )
+        for item in db.teacher_reports
     )
     session.add_all(
         rows.PublicDataSourceRow(
@@ -681,6 +783,83 @@ def _review_summary(row: rows.ReviewSummaryRow) -> dict:
         "shortSummary": row.short_summary,
         "wrongPatternJson": row.wrong_pattern_json,
         "realtimeResultJson": row.realtime_result_json,
+    }
+
+
+def _student_support_intake_source(row: rows.StudentSupportIntakeSourceRow) -> dict:
+    return {
+        "id": row.id,
+        "studentId": row.student_id,
+        "sourceType": row.source_type,
+        "payloadJson": row.payload_json,
+        "createdAt": row.created_at,
+    }
+
+
+def _student_support_profile(row: rows.StudentSupportProfileRow) -> dict:
+    return {
+        "id": row.id,
+        "studentId": row.student_id,
+        "sourceIntakeId": row.source_intake_id,
+        "status": row.status,
+        "profileJson": row.profile_json,
+        "generatedBy": row.generated_by,
+        "teacherConfirmedByUserId": row.teacher_confirmed_by_user_id,
+        "createdAt": row.created_at,
+        "confirmedAt": row.confirmed_at,
+    }
+
+
+def _student_context_brief(row: rows.StudentContextBriefRow) -> dict:
+    return {
+        "id": row.id,
+        "studentId": row.student_id,
+        "briefText": row.brief_text,
+        "studentType": row.student_type,
+        "readingLoad": row.reading_load,
+        "choiceCount": row.choice_count,
+        "recentSuccessPatterns": row.recent_success_patterns,
+        "recentDifficultyPatterns": row.recent_difficulty_patterns,
+        "recommendedScaffolds": row.recommended_scaffolds,
+        "avoidTopicRegression": row.avoid_topic_regression,
+        "sourceWatermark": row.source_watermark,
+        "dirty": row.dirty,
+        "status": row.status,
+        "sourceJson": row.source_json,
+        "model": row.model,
+        "refreshedAt": row.refreshed_at,
+        "createdAt": row.created_at,
+    }
+
+
+def _teacher_report_draft(row: rows.TeacherReportDraftRow) -> dict:
+    return {
+        "id": row.id,
+        "reviewSummaryId": row.review_summary_id,
+        "studentId": row.student_id,
+        "contentId": row.content_id,
+        "status": row.status,
+        "bodyMarkdown": row.body_markdown,
+        "nextLearningSuggestions": row.next_learning_suggestions,
+        "memoryCandidates": row.memory_candidates,
+        "inputSnapshotJson": row.input_snapshot_json,
+        "model": row.model,
+        "createdAt": row.created_at,
+        "completedAt": row.completed_at,
+    }
+
+
+def _teacher_report(row: rows.TeacherReportRow) -> dict:
+    return {
+        "id": row.id,
+        "draftId": row.draft_id,
+        "reviewSummaryId": row.review_summary_id,
+        "studentId": row.student_id,
+        "contentId": row.content_id,
+        "teacherBody": row.teacher_body,
+        "selectedMemoryCandidates": row.selected_memory_candidates,
+        "createdByUserId": row.created_by_user_id,
+        "createdAt": row.created_at,
     }
 
 

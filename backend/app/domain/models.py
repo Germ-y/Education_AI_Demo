@@ -243,6 +243,83 @@ class ReviewSummary(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class StudentSupportIntakeSource(BaseModel):
+    id: str
+    student_id: str = Field(alias="studentId")
+    source_type: Literal["teacher_registration", "teacher_update", "center_summary"] = Field(alias="sourceType")
+    payload_json: dict[str, Any] = Field(default_factory=dict, alias="payloadJson")
+    created_at: str = Field(alias="createdAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class StudentSupportProfile(BaseModel):
+    id: str
+    student_id: str = Field(alias="studentId")
+    source_intake_id: str | None = Field(default=None, alias="sourceIntakeId")
+    status: Literal["draft", "confirmed", "superseded"] = "draft"
+    profile_json: dict[str, Any] = Field(default_factory=dict, alias="profileJson")
+    generated_by: str = Field(default="local_demo_ai", alias="generatedBy")
+    teacher_confirmed_by_user_id: str | None = Field(default=None, alias="teacherConfirmedByUserId")
+    created_at: str = Field(alias="createdAt")
+    confirmed_at: str | None = Field(default=None, alias="confirmedAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class StudentContextBrief(BaseModel):
+    id: str
+    student_id: str = Field(alias="studentId")
+    brief_text: str = Field(alias="briefText")
+    student_type: str = Field(alias="studentType")
+    reading_load: str = Field(alias="readingLoad")
+    choice_count: int = Field(alias="choiceCount")
+    recent_success_patterns: list[str] = Field(default_factory=list, alias="recentSuccessPatterns")
+    recent_difficulty_patterns: list[str] = Field(default_factory=list, alias="recentDifficultyPatterns")
+    recommended_scaffolds: list[str] = Field(default_factory=list, alias="recommendedScaffolds")
+    avoid_topic_regression: list[str] = Field(default_factory=list, alias="avoidTopicRegression")
+    source_watermark: str = Field(alias="sourceWatermark")
+    dirty: bool = True
+    status: Literal["dirty", "refreshed"] = "dirty"
+    source_json: dict[str, Any] = Field(default_factory=dict, alias="sourceJson")
+    model: str = "local_demo_ai"
+    refreshed_at: str | None = Field(default=None, alias="refreshedAt")
+    created_at: str = Field(alias="createdAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class TeacherReportDraft(BaseModel):
+    id: str
+    review_summary_id: str = Field(alias="reviewSummaryId")
+    student_id: str = Field(alias="studentId")
+    content_id: str = Field(alias="contentId")
+    status: Literal["streaming", "completed", "failed"] = "completed"
+    body_markdown: str = Field(alias="bodyMarkdown")
+    next_learning_suggestions: list[str] = Field(default_factory=list, alias="nextLearningSuggestions")
+    memory_candidates: list[str] = Field(default_factory=list, alias="memoryCandidates")
+    input_snapshot_json: dict[str, Any] = Field(default_factory=dict, alias="inputSnapshotJson")
+    model: str = "local_demo_ai"
+    created_at: str = Field(alias="createdAt")
+    completed_at: str | None = Field(default=None, alias="completedAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class TeacherReport(BaseModel):
+    id: str
+    draft_id: str | None = Field(default=None, alias="draftId")
+    review_summary_id: str = Field(alias="reviewSummaryId")
+    student_id: str = Field(alias="studentId")
+    content_id: str = Field(alias="contentId")
+    teacher_body: str = Field(alias="teacherBody")
+    selected_memory_candidates: list[str] = Field(default_factory=list, alias="selectedMemoryCandidates")
+    created_by_user_id: str = Field(alias="createdByUserId")
+    created_at: str = Field(alias="createdAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class AuditLog(BaseModel):
     id: str
     actor_user_id: str | None = Field(default=None, alias="actorUserId")
@@ -274,6 +351,11 @@ class DemoDatabase(BaseModel):
     realtime_sessions: list[RealtimePracticeSession] = Field(default_factory=list, alias="realtimeSessions")
     public_data_sources: list[PublicDataSource] = Field(alias="publicDataSources")
     review_summaries: list[ReviewSummary] = Field(default_factory=list, alias="reviewSummaries")
+    student_support_intake_sources: list[StudentSupportIntakeSource] = Field(default_factory=list, alias="studentSupportIntakeSources")
+    student_support_profiles: list[StudentSupportProfile] = Field(default_factory=list, alias="studentSupportProfiles")
+    student_context_briefs: list[StudentContextBrief] = Field(default_factory=list, alias="studentContextBriefs")
+    teacher_report_drafts: list[TeacherReportDraft] = Field(default_factory=list, alias="teacherReportDrafts")
+    teacher_reports: list[TeacherReport] = Field(default_factory=list, alias="teacherReports")
     audit_logs: list[AuditLog] = Field(default_factory=list, alias="auditLogs")
 
     model_config = ConfigDict(populate_by_name=True)

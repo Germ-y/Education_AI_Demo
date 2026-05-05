@@ -9,10 +9,8 @@ description: EduYJ 레포에서 장기 작업을 이어갈 때 사용한다. 현
 
 1. `AGENTS.md`
 2. `GOAL.md`
-3. `docs/HANDOFF.md`
-4. `docs/ISSUES.md`
-5. API 작업이면 `docs/API.md`
-6. DB/asset 작업이면 `backend/data/README.md`
+3. `docs/GOAL_CONTEXT.md`
+4. DB/asset 작업이면 `backend/data/README.md`
 
 ## 기본 규칙
 
@@ -23,16 +21,16 @@ description: EduYJ 레포에서 장기 작업을 이어갈 때 사용한다. 현
 - 학생 콘텐츠는 4단계다.
 - 4단계가 realtime이다.
 - 영상 생성 범위를 다시 넣지 않는다.
-- API, DB, 진행상황, 남은 이슈가 바뀌면 `docs/HANDOFF.md`, `docs/ISSUES.md`, `docs/API.md`, `backend/data/README.md` 중 필요한 곳만 갱신한다.
+- API, DB, 진행상황, 남은 이슈가 바뀌면 `docs/GOAL_CONTEXT.md`와 필요한 경우 `backend/data/README.md`만 갱신한다.
 
 ## 반복 순서
 
 ```text
 git status 확인
-HANDOFF/ISSUES에서 현재 상태 확인
+GOAL_CONTEXT에서 현재 상태 확인
 작게 수정
 검증 실행
-필요하면 HANDOFF/API 갱신
+필요하면 GOAL_CONTEXT 갱신
 작게 커밋
 필요하면 push
 ```

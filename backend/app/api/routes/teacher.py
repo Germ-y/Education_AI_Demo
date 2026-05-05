@@ -6,7 +6,13 @@ from app.api.response import ok
 from app.core.config import get_settings
 from app.data.neis_client import NeisClient
 from app.domain.models import SchoolProfile
-from app.domain.schemas import CaseNoteCreate, MemoryCardPatch, StudentRegistrationRequest
+from app.domain.schemas import (
+    CaseNoteCreate,
+    MemoryCardPatch,
+    StudentRegistrationRequest,
+    SupportProfileConfirmRequest,
+    SupportProfileDraftRequest,
+)
 from app.services.store import DemoStore, SessionPrincipal
 
 router = APIRouter(prefix="/api/teacher", tags=["teacher"])
@@ -110,6 +116,113 @@ def get_student_context_bundle(
         payload_json={},
     )
     return ok(bundle)
+
+
+@router.get("/students/{student_id}/context-brief")
+def get_student_context_brief(
+    student_id: str,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    brief = demo_store.get_student_context_brief(student_id)
+    if brief is None:
+        brief = demo_store.refresh_student_context_brief(student_id, teacher_id=principal.id if principal.role == "teacher" else None)
+    if brief is None:
+        raise HTTPException(status_code=404, detail={"code": "CONTEXT_BRIEF_NOT_FOUND", "message": "학생 ContextBrief를 찾을 수 없습니다."})
+    demo_store.record_audit(
+        actor_user_id=principal.id,
+        student_id=student_id,
+        action="view_context_brief",
+        resource_type="student_context_brief",
+        resource_id=brief.id,
+        payload_json={"dirty": brief.dirty},
+    )
+    return ok(brief.model_dump(by_alias=True))
+
+
+@router.post("/students/{student_id}/context-brief/refresh")
+def refresh_student_context_brief(
+    student_id: str,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    brief = demo_store.refresh_student_context_brief(student_id, teacher_id=principal.id if principal.role == "teacher" else None)
+    if brief is None:
+        raise HTTPException(status_code=404, detail={"code": "CONTEXT_BRIEF_NOT_FOUND", "message": "학생 ContextBrief를 갱신할 수 없습니다."})
+    demo_store.record_audit(
+        actor_user_id=principal.id,
+        student_id=student_id,
+        action="refresh_context_brief",
+        resource_type="student_context_brief",
+        resource_id=brief.id,
+        payload_json={"dirty": brief.dirty},
+    )
+    return ok(brief.model_dump(by_alias=True))
+
+
+@router.post("/students/{student_id}/support-profile-drafts")
+def create_support_profile_draft(
+    student_id: str,
+    payload: SupportProfileDraftRequest | None = None,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    if principal.role != "teacher":
+        raise HTTPException(status_code=403, detail={"code": "FORBIDDEN", "message": "교사만 지원 프로필 초안을 만들 수 있습니다."})
+    draft = demo_store.create_support_profile_draft(
+        student_id,
+        teacher_id=principal.id,
+        support_intake=payload.support_intake if payload else None,
+        teacher_note=payload.teacher_note if payload else None,
+    )
+    if draft is None:
+        raise HTTPException(status_code=404, detail={"code": "STUDENT_NOT_FOUND", "message": "지원 프로필 초안을 만들 학생을 찾을 수 없습니다."})
+    demo_store.record_audit(
+        actor_user_id=principal.id,
+        student_id=student_id,
+        action="create_support_profile_draft",
+        resource_type="student_support_profile",
+        resource_id=draft.id,
+        payload_json={"generatedBy": draft.generated_by, "sourceIntakeId": draft.source_intake_id},
+    )
+    return ok(
+        {
+            "draftId": draft.id,
+            "studentId": draft.student_id,
+            "status": "completed",
+            "profileDraft": draft.profile_json,
+            "supportProfile": draft.model_dump(by_alias=True),
+        }
+    )
+
+
+@router.post("/students/{student_id}/support-profiles")
+def confirm_support_profile(
+    student_id: str,
+    payload: SupportProfileConfirmRequest,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    if principal.role != "teacher":
+        raise HTTPException(status_code=403, detail={"code": "FORBIDDEN", "message": "교사만 지원 프로필을 확정할 수 있습니다."})
+    profile = demo_store.confirm_support_profile(
+        student_id,
+        teacher_id=principal.id,
+        draft_id=payload.draft_id,
+        profile_draft=payload.profile_draft,
+        teacher_note=payload.teacher_note,
+    )
+    if profile is None:
+        raise HTTPException(status_code=404, detail={"code": "STUDENT_NOT_FOUND", "message": "확정할 지원 프로필 학생을 찾을 수 없습니다."})
+    demo_store.record_audit(
+        actor_user_id=principal.id,
+        student_id=student_id,
+        action="confirm_support_profile",
+        resource_type="student_support_profile",
+        resource_id=profile.id,
+        payload_json={"draftId": payload.draft_id},
+    )
+    return ok(profile.model_dump(by_alias=True))
 
 
 @router.get("/students/{student_id}/report")

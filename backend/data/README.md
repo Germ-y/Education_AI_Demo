@@ -90,4 +90,11 @@ realtimePracticeSessions: 8
 reviewSummaries: 3
 caseNotes: 3
 publicDataSources: 2
+studentSupportIntakeSources: schema ready, seed 기본값 0
+studentSupportProfiles: schema ready, seed 기본값 0
+studentContextBriefs: schema ready, seed 기본값 0
+teacherReportDrafts: schema ready, seed 기본값 0
+teacherReports: schema ready, seed 기본값 0
 ```
+
+2026-05-06 코드 기준으로 지원 프로필, AI 리포트, ContextBrief table이 추가됐다. 기존 dump를 복원해도 앱 시작 시 `create_schema()`가 누락 table을 만들며, 공유 기준 DB/dump를 새로 확정할 때 위 table 데이터까지 함께 갱신한다.

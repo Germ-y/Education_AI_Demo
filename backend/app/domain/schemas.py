@@ -428,6 +428,7 @@ class StudentRegistrationRequest(BaseModel):
     strengths: list[str] = Field(default_factory=list)
     weaknesses: list[str] = Field(default_factory=list)
     preferred_supports: list[str] = Field(default_factory=list, alias="preferredSupports")
+    support_intake: dict[str, Any] | None = Field(default=None, alias="supportIntake")
     timetable_date: str | None = Field(default=None, alias="timetableDate")
 
     model_config = ConfigDict(populate_by_name=True)
@@ -437,3 +438,29 @@ class StudentRegistrationRequest(BaseModel):
         if not self.school_code and not self.school_name:
             raise ValueError("schoolCode 또는 schoolName 중 하나가 필요합니다.")
         return self
+
+
+class SupportProfileDraftRequest(BaseModel):
+    support_intake: dict[str, Any] | None = Field(default=None, alias="supportIntake")
+    teacher_note: str | None = Field(default=None, alias="teacherNote")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class SupportProfileConfirmRequest(BaseModel):
+    draft_id: str | None = Field(default=None, alias="draftId")
+    profile_draft: dict[str, Any] = Field(alias="profileDraft")
+    teacher_note: str | None = Field(default=None, alias="teacherNote")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class TeacherReportCreateRequest(BaseModel):
+    draft_id: str | None = Field(default=None, alias="draftId")
+    review_summary_id: str = Field(alias="reviewSummaryId")
+    student_id: str = Field(alias="studentId")
+    content_id: str = Field(alias="contentId")
+    teacher_body: str = Field(alias="teacherBody", min_length=1)
+    selected_memory_candidates: list[str] = Field(default_factory=list, alias="selectedMemoryCandidates")
+
+    model_config = ConfigDict(populate_by_name=True)

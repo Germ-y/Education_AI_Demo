@@ -7,9 +7,7 @@ description: EduYJ 백엔드 API, DB 스키마, seed 데이터, 공공데이터 
 
 먼저 볼 문서:
 
-- `docs/HANDOFF.md`
-- `docs/ISSUES.md`
-- `docs/API.md`
+- `docs/GOAL_CONTEXT.md`
 - `backend/data/README.md`
 
 ## 구현 순서
@@ -35,4 +33,4 @@ description: EduYJ 백엔드 API, DB 스키마, seed 데이터, 공공데이터 
 - AI provider key는 서버 밖으로 나가지 않는다.
 - 공공데이터 원본 record와 정규화 record는 따로 저장한다.
 - 승인, 메모리 업데이트, 학생 데이터 접근은 audit log로 남긴다.
-- 계약이 바뀌면 `docs/API.md`와 `frontend/lib/api/contracts.ts`를 같이 확인한다.
+- 계약이 바뀌면 `docs/GOAL_CONTEXT.md`와 `frontend/lib/api/contracts.ts`를 같이 확인한다.

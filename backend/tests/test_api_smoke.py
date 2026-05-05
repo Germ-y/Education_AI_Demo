@@ -1,4 +1,5 @@
 import copy
+import json
 import os
 import threading
 import time
@@ -180,6 +181,17 @@ def _correct_answer_for_stage(stage: dict) -> dict:
         accepted = template["acceptedAnswers"][0]
         return accepted if isinstance(accepted, dict) else {"answer": accepted}
     return {"acknowledged": True}
+
+
+def _sse_events(raw: str) -> list[tuple[str, dict]]:
+    events = []
+    for block in raw.strip().split("\n\n"):
+        lines = block.splitlines()
+        event = next((line.removeprefix("event: ") for line in lines if line.startswith("event: ")), "")
+        data = next((line.removeprefix("data: ") for line in lines if line.startswith("data: ")), "{}")
+        if event:
+            events.append((event, json.loads(data)))
+    return events
 
 
 def test_teacher_and_student_demo_flows() -> None:
@@ -857,12 +869,44 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
     assert context_bundle.status_code == 200
     assert context_bundle.json()["data"]["student"]["displayName"] == "최하늘"
 
+    support_draft = client.post(f"/api/teacher/students/{student_id}/support-profile-drafts", headers=teacher_headers)
+    assert support_draft.status_code == 200, support_draft.json()
+    support_draft_payload = support_draft.json()["data"]
+    assert support_draft_payload["profileDraft"]["draftLabel"] == "수업 설계 초안"
+    assert support_draft_payload["profileDraft"]["source"]["rawRecordPreserved"] is True
+    assert "그림 카드" in support_draft_payload["profileDraft"]["learningResponsePattern"]["worksWell"]
+
+    confirmed_support = client.post(
+        f"/api/teacher/students/{student_id}/support-profiles",
+        headers=teacher_headers,
+        json={
+            "draftId": support_draft_payload["draftId"],
+            "profileDraft": support_draft_payload["profileDraft"],
+            "teacherNote": "등록 뒤 첫 수업은 피자 그림 단서부터 시작합니다.",
+        },
+    )
+    assert confirmed_support.status_code == 200, confirmed_support.json()
+    assert confirmed_support.json()["data"]["status"] == "confirmed"
+    detail_after_profile = client.get(f"/api/teacher/students/{student_id}", headers=teacher_headers)
+    assert detail_after_profile.status_code == 200
+    assert detail_after_profile.json()["data"]["supportProfile"]["status"] == "confirmed"
+    assert detail_after_profile.json()["data"]["dashboardProfile"]["supportProfileStatus"] == "confirmed"
+    assert detail_after_profile.json()["data"]["dashboardProfile"]["primaryNeedTitle"] == "현재 목표"
+
+    context_brief = client.get(f"/api/teacher/students/{student_id}/context-brief", headers=teacher_headers)
+    assert context_brief.status_code == 200
+    assert context_brief.json()["data"]["dirty"] is True
+    refreshed_brief = client.post(f"/api/teacher/students/{student_id}/context-brief/refresh", headers=teacher_headers)
+    assert refreshed_brief.status_code == 200
+    assert refreshed_brief.json()["data"]["dirty"] is False
+    assert "그림 카드" in refreshed_brief.json()["data"]["briefText"]
+
     scenario_spine = _pizza_scenario_spine()
     stage_visual_specs = _pizza_stage_visual_specs()
     generated_content = _generated_learning_focus_content_payload(student_id, case_id)
     content_generation_calls = {"count": 0}
 
-    def fake_json_response(self, *, model, instructions, input_snapshot, timeout_sec=90):
+    def fake_json_response(self, *, model, instructions, input_snapshot, timeout_sec=90, max_output_tokens=None):
         if "Content Quality Critic" in instructions:
             return (
                 {
@@ -880,7 +924,10 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
             assert input_snapshot["generationPlan"]["unitVersion"] == "content_generation_units_v1"
             assert len(input_snapshot["generationPlan"]["stagePlans"]) == 4
             assert len(input_snapshot["generationPlan"]["visualSpecDrafts"]) == 5
+            assert input_snapshot["caseFile"]["contextBrief"]["dirty"] is False
             return copy.deepcopy(generated_content), {"input_tokens": 12, "output_tokens": 24}
+        assert input_snapshot["studentContextBrief"]["dirty"] is False
+        assert "그림 카드" in input_snapshot["studentContextBrief"]["briefText"]
         return (
             {
                 "planVersion": "orchestrator_plan_v1",
@@ -1134,6 +1181,74 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
     assert students_after_complete.status_code == 200
     assert students_after_complete.json()["data"][0]["dashboardStage"] == "feedback"
 
+    report_draft_response = client.post(
+        f"/api/review-summaries/{latest_report['id']}/report-drafts/stream",
+        headers=teacher_headers,
+    )
+    assert report_draft_response.status_code == 200, report_draft_response.text
+    report_events = _sse_events(report_draft_response.text)
+    assert [event for event, _ in report_events] == ["draft_delta", "draft_metadata", "done"]
+    draft_text = next(data["text"] for event, data in report_events if event == "draft_delta")
+    metadata = next(data for event, data in report_events if event == "draft_metadata")
+    done = next(data for event, data in report_events if event == "done")
+    assert "## 수업 반응" in draft_text
+    assert metadata["memoryCandidates"]
+    saved_report = client.post(
+        "/api/teacher-reports",
+        headers=teacher_headers,
+        json={
+            "draftId": done["draftId"],
+            "reviewSummaryId": latest_report["id"],
+            "studentId": student_id,
+            "contentId": content_id,
+            "teacherBody": f"{draft_text}\n\n교사 확인: 다음 시간에도 그림 단서를 먼저 씁니다.",
+            "selectedMemoryCandidates": metadata["memoryCandidates"],
+        },
+    )
+    assert saved_report.status_code == 200, saved_report.json()
+    assert saved_report.json()["data"]["selectedMemoryCandidates"] == metadata["memoryCandidates"]
+    brief_after_report = client.get(f"/api/teacher/students/{student_id}/context-brief", headers=teacher_headers)
+    assert brief_after_report.status_code == 200
+    assert brief_after_report.json()["data"]["dirty"] is True
+    refreshed_after_report = client.post(f"/api/teacher/students/{student_id}/context-brief/refresh", headers=teacher_headers)
+    assert refreshed_after_report.status_code == 200
+    assert refreshed_after_report.json()["data"]["dirty"] is False
+    assert any("정답률" in pattern for pattern in refreshed_after_report.json()["data"]["recentSuccessPatterns"])
+    report_after_save = client.get(f"/api/teacher/students/{student_id}/report", headers=teacher_headers)
+    assert report_after_save.status_code == 200
+    assert report_after_save.json()["data"]["reports"][0]["teacherReports"][0]["id"] == saved_report.json()["data"]["id"]
+
+    second_orchestrator = client.post(
+        "/api/ai/orchestrator-runs",
+        headers=teacher_headers,
+        json={
+            "studentId": student_id,
+            "caseId": case_id,
+            "requestedGoal": "피자 그림에서 2/4도 전체와 부분으로 말한다.",
+            "contentType": "learning_focus",
+        },
+    )
+    assert second_orchestrator.status_code == 200, second_orchestrator.json()
+    second_orchestrator_run = client.get(
+        f"/api/ai/agent-runs/{second_orchestrator.json()['data']['agentRun']['id']}",
+        headers=teacher_headers,
+    ).json()["data"]
+    assert second_orchestrator_run["status"] == "succeeded"
+    second_content_generation = client.post(
+        "/api/ai/content-generations",
+        headers=teacher_headers,
+        json={"orchestratorRunId": second_orchestrator_run["id"], "studentId": student_id, "caseId": case_id},
+    )
+    assert second_content_generation.status_code == 200, second_content_generation.json()
+    second_content_run = client.get(
+        f"/api/ai/agent-runs/{second_content_generation.json()['data']['agentRun']['id']}",
+        headers=teacher_headers,
+    ).json()["data"]
+    assert second_content_run["status"] == "succeeded"
+    second_content_payload = second_content_run["outputJson"].get("missionContent", second_content_run["outputJson"])
+    assert second_content_payload["id"] != content_id
+    assert content_generation_calls["count"] == 2
+
 
 def test_completed_mission_stays_completed_after_restart() -> None:
     client = TestClient(create_app())
@@ -1294,7 +1409,7 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     image_parallel_probe = {"active": 0, "max": 0}
     image_parallel_lock = threading.Lock()
 
-    def fake_json_response(self, *, model, instructions, input_snapshot, timeout_sec=90):
+    def fake_json_response(self, *, model, instructions, input_snapshot, timeout_sec=90, max_output_tokens=None):
         if "Content Quality Critic" in instructions:
             return (
                 {

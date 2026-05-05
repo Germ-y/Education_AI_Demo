@@ -7,9 +7,7 @@ description: EduYJ 학생 미션 콘텐츠, 이미지 패키지, 1~3단계 템�
 
 먼저 볼 문서:
 
-- `docs/HANDOFF.md`
-- `docs/ISSUES.md`
-- `docs/API.md`
+- `docs/GOAL_CONTEXT.md`
 
 ## 반드시 지킬 것
 

@@ -29,6 +29,7 @@ def create_app() -> FastAPI:
     app.include_router(audit.router)
     app.include_router(contents.router)
     app.include_router(review.router)
+    app.include_router(review.teacher_reports_router)
     app.include_router(teacher.router)
     app.include_router(student.router)
     app.include_router(public_data.router)

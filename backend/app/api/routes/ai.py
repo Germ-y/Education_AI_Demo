@@ -124,12 +124,19 @@ def create_orchestrator_run(
 
     settings = get_settings()
     spec = PROMPT_SPECS["orchestrator_plan"]
+    context_brief = demo_store.get_student_context_brief(payload.student_id)
     input_snapshot = {
         "teacherId": principal.id,
         "studentId": payload.student_id,
         "caseId": payload.case_id,
         "requestedGoal": payload.requested_goal,
         "contentType": payload.content_type,
+        "studentContextBrief": context_brief.model_dump(by_alias=True) if context_brief else None,
+        "generationContext": {
+            "teacherRequestedGoal": payload.requested_goal,
+            "contextBriefPriority": "use_context_brief_for_scaffolding_not_topic_override",
+            "contextBriefDirty": context_brief.dirty if context_brief else True,
+        },
         "caseFile": case_file,
     }
     agent_run = agent_runs.create_running(
@@ -289,6 +296,7 @@ def _run_orchestrator_agent(
             instructions=load_prompt("orchestrator_plan"),
             input_snapshot=input_snapshot,
             timeout_sec=settings.openai_orchestrator_timeout_sec,
+            max_output_tokens=settings.openai_orchestrator_max_output_tokens,
         )
         output_json = _normalize_orchestrator_plan_candidate(output_json, content_type=content_type)
         validate_orchestrator_plan_quality(
@@ -657,6 +665,50 @@ def _normalize_generated_stage(stage: Any) -> Any:
         for unsupported_key in ("cards", "choices", "tiles"):
             normalized_template_json.pop(unsupported_key, None)
         normalized["templateJson"] = normalized_template_json
+    realtime_spec = normalized.get("realtimeSpec")
+    if isinstance(realtime_spec, dict):
+        normalized["realtimeSpec"] = _normalize_generated_realtime_spec(realtime_spec)
+    return normalized
+
+
+def _normalize_generated_realtime_spec(realtime_spec: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(realtime_spec)
+    rubric = normalized.get("rubric")
+    if isinstance(rubric, list):
+        normalized["rubric"] = [_normalize_generated_rubric_item(item, index) for index, item in enumerate(rubric, start=1)]
+    reflection = normalized.get("postPracticeReflection")
+    if isinstance(reflection, dict):
+        candidates: list[str] = []
+        question = reflection.get("question")
+        if isinstance(question, str) and question.strip():
+            candidates.append(question.strip())
+        prompts = reflection.get("questions") or reflection.get("prompts")
+        if isinstance(prompts, list):
+            candidates.extend(str(item).strip() for item in prompts if str(item).strip())
+        if candidates:
+            normalized["postPracticeReflection"] = candidates
+        else:
+            normalized["postPracticeReflection"] = ["오늘 연습에서 잘 된 점을 한 문장으로 말해볼까요?"]
+    elif isinstance(reflection, str):
+        normalized["postPracticeReflection"] = [reflection.strip()] if reflection.strip() else []
+    return normalized
+
+
+def _normalize_generated_rubric_item(item: Any, index: int) -> Any:
+    if not isinstance(item, dict):
+        return item
+    normalized = dict(item)
+    label = normalized.get("label")
+    if not isinstance(label, str) or not label.strip():
+        for fallback_key in ("description", "criterion", "text", "name"):
+            fallback = normalized.get(fallback_key)
+            if isinstance(fallback, str) and fallback.strip():
+                normalized["label"] = fallback.strip()
+                break
+    if not isinstance(normalized.get("id"), str) or not normalized["id"].strip():
+        normalized["id"] = f"r{index}"
+    if "required" not in normalized:
+        normalized["required"] = index == 1
     return normalized
 
 
@@ -830,6 +882,7 @@ def _generate_valid_mission_content(
             instructions=instructions,
             input_snapshot=generation_snapshot,
             timeout_sec=settings.openai_content_timeout_sec,
+            max_output_tokens=settings.openai_content_max_output_tokens,
         )
         logger.info(
             "ai.content.attempt_model_returned student_id=%s case_id=%s attempt=%s elapsed_sec=%.1f",
@@ -920,6 +973,7 @@ def _critique_mission_content_quality(
             "missionContent": mission.model_dump(by_alias=True),
         },
         timeout_sec=settings.openai_critique_timeout_sec,
+        max_output_tokens=settings.openai_critique_max_output_tokens,
     )
     verdict = output_json.get("verdict")
     if verdict not in {"pass", "repair"}:

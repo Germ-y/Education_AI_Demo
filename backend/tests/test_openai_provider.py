@@ -63,3 +63,52 @@ def test_realtime_client_secret_uses_configured_voice(monkeypatch) -> None:
     session = captured["payload"]["session"]
     assert session["model"] == "gpt-realtime-1.5"
     assert session["audio"]["output"] == {"voice": "marin", "speed": 0.92}
+
+
+def test_json_response_disables_reasoning_for_gpt_5_1(monkeypatch) -> None:
+    captured: dict = {}
+    settings = Settings(openai_api_key="test-key", openai_reasoning_effort="none", openai_text_verbosity="low")
+    provider = OpenAiProvider(settings)
+
+    def fake_post(path: str, payload: dict, *, timeout_sec: float) -> dict:
+        captured["path"] = path
+        captured["payload"] = payload
+        captured["timeout_sec"] = timeout_sec
+        return {"output_text": "{\"ok\": true}", "usage": {"output_tokens_details": {"reasoning_tokens": 0}}}
+
+    monkeypatch.setattr(provider, "_post", fake_post)
+
+    data, usage = provider.create_json_response(
+        model="gpt-5.1",
+        instructions="JSON만 반환합니다.",
+        input_snapshot={"topic": "테스트"},
+        timeout_sec=10,
+        max_output_tokens=1200,
+    )
+
+    assert data == {"ok": True}
+    assert usage == {"output_tokens_details": {"reasoning_tokens": 0}}
+    assert captured["path"] == "/v1/responses"
+    assert captured["payload"]["reasoning"] == {"effort": "none"}
+    assert captured["payload"]["text"] == {"verbosity": "low"}
+    assert captured["payload"]["max_output_tokens"] == 1200
+
+
+def test_json_response_downgrades_none_reasoning_for_older_gpt_5_models(monkeypatch) -> None:
+    captured: dict = {}
+    provider = OpenAiProvider(Settings(openai_api_key="test-key", openai_reasoning_effort="none"))
+
+    def fake_post(path: str, payload: dict, *, timeout_sec: float) -> dict:
+        captured["payload"] = payload
+        return {"output_text": "{\"ok\": true}"}
+
+    monkeypatch.setattr(provider, "_post", fake_post)
+
+    provider.create_json_response(
+        model="gpt-5-nano",
+        instructions="JSON만 반환합니다.",
+        input_snapshot={"topic": "테스트"},
+        timeout_sec=10,
+    )
+
+    assert captured["payload"]["reasoning"] == {"effort": "minimal"}

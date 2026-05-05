@@ -246,6 +246,7 @@ export type StudentRegistrationRequest = {
   strengths: string[];
   weaknesses: string[];
   preferredSupports: string[];
+  supportIntake?: Record<string, unknown> | null;
   timetableDate?: string | null;
 };
 
@@ -319,6 +320,11 @@ export type DashboardProfile = {
   nextSessionFocus: string[];
   aiContextSummary: string;
   autoContext: Array<{ label: string; value: string }>;
+  supportProfileStatus?: "none" | "confirmed";
+  lessonDesignHints?: string[];
+  learningResponsePattern?: Record<string, unknown> | null;
+  behaviorSupportProfile?: Record<string, unknown> | null;
+  supportCautions?: string[];
 };
 
 export type StudentContextBundle = {
@@ -343,7 +349,57 @@ export type StudentContextBundle = {
     mustUse: string[];
     avoid: string[];
     evidenceSources: Array<Record<string, unknown>>;
+    contextBriefId?: string | null;
+    contextBriefDirty?: boolean;
   };
+  supportProfile?: StudentSupportProfile | null;
+  contextBrief?: StudentContextBrief | null;
+};
+
+export type StudentSupportProfile = {
+  id: string;
+  studentId: string;
+  sourceIntakeId?: string | null;
+  status: "draft" | "confirmed" | "superseded";
+  profileJson: Record<string, unknown>;
+  generatedBy: string;
+  teacherConfirmedByUserId?: string | null;
+  createdAt: string;
+  confirmedAt?: string | null;
+};
+
+export type SupportProfileDraftResponse = {
+  draftId: string;
+  studentId: string;
+  status: "completed";
+  profileDraft: Record<string, unknown>;
+  supportProfile: StudentSupportProfile;
+};
+
+export type SupportProfileConfirmRequest = {
+  draftId?: string | null;
+  profileDraft: Record<string, unknown>;
+  teacherNote?: string | null;
+};
+
+export type StudentContextBrief = {
+  id: string;
+  studentId: string;
+  briefText: string;
+  studentType: string;
+  readingLoad: string;
+  choiceCount: number;
+  recentSuccessPatterns: string[];
+  recentDifficultyPatterns: string[];
+  recommendedScaffolds: string[];
+  avoidTopicRegression: string[];
+  sourceWatermark: string;
+  dirty: boolean;
+  status: "dirty" | "refreshed";
+  sourceJson: Record<string, unknown>;
+  model: string;
+  refreshedAt?: string | null;
+  createdAt: string;
 };
 
 export type StudentCaseFile = {
@@ -351,6 +407,9 @@ export type StudentCaseFile = {
   schoolContext?: PublicContextBundle;
   dashboardProfile?: DashboardProfile;
   contextBundle?: StudentContextBundle;
+  supportProfileDraft?: StudentSupportProfile | null;
+  supportProfile?: StudentSupportProfile | null;
+  contextBrief?: StudentContextBrief | null;
   openCase: SupportCaseSummary;
   memoryCard: MemoryCard | null;
   weeklyRecords: CaseNote[];
@@ -358,6 +417,42 @@ export type StudentCaseFile = {
   recentContents: MissionContent[];
   plannerItems: PlannerItem[];
   publicContextSummary?: Record<string, unknown>;
+};
+
+export type TeacherReportDraft = {
+  id: string;
+  reviewSummaryId: string;
+  studentId: string;
+  contentId: string;
+  status: "streaming" | "completed" | "failed";
+  bodyMarkdown: string;
+  nextLearningSuggestions: string[];
+  memoryCandidates: string[];
+  inputSnapshotJson: Record<string, unknown>;
+  model: string;
+  createdAt: string;
+  completedAt?: string | null;
+};
+
+export type TeacherReport = {
+  id: string;
+  draftId?: string | null;
+  reviewSummaryId: string;
+  studentId: string;
+  contentId: string;
+  teacherBody: string;
+  selectedMemoryCandidates: string[];
+  createdByUserId: string;
+  createdAt: string;
+};
+
+export type TeacherReportCreateRequest = {
+  draftId?: string | null;
+  reviewSummaryId: string;
+  studentId: string;
+  contentId: string;
+  teacherBody: string;
+  selectedMemoryCandidates: string[];
 };
 
 export type StudentRegistrationResponse = {
@@ -386,6 +481,8 @@ export type StudentReportItem = {
   realtimeResultJson: Record<string, unknown>;
   realtimeTranscriptSummary?: string | null;
   reflection?: Record<string, unknown> | null;
+  aiReportDrafts?: TeacherReportDraft[];
+  teacherReports?: TeacherReport[];
 };
 
 export type StudentReport = {

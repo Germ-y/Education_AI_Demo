@@ -191,6 +191,65 @@ def test_content_generation_output_accepts_direct_mission_content_schema() -> No
     assert len([asset for asset in mission.assets if asset.asset_type == "audio"]) == 5
 
 
+def test_content_generation_normalizes_realtime_reflection_object() -> None:
+    base_content = next(content for content in create_demo_database().mission_contents if content.student_id == "student_learning_fraction")
+    content = base_content.model_dump(by_alias=True)
+    content["id"] = "content_generated_realtime_reflection_check"
+    content["status"] = "teacher_review"
+    content["approvedByUserId"] = None
+    content["approvedAt"] = None
+    content["publishedAt"] = None
+    for stage in content["stages"]:
+        stage["missionContentId"] = content["id"]
+    for asset in content["assets"]:
+        asset["missionContentId"] = content["id"]
+        asset["storageUrl"] = ""
+        asset["previewUrl"] = None
+        asset["qaStatus"] = "pending"
+        asset["approvalStatus"] = "pending"
+
+    realtime_spec = content["stages"][3]["realtimeSpec"]
+    realtime_spec["postPracticeReflection"] = {
+        "question": "오늘 연습에서 내가 말한 도움 요청 문장을 떠올려볼까요?",
+        "choices": ["잘 말했어요.", "조금 더 연습하고 싶어요."],
+    }
+
+    mission = _mission_from_generation(content, student_id=base_content.student_id, case_id=base_content.case_id)
+
+    assert mission.stages[3].realtime_spec is not None
+    assert mission.stages[3].realtime_spec.post_practice_reflection == ["오늘 연습에서 내가 말한 도움 요청 문장을 떠올려볼까요?"]
+
+
+def test_content_generation_normalizes_realtime_rubric_description() -> None:
+    base_content = next(content for content in create_demo_database().mission_contents if content.student_id == "student_learning_fraction")
+    content = base_content.model_dump(by_alias=True)
+    content["id"] = "content_generated_realtime_rubric_check"
+    content["status"] = "teacher_review"
+    content["approvedByUserId"] = None
+    content["approvedAt"] = None
+    content["publishedAt"] = None
+    for stage in content["stages"]:
+        stage["missionContentId"] = content["id"]
+    for asset in content["assets"]:
+        asset["missionContentId"] = content["id"]
+        asset["storageUrl"] = ""
+        asset["previewUrl"] = None
+        asset["qaStatus"] = "pending"
+        asset["approvalStatus"] = "pending"
+
+    realtime_spec = content["stages"][3]["realtimeSpec"]
+    realtime_spec["rubric"] = [
+        {"id": "r1", "description": "전체를 먼저 확인한다고 말한다.", "required": True},
+        {"id": "r2", "description": "부분의 수를 한 문장으로 설명한다.", "required": False},
+    ]
+
+    mission = _mission_from_generation(content, student_id=base_content.student_id, case_id=base_content.case_id)
+
+    assert mission.stages[3].realtime_spec is not None
+    assert mission.stages[3].realtime_spec.rubric[0].label == "전체를 먼저 확인한다고 말한다."
+    assert mission.stages[3].realtime_spec.rubric[1].label == "부분의 수를 한 문장으로 설명한다."
+
+
 def test_content_generation_strips_unsupported_card_match_cards() -> None:
     base_content = next(content for content in create_demo_database().mission_contents if content.student_id == "student_learning_fraction")
     content = base_content.model_dump(by_alias=True)
