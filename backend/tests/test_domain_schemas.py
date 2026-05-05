@@ -452,6 +452,37 @@ def test_mission_quality_allows_source_lines_for_notice_or_poster_tasks() -> Non
     )
 
 
+def test_mission_quality_rejects_life_support_background_only_distractor() -> None:
+    content = _generated_life_support_content()
+    content["stages"][1]["templateJson"]["question"] = "무엇이 보이나요?"
+    content["stages"][1]["templateJson"]["choices"] = [
+        {"id": "a", "text": "바닥에 젖은 자국이 보여요."},
+        {"id": "b", "text": "천장이나 창문 보기"},
+    ]
+    mission = MissionContent.model_validate(content)
+
+    with pytest.raises(ContentQualityError, match="행동 판단"):
+        validate_mission_content_quality(
+            mission,
+            case_file=_life_support_case_file(),
+        )
+
+
+def test_mission_quality_accepts_life_support_plausible_decision_fork() -> None:
+    content = _generated_life_support_content()
+    content["stages"][1]["templateJson"]["question"] = "바로 움직이기 전에 무엇을 먼저 확인해야 할까요?"
+    content["stages"][1]["templateJson"]["choices"] = [
+        {"id": "a", "text": "옆 친구가 지나가고 있는지 보기"},
+        {"id": "b", "text": "식판을 들고 바로 자리로 가기"},
+    ]
+    mission = MissionContent.model_validate(content)
+
+    validate_mission_content_quality(
+        mission,
+        case_file=_life_support_case_file(),
+    )
+
+
 def _valid_learning_plan() -> dict:
     return {
         "planVersion": "orchestrator_plan_v1",
@@ -524,6 +555,19 @@ def _fraction_case_file() -> dict:
     }
 
 
+def _life_support_case_file() -> dict:
+    return {
+        "profile": {
+            "id": "student_life_bus",
+            "studentType": "life_support",
+            "profileJson": {
+                "readingLoad": "very_low",
+                "choiceCountLimit": 2,
+            },
+        }
+    }
+
+
 def _generated_fraction_content() -> dict:
     base_content = next(content for content in create_demo_database().mission_contents if content.student_id == "student_learning_fraction")
     content = base_content.model_dump(by_alias=True)
@@ -556,6 +600,54 @@ def _generated_fraction_content() -> dict:
                 "prompt": f"{asset['assetRole']} 장면. 따뜻한 교실 느낌의 피자 조각 장면만 보여주고 문제 문장, 선택지, 정답, 힌트 텍스트는 넣지 않습니다.",
                 "textRenderingPolicy": "scene_only_no_problem_text",
             }
+        asset["storageUrl"] = ""
+        asset["previewUrl"] = None
+        asset["qaStatus"] = "pending"
+        asset["approvalStatus"] = "pending"
+    return content
+
+
+def _generated_life_support_content() -> dict:
+    base_content = next(content for content in create_demo_database().mission_contents if content.student_id == "student_life_bus")
+    content = base_content.model_dump(by_alias=True)
+    content["id"] = "content_generated_life_quality_001"
+    content["status"] = "teacher_review"
+    content["approvedByUserId"] = None
+    content["approvedAt"] = None
+    content["publishedAt"] = None
+    content["teacherReviewSummary"] = "버스를 타기 전에 확인할 단서와 도움 요청 순서를 연습합니다."
+    for stage in content["stages"]:
+        stage["id"] = f"stage_generated_life_quality_{stage['step']}"
+        stage["missionContentId"] = content["id"]
+        image_role = "stage_4_realtime" if stage["step"] == 4 else f"stage_{stage['step']}"
+        stage["templateJson"]["imageAssetId"] = f"asset_{content['id']}_{image_role}"
+        stage["templateJson"]["audioAssetId"] = f"asset_{content['id']}_{image_role}_audio"
+        stage["templateJson"]["assetBundle"] = {
+            "imageAssetId": stage["templateJson"]["imageAssetId"],
+            "audioAssetId": stage["templateJson"]["audioAssetId"],
+        }
+        if stage["step"] == 2:
+            stage["templateJson"]["question"] = "버스를 타기 전에 무엇을 먼저 확인해야 할까요?"
+            stage["templateJson"]["choices"] = [
+                {"id": "a", "text": "센터로 가는 버스 번호 확인하기"},
+                {"id": "b", "text": "버스가 오면 바로 타기"},
+            ]
+        if stage.get("realtimeSpec"):
+            stage["realtimeSpec"]["id"] = "rt_spec_generated_life_quality_001"
+            stage["realtimeSpec"]["stageId"] = stage["id"]
+            stage["realtimeSpec"]["imageAssetId"] = stage["templateJson"]["imageAssetId"]
+    for asset in content["assets"]:
+        asset["missionContentId"] = content["id"]
+        asset_step = 4 if asset["assetRole"] == "stage_4_realtime" else asset["assetRole"][-1]
+        asset["stageId"] = None if asset["assetRole"] == "hero" else f"stage_generated_life_quality_{asset_step}"
+        asset["id"] = f"asset_{content['id']}_{asset['assetRole']}{'_audio' if asset['assetType'] == 'audio' else ''}"
+        if asset["assetType"] == "image":
+            asset["promptJson"] = {
+                "prompt": f"{asset['assetRole']} 장면. 버스 정류장에서 센터행 버스 번호를 확인하는 실제 생활 장면을 보여주고 문제 문장, 선택지, 정답, 힌트 텍스트는 넣지 않습니다.",
+                "textRenderingPolicy": "scene_only_no_problem_text",
+            }
+        if asset["assetType"] == "audio":
+            asset["sourceText"] = "버스를 타기 전에 번호를 먼저 확인해요. 헷갈리면 선생님이나 기사님께 짧게 물어볼 수 있어요."
         asset["storageUrl"] = ""
         asset["previewUrl"] = None
         asset["qaStatus"] = "pending"

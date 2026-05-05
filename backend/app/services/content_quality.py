@@ -154,6 +154,73 @@ SOURCE_MATERIAL_TERMS = (
     "문구",
 )
 
+LIFE_SUPPORT_BACKGROUND_ONLY_TERMS = (
+    "천장",
+    "창문",
+    "하늘",
+    "벽",
+    "색깔",
+    "모양",
+    "장식",
+)
+
+LIFE_SUPPORT_DECISION_TERMS = (
+    "먼저",
+    "확인",
+    "보기",
+    "살피",
+    "멈추",
+    "말",
+    "요청",
+    "도움",
+    "기다리",
+    "조심",
+    "안전",
+    "알리",
+    "물어",
+    "천천히",
+    "피하",
+    "내려놓",
+    "지나가",
+    "미끄",
+)
+
+LIFE_SUPPORT_BACKGROUND_CONTEXT_TERMS = (
+    "안전",
+    "위험",
+    "닫",
+    "열",
+    "연기",
+    "사람",
+    "친구",
+    "지나가",
+    "표지",
+    "번호",
+    "시간",
+    "도움",
+    "요청",
+    "알림",
+)
+
+LEARNING_FOCUS_REASONING_TERMS = (
+    "개념",
+    "근거",
+    "이유",
+    "비교",
+    "구분",
+    "계산",
+    "설명",
+    "전체",
+    "부분",
+    "문장",
+    "자료",
+    "단서",
+    "규칙",
+    "값",
+    "수",
+    "뜻",
+)
+
 
 class ContentQualityError(ValueError):
     def __init__(self, issues: list[str]) -> None:
@@ -226,6 +293,7 @@ def validate_mission_content_quality(
     _validate_visible_content_text(mission, reading_load, choice_limit, issues)
     _validate_source_material_evidence(mission, issues)
     _validate_image_prompt_policy(mission, issues)
+    _validate_track_specific_problem_quality(mission, expected_content_type, issues)
 
     if issues:
         raise ContentQualityError(issues)
@@ -485,6 +553,92 @@ def _validate_source_material_evidence(mission: MissionContent, issues: list[str
                 f"{stage.id}.templateJson.sourceTextLines 또는 sceneTextLines가 필요합니다. "
                 "안내문/포스터/표지판처럼 읽거나 확인할 자료를 쓰는 단계는 실제 근거 문구를 먼저 구조화해야 합니다."
             )
+
+
+def _validate_track_specific_problem_quality(mission: MissionContent, content_type: str, issues: list[str]) -> None:
+    if content_type == StudentType.LIFE_SUPPORT.value:
+        _validate_life_support_problem_quality(mission, issues)
+    if content_type == StudentType.LEARNING_FOCUS.value:
+        _validate_learning_focus_problem_quality(mission, issues)
+
+
+def _validate_life_support_problem_quality(mission: MissionContent, issues: list[str]) -> None:
+    for stage in mission.stages:
+        if stage.step not in {2, 3}:
+            continue
+        template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
+        question = str(template_json.get("question") or "")
+        choice_texts = _choice_like_texts(template_json)
+        problem_text = " ".join([question, *choice_texts])
+
+        if stage.step == 2 and _looks_like_passive_background_question(question):
+            issues.append(f"{stage.id}.templateJson.question은 단순 배경 찾기가 아니라 행동 판단에 쓰이는 단서를 묻도록 작성해야 합니다.")
+
+        for text in choice_texts:
+            if _is_background_only_life_support_text(text):
+                issues.append(f"{stage.id}.templateJson 선택지가 행동 판단과 무관한 배경 단서입니다: {text}")
+
+        if stage.step == 3 and _as_value(stage.template_type) == TemplateType.SEQUENCE_ORDERING.value:
+            cards = [str(card.get("text") or "") for card in template_json.get("cards", []) if isinstance(card, dict)]
+            if _is_generic_life_support_sequence(cards, question):
+                issues.append(f"{stage.id}.templateJson.cards는 상황 단서가 빠진 일반 행동 순서입니다. 장면의 구체 단서나 도움 요청 말을 포함해야 합니다.")
+
+        if stage.step in {2, 3} and problem_text and not _contains_any(problem_text, LIFE_SUPPORT_DECISION_TERMS):
+            issues.append(f"{stage.id}.templateJson은 일상생활 지원형답게 확인, 말하기, 도움 요청, 안전 행동 중 하나와 연결되어야 합니다.")
+
+
+def _validate_learning_focus_problem_quality(mission: MissionContent, issues: list[str]) -> None:
+    for stage in mission.stages:
+        if stage.step not in {2, 3}:
+            continue
+        template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
+        visible_text = " ".join(text for _, text in _iter_template_visible_text(template_json, stage.id))
+        if not visible_text:
+            continue
+        if _contains_any(visible_text, ("도움 요청", "안전하게", "조심", "위험", "선생님께 말")) and not _contains_any(
+            visible_text,
+            LEARNING_FOCUS_REASONING_TERMS,
+        ):
+            issues.append(f"{stage.id}.templateJson은 학습지원형인데 일상생활 행동 문제처럼 보입니다. 목표 개념이나 근거 판단이 드러나야 합니다.")
+
+
+def _choice_like_texts(template_json: dict[str, Any]) -> list[str]:
+    texts: list[str] = []
+    for key in ("choices", "cards", "leftCards", "rightCards"):
+        value = template_json.get(key)
+        if not isinstance(value, list):
+            continue
+        for item in value:
+            if isinstance(item, dict) and isinstance(item.get("text"), str):
+                texts.append(item["text"])
+            elif isinstance(item, str):
+                texts.append(item)
+    return texts
+
+
+def _looks_like_passive_background_question(question: str) -> bool:
+    if not question:
+        return False
+    passive_patterns = ("무엇이 보", "어떤 것이 보", "무엇을 보", "어떤 그림", "어떤 물건")
+    return any(pattern in question for pattern in passive_patterns) and not _contains_any(question, LIFE_SUPPORT_DECISION_TERMS)
+
+
+def _is_background_only_life_support_text(text: str) -> bool:
+    if not text:
+        return False
+    return _contains_any(text, LIFE_SUPPORT_BACKGROUND_ONLY_TERMS) and not _contains_any(text, LIFE_SUPPORT_BACKGROUND_CONTEXT_TERMS)
+
+
+def _is_generic_life_support_sequence(cards: list[str], question: str) -> bool:
+    if len(cards) < 3:
+        return False
+    combined_cards = " ".join(cards)
+    generic_hits = sum(1 for term in ("멈추", "주변 확인", "도움 요청", "말하기") if term in combined_cards)
+    return generic_hits >= 3 and not _contains_any(combined_cards + " " + question, ("국물", "바닥", "식판", "공", "버스", "정류장", "센터", "도서관", "안내문", "직원", "친구"))
+
+
+def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
+    return any(term in text for term in terms)
 
 
 def _iter_template_visible_text(value: Any, prefix: str) -> list[tuple[str, str]]:

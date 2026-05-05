@@ -48,7 +48,11 @@ You receive a JSON object with:
 
 1. Identify the student track:
    - `life_support`: everyday life support, sequence, clue, help request, social participation.
+     Build a realistic judgment fork: a situation where the student should pause, notice one useful clue, choose between two plausible next moves, and then practice saying or doing that move.
+     The wrong path should be a believable student impulse, not an unrelated background object.
    - `learning_focus`: academic concept, basic problem, applied problem, explain-back.
+     Build a concept reasoning frame: one concept anchor, one simple check, one controlled transfer, and one short explanation by the student.
+     The wrong path should reflect a common misconception, not a random answer.
 2. Decide the next session goal in one sentence.
 3. Decide the support strategy:
    - success-first
@@ -85,12 +89,16 @@ You receive a JSON object with:
    - For a `life_support` student with very low reading load or a 2-choice limit, prefer `scene_observation` or `highlight_clue` for stage 2. Do not choose `card_match` for the easiest success step unless the teacher explicitly requested matching.
    - For a `learning_focus` student with very low reading load or a 2-choice limit, prefer `scene_question`, `clue_question`, `image_quiz` only when allowed by choices, or `applied_question` over `card_match` for the first success step. Do not use `card_match` when there are only two pairs and it makes the UI feel like unnecessary line-drawing.
    - For `life_support`, stage 2 should identify a usable real-world clue, not merely ask for an obvious color/object label. Stage 3 should ask for a next action or help-request quality that would actually matter in the situation.
+   - For `life_support`, never design stage 2 as "hazard/object vs window/ceiling/sky/color" unless that background item is genuinely part of the decision. A good life-support item asks, "What should I check before I act?" or "What information should I tell the helper?"
+   - For `learning_focus`, stage 2 and stage 3 must stay academic. Daily-life scenes may be used as context, but the actual task must require the target concept, evidence, comparison, calculation, reading strategy, or explanation. Do not drift into a life-support safety or manners problem.
 5. Build a shared scenario spine before writing stage purposes:
    - name the real-world scene, object, or problem anchor
    - identify 2~4 concrete visual anchors that images must show
    - identify the emotional entry point: how the first step feels achievable without babying the student
    - ensure stage 2 reuses the stage 1 anchor and stage 3 transfers only one step deeper
    - ensure stage 4 asks the student to explain or act out exactly the same reasoning/behavior, not a loosely related conversation
+   - for `life_support`, write the concrete decision fork in one line: "I might want to X, but first I should notice/check/say Y."
+   - for `learning_focus`, write the concrete reasoning fork in one line: "I might confuse X with Y, so I should use evidence/rule Z."
 6. Decide whether stage 4 should be:
    - `realtime_roleplay` for `life_support`
    - `realtime_teach_back` for `learning_focus`
