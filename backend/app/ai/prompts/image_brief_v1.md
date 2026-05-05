@@ -77,11 +77,22 @@ When OCR is required:
 
 For every image role:
 
-1. Read the matching stage `templateJson`, `realtimeSpec`, and `learningEvidence` from the input.
-2. Choose the exact evidence object the student needs to inspect.
-3. Decide the camera composition that makes that evidence large enough to read or reason from.
-4. Decide whether a person is necessary. If not necessary, omit people. If necessary, keep the person secondary.
-5. Write the prompt as a production brief with these parts: scene, learning evidence, composition, human presence, style, accessibility, OCR/text policy, avoid list.
+1. Read the matching `stageVisualSpec` first. It is the source of truth.
+2. Use `scenarioSpine` only to keep the five images coherent.
+3. Use `visualSource.sourceTextLines` and `visualSource.sceneTextLines` only to confirm allowed scene text.
+4. Choose the exact evidence object the student needs to inspect.
+5. Decide the camera composition that makes that evidence large enough to read or reason from.
+6. Decide whether a person is necessary. If not necessary, omit people. If necessary, keep the person secondary.
+7. Write the prompt as a production brief with these parts: scene, learning evidence, composition, human presence, style, accessibility, OCR/text policy, avoid list.
+
+Critical distinction:
+
+- `sourceTextLines` and `sceneTextLines` are the only stage text fields that may be rendered inside the image.
+- `question`, `studentInstruction`, `choiceTexts`, `matchingTexts`, `sequenceTexts`, feedback, answer categories, and right/left card labels are problem UI unless the exact same string also appears in `allowedSceneText`.
+- For card matching, the source sentence cards may appear only when they are listed as source text. Category cards such as "확인할 수 있는 사실", "의견", "정답", "권유가 담긴 의견", or any answer bucket must not appear in the image.
+- Use choice/card/category texts only to understand the stage. Do not copy them into the image prompt as visible text.
+- If `stageVisualSpec.allowedSceneText` is empty, the generated image must contain no readable text.
+- Always include the exact `stageVisualSpec.doNotRenderText` ideas in your internal avoid list. Do not copy those strings into visible objects.
 
 Quality bar:
 

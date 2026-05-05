@@ -513,7 +513,74 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     generated_content["approvedByUserId"] = None
     generated_content["approvedAt"] = None
     generated_content["publishedAt"] = None
+    scenario_spine = {
+        "situation": "피자 조각 그림을 보고 전체와 부분을 구분합니다.",
+        "studentTask": "전체 조각 수와 고른 조각 수를 차례로 말합니다.",
+        "learningOrBehaviorTarget": "분모와 분자의 의미 연결",
+        "evidenceSource": "네 조각으로 나뉜 피자 그림",
+        "commonMistakeOrImpulse": "고른 조각만 보고 전체 수를 놓칠 수 있습니다.",
+        "stage4Reuse": "왜 1/4인지 전체와 부분을 넣어 설명합니다.",
+    }
+    stage_visual_specs = [
+        {
+            "assetRole": "hero",
+            "step": 0,
+            "visualPurpose": "전체와 부분을 배울 피자 조각 장면을 소개합니다.",
+            "sceneSummary": "네 조각 피자가 놓인 책상 장면",
+            "primaryEvidenceObject": "네 조각 피자",
+            "mustShow": ["네 조각 피자"],
+            "allowedSceneText": [],
+            "doNotRenderText": ["문제", "선택지", "정답", "힌트"],
+            "composition": "피자 조각이 중심에 크게 보입니다.",
+        },
+        {
+            "assetRole": "stage_1",
+            "step": 1,
+            "visualPurpose": "전체 피자가 몇 조각인지 확인하게 합니다.",
+            "sceneSummary": "네 조각으로 나뉜 피자 전체",
+            "primaryEvidenceObject": "전체 피자",
+            "mustShow": ["네 조각", "전체 피자"],
+            "allowedSceneText": [],
+            "doNotRenderText": ["문제", "선택지", "정답", "힌트"],
+            "composition": "전체 피자 윤곽이 한눈에 보입니다.",
+        },
+        {
+            "assetRole": "stage_2",
+            "step": 2,
+            "visualPurpose": "전체 조각 수를 세는 근거를 보여줍니다.",
+            "sceneSummary": "네 조각 피자 중 한 조각이 살짝 강조된 장면",
+            "primaryEvidenceObject": "네 조각 피자",
+            "mustShow": ["네 조각", "한 조각 강조"],
+            "allowedSceneText": [],
+            "doNotRenderText": ["전체는 몇 조각인가요?", "1개", "2개", "4개", "정답"],
+            "composition": "조각 경계가 분명하게 보입니다.",
+        },
+        {
+            "assetRole": "stage_3",
+            "step": 3,
+            "visualPurpose": "고른 조각과 전체 조각을 연결해 분수로 말하게 합니다.",
+            "sceneSummary": "고른 한 조각과 전체 네 조각이 함께 보이는 장면",
+            "primaryEvidenceObject": "강조된 한 조각",
+            "mustShow": ["한 조각", "네 조각 전체"],
+            "allowedSceneText": [],
+            "doNotRenderText": ["분수", "빈칸", "정답", "힌트"],
+            "composition": "한 조각과 전체가 동시에 비교됩니다.",
+        },
+        {
+            "assetRole": "stage_4_realtime",
+            "step": 4,
+            "visualPurpose": "학생이 전체와 부분을 말로 설명하는 상황을 준비합니다.",
+            "sceneSummary": "피자 조각을 보며 설명을 준비하는 책상 장면",
+            "primaryEvidenceObject": "피자 조각 그림",
+            "mustShow": ["피자 조각 그림"],
+            "allowedSceneText": [],
+            "doNotRenderText": ["말하기 정답", "힌트", "채점"],
+            "composition": "설명할 그림이 중심에 있고 사람은 손 정도만 보입니다.",
+        },
+    ]
     generated_content["briefJson"]["difficulty"] = "기초"
+    generated_content["briefJson"]["scenarioSpine"] = scenario_spine
+    generated_content["briefJson"]["stageVisualSpecs"] = stage_visual_specs
     for stage in generated_content["stages"]:
         stage["id"] = f"stage_generated_contract_{stage['step']}"
         stage["missionContentId"] = generated_content["id"]
@@ -614,6 +681,7 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
                 "targetSkill": "분모와 분자의 의미 연결",
                 "difficultyPolicy": {"level": "easy_success", "reason": "시각 자료로 쉬운 성공 경험부터 시작합니다."},
                 "selectedStrategy": ["short visual explanation", "teach-back"],
+                "scenarioSpine": scenario_spine,
                 "stagePlan": [
                     {
                         "step": 1,
@@ -651,6 +719,7 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
                     {"assetRole": "stage_3", "scenePurpose": "분수 연결", "mustShow": ["한 조각 강조"], "mustNotShow": ["problem text"]},
                     {"assetRole": "stage_4_realtime", "scenePurpose": "설명 상황", "mustShow": ["마스코트"], "mustNotShow": ["problem text"]},
                 ],
+                "stageVisualSpecs": stage_visual_specs,
                 "ttsNarrationIntent": [
                     {"assetRole": "hero", "voicePurpose": "시작 안내", "tone": "bright"},
                     {"assetRole": "stage_1", "voicePurpose": "전체 보기", "tone": "calm"},

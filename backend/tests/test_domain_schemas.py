@@ -1,7 +1,7 @@
 import pytest
 
 from app.api.routes.ai import _mission_from_generation
-from app.api.routes.contents import _requests_problem_answer_image_text
+from app.api.routes.contents import _blocked_visible_text_in_image_prompt, _pairs_from_left_right_cards, _requests_problem_answer_image_text
 from app.data.demo_data import create_demo_database
 from app.domain.schemas import ContentAsset, ContentStage, MissionContent
 from app.services.content_quality import ContentQualityError, validate_mission_content_quality, validate_orchestrator_plan_quality
@@ -18,7 +18,47 @@ def test_accepts_demo_4_stage_missions() -> None:
 
 def test_image_prompt_checker_only_blocks_requested_problem_answer_text() -> None:
     assert not _requests_problem_answer_image_text("문제 문장이나 선택지는 넣지 마세요.", "문제 문장")
+    assert not _requests_problem_answer_image_text("정답 UI가 없는 실제 게시판 장면으로 구성합니다.", "정답")
+    assert not _requests_problem_answer_image_text("선택지와 정답은 포함하지 않는 포스터 장면입니다.", "정답")
+    assert not _requests_problem_answer_image_text(
+        "Real notice board with short source text. Do not include problem instructions, choices, hints, correct answers, or 정답 category labels.",
+        "정답",
+    )
     assert _requests_problem_answer_image_text("이미지 중앙에 정답을 크게 보여주세요.", "정답")
+
+
+def test_image_brief_evidence_reads_card_match_dict_matches() -> None:
+    pairs = _pairs_from_left_right_cards(
+        {
+            "leftCards": [
+                {"id": "line_schedule", "text": "매주 화요일 3시에 진행됩니다."},
+                {"id": "line_join", "text": "함께해요!"},
+            ],
+            "rightCards": [
+                {"id": "fact", "text": "확인할 수 있는 사실"},
+                {"id": "opinion", "text": "권유가 담긴 의견"},
+            ],
+            "matches": {"line_schedule": "fact", "line_join": "opinion"},
+        }
+    )
+
+    assert pairs == [
+        {"left": "매주 화요일 3시에 진행됩니다.", "right": "확인할 수 있는 사실"},
+        {"left": "함께해요!", "right": "권유가 담긴 의견"},
+    ]
+
+
+def test_image_brief_blocks_choice_text_from_visible_prompt() -> None:
+    mission = MissionContent.model_validate(_generated_life_support_content())
+    asset = next(asset for asset in mission.assets if asset.asset_type == "image" and asset.asset_role == "stage_2")
+
+    blocked = _blocked_visible_text_in_image_prompt(
+        mission,
+        asset,
+        "버스 정류장 장면 안에 '센터로 가는 버스 번호 확인하기' 선택 카드가 크게 보입니다.",
+    )
+
+    assert blocked == "센터로 가는 버스 번호 확인하기"
 
 
 def test_rejects_fifth_stage() -> None:
@@ -493,6 +533,14 @@ def _valid_learning_plan() -> dict:
         "targetSkill": "분모와 분자의 의미 연결",
         "difficultyPolicy": {"level": "easy_success", "reason": "시각 자료로 쉬운 성공 경험부터 시작합니다."},
         "selectedStrategy": ["short visual explanation", "teach-back"],
+        "scenarioSpine": {
+            "situation": "피자 조각 그림을 보고 전체와 부분을 구분합니다.",
+            "studentTask": "전체 조각 수와 고른 조각 수를 차례로 말합니다.",
+            "learningOrBehaviorTarget": "분모와 분자의 의미 연결",
+            "evidenceSource": "네 조각으로 나뉜 피자 그림",
+            "commonMistakeOrImpulse": "고른 조각만 보고 전체 수를 놓칠 수 있습니다.",
+            "stage4Reuse": "왜 1/4인지 전체와 부분을 넣어 설명합니다.",
+        },
         "stagePlan": [
             {
                 "step": 1,
@@ -530,6 +578,7 @@ def _valid_learning_plan() -> dict:
             {"assetRole": "stage_3", "scenePurpose": "분수 연결", "mustShow": ["한 조각 강조"], "mustNotShow": ["problem text"]},
             {"assetRole": "stage_4_realtime", "scenePurpose": "설명 상황", "mustShow": ["마스코트"], "mustNotShow": ["problem text"]},
         ],
+        "stageVisualSpecs": _fraction_stage_visual_specs(),
         "ttsNarrationIntent": [
             {"assetRole": "hero", "voicePurpose": "시작 안내", "tone": "bright"},
             {"assetRole": "stage_1", "voicePurpose": "전체 보기", "tone": "calm"},
@@ -568,6 +617,66 @@ def _life_support_case_file() -> dict:
     }
 
 
+def _fraction_stage_visual_specs() -> list[dict]:
+    return [
+        {
+            "assetRole": "hero",
+            "step": 0,
+            "visualPurpose": "전체와 부분을 배울 피자 조각 장면을 소개합니다.",
+            "sceneSummary": "네 조각 피자가 놓인 책상 장면",
+            "primaryEvidenceObject": "네 조각 피자",
+            "mustShow": ["네 조각 피자"],
+            "allowedSceneText": [],
+            "doNotRenderText": ["문제", "선택지", "정답", "힌트"],
+            "composition": "피자 조각이 중심에 크게 보입니다.",
+        },
+        {
+            "assetRole": "stage_1",
+            "step": 1,
+            "visualPurpose": "전체 피자가 몇 조각인지 확인하게 합니다.",
+            "sceneSummary": "네 조각으로 나뉜 피자 전체",
+            "primaryEvidenceObject": "전체 피자",
+            "mustShow": ["네 조각", "전체 피자"],
+            "allowedSceneText": [],
+            "doNotRenderText": ["문제", "선택지", "정답", "힌트"],
+            "composition": "전체 피자 윤곽이 한눈에 보입니다.",
+        },
+        {
+            "assetRole": "stage_2",
+            "step": 2,
+            "visualPurpose": "전체 조각 수를 세는 근거를 보여줍니다.",
+            "sceneSummary": "네 조각 피자 중 한 조각이 살짝 강조된 장면",
+            "primaryEvidenceObject": "네 조각 피자",
+            "mustShow": ["네 조각", "한 조각 강조"],
+            "allowedSceneText": [],
+            "doNotRenderText": ["전체는 몇 조각인가요?", "1개", "2개", "4개", "정답"],
+            "composition": "조각 경계가 분명하게 보입니다.",
+        },
+        {
+            "assetRole": "stage_3",
+            "step": 3,
+            "visualPurpose": "고른 조각과 전체 조각을 연결해 분수로 말하게 합니다.",
+            "sceneSummary": "고른 한 조각과 전체 네 조각이 함께 보이는 장면",
+            "primaryEvidenceObject": "강조된 한 조각",
+            "mustShow": ["한 조각", "네 조각 전체"],
+            "allowedSceneText": [],
+            "doNotRenderText": ["분수", "빈칸", "정답", "힌트"],
+            "composition": "한 조각과 전체가 동시에 비교됩니다.",
+        },
+        {
+            "assetRole": "stage_4_realtime",
+            "step": 4,
+            "visualPurpose": "학생이 전체와 부분을 말로 설명하는 상황을 준비합니다.",
+            "sceneSummary": "피자 조각을 보며 설명을 준비하는 책상 장면",
+            "primaryEvidenceObject": "피자 조각 그림",
+            "mustShow": ["피자 조각 그림"],
+            "allowedSceneText": [],
+            "doNotRenderText": ["말하기 정답", "힌트", "채점"],
+            "composition": "설명할 그림이 중심에 있고 사람은 손 정도만 보입니다.",
+        },
+    ]
+
+
 def _generated_fraction_content() -> dict:
     base_content = next(content for content in create_demo_database().mission_contents if content.student_id == "student_learning_fraction")
     content = base_content.model_dump(by_alias=True)
@@ -576,6 +685,11 @@ def _generated_fraction_content() -> dict:
     content["approvedByUserId"] = None
     content["approvedAt"] = None
     content["publishedAt"] = None
+    content["briefJson"] = {
+        **content.get("briefJson", {}),
+        "scenarioSpine": _valid_learning_plan()["scenarioSpine"],
+        "stageVisualSpecs": _fraction_stage_visual_specs(),
+    }
     for stage in content["stages"]:
         stage["id"] = f"stage_generated_quality_{stage['step']}"
         stage["missionContentId"] = content["id"]

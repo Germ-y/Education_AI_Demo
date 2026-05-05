@@ -255,6 +255,7 @@ def validate_orchestrator_plan_quality(
     _validate_stage_plan(plan.get("stagePlan"), content_type, issues)
     _validate_stage_plan_template_variety(plan.get("stagePlan"), issues, reading_load=reading_load, choice_limit=choice_limit)
     _validate_intent_roles(plan.get("imagePackageIntent"), "orchestrator.imagePackageIntent", issues)
+    _validate_stage_visual_specs(plan.get("stageVisualSpecs"), "orchestrator.stageVisualSpecs", issues)
     _validate_intent_roles(plan.get("ttsNarrationIntent"), "orchestrator.ttsNarrationIntent", issues)
 
     if issues:
@@ -294,6 +295,7 @@ def validate_mission_content_quality(
     _validate_source_material_evidence(mission, issues)
     _validate_image_prompt_policy(mission, issues)
     _validate_track_specific_problem_quality(mission, expected_content_type, issues)
+    _validate_mission_visual_brief_contract(mission, orchestrator_plan, issues)
 
     if issues:
         raise ContentQualityError(issues)
@@ -736,6 +738,46 @@ def _validate_intent_roles(value: Any, path: str, issues: list[str]) -> None:
     roles = [item.get("assetRole") for item in value if isinstance(item, dict)]
     if sorted(roles) != sorted(role.value for role in REQUIRED_ASSET_ROLES):
         issues.append(f"{path}는 hero, stage_1, stage_2, stage_3, stage_4_realtime을 각각 1개씩 가져야 합니다.")
+
+
+def _validate_stage_visual_specs(value: Any, path: str, issues: list[str]) -> None:
+    if value is None:
+        issues.append(f"{path}가 필요합니다. 오케스트레이터는 단계별 이미지 제작 지시서를 반환해야 합니다.")
+        return
+    if not isinstance(value, list):
+        issues.append(f"{path}는 asset role list여야 합니다.")
+        return
+    roles = [item.get("assetRole") for item in value if isinstance(item, dict)]
+    if sorted(roles) != sorted(role.value for role in REQUIRED_ASSET_ROLES):
+        issues.append(f"{path}는 hero, stage_1, stage_2, stage_3, stage_4_realtime을 각각 1개씩 가져야 합니다.")
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            issues.append(f"{path}[{index}]는 object여야 합니다.")
+            continue
+        for key in ("visualPurpose", "sceneSummary", "primaryEvidenceObject", "composition"):
+            _validate_korean_text(item.get(key), f"{path}[{index}].{key}", issues)
+        for key in ("mustShow", "allowedSceneText", "doNotRenderText"):
+            if not isinstance(item.get(key), list):
+                issues.append(f"{path}[{index}].{key}는 list여야 합니다.")
+
+
+def _validate_mission_visual_brief_contract(
+    mission: MissionContent,
+    orchestrator_plan: dict[str, Any] | None,
+    issues: list[str],
+) -> None:
+    if not orchestrator_plan or not isinstance(orchestrator_plan.get("stageVisualSpecs"), list):
+        return
+    brief_json = mission.brief_json if isinstance(mission.brief_json, dict) else {}
+    if not isinstance(brief_json.get("scenarioSpine"), dict):
+        issues.append("mission.briefJson.scenarioSpine은 orchestratorPlan에서 보존되어야 합니다.")
+    stage_visual_specs = brief_json.get("stageVisualSpecs")
+    if not isinstance(stage_visual_specs, list):
+        issues.append("mission.briefJson.stageVisualSpecs는 orchestratorPlan에서 보존되어야 합니다.")
+        return
+    roles = [item.get("assetRole") for item in stage_visual_specs if isinstance(item, dict)]
+    if sorted(roles) != sorted(role.value for role in REQUIRED_ASSET_ROLES):
+        issues.append("mission.briefJson.stageVisualSpecs는 5개 이미지 역할별 제작 지시서를 모두 포함해야 합니다.")
 
 
 def _validate_text_list(value: Any, path: str, issues: list[str]) -> None:

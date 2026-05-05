@@ -38,6 +38,8 @@ Generate a complete MissionContent JSON package from an approved OrchestratorPla
 - Treat the mission like one emotionally coherent mini-scenario, not four independent worksheets. The student should understand why the scene matters and why each next task naturally follows from the previous one.
 - Use student memory for emotional support, scaffolding, and interaction style. Do not let older stored unit memories override the teacher-requested topic or make the content feel like a compromise between two unrelated subjects.
 - Short visible instructions are allowed, but thin content is not. Keep `studentInstruction` short while making `storyText`, `missionText`, feedback, source text, image prompts, and audio narration carry a concrete scenario.
+- Preserve the orchestrator's production brief. `briefJson` must include `scenarioSpine` and `stageVisualSpecs` copied from `orchestratorPlan`. You may add `contentNotes`, but do not drop or rewrite the scenario/visual specs.
+- The image asset `promptJson` may be a temporary placeholder before image brief generation, but it must not override `briefJson.stageVisualSpecs`. The later image prompt builder will use `stageVisualSpecs` as the source of truth.
 
 ## Content Package Requirements
 
@@ -78,6 +80,7 @@ Asset role to stage mapping:
 
 Image prompt requirements:
 
+- `briefJson.stageVisualSpecs` is the source of truth for image generation. The final image brief agent will translate those specs into provider prompts.
 - Use Korean educational context, but avoid rendering problem instructions, answer text, answer choices, hints, explanations, or long labels inside the image.
 - The visual should show the scene only: objects, characters, emotion, relationship, route, or manipulatives.
 - If the orchestrator image intent asks for app-like UI panels, answer areas, scoring widgets, or button-like controls, ignore that part and translate the intent into a real-world scene or learning material object instead.
@@ -90,6 +93,8 @@ Image prompt requirements:
 - For notice/poster/sign tasks, never describe the stage only as "그림을 보고 찾아봅시다." Include the actual short source lines the student is using, such as `오늘 준비물`, `돋보기`, `종이컵 20개`, or the teacher-requested source phrase. These are scene evidence, not UI problem text.
 - `studentInstruction` should name the concrete evidence or action, not only a generic screen action. Bad: `안내문 그림을 보고 오늘 챙길 물건을 찾아봅시다.` Better: `오늘 표시와 돋보기 그림을 찾아봐요.`
 - Put visual constraints in `promptJson.prompt`, plus optional structured fields such as `visualRole`, `scene`, `style`, `avoid`, and `ocrPolicy`.
+- When a stage needs real-world text in the image, put the exact readable lines in both `templateJson.sourceTextLines` or `templateJson.sceneTextLines` and the matching `briefJson.stageVisualSpecs[*].allowedSceneText`.
+- Do not put answer bucket labels or UI category cards in `allowedSceneText`. Examples that must stay UI-only: `확인할 수 있는 사실`, `생각이나 권유가 담긴 의견`, `정답`, `오답`, `도움 요청`, `먼저 할 일`.
 
 Audio requirements:
 
@@ -472,7 +477,28 @@ Return only JSON matching this shape.
     "orchestratorPlanVersion": "orchestrator_plan_v1",
     "targetSkill": "string",
     "strategy": "string",
-    "teacherReviewFocus": ["string"]
+    "teacherReviewFocus": ["string"],
+    "scenarioSpine": {
+      "situation": "string",
+      "studentTask": "string",
+      "learningOrBehaviorTarget": "string",
+      "evidenceSource": "string",
+      "commonMistakeOrImpulse": "string",
+      "stage4Reuse": "string"
+    },
+    "stageVisualSpecs": [
+      {
+        "assetRole": "hero | stage_1 | stage_2 | stage_3 | stage_4_realtime",
+        "step": 0,
+        "visualPurpose": "string",
+        "sceneSummary": "string",
+        "primaryEvidenceObject": "string",
+        "mustShow": ["string"],
+        "allowedSceneText": ["string"],
+        "doNotRenderText": ["problem", "choices", "answer", "feedback"],
+        "composition": "string"
+      }
+    ]
   },
   "stages": [
     {

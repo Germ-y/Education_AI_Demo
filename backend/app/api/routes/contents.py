@@ -529,16 +529,20 @@ def _uses_image_brief_prompt(prompt_json: dict | None) -> bool:
 
 def _image_brief_input_snapshot(content, image_assets: list) -> dict:
     stages = sorted(content.stages, key=lambda item: item.step)
+    scenario_spine = content.brief_json.get("scenarioSpine") if isinstance(content.brief_json, dict) else None
+    stage_visual_specs = _stage_visual_specs_by_role(content)
     return {
         "contentId": content.id,
         "contentType": content.content_type,
         "title": content.title,
         "sessionGoal": content.session_goal,
-        "briefJson": content.brief_json,
+        "scenarioSpine": scenario_spine if isinstance(scenario_spine, dict) else {},
+        "stageVisualSpecs": list(stage_visual_specs.values()),
         "scenarioVisualGuidance": {
             "goal": "Make the learning evidence visually dominant, not the person.",
             "cameraVariety": "Use distinct hero/stage shots in one coherent scenario.",
             "humanPresencePolicy": "People are optional and secondary unless the task is social expression or realtime role practice.",
+            "textBoundary": "Only allowedSceneText may be visibly rendered in images. Problem UI text, choices, answer labels, feedback, and category buckets are doNotRenderText.",
         },
         "stages": [
             {
@@ -547,10 +551,9 @@ def _image_brief_input_snapshot(content, image_assets: list) -> dict:
                 "stageRole": stage.stage_role,
                 "templateType": stage.template_type,
                 "studentTitle": stage.student_title,
-                "studentInstruction": stage.student_instruction,
-                "templateJson": stage.template_json,
-                "realtimeSpec": stage.realtime_spec.model_dump(by_alias=True) if stage.realtime_spec else None,
-                "learningEvidence": _stage_learning_evidence(stage),
+                "visualSource": _stage_visual_source(stage),
+                "stageVisualSpec": _stage_visual_spec_for_stage(stage, stage_visual_specs),
+                "doNotRenderText": _stage_do_not_render_text(stage),
             }
             for stage in stages
         ],
@@ -560,11 +563,179 @@ def _image_brief_input_snapshot(content, image_assets: list) -> dict:
                 "assetRole": asset.asset_role,
                 "stageId": asset.stage_id,
                 "currentPromptJson": asset.prompt_json,
-                "stageEvidence": _asset_stage_evidence(asset, stages),
+                "stageVisualSpec": _stage_visual_spec_for_asset(content, asset, stages, stage_visual_specs),
+                "allowedSceneText": _allowed_scene_text_for_asset(content, asset, stages, stage_visual_specs),
+                "doNotRenderText": _do_not_render_text_for_asset(content, asset, stages, stage_visual_specs),
             }
             for asset in image_assets
         ],
     }
+
+
+def _stage_visual_specs_by_role(content) -> dict[str, dict[str, Any]]:
+    brief_json = content.brief_json if isinstance(content.brief_json, dict) else {}
+    raw_specs = brief_json.get("stageVisualSpecs")
+    specs: dict[str, dict[str, Any]] = {}
+    if not isinstance(raw_specs, list):
+        return specs
+    for item in raw_specs:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("assetRole")
+        if isinstance(role, str) and role:
+            specs[role] = item
+    return specs
+
+
+def _stage_visual_source(stage) -> dict[str, Any]:
+    template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
+    return {
+        "sourceTextLines": _string_list(template_json.get("sourceTextLines")),
+        "sceneTextLines": _string_list(template_json.get("sceneTextLines")),
+        "visualAnchors": _extract_visual_anchors(template_json),
+        "assetRole": _asset_role_for_step(stage.step).value,
+    }
+
+
+def _stage_visual_spec_for_stage(stage, stage_visual_specs: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    role = _asset_role_for_step(stage.step).value
+    return stage_visual_specs.get(role) or _fallback_stage_visual_spec(stage)
+
+
+def _stage_visual_spec_for_asset(content, asset, stages: list, stage_visual_specs: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    role = _as_asset_role_value(asset.asset_role)
+    if role in stage_visual_specs:
+        return stage_visual_specs[role]
+    if asset.asset_role == AssetRole.HERO:
+        return _fallback_hero_visual_spec(content, stages)
+    stage = next((candidate for candidate in stages if candidate.id == asset.stage_id), None)
+    return _fallback_stage_visual_spec(stage) if stage else {}
+
+
+def _fallback_hero_visual_spec(content, stages: list) -> dict[str, Any]:
+    anchors = _brief_visual_anchors_from_stages(stages)
+    return {
+        "assetRole": AssetRole.HERO.value,
+        "step": 0,
+        "visualPurpose": "미션 전체의 상황과 핵심 학습 근거를 한눈에 보여줍니다.",
+        "sceneSummary": content.title,
+        "primaryEvidenceObject": anchors[0] if anchors else content.title,
+        "mustShow": anchors[:5],
+        "allowedSceneText": _allowed_scene_text_from_stages(stages),
+        "doNotRenderText": _do_not_render_text_from_stages(stages),
+        "composition": "학습 근거가 화면 중심에 보이고 사람은 보조 맥락으로만 배치합니다.",
+    }
+
+
+def _fallback_stage_visual_spec(stage) -> dict[str, Any]:
+    if stage is None:
+        return {}
+    template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
+    allowed_scene_text = _allowed_scene_text_from_stage(stage)
+    anchors = _extract_visual_anchors(template_json)
+    role = _asset_role_for_step(stage.step).value
+    return {
+        "assetRole": role,
+        "step": stage.step,
+        "visualPurpose": f"{stage.student_title} 단계에서 학생이 볼 실제 장면 근거를 보여줍니다.",
+        "sceneSummary": _first_text_value(template_json, ("storyText", "missionText", "context", "situation")) or stage.student_title,
+        "primaryEvidenceObject": anchors[0] if anchors else (allowed_scene_text[0] if allowed_scene_text else stage.student_title),
+        "mustShow": anchors[:5],
+        "allowedSceneText": allowed_scene_text,
+        "doNotRenderText": _stage_do_not_render_text(stage),
+        "composition": "장면 근거를 크게 보여주고 문제 UI, 선택지, 정답 범주는 이미지 밖에 남깁니다.",
+    }
+
+
+def _allowed_scene_text_for_asset(content, asset, stages: list, stage_visual_specs: dict[str, dict[str, Any]]) -> list[str]:
+    spec = _stage_visual_spec_for_asset(content, asset, stages, stage_visual_specs)
+    spec_lines = _string_list(spec.get("allowedSceneText")) if isinstance(spec, dict) else []
+    if asset.asset_role == AssetRole.HERO:
+        return _dedupe_strings(spec_lines + _allowed_scene_text_from_stages(stages))
+    stage = next((candidate for candidate in stages if candidate.id == asset.stage_id), None)
+    return _dedupe_strings(spec_lines + (_allowed_scene_text_from_stage(stage) if stage else []))
+
+
+def _do_not_render_text_for_asset(content, asset, stages: list, stage_visual_specs: dict[str, dict[str, Any]]) -> list[str]:
+    spec = _stage_visual_spec_for_asset(content, asset, stages, stage_visual_specs)
+    spec_lines = _string_list(spec.get("doNotRenderText")) if isinstance(spec, dict) else []
+    if asset.asset_role == AssetRole.HERO:
+        return _dedupe_strings(spec_lines + _do_not_render_text_from_stages(stages))
+    stage = next((candidate for candidate in stages if candidate.id == asset.stage_id), None)
+    return _dedupe_strings(spec_lines + (_stage_do_not_render_text(stage) if stage else []))
+
+
+def _allowed_scene_text_from_stages(stages: list) -> list[str]:
+    lines: list[str] = []
+    for stage in stages:
+        lines.extend(_allowed_scene_text_from_stage(stage))
+    return _dedupe_strings(lines)
+
+
+def _allowed_scene_text_from_stage(stage) -> list[str]:
+    if stage is None:
+        return []
+    template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
+    return _dedupe_strings(_string_list(template_json.get("sourceTextLines")) + _string_list(template_json.get("sceneTextLines")))
+
+
+def _do_not_render_text_from_stages(stages: list) -> list[str]:
+    lines: list[str] = []
+    for stage in stages:
+        lines.extend(_stage_do_not_render_text(stage))
+    return _dedupe_strings(lines)
+
+
+def _stage_do_not_render_text(stage) -> list[str]:
+    if stage is None:
+        return []
+    template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
+    blocked = [stage.student_instruction]
+    evidence = _stage_learning_evidence(stage)
+    for key in ("taskPrompt", "taskBody"):
+        value = evidence.get(key)
+        if isinstance(value, str):
+            blocked.append(value)
+    for key in ("choiceTexts", "matchingTexts", "sequenceTexts"):
+        value = evidence.get(key)
+        if isinstance(value, list):
+            blocked.extend(item for item in value if isinstance(item, str))
+    blocked.extend(_template_feedback_texts(template_json))
+    allowed = set(_allowed_scene_text_from_stage(stage))
+    return _dedupe_strings(text for text in blocked if text and text not in allowed)
+
+
+def _template_feedback_texts(template_json: dict[str, Any]) -> list[str]:
+    texts: list[str] = []
+    for key in ("correctFeedback", "wrongFeedback", "hint", "explanation", "answer"):
+        value = template_json.get(key)
+        if isinstance(value, str):
+            texts.append(value)
+    return texts
+
+
+def _dedupe_strings(values) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        stripped = value.strip()
+        if stripped and stripped not in result:
+            result.append(stripped)
+    return result
+
+
+def _as_asset_role_value(value: Any) -> str:
+    return value.value if hasattr(value, "value") else str(value)
+
+
+def _asset_role_for_step(step: int) -> AssetRole:
+    return {
+        1: AssetRole.STAGE_1,
+        2: AssetRole.STAGE_2,
+        3: AssetRole.STAGE_3,
+        4: AssetRole.STAGE_4_REALTIME,
+    }[step]
 
 
 def _apply_image_brief_output(content, output_json: dict) -> None:
@@ -604,6 +775,16 @@ def _apply_image_brief_output(content, output_json: dict) -> None:
                         "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "assetId": asset.id},
                     },
                 )
+        blocked_text = _blocked_visible_text_in_image_prompt(content, asset, prompt)
+        if blocked_text:
+            raise HTTPException(
+                status_code=424,
+                detail={
+                    "code": "IMAGE_BRIEF_UI_TEXT",
+                    "message": f"{asset.asset_role} 이미지 프롬프트에 sourceTextLines가 아닌 UI/보기 문구가 들어갔습니다: {blocked_text}",
+                    "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "assetId": asset.id},
+                },
+            )
         existing = asset.prompt_json if isinstance(asset.prompt_json, dict) else {}
         ocr_required = bool(brief.get("ocrRequired", False))
         text_rendering_policy = "short_scene_text_allowed_no_problem_ui" if ocr_required else "scene_only_no_problem_text"
@@ -624,11 +805,54 @@ def _apply_image_brief_output(content, output_json: dict) -> None:
 def _requests_problem_answer_image_text(prompt: str, term: str) -> bool:
     index = prompt.find(term)
     while index != -1:
-        window = prompt[max(0, index - 24) : index + len(term) + 56]
+        window = prompt[max(0, index - 80) : index + len(term) + 120]
         if not _is_negated_image_prompt_term(window):
             return True
         index = prompt.find(term, index + len(term))
     return False
+
+
+def _blocked_visible_text_in_image_prompt(content, asset, prompt: str) -> str | None:
+    allowed_scene_texts = set()
+    blocked_texts = []
+    stages = list(content.stages)
+    stage_visual_specs = _stage_visual_specs_by_role(content)
+    for stage in stages:
+        template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
+        allowed_scene_texts.update(_string_list(template_json.get("sourceTextLines")))
+        allowed_scene_texts.update(_string_list(template_json.get("sceneTextLines")))
+    allowed_scene_texts.update(_allowed_scene_text_for_asset(content, asset, stages, stage_visual_specs))
+
+    if asset.asset_role == AssetRole.HERO:
+        target_stages = stages
+    else:
+        target_stages = [stage for stage in stages if stage.id == asset.stage_id]
+
+    for stage in target_stages:
+        evidence = _stage_learning_evidence(stage)
+        for key in ("taskPrompt", "taskBody"):
+            value = evidence.get(key)
+            if isinstance(value, str):
+                blocked_texts.append(value)
+        for key in ("choiceTexts", "matchingTexts", "sequenceTexts"):
+            value = evidence.get(key)
+            if isinstance(value, list):
+                blocked_texts.extend(item for item in value if isinstance(item, str))
+    blocked_texts.extend(_do_not_render_text_for_asset(content, asset, stages, stage_visual_specs))
+
+    for text in blocked_texts:
+        cleaned = text.strip()
+        if not _is_meaningful_image_ui_text(cleaned):
+            continue
+        if cleaned in allowed_scene_texts:
+            continue
+        if cleaned in prompt:
+            return cleaned
+    return None
+
+
+def _is_meaningful_image_ui_text(text: str) -> bool:
+    return len(text) >= 5 and any("\uac00" <= character <= "\ud7a3" for character in text)
 
 
 def _is_negated_image_prompt_term(text: str) -> bool:
@@ -638,14 +862,26 @@ def _is_negated_image_prompt_term(text: str) -> bool:
         "넣지 않",
         "포함하지 마세요",
         "포함하지 않",
+        "포함하지 않는",
         "보이지 않",
+        "보이지 않는",
+        "노출하지",
+        "노출되지",
+        "드러나지",
+        "렌더링하지",
+        "쓰지",
+        "사용하지",
+        "요청하지",
         "피하고",
         "피합니다",
         "제외",
         "금지",
         "없이",
+        "없는",
         "없게",
+        "아닌",
         "no ",
+        "do not",
         "not include",
         "avoid",
         "without",
@@ -755,11 +991,17 @@ def _pairs_from_left_right_cards(template_json: dict[str, Any]) -> list[dict[str
     left_cards = template_json.get("leftCards")
     right_cards = template_json.get("rightCards")
     matches = template_json.get("matches")
-    if not isinstance(left_cards, list) or not isinstance(right_cards, list) or not isinstance(matches, list):
+    if not isinstance(left_cards, list) or not isinstance(right_cards, list):
         return []
     right_by_id = {card.get("id"): card for card in right_cards if isinstance(card, dict)}
     pairs: list[dict[str, Any]] = []
-    for match in matches:
+    if isinstance(matches, dict):
+        match_items = [{"leftId": left_id, "rightId": right_id} for left_id, right_id in matches.items()]
+    elif isinstance(matches, list):
+        match_items = matches
+    else:
+        match_items = []
+    for match in match_items:
         if not isinstance(match, dict):
             continue
         left_id = match.get("leftId")
