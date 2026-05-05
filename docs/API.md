@@ -66,7 +66,7 @@
 ## AI/Content
 
 - `POST /api/ai/orchestrator-runs`: 학생 맥락 기반 생성 계획 생성
-- `POST /api/ai/content-generations`: 4단계 미션 콘텐츠 생성
+- `POST /api/ai/content-generations`: 4단계 미션 콘텐츠 생성. 내부 입력은 `generationPlan.scenarioPlan`, `stagePlans`, `visualSpecDrafts`로 분리되고, 저장된 콘텐츠의 `briefJson.generationUnits.stageContentDrafts`에 단계별 draft가 남는다.
 - `GET /api/ai/agent-runs/{agentRunId}`: AI 실행 기록 조회
 - `GET /api/contents/{contentId}`: 교사용 콘텐츠 상세 조회
 - `PATCH /api/contents/{contentId}/review`: 교사가 stage instruction/question/choice/realtime goal을 직접 수정

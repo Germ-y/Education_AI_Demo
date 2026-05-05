@@ -12,7 +12,7 @@
 | --- | ---: | --- |
 | 교사 대시보드 데이터 연결 | 75% | seed 학생, context bundle, 리포트, 콘텐츠 상태는 연결됨. 학생등록 UI와 생성 job 상태 UX가 남음. |
 | 백엔드 API 기반 | 82% | 교사/학생/콘텐츠/공공데이터/NEIS 학교검색/학생등록 백엔드가 있음. 운영 migration과 job queue는 미완성. |
-| 콘텐츠 생성 품질 | 60% | 4단계 생성은 되지만 시나리오 깊이, 문제-이미지 정합성, retry 구조가 아직 불안정함. |
+| 콘텐츠 생성 품질 | 68% | 생성 입력/출력이 scenario/stage/visual unit으로 나뉘고 retry target이 남음. 작성 전 품질 기준 강화가 다음 병목임. |
 | 이미지/음성 asset 파이프라인 | 82% | background job 생성/polling과 asset별 성공·실패 상태 저장이 연결됨. provider 실패 UX와 운영 queue 전환이 남음. |
 | 학생 런타임/realtime | 70% | published 미션, 제출, 회고, 완료 기록은 됨. preview/runtime 경계와 WebRTC 안정화가 남음. |
 | 학생등록 UX | 88% | 교사 대시보드 모달에서 학교검색, 학교 선택, 강점/약점/지원 입력, 등록 후 목록/상세 갱신과 access code 확인까지 연결됨. 브라우저 통합 회귀만 남음. |
@@ -50,42 +50,18 @@
 
 - 최종 E2E에서 대시보드 진입부터 실제 등록, context-bundle, 자료 생성 시작까지 브라우저로 다시 확인한다.
 
-### P0. 콘텐츠 생성 구조를 작은 단위로 분리
+### 완료. 콘텐츠 생성 구조를 작은 단위로 분리
 
-현재 병목:
+현재 상태:
 
-- 오케스트레이터가 `scenarioSpine`, `stagePlan`, `stageVisualSpecs`, `imagePackageIntent`, `ttsNarrationIntent`를 한 번에 만든다.
-- 콘텐츠 agent가 `MissionContent` 전체 JSON, 4개 stage, 10개 asset record, realtime spec을 한 번에 만든다.
-- 품질 실패 시 작은 부분만 고치지 않고 전체 MissionContent를 다시 생성한다.
-- 실제 agent run 로그에서 content 생성은 80초대가 흔하고, 실패 retry 포함 396초까지 확인됨.
+- 콘텐츠 생성 입력은 `generationPlan.scenarioPlan`, `stagePlans`, `visualSpecDrafts`로 분리된다.
+- 저장된 콘텐츠는 `briefJson.generationUnits.stageContentDrafts`에 단계별 template/realtime/asset/visual draft를 남긴다.
+- schema/quality retry는 `qualityRepair.stageRepairTargets`와 이전 `stageContentDrafts`를 함께 보내 실패 stage/visual unit 중심으로 고친다.
+- content id, stage id, asset id는 백엔드가 계속 결정적으로 재작성한다.
 
-해야 할 구조:
+남은 확장:
 
-```text
-teacher request
--> scenario planner
--> stage planner
--> stage content builder
--> visual spec builder
--> deterministic image prompt builder
--> image/audio generation job
--> final package validator
--> teacher review
-```
-
-권장 구현 순서:
-
-1. `ScenarioPlan` 스키마를 별도 저장 가능한 중간 산출물로 분리.
-2. stage 1~4를 각각 생성하거나 최소한 `stageContentDrafts` 배열로 나눠 검증.
-3. 실패 시 해당 stage 또는 visual spec만 repair.
-4. `MissionContent` 조립은 백엔드가 결정적으로 수행.
-5. content id, stage id, asset id는 계속 백엔드가 생성.
-
-완료 기준:
-
-- 한 stage 검증 실패가 전체 4단계 재생성으로 이어지지 않는다.
-- 생성 결과가 너무 유치하거나 얕을 때 교사 검토 전에 구조화된 이유가 남는다.
-- 학습지원형/일상생활 지원형이 요청 주제와 섞이지 않는다.
+- 지금은 단일 content agent 호출 안에서 unit을 분리하고 targeted repair snapshot을 보내는 구조다. 운영 최적화가 필요하면 stage별 agent run을 별도 durable job으로 승격한다.
 
 ### P1. 콘텐츠 품질 기준을 검수 탈락이 아니라 작성 기준으로 전환
 
@@ -213,7 +189,7 @@ backend/generated/assets/students/{studentId}/{contentId}/{assetId}.mp3
 | 단계 | 코드 위치 | 현재 병목 | 다음 조치 |
 | --- | --- | --- | --- |
 | 오케스트레이터 | `backend/app/api/routes/ai.py` | 큰 JSON 계획을 한 번에 생성 | scenario/stage/visual plan 분리 |
-| 콘텐츠 agent | `backend/app/api/routes/ai.py` | MissionContent 전체 생성과 전체 retry | stage별 draft와 부분 repair |
+| 콘텐츠 agent | `backend/app/api/routes/ai.py` | stageContentDrafts와 targeted repair는 연결됨 | stage별 별도 agent run은 운영 최적화로 남김 |
 | 품질 검수 | `backend/app/services/content_quality.py` | 탈락 조건 중심 | 작성 전 품질 기준으로 이동 |
 | 이미지 prompt | `backend/app/api/routes/contents.py` | deterministic으로 개선됨 | 앞단 visual spec 품질 강화 |
 | 이미지 생성 | `backend/app/api/routes/contents.py` | background job과 partial retry는 연결됨 | 운영 queue와 provider 재시도 정책 고도화 |
@@ -223,7 +199,6 @@ backend/generated/assets/students/{studentId}/{contentId}/{assetId}.mp3
 
 ## 다음 커밋 추천 순서
 
-1. `fix : 콘텐츠 생성 stage draft 구조화`
-2. `fix : 검토 preview 템플릿별 프레임 안정화`
-3. `test : 교사 생성부터 학생 완료까지 e2e 추가`
-4. `docs : 공유 DB와 asset 기준 갱신`
+1. `fix : 검토 preview 템플릿별 프레임 안정화`
+2. `test : 교사 생성부터 학생 완료까지 e2e 추가`
+3. `docs : 공유 DB와 asset 기준 갱신`

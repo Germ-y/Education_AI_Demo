@@ -806,10 +806,16 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
             )
         if "MissionContent" in instructions:
             content_generation_calls["count"] += 1
+            assert input_snapshot["generationPlan"]["unitVersion"] == "content_generation_units_v1"
+            assert len(input_snapshot["generationPlan"]["stagePlans"]) == 4
+            assert len(input_snapshot["generationPlan"]["visualSpecDrafts"]) == 5
             if content_generation_calls["count"] == 1:
                 assert "qualityRepair" not in input_snapshot
                 return invalid_generated_content, {"input_tokens": 10, "output_tokens": 20}
             assert input_snapshot["qualityRepair"]["validationErrors"]
+            assert input_snapshot["qualityRepair"]["repairMode"] == "targeted_stage_or_visual_repair"
+            assert input_snapshot["qualityRepair"]["stageContentDrafts"]
+            assert input_snapshot["qualityRepair"]["stageRepairTargets"][0]["step"] == 4
             return generated_content, {"input_tokens": 10, "output_tokens": 20}
         return (
             {
@@ -944,6 +950,10 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     assert saved_content_response.status_code == 200
     content = saved_content_response.json()["data"]
     assert content["briefJson"]["generatedAt"]
+    generation_units = content["briefJson"]["generationUnits"]
+    assert generation_units["unitVersion"] == "content_generation_units_v1"
+    assert len(generation_units["stageContentDrafts"]) == 4
+    assert generation_units["stageContentDrafts"][1]["visualSpec"]["assetRole"] == "stage_2"
 
     latest_seed = client.get("/api/context/seed")
     assert latest_seed.status_code == 200

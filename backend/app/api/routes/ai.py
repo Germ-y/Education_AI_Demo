@@ -192,12 +192,14 @@ def create_content_generation(
 
     settings = get_settings()
     spec = PROMPT_SPECS["mission_content_package"]
+    generation_plan = _build_generation_plan(orchestrator_run.output_json)
     input_snapshot = {
         "teacherId": principal.id,
         "studentId": payload.student_id,
         "caseId": payload.case_id,
         "orchestratorRunId": payload.orchestrator_run_id,
         "orchestratorPlan": orchestrator_run.output_json,
+        "generationPlan": generation_plan,
         "caseFile": case_file,
     }
     agent_run = agent_runs.create_running(
@@ -387,6 +389,72 @@ def _normalize_orchestrator_plan_candidate(plan: Any, *, content_type: str) -> d
         ]
         logger.info("ai.orchestrator.normalized content_type=%s changes=%s", content_type, changes)
     return normalized
+
+
+def _build_generation_plan(orchestrator_plan: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "unitVersion": "content_generation_units_v1",
+        "scenarioPlan": _scenario_plan_from_orchestrator(orchestrator_plan),
+        "stagePlans": _stage_plans_from_orchestrator(orchestrator_plan),
+        "visualSpecDrafts": _visual_spec_drafts_from_orchestrator(orchestrator_plan),
+        "assetIntent": {
+            "imagePackageIntent": orchestrator_plan.get("imagePackageIntent") if isinstance(orchestrator_plan, dict) else None,
+            "ttsNarrationIntent": orchestrator_plan.get("ttsNarrationIntent") if isinstance(orchestrator_plan, dict) else None,
+        },
+        "assemblyPolicy": {
+            "contentId": "backend_generated",
+            "stageIds": "backend_generated_by_step",
+            "assetIds": "backend_generated_by_role",
+            "finalPackage": "MissionContent",
+        },
+    }
+
+
+def _scenario_plan_from_orchestrator(orchestrator_plan: dict[str, Any]) -> dict[str, Any]:
+    scenario = orchestrator_plan.get("scenarioSpine") if isinstance(orchestrator_plan, dict) else None
+    return {
+        "unitId": "scenario",
+        "scenarioSpine": scenario if isinstance(scenario, dict) else {},
+        "sessionGoal": orchestrator_plan.get("sessionGoal") if isinstance(orchestrator_plan, dict) else None,
+        "targetSkill": orchestrator_plan.get("targetSkill") if isinstance(orchestrator_plan, dict) else None,
+        "contentType": orchestrator_plan.get("contentType") if isinstance(orchestrator_plan, dict) else None,
+    }
+
+
+def _stage_plans_from_orchestrator(orchestrator_plan: dict[str, Any]) -> list[dict[str, Any]]:
+    stage_plan = orchestrator_plan.get("stagePlan") if isinstance(orchestrator_plan, dict) else None
+    if not isinstance(stage_plan, list):
+        return []
+    plans = []
+    for item in stage_plan:
+        if not isinstance(item, dict):
+            continue
+        step = item.get("step")
+        plans.append(
+            {
+                "unitId": f"stage_{step}",
+                "step": step,
+                "stageRole": item.get("stageRole"),
+                "templateType": item.get("templateType"),
+                "studentTitle": item.get("studentTitle"),
+                "purpose": item.get("purpose"),
+                "templateRationale": item.get("templateRationale") or item.get("reason"),
+            }
+        )
+    return plans
+
+
+def _visual_spec_drafts_from_orchestrator(orchestrator_plan: dict[str, Any]) -> list[dict[str, Any]]:
+    specs = orchestrator_plan.get("stageVisualSpecs") if isinstance(orchestrator_plan, dict) else None
+    if not isinstance(specs, list):
+        return []
+    drafts = []
+    for item in specs:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("assetRole") or item.get("role") or "")
+        drafts.append({"unitId": f"visual_{role or len(drafts) + 1}", **item})
+    return drafts
 
 
 def _run_content_agent(
@@ -592,6 +660,127 @@ def _normalize_generated_stage(stage: Any) -> Any:
     return normalized
 
 
+def _attach_generation_units(mission: MissionContent, *, orchestrator_plan: dict[str, Any]) -> MissionContent:
+    generation_plan = _build_generation_plan(orchestrator_plan)
+    brief_json = dict(mission.brief_json)
+    if isinstance(orchestrator_plan.get("scenarioSpine"), dict):
+        brief_json["scenarioSpine"] = orchestrator_plan["scenarioSpine"]
+    if isinstance(orchestrator_plan.get("stageVisualSpecs"), list):
+        brief_json["stageVisualSpecs"] = orchestrator_plan["stageVisualSpecs"]
+    brief_json["generationUnits"] = {
+        **generation_plan,
+        "stageContentDrafts": _stage_content_drafts_from_mission(mission, orchestrator_plan),
+        "assemblyNotes": [
+            "백엔드가 content/stage/asset id를 결정적으로 재작성했습니다.",
+            "이미지 provider prompt는 stageVisualSpecs와 templateJson을 조합해 별도 생성합니다.",
+        ],
+    }
+    return mission.model_copy(update={"brief_json": brief_json})
+
+
+def _stage_content_drafts_from_mission(mission: MissionContent, orchestrator_plan: dict[str, Any]) -> list[dict[str, Any]]:
+    visual_specs_by_role = {
+        str(spec.get("assetRole") or spec.get("role") or ""): spec
+        for spec in _visual_spec_drafts_from_orchestrator(orchestrator_plan)
+    }
+    assets_by_role_type = {
+        (_enum_value(asset.asset_role), _enum_value(asset.asset_type)): asset.id
+        for asset in mission.assets
+    }
+    drafts = []
+    for stage in sorted(mission.stages, key=lambda item: item.step):
+        role = "stage_4_realtime" if stage.step == 4 else f"stage_{stage.step}"
+        drafts.append(
+            {
+                "unitId": f"stage_{stage.step}",
+                "step": stage.step,
+                "stageId": stage.id,
+                "stageRole": _enum_value(stage.stage_role),
+                "templateType": _enum_value(stage.template_type),
+                "studentTitle": stage.student_title,
+                "studentInstruction": stage.student_instruction,
+                "templateJson": stage.template_json,
+                "realtimeSpec": stage.realtime_spec.model_dump(by_alias=True) if stage.realtime_spec else None,
+                "imageAssetId": assets_by_role_type.get((role, "image")),
+                "audioAssetId": assets_by_role_type.get((role, "audio")),
+                "visualSpec": visual_specs_by_role.get(role),
+            }
+        )
+    return drafts
+
+
+def _stage_content_drafts_from_output(output_json: dict | None, orchestrator_plan: dict[str, Any]) -> list[dict[str, Any]]:
+    candidate = _mission_candidate_from_output(output_json)
+    if not isinstance(candidate, dict):
+        return []
+    stages = candidate.get("stages")
+    if not isinstance(stages, list):
+        return []
+    visual_specs_by_role = {
+        str(spec.get("assetRole") or spec.get("role") or ""): spec
+        for spec in _visual_spec_drafts_from_orchestrator(orchestrator_plan)
+    }
+    drafts = []
+    for stage in stages:
+        if not isinstance(stage, dict):
+            continue
+        step = stage.get("step")
+        role = "stage_4_realtime" if step == 4 else f"stage_{step}"
+        template_json = stage.get("templateJson") if isinstance(stage.get("templateJson"), dict) else {}
+        drafts.append(
+            {
+                "unitId": f"stage_{step}",
+                "step": step,
+                "stageId": stage.get("id"),
+                "stageRole": stage.get("stageRole"),
+                "templateType": stage.get("templateType"),
+                "studentTitle": stage.get("studentTitle"),
+                "studentInstruction": stage.get("studentInstruction"),
+                "templateJson": template_json,
+                "realtimeSpec": stage.get("realtimeSpec") if isinstance(stage.get("realtimeSpec"), dict) else None,
+                "imageAssetId": template_json.get("imageAssetId"),
+                "audioAssetId": template_json.get("audioAssetId"),
+                "visualSpec": visual_specs_by_role.get(role),
+            }
+        )
+    return drafts
+
+
+def _stage_repair_targets_from_errors(validation_errors: list[str], previous_output: dict | None) -> list[dict[str, Any]]:
+    candidate = _mission_candidate_from_output(previous_output)
+    stages = candidate.get("stages") if isinstance(candidate, dict) else None
+    stage_refs = {}
+    if isinstance(stages, list):
+        for stage in stages:
+            if isinstance(stage, dict) and isinstance(stage.get("step"), int):
+                stage_refs[stage["step"]] = str(stage.get("id") or "")
+
+    targets = []
+    for step in (1, 2, 3, 4):
+        reasons = []
+        markers = [f"{step}단계", f"stagePlan[{step}]", f"step {step}", f"step={step}", f"stage_{step}"]
+        if stage_refs.get(step):
+            markers.append(stage_refs[step])
+        for error in validation_errors:
+            if any(marker and marker in error for marker in markers):
+                reasons.append(error)
+        if reasons:
+            targets.append({"unitId": f"stage_{step}", "step": step, "stageId": stage_refs.get(step), "reasons": reasons})
+    if targets:
+        return targets
+    return [{"unitId": "package", "step": None, "stageId": None, "reasons": validation_errors}]
+
+
+def _mission_candidate_from_output(output_json: dict | None) -> Any:
+    if not isinstance(output_json, dict):
+        return None
+    return output_json.get("missionContent") if isinstance(output_json.get("missionContent"), dict) else output_json
+
+
+def _enum_value(value: Any) -> str:
+    return value.value if hasattr(value, "value") else str(value)
+
+
 def _generate_valid_mission_content(
     *,
     settings,
@@ -611,12 +800,20 @@ def _generate_valid_mission_content(
         attempt_started_at = time.perf_counter()
         generation_snapshot = input_snapshot
         if attempt > 1:
+            stage_repair_targets = _stage_repair_targets_from_errors(validation_errors, previous_output)
             generation_snapshot = {
                 **input_snapshot,
                 "qualityRepair": {
                     "attempt": attempt,
-                    "instruction": "이전 출력은 저장되지 않았습니다. validationErrors를 모두 반영해 완전한 MissionContent JSON 전체를 다시 반환하세요.",
+                    "repairMode": "targeted_stage_or_visual_repair",
+                    "instruction": (
+                        "validationErrors와 stageRepairTargets에 해당하는 stage/visual unit만 고치고 "
+                        "나머지 stageContentDrafts는 그대로 보존한 완전한 MissionContent JSON을 반환하세요."
+                    ),
                     "validationErrors": validation_errors,
+                    "stageRepairTargets": stage_repair_targets,
+                    "stageContentDrafts": _stage_content_drafts_from_output(previous_output, orchestrator_plan),
+                    "visualSpecDrafts": _visual_spec_drafts_from_orchestrator(orchestrator_plan),
                     "previousOutput": previous_output,
                 },
             }
@@ -645,6 +842,7 @@ def _generate_valid_mission_content(
         previous_output = output_json
         try:
             mission = _mission_from_generation(output_json, student_id=student_id, case_id=case_id)
+            mission = _attach_generation_units(mission, orchestrator_plan=orchestrator_plan)
             validate_mission_content_quality(mission, case_file=case_file, orchestrator_plan=orchestrator_plan)
             if settings.openai_content_critique_enabled:
                 critique = _critique_mission_content_quality(

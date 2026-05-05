@@ -49,6 +49,8 @@
 - 생성된 콘텐츠는 `teacher_review`로 저장되고, 교사 승인 후 `approved`, 배포 후 `published`가 된다.
 - provider key가 없거나 생성/검증에 실패하면 대체 seed 콘텐츠를 저장하지 않고 실패 run과 검수 필요 상태를 남긴다.
 - 콘텐츠 생성은 `mission_content_package` 출력 뒤 schema/계약 검증을 통과해야 저장된다. LLM 기반 `content_quality_critique`는 선택 설정이며 기본 병목을 줄이기 위해 현재 기본값은 비활성화다.
+- 콘텐츠 생성 입력은 `generationPlan.scenarioPlan`, `stagePlans`, `visualSpecDrafts`로 분리되고, 저장된 콘텐츠는 `briefJson.generationUnits.stageContentDrafts`에 단계별 template/realtime/asset/visual draft를 남긴다.
+- 콘텐츠 품질/schema retry는 `qualityRepair.stageRepairTargets`와 이전 `stageContentDrafts`를 함께 전달해 실패 stage/visual unit 중심으로 고친다.
 - 이미지 생성 전에는 별도 LLM을 다시 호출하지 않고, 완성된 `MissionContent`의 `briefJson.stageVisualSpecs`와 단계별 `templateJson`을 조합해 5개 이미지 prompt를 만든다. `gpt-image-2`에는 이 장면 prompt만 전달한다.
 - 이미지 prompt는 장면만 설명해야 하며 빈 카드, 말풍선, UI 패널, 선택지 영역, 버튼 같은 학습지형 구성을 요청하면 실패 처리한다.
 - OpenAI Realtime 음성은 ElevenLabs 안내 음성과 별도다. 기본값은 `OPENAI_REALTIME_VOICE=marin`, `OPENAI_REALTIME_VOICE_SPEED=0.92`다.
@@ -167,6 +169,5 @@ git diff --check
 
 최우선:
 
-1. 콘텐츠 생성 구조를 scenario/stage/visual spec 단위로 분리
-2. 검토 preview와 realtime preview/runtime 안정화
-3. 교사 승인부터 학생 완료, 교사 리포트 확인까지 E2E 회귀 테스트 추가
+1. 검토 preview와 realtime preview/runtime 안정화
+2. 교사 승인부터 학생 완료, 교사 리포트 확인까지 E2E 회귀 테스트 추가

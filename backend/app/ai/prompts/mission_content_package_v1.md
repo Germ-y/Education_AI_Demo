@@ -26,6 +26,8 @@ Generate a complete MissionContent JSON package from an approved OrchestratorPla
 - All visual context must reference image assets by role/id.
 - All stage entry narration must reference audio assets by role/id.
 - If the input contains `qualityRepair`, treat `qualityRepair.validationErrors` as authoritative. Return a corrected complete MissionContent JSON, not a patch or explanation.
+- If the input contains `generationPlan`, use it as separated source material: `scenarioPlan` is the mission spine, `stagePlans` are the four stage contracts, and `visualSpecDrafts` are image evidence plans. Build each stage from its own stage unit before assembling the final package.
+- If the input contains `qualityRepair.stageRepairTargets`, repair only those stage or visual units. Preserve the valid `qualityRepair.stageContentDrafts` for other steps unless they directly conflict with the repair target.
 - Return the backend `MissionContent` schema directly. Do not invent wrapper-only id fields or placeholder asset lists.
 - `id` is the content id. Every `stage.missionContentId` and every `asset.missionContentId` must equal that `id`.
 - Every stage must copy `step`, `stageRole`, and `templateType` exactly from `orchestratorPlan.stagePlan`.
@@ -39,6 +41,7 @@ Generate a complete MissionContent JSON package from an approved OrchestratorPla
 - Use student memory for emotional support, scaffolding, and interaction style. Do not let older stored unit memories override the teacher-requested topic or make the content feel like a compromise between two unrelated subjects.
 - Short visible instructions are allowed, but thin content is not. Keep `studentInstruction` short while making `storyText`, `missionText`, feedback, source text, image prompts, and audio narration carry a concrete scenario.
 - Preserve the orchestrator's production brief. `briefJson` must include `scenarioSpine` and `stageVisualSpecs` copied from `orchestratorPlan`. You may add `contentNotes`, but do not drop or rewrite the scenario/visual specs.
+- Add `briefJson.generationUnits.stageContentDrafts` with one item per stage. Each draft should include the stage contract, the final `templateJson`, linked image/audio asset ids, and the matching visual spec. This lets reviewers and retry logic inspect a single stage without treating the package as one opaque blob.
 - The image asset `promptJson` may be a temporary placeholder before asset generation, but it must not override `briefJson.stageVisualSpecs`. The backend image prompt builder will combine `stageVisualSpecs` and the final `templateJson` as the source of truth.
 
 ## Content Package Requirements
