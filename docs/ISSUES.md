@@ -211,7 +211,7 @@ backend/generated/assets/students/{studentId}/{contentId}/{assetId}.mp3
 
 필수 시나리오:
 
-1. 교사 로그인.
+1. 교사 대시보드 진입.
 2. NEIS 학교검색.
 3. 학생등록.
 4. 등록 학생으로 콘텐츠 생성.
