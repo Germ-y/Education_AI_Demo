@@ -14,7 +14,7 @@
 | 백엔드 API 기반 | 82% | 교사/학생/콘텐츠/공공데이터/NEIS 학교검색/학생등록 백엔드가 있음. 운영 migration과 job queue는 미완성. |
 | 콘텐츠 생성 품질 | 76% | scenario/stage/visual unit과 작성 전 설계 필드가 검증됨. 실제 생성 샘플 반복 품질 확인은 E2E에서 남음. |
 | 이미지/음성 asset 파이프라인 | 82% | background job 생성/polling과 asset별 성공·실패 상태 저장이 연결됨. provider 실패 UX와 운영 queue 전환이 남음. |
-| 학생 런타임/realtime | 75% | published 미션, 제출, 회고, 완료 기록은 됨. preview/runtime 경계는 분리됨. WebRTC 안정화가 남음. |
+| 학생 런타임/realtime | 82% | published 미션, 제출, 회고, 완료 기록은 됨. preview/runtime 경계와 WebRTC 취소/재시작 방어가 연결됨. provider 실연결 E2E가 남음. |
 | 학생등록 UX | 88% | 교사 대시보드 모달에서 학교검색, 학교 선택, 강점/약점/지원 입력, 등록 후 목록/상세 갱신과 access code 확인까지 연결됨. 브라우저 통합 회귀만 남음. |
 | 문서/인수인계 | 70% | 문서는 축소됨. DB dump와 generated asset 정책을 최신 상태로 반복 관리해야 함. |
 
@@ -95,25 +95,22 @@
 - 최종 E2E에서 검토 모달 4개 stage를 다시 확인한다.
 - 현재 로컬 DB에는 stale content mapping이 있어 대시보드 진입 시 `content_generated_001`, `content_prepared_notice_magnifier_001` 404가 찍힌다. DB/asset 정책 정리 단계에서 공유 기준 DB와 함께 정리한다.
 
-### P1. Realtime 안정화
+### 완료. Realtime 안정화
 
 현재 상태:
 
 - 학생 runtime은 published 콘텐츠에서만 realtime 세션을 만들 수 있다.
 - 교사 preview realtime endpoint는 별도 존재한다.
-- 프론트 WebRTC 연결 중 빠른 이탈/재시작 시 `RTCPeerConnection` closed 관련 오류가 날 수 있다.
+- 프론트는 realtime 연결 시도 id를 예약하고, 취소/이탈/재시작 뒤 늦게 도착한 WebRTC 이벤트를 무시한다.
+- 연결 중에는 `연결 중단`으로 바로 idle 상태로 돌아갈 수 있고, preview 완료 뒤에는 다시 시작할 수 있다.
+- 교사용 preview와 학생 runtime의 시작 실패 메시지를 분리했다.
+- preview/runtime 화면은 이미지, 안내 음성, 실시간 연결 상태를 단계별로 표시한다.
+- OpenAI realtime 기본값은 `OPENAI_REALTIME_VOICE=marin`, `OPENAI_REALTIME_VOICE_SPEED=0.92`이고 provider 단위 테스트가 있다.
 
-해야 할 일:
+남은 확인:
 
-- 연결 attempt id 방어를 더 촘촘히 유지.
-- 연결 실패 원인을 교사용 메시지와 학생용 메시지로 분리.
-- preview에서 opening audio, image, realtime 연결 상태를 단계별로 표시.
-- OpenAI realtime voice/speed 설정을 테스트해 기본값 확정.
-
-완료 기준:
-
-- 검토 모달에서 4단계 realtime preview를 시작/중단/재시작해도 콘솔 오류가 없다.
-- 학생이 published 미션에서 realtime을 완료하면 이벤트와 리포트에 반영된다.
+- 2026-05-05 브라우저 확인: provider 응답 대기 중 preview 시작 후 즉시 `연결 중단`해도 콘솔 오류 없이 대기 상태로 돌아왔다.
+- 실제 provider client secret, 마이크 권한, WebRTC 음성 송수신, 완료 저장은 최종 E2E에서 한 번 더 확인한다.
 
 ### P1. DB dump와 generated asset 정책 정리
 

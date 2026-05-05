@@ -131,6 +131,8 @@
 - 프론트 학생 route에서 unpublished 콘텐츠를 preview 없이 열면 런타임을 차단하고 `preview=1` 교사용 미리보기로 안내한다.
 - 학생 플레이 중 1~3단계 콘텐츠는 AI가 새로 생성하거나 바꾸지 않는다.
 - 4단계 realtime 세션은 승인된 `RealtimePracticeSpec`이 있는 stage에서만 만든다.
+- 교사용 preview는 `POST /api/contents/{contentId}/stages/{stageId}/preview-realtime-session`을 사용하며 unpublished 콘텐츠도 검토할 수 있다.
+- 프론트는 realtime 연결 상태를 `대기`, `연결 중`, `연결됨`, `저장 중`, `완료`, `확인 필요`로 표시한다.
 
 Asset generation job 응답 예시:
 

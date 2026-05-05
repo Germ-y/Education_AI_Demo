@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ApiFetchError,
   completeRealtimeSession,
   completeStudentMission,
   createPreviewRealtimeSession,
@@ -1039,6 +1040,48 @@ function getRealtimePracticeCopy(scene: StudentContext["scene"], question: Stage
   };
 }
 
+type RealtimeConnectionState = "idle" | "connecting" | "connected" | "ending" | "complete" | "error";
+
+const realtimeConnectionStatusLabel: Record<RealtimeConnectionState, string> = {
+  idle: "대기",
+  connecting: "연결 중",
+  connected: "연결됨",
+  ending: "저장 중",
+  complete: "완료",
+  error: "확인 필요",
+};
+
+function formatRealtimeStartError(error: unknown, previewMode: boolean) {
+  if (error instanceof ApiFetchError) {
+    if (error.status === 424) {
+      return previewMode
+        ? "검토용 실시간 대화를 시작하려면 Realtime provider 설정을 먼저 확인해야 합니다."
+        : "실시간 연습 제공자 연결을 시작하지 못했어요. 선생님에게 설정 확인이 필요합니다.";
+    }
+
+    return previewMode
+      ? `검토용 실시간 대화를 시작하지 못했습니다. ${error.message}`
+      : `실시간 대화를 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요. ${error.message}`;
+  }
+
+  if (typeof DOMException !== "undefined" && error instanceof DOMException) {
+    if (error.name === "NotAllowedError") {
+      return previewMode
+        ? "브라우저 마이크 권한이 꺼져 있어 검토용 실시간 대화를 시작하지 못했습니다."
+        : "마이크 권한이 꺼져 있어 실시간 연습을 시작하지 못했어요.";
+    }
+    if (error.name === "NotFoundError") {
+      return previewMode
+        ? "사용 가능한 마이크를 찾지 못해 검토용 실시간 대화를 시작하지 못했습니다."
+        : "사용 가능한 마이크를 찾지 못했어요.";
+    }
+  }
+
+  return previewMode
+    ? "검토용 실시간 대화를 시작하지 못했습니다. 연결을 끊고 다시 시작해 주세요."
+    : "실시간 대화를 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.";
+}
+
 function RealtimePracticeRoom({
   question,
   scene,
@@ -1073,7 +1116,7 @@ function RealtimePracticeRoom({
   const timeLimitMinutes = Math.round((question.realtimePracticeSpec?.timeLimitSeconds ?? 180) / 60);
   const minimumStudentTurns = 1;
   const [draft, setDraft] = useState("");
-  const [connectionState, setConnectionState] = useState<"idle" | "connecting" | "connected" | "ending" | "complete" | "error">("idle");
+  const [connectionState, setConnectionState] = useState<RealtimeConnectionState>("idle");
   const [statusMessage, setStatusMessage] = useState("시작을 누르면 별이와 실시간으로 대화할 수 있어요.");
   const [studentTurns, setStudentTurns] = useState(0);
   const [messages, setMessages] = useState<Array<{ id: number; role: "partner" | "student" | "system"; text: string }>>([
@@ -1096,6 +1139,13 @@ function RealtimePracticeRoom({
   const speechStartedAtRef = useRef<number | null>(null);
   const hasUserSubmittedRef = useRef(false);
   const responseInProgressRef = useRef(false);
+  const realtimeStatusItems = [
+    { label: "이미지", state: question.imageUrl ? "준비됨" : "없음" },
+    { label: "안내 음성", state: question.audioUrl ? "준비됨" : "없음" },
+    { label: "실시간 연결", state: realtimeConnectionStatusLabel[connectionState] },
+  ];
+  const showRealtimeCompleteToast =
+    isComplete && connectionState !== "connecting" && connectionState !== "connected" && connectionState !== "ending";
 
   useEffect(() => {
     messageListRef.current?.scrollTo({
@@ -1108,12 +1158,49 @@ function RealtimePracticeRoom({
 
   function closeRealtimeConnection() {
     connectionAttemptIdRef.current += 1;
-    dataChannelRef.current?.close();
-    peerConnectionRef.current?.close();
+    try {
+      dataChannelRef.current?.close();
+    } catch {
+      // 이미 닫힌 채널은 무시한다.
+    }
+    try {
+      peerConnectionRef.current?.close();
+    } catch {
+      // 이미 닫힌 연결은 무시한다.
+    }
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = null;
+    }
     dataChannelRef.current = null;
     peerConnectionRef.current = null;
     mediaStreamRef.current = null;
+  }
+
+  function beginRealtimeAttempt() {
+    connectionAttemptIdRef.current += 1;
+    return connectionAttemptIdRef.current;
+  }
+
+  function isCurrentRealtimeAttempt(attemptId: number) {
+    return connectionAttemptIdRef.current === attemptId;
+  }
+
+  function resetRealtimeRunState() {
+    realtimeSessionIdRef.current = null;
+    realtimeTokenRef.current = null;
+    startedAtRef.current = null;
+    transcriptRef.current = [practice.sceneLine];
+    partnerDraftRef.current = "";
+    studentDraftRef.current = "";
+    speechStartedAtRef.current = null;
+    hasUserSubmittedRef.current = false;
+    responseInProgressRef.current = false;
+    setDraft("");
+    setStudentTurns(0);
+    setMessages([{ id: 1, role: "partner", text: practice.sceneLine }]);
+    setLivePartnerText("");
+    setLiveStudentText("");
   }
 
   const appendMessage = (role: "partner" | "student" | "system", text: string) => {
@@ -1241,6 +1328,9 @@ function RealtimePracticeRoom({
       return;
     }
 
+    closeRealtimeConnection();
+    resetRealtimeRunState();
+    const connectionAttemptId = beginRealtimeAttempt();
     setConnectionState("connecting");
     setStatusMessage("실시간 대화를 연결하고 있어요.");
 
@@ -1251,17 +1341,20 @@ function RealtimePracticeRoom({
       if (previewMode) {
         setStatusMessage("검토용 실시간 대화를 준비하고 있어요.");
         const session = await createPreviewRealtimeSession(contentId, stageId);
+        if (!isCurrentRealtimeAttempt(connectionAttemptId)) return;
         realtimeTokenRef.current = null;
         realtimeSessionIdRef.current = session.sessionId;
         startedAtRef.current = Date.now();
-        await connectRealtimeSession(session);
+        await connectRealtimeSession(session, connectionAttemptId);
         return;
       }
 
       if ((!activeToken || !activeAttemptId) && accessCode) {
         setStatusMessage("학습 기록을 준비하고 있어요.");
         const access = await studentAccess({ accessCode });
+        if (!isCurrentRealtimeAttempt(connectionAttemptId)) return;
         const attempt = await startStudentMission(contentId, { token: access.session.accessToken });
+        if (!isCurrentRealtimeAttempt(connectionAttemptId)) return;
         activeToken = access.session.accessToken;
         activeAttemptId = attempt.id;
         onRuntimeReady(activeToken, activeAttemptId);
@@ -1273,22 +1366,24 @@ function RealtimePracticeRoom({
 
       realtimeTokenRef.current = activeToken;
       const session = await createRealtimeSession(contentId, stageId, { attemptId: activeAttemptId }, { token: activeToken });
+      if (!isCurrentRealtimeAttempt(connectionAttemptId)) return;
       realtimeSessionIdRef.current = session.sessionId;
       startedAtRef.current = Date.now();
-      await connectRealtimeSession(session);
+      await connectRealtimeSession(session, connectionAttemptId);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "알 수 없는 오류";
-      console.error("Realtime conversation failed", error);
+      if (!isCurrentRealtimeAttempt(connectionAttemptId)) return;
+      const message = formatRealtimeStartError(error, previewMode);
       closeRealtimeConnection();
       setConnectionState("error");
-      setStatusMessage(`실시간 대화를 시작하지 못했어요. ${message.slice(0, 140)}`);
-      appendMessage("system", `실시간 대화를 시작하지 못했어요. ${message.slice(0, 140)}`);
+      setStatusMessage(message);
+      appendMessage("system", message);
     }
   };
 
-  const connectRealtimeSession = async (session: Awaited<ReturnType<typeof createRealtimeSession>>) => {
-    const connectionAttemptId = connectionAttemptIdRef.current + 1;
-    connectionAttemptIdRef.current = connectionAttemptId;
+  const connectRealtimeSession = async (
+    session: Awaited<ReturnType<typeof createRealtimeSession>>,
+    connectionAttemptId: number,
+  ) => {
     const peerConnection = new RTCPeerConnection();
     peerConnectionRef.current = peerConnection;
     const isActiveConnection = () =>
@@ -1297,7 +1392,7 @@ function RealtimePracticeRoom({
       peerConnection.signalingState !== "closed";
 
     peerConnection.ontrack = (event) => {
-      if (remoteAudioRef.current) {
+      if (isActiveConnection() && remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = event.streams[0];
       }
     };
@@ -1313,12 +1408,14 @@ function RealtimePracticeRoom({
     const dataChannel = peerConnection.createDataChannel("oai-events");
     dataChannelRef.current = dataChannel;
     dataChannel.addEventListener("open", () => {
+      if (!isActiveConnection()) return;
       setConnectionState("connected");
       setStatusMessage("연결됐어요. 마이크로 말하거나 아래에 문장을 입력해도 돼요.");
       appendMessage("system", previewMode ? "검토용 실시간 대화가 연결됐어요." : "실시간 대화가 연결됐어요. 말하거나 채팅을 보내세요.");
       sendSessionEvent("realtime_session_connected", { provider: session.provider, model: session.model, preview: Boolean(previewMode) });
     });
     dataChannel.addEventListener("message", (event) => {
+      if (!isActiveConnection()) return;
       try {
         handleRealtimeEvent(JSON.parse(event.data));
       } catch {
@@ -1326,6 +1423,7 @@ function RealtimePracticeRoom({
       }
     });
     dataChannel.addEventListener("error", () => {
+      if (!isActiveConnection()) return;
       setConnectionState("error");
       setStatusMessage("대화 채널 연결에 실패했어요.");
     });
@@ -1355,6 +1453,13 @@ function RealtimePracticeRoom({
     });
   };
 
+  const cancelRealtimeConversation = () => {
+    closeRealtimeConnection();
+    resetRealtimeRunState();
+    setConnectionState("idle");
+    setStatusMessage(previewMode ? "검토용 실시간 대화를 중단했어요. 다시 시작할 수 있습니다." : "실시간 연습을 중단했어요. 다시 시작할 수 있어요.");
+  };
+
   const submitMessage = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -1368,27 +1473,32 @@ function RealtimePracticeRoom({
 
     const dataChannel = dataChannelRef.current;
     if (dataChannel?.readyState === "open") {
-      dataChannel.send(
-        JSON.stringify({
-          type: "conversation.item.create",
-          item: {
-            type: "message",
-            role: "user",
-            content: [{ type: "input_text", text: trimmed }],
-          },
-        }),
-      );
-      if (responseInProgressRef.current) {
-        setStatusMessage("?대떦 ?듬? ?앷컖???덈굹硫??ㅼ쓬 留먯쓣 蹂대궡二쇱꽭??");
-        return;
+      try {
+        dataChannel.send(
+          JSON.stringify({
+            type: "conversation.item.create",
+            item: {
+              type: "message",
+              role: "user",
+              content: [{ type: "input_text", text: trimmed }],
+            },
+          }),
+        );
+        if (responseInProgressRef.current) {
+          setStatusMessage("이전 답변이 끝나면 다음 말을 이어서 보낼게요.");
+          return;
+        }
+        responseInProgressRef.current = true;
+        dataChannel.send(JSON.stringify({ type: "response.create" }));
+      } catch {
+        setConnectionState("error");
+        setStatusMessage("대화 채널이 끊어졌어요. 다시 시작해 주세요.");
       }
-      responseInProgressRef.current = true;
-      dataChannel.send(JSON.stringify({ type: "response.create" }));
     }
   };
 
   const finishRealtimeConversation = async () => {
-    if (connectionState === "ending") return;
+    if (connectionState === "ending" || connectionState === "idle") return;
     setConnectionState("ending");
     setStatusMessage("대화 기록을 저장하고 있어요.");
     closeRealtimeConnection();
@@ -1435,6 +1545,28 @@ function RealtimePracticeRoom({
           <div className="mt-3">
             <StageMedia question={question} theme={theme} compact featured />
           </div>
+          <div className="mt-3 grid grid-cols-3 gap-2" aria-live="polite">
+            {realtimeStatusItems.map((item) => {
+              const isReady = item.state === "준비됨" || item.state === "연결됨" || item.state === "완료";
+              const needsAttention = item.state === "확인 필요" || item.state === "없음";
+
+              return (
+                <div
+                  key={item.label}
+                  className={`rounded-[14px] border px-3 py-2 shadow-sm ${
+                    isReady
+                      ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
+                      : needsAttention
+                        ? "border-[#fed7aa] bg-[#fff7ed] text-[#9a3412]"
+                        : "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
+                  }`}
+                >
+                  <p className="text-[11px] font-black">{item.label}</p>
+                  <p className="mt-0.5 text-xs font-black">{item.state}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <div className="relative z-10 mt-4 grid grid-cols-[minmax(0,1fr)_128px] items-end gap-3">
@@ -1463,7 +1595,7 @@ function RealtimePracticeRoom({
         </div>
 
         <div className="relative min-h-0">
-        {isComplete && (
+        {showRealtimeCompleteToast && (
           <div className="pointer-events-none absolute inset-x-5 bottom-5 z-20">
             <div className="pointer-events-auto mx-auto flex max-w-[460px] items-center justify-between gap-3 rounded-[20px] border border-[#f0dfb4] bg-[#fff9e8] px-4 py-3 shadow-[0_18px_42px_rgba(31,41,55,0.18)] animate-[stageToastIn_220ms_ease-out_both]">
               <div className="min-w-0">
@@ -1533,14 +1665,22 @@ function RealtimePracticeRoom({
         </div>
 
         <div className="border-t border-[#e2e8f0] bg-white p-4">
-          {connectionState === "idle" || connectionState === "error" ? (
+          {connectionState === "idle" || connectionState === "error" || (previewMode && connectionState === "complete") ? (
             <button
               type="button"
               onClick={startRealtimeConversation}
               className="w-full rounded-[16px] px-5 py-3 text-sm font-black text-white shadow-[0_12px_24px_rgba(39,174,96,0.22)] transition duration-200 hover:-translate-y-0.5"
               style={{ backgroundColor: theme.accent }}
             >
-              실시간 대화 시작
+              {connectionState === "complete" ? "실시간 대화 다시 시작" : "실시간 대화 시작"}
+            </button>
+          ) : connectionState === "connecting" ? (
+            <button
+              type="button"
+              onClick={cancelRealtimeConversation}
+              className="w-full rounded-[16px] border border-[#dce5ec] bg-white px-5 py-3 text-sm font-black text-[#334155] shadow-sm transition duration-200 hover:-translate-y-0.5"
+            >
+              연결 중단
             </button>
           ) : (
             <form
@@ -1569,9 +1709,9 @@ function RealtimePracticeRoom({
                 type="button"
                 onClick={finishRealtimeConversation}
                 className="rounded-[16px] border border-[#dce5ec] bg-white px-5 py-3 text-sm font-black text-[#334155] shadow-sm transition duration-200 hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
-                disabled={connectionState === "connecting" || connectionState === "ending"}
+                disabled={connectionState === "ending" || connectionState === "complete"}
               >
-                마치기
+                {connectionState === "ending" ? "저장 중" : "마치기"}
               </button>
             </form>
           )}

@@ -58,6 +58,8 @@
 - 이미지 생성 전에는 별도 LLM을 다시 호출하지 않고, 완성된 `MissionContent`의 `briefJson.stageVisualSpecs`와 단계별 `templateJson`을 조합해 5개 이미지 prompt를 만든다. `gpt-image-2`에는 이 장면 prompt만 전달한다.
 - 이미지 prompt는 장면만 설명해야 하며 빈 카드, 말풍선, UI 패널, 선택지 영역, 버튼 같은 학습지형 구성을 요청하면 실패 처리한다.
 - OpenAI Realtime 음성은 ElevenLabs 안내 음성과 별도다. 기본값은 `OPENAI_REALTIME_VOICE=marin`, `OPENAI_REALTIME_VOICE_SPEED=0.92`다.
+- 4단계 realtime 화면은 이미지, 안내 음성, 실시간 연결 상태를 분리해서 보여준다.
+- realtime preview/runtime은 연결 시도 id로 이전 WebRTC 이벤트를 무시하고, 연결 중단 후 다시 시작할 수 있다.
 - ElevenLabs 안내 음성은 선생님이 옆에서 또렷하게 말해주는 톤을 목표로 한다. 기본값은 `ELEVENLABS_MODEL_ID=eleven_v3`, `ELEVENLABS_SPEED=1.08`, `ELEVENLABS_ENABLE_AUDIO_TAGS=false`다. v3 오디오 태그는 한국어 말끝이 늘어지는 현상이 있어 기본 비활성화한다.
 
 일상생활 지원형 단계명:
@@ -173,5 +175,5 @@ git diff --check
 
 최우선:
 
-1. 검토 preview와 realtime preview/runtime 안정화
+1. DB dump와 generated asset 공유 기준 정리
 2. 교사 승인부터 학생 완료, 교사 리포트 확인까지 E2E 회귀 테스트 추가
