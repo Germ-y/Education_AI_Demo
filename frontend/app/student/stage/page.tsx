@@ -1,4 +1,5 @@
-import { getStudentContextForRoute } from "@/lib/student-context-source";
+import { getStudentContextForRoute, isStudentRuntimePreviewOnlyError } from "@/lib/student-context-source";
+import { StudentPreviewOnlyNotice } from "../StudentPreviewOnlyNotice";
 import { StudentStageExperience } from "./StudentStageExperience";
 
 export default async function StudentStagePage({
@@ -12,8 +13,17 @@ export default async function StudentStagePage({
   const stepParam = Array.isArray(params.step) ? params.step[0] : params.step;
   const completeParam = Array.isArray(params.complete) ? params.complete[0] : params.complete;
   const previewParam = Array.isArray(params.preview) ? params.preview[0] : params.preview;
-  const context = await getStudentContextForRoute({ caseId: caseIdParam, contentId: contentIdParam, preview: previewParam === "1" });
   const requestedStep = Number(stepParam);
+  let context: Awaited<ReturnType<typeof getStudentContextForRoute>>;
+  try {
+    context = await getStudentContextForRoute({ caseId: caseIdParam, contentId: contentIdParam, preview: previewParam === "1" });
+  } catch (error) {
+    if (isStudentRuntimePreviewOnlyError(error)) {
+      return <StudentPreviewOnlyNotice error={error} step={Number.isInteger(requestedStep) ? requestedStep : undefined} />;
+    }
+    throw error;
+  }
+
   const maxOpenStep =
     completeParam === "1" || previewParam === "1" || context.scene.isCompleted
       ? context.scene.totalSteps

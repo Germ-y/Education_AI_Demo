@@ -265,8 +265,8 @@ const learningStatus: Record<CaseStatus, { label: string; progress: number; curr
 const workflowSteps = ["자료 제안", "제안 검토", "학습", "학습 피드백"];
 const reportFeedbackNotePrefix = "review_summary_feedback:";
 const studentPreviewViewport = {
-  width: 1024,
-  height: 900,
+  width: 1125,
+  height: 852,
 };
 
 const reviewStagePreviews: ReviewStageDraft[] = [];
@@ -2224,6 +2224,8 @@ export default function DashboardPage() {
                       const materialRejected = isMaterialRejected(item);
                       const isActionRunning = reviewActionId === item.id;
                       const needsMediaGeneration = hasMissingGeneratedMedia(item.content);
+                      const teacherPreviewHref = `/student/stage?caseId=${encodeURIComponent(item.caseId)}&contentId=${encodeURIComponent(item.content.id)}&preview=1`;
+                      const studentRuntimeHref = `/student/stage?caseId=${encodeURIComponent(item.caseId)}&contentId=${encodeURIComponent(item.content.id)}`;
 
                       return (
                         <div key={item.id} className="rounded-md border border-[#e5e9f0] bg-white p-4">
@@ -2269,6 +2271,26 @@ export default function DashboardPage() {
                             >
                               제안 검토하기
                             </button>
+                            <Link
+                              href={teacherPreviewHref}
+                              target="_blank"
+                              className="rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8]"
+                            >
+                              교사용 미리보기
+                            </Link>
+                            {materialApplied ? (
+                              <Link
+                                href={studentRuntimeHref}
+                                target="_blank"
+                                className="rounded-md border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm font-bold text-[#15803d]"
+                              >
+                                학생 배포 화면
+                              </Link>
+                            ) : (
+                              <span className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 text-sm font-bold text-[#94a3b8]">
+                                배포 후 학생 URL
+                              </span>
+                            )}
                             {needsMediaGeneration && (
                               <button
                                 onClick={() => handleRetryMaterialAssets(item)}

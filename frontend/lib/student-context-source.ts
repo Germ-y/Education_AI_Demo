@@ -1,6 +1,25 @@
-import { getContextSeed, getReviewableContent, getStudentMission, type MissionContent, type TemplateType } from "@/lib/api";
+import { getContextSeed, getReviewableContent, type MissionContent, type TemplateType } from "@/lib/api";
 import { getAssetUrl, getTemplateRenderer, resolveStageAssets, validateMissionContent } from "@/lib/mission-content";
 import type { SceneTheme, SceneVisual, StageQuestion, StudentContext } from "@/lib/student-scene-types";
+
+export class StudentRuntimePreviewOnlyError extends Error {
+  code = "STUDENT_RUNTIME_PREVIEW_ONLY";
+  contentId: string;
+  caseId: string;
+  status: MissionContent["status"];
+
+  constructor(content: Pick<MissionContent, "id" | "caseId" | "status">) {
+    super("아직 학생 화면에 배포되지 않은 자료입니다.");
+    this.name = "StudentRuntimePreviewOnlyError";
+    this.contentId = content.id;
+    this.caseId = content.caseId;
+    this.status = content.status;
+  }
+}
+
+export function isStudentRuntimePreviewOnlyError(error: unknown): error is StudentRuntimePreviewOnlyError {
+  return error instanceof StudentRuntimePreviewOnlyError;
+}
 
 type StudentRouteParams = {
   caseId?: string;
@@ -214,7 +233,7 @@ async function getMissionForRoute(contentId: string, options: { allowReviewable:
     return content;
   }
 
-  return await getStudentMission(contentId);
+  throw new StudentRuntimePreviewOnlyError(content);
 }
 
 function resolveContentIdFromSeed(seed: Awaited<ReturnType<typeof getContextSeed>>, caseId?: string, options: { preview: boolean } = { preview: false }) {

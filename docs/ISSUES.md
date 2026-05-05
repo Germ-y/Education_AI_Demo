@@ -14,7 +14,7 @@
 | 백엔드 API 기반 | 82% | 교사/학생/콘텐츠/공공데이터/NEIS 학교검색/학생등록 백엔드가 있음. 운영 migration과 job queue는 미완성. |
 | 콘텐츠 생성 품질 | 76% | scenario/stage/visual unit과 작성 전 설계 필드가 검증됨. 실제 생성 샘플 반복 품질 확인은 E2E에서 남음. |
 | 이미지/음성 asset 파이프라인 | 82% | background job 생성/polling과 asset별 성공·실패 상태 저장이 연결됨. provider 실패 UX와 운영 queue 전환이 남음. |
-| 학생 런타임/realtime | 70% | published 미션, 제출, 회고, 완료 기록은 됨. preview/runtime 경계와 WebRTC 안정화가 남음. |
+| 학생 런타임/realtime | 75% | published 미션, 제출, 회고, 완료 기록은 됨. preview/runtime 경계는 분리됨. WebRTC 안정화가 남음. |
 | 학생등록 UX | 88% | 교사 대시보드 모달에서 학교검색, 학교 선택, 강점/약점/지원 입력, 등록 후 목록/상세 갱신과 access code 확인까지 연결됨. 브라우저 통합 회귀만 남음. |
 | 문서/인수인계 | 70% | 문서는 축소됨. DB dump와 generated asset 정책을 최신 상태로 반복 관리해야 함. |
 
@@ -79,24 +79,21 @@
 - 같은 요청을 3회 생성해도 주제, 학생 유형, 단계 흐름이 크게 흔들리지 않는다.
 - 교사가 봤을 때 "문제는 맞지만 너무 유치함" 케이스가 줄어든다.
 
-### P1. 검토 화면과 학생 화면 preview 안정화
+### 완료. 검토 화면과 학생 화면 preview 안정화
 
 현재 상태:
 
-- iframe 높이/일부 카드매칭 잘림은 한 차례 보정됨.
-- 그래도 템플릿별 aspect/frame 검증은 부족하다.
+- iframe preview 기준은 실제 학생 캔버스를 담는 `1125x852` viewport로 맞췄다.
+- 카드매칭, 순서배열, blank fill 템플릿은 고정 stage board 안에서 자체 높이와 내부 스크롤을 갖는다.
+- blank fill은 좁은 우측 패널이 아니라 전체 stage board에서 visual과 입력 UI를 함께 보여준다.
+- 교사 대시보드는 `교사용 미리보기`와 `학생 배포 화면` URL을 분리한다.
+- unpublished 콘텐츠를 학생 runtime URL로 열면 학생 화면을 실행하지 않고 교사용 preview 안내 화면으로 이동시킨다.
+- 2026-05-05 브라우저 확인: choice, blank fill, sequence, card match direct preview는 desktop/mobile에서 document overflow 없이 렌더링됐다.
 
-해야 할 일:
+남은 확인:
 
-- 템플릿별 visual regression 체크 추가.
-- 카드매칭, 순서배열, 선택형, blank fill의 모바일/desktop preview 기준 높이 고정.
-- 교사용 preview URL과 학생 published runtime URL을 UI에서 명확히 분리.
-- unpublished 콘텐츠를 학생 runtime으로 열면 교사 preview로 안내한다.
-
-완료 기준:
-
-- 검토 모달에서 4개 stage가 스크롤/잘림 없이 확인된다.
-- 교사 preview realtime은 unpublished에서도 가능하고, 학생 runtime은 published만 가능하다.
+- 최종 E2E에서 검토 모달 4개 stage를 다시 확인한다.
+- 현재 로컬 DB에는 stale content mapping이 있어 대시보드 진입 시 `content_generated_001`, `content_prepared_notice_magnifier_001` 404가 찍힌다. DB/asset 정책 정리 단계에서 공유 기준 DB와 함께 정리한다.
 
 ### P1. Realtime 안정화
 
@@ -179,10 +176,10 @@ backend/generated/assets/students/{studentId}/{contentId}/{assetId}.mp3
 | 이미지 생성 | `backend/app/api/routes/contents.py` | background job과 partial retry는 연결됨 | 운영 queue와 provider 재시도 정책 고도화 |
 | 음성 생성 | `backend/app/ai/elevenlabs_provider.py` | 속도 병목은 작음 | sourceText 품질과 speed 테스트 |
 | 검토/승인 | `backend/app/services/store.py` | asset 실패 시 상태 설명이 거칠다 | asset job 상태 UI 추가 |
-| 학생 runtime | `backend/app/api/routes/student.py` | preview/published 경계 혼동 가능 | URL/상태 분리 |
+| 학생 runtime | `backend/app/api/routes/student.py` | WebRTC 빠른 이탈/재시작 오류 가능 | Realtime 안정화 |
 
 ## 다음 커밋 추천 순서
 
-1. `fix : 검토 preview 템플릿별 프레임 안정화`
-2. `test : 교사 생성부터 학생 완료까지 e2e 추가`
-3. `docs : 공유 DB와 asset 기준 갱신`
+1. `fix : realtime preview runtime 안정화`
+2. `docs : 공유 DB와 asset 기준 갱신`
+3. `test : 교사 생성부터 학생 완료까지 e2e 추가`

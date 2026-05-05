@@ -525,7 +525,7 @@ function ChoiceButton({
       style={selected && correct ? { borderColor: theme.accent, backgroundColor: theme.accentSoft, color: theme.accentStrong } : undefined}
     >
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#eef3f7] text-sm">{prefix}</span>
-      <span className="break-keep">{label}</span>
+      <span className="min-w-0 break-keep [overflow-wrap:anywhere]">{label}</span>
     </button>
   );
 }
@@ -635,7 +635,10 @@ function SequenceTemplate({
   const availableItems = items.filter((item) => !selectedIds.includes(item.id));
 
   return (
-    <div className="grid min-h-0 grid-rows-[auto_auto_auto] gap-2 overflow-hidden rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-3 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]">
+    <div
+      data-template-kind="sequence-ordering"
+      className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-2 overflow-hidden rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-3 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-base font-black leading-5">{question.prompt}</p>
@@ -686,7 +689,7 @@ function SequenceTemplate({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-[18px] border border-[#f0dfb4] bg-[#fff9e8] p-2.5">
+      <div className="min-h-0 overflow-y-auto rounded-[18px] border border-[#f0dfb4] bg-[#fff9e8] p-2.5">
         <div className="flex items-center justify-between">
           <p className="text-xs font-black text-[#8a5a00]">카드 트레이</p>
           {availableItems.length > 0 && <p className="text-[11px] font-bold text-[#8a5a00]">카드를 차례대로 눌러요</p>}
@@ -703,8 +706,8 @@ function SequenceTemplate({
               className="h-[48px] cursor-grab rounded-[16px] border bg-white px-3 py-1.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(57,78,97,0.12)] active:cursor-grabbing disabled:cursor-default disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
               style={{ borderColor: picked ? theme.accent : "#dde6ee" }}
             >
-              <p className="line-clamp-2 text-[13px] font-black leading-[18px] break-keep">{item.label}</p>
-              {item.caption && <p className="text-[10px] font-bold leading-4 text-[#6d746c] break-keep">{item.caption}</p>}
+              <p className="line-clamp-2 text-[13px] font-black leading-[18px] break-keep [overflow-wrap:anywhere]">{item.label}</p>
+              {item.caption && <p className="text-[10px] font-bold leading-4 text-[#6d746c] break-keep [overflow-wrap:anywhere]">{item.caption}</p>}
             </button>
             );
           })}
@@ -780,6 +783,7 @@ function CardMatchingTemplate({
 
   return (
     <div
+      data-template-kind="card-match"
       className={`grid h-full min-h-0 content-start gap-3 overflow-y-auto rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-4 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)] ${
         question.imageUrl || question.audioUrl ? "grid-rows-[auto_auto_auto]" : "grid-rows-[auto_auto]"
       }`}
@@ -821,7 +825,7 @@ function CardMatchingTemplate({
                   boxShadow: picked ? `0 0 0 6px ${theme.accentSoft}` : undefined,
                 }}
               >
-                <span className="flex-1 break-keep">{item.left}</span>
+                <span className="min-w-0 flex-1 break-keep [overflow-wrap:anywhere]">{item.left}</span>
                 {matched && (
                   <span className="ml-3 flex h-8 w-8 items-center justify-center rounded-full text-sm text-white" style={{ backgroundColor: theme.accent }}>
                     ✓
@@ -886,7 +890,7 @@ function CardMatchingTemplate({
                 className="relative z-10 flex items-center rounded-[16px] border bg-white px-4 text-left text-[0.9rem] font-black leading-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
                 style={{ minHeight: matchingRowHeight, borderColor: used ? theme.accent : "#dde6ee", backgroundColor: used ? theme.accentSoft : "#ffffff" }}
               >
-                <span className="flex-1 break-keep">{item.right}</span>
+                <span className="min-w-0 flex-1 break-keep [overflow-wrap:anywhere]">{item.right}</span>
                 {used && (
                   <span className="ml-3 flex h-8 w-8 items-center justify-center rounded-full text-sm text-white" style={{ backgroundColor: theme.accent }}>
                     ✓
@@ -919,9 +923,15 @@ function FillBlankTemplate({
   const fillParts = getFillBlankParts(question);
 
   return (
-    <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-4 shadow-[inset_0_-8px_0_rgba(39,174,96,0.05)]">
+    <div
+      data-template-kind="blank-fill"
+      className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3 overflow-hidden rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-4 shadow-[inset_0_-8px_0_rgba(39,174,96,0.05)]"
+    >
       <div className="flex items-start justify-between gap-3">
-        {question.body && <p className="min-w-0 text-sm font-bold leading-6 text-[#596157] line-clamp-2">{question.body}</p>}
+        <div className="min-w-0">
+          <p className="text-base font-black leading-6 break-keep [overflow-wrap:anywhere]">{question.prompt}</p>
+          {question.body && <p className="mt-1 line-clamp-2 text-sm font-bold leading-6 text-[#596157] break-keep [overflow-wrap:anywhere]">{question.body}</p>}
+        </div>
         <button
           onClick={onReset}
           disabled={!hasSlots}
@@ -932,7 +942,7 @@ function FillBlankTemplate({
         </button>
       </div>
 
-      <div className="min-h-0 overflow-y-auto rounded-[20px] border border-[#dde6ee] bg-white px-4 py-5 text-center text-[1.35rem] font-black leading-9 break-keep">
+      <div className="min-h-0 overflow-y-auto rounded-[20px] border border-[#dde6ee] bg-white px-4 py-5 text-center text-[1.35rem] font-black leading-9 break-keep [overflow-wrap:anywhere]">
         <div className="mx-auto max-w-[26rem]">
         {fillParts.map((part, index) => {
           if (part.kind === "text") return <span key={`${part.value}-${index}`}>{part.value}</span>;
@@ -946,7 +956,7 @@ function FillBlankTemplate({
         </div>
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(82px,1fr))] gap-3 rounded-[20px] border border-[#f0dfb4] bg-[#fff9e8] p-3">
+      <div className="grid max-h-32 grid-cols-[repeat(auto-fit,minmax(82px,1fr))] gap-3 overflow-y-auto rounded-[20px] border border-[#f0dfb4] bg-[#fff9e8] p-3">
         {question.fillOptions?.map((option) => (
           <button
             key={option.id}
@@ -957,6 +967,33 @@ function FillBlankTemplate({
             {option.label}
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function FillBlankStageBoard({
+  visual,
+  question,
+  slots,
+  theme,
+  onPick,
+  onReset,
+}: {
+  visual: SceneVisual;
+  question: StageQuestion;
+  slots: string[];
+  theme: SceneTheme;
+  onPick: (id: string) => void;
+  onReset: () => void;
+}) {
+  return (
+    <div className="grid h-full min-h-0 grid-cols-[minmax(300px,0.82fr)_minmax(380px,1fr)] gap-3">
+      <div className="min-h-0 overflow-hidden">
+        <StageVisualBoard visual={visual} question={question} theme={theme} compact />
+      </div>
+      <div className="min-h-0 overflow-hidden">
+        <FillBlankTemplate question={question} slots={slots} theme={theme} onPick={onPick} onReset={onReset} />
       </div>
     </div>
   );
@@ -1742,6 +1779,12 @@ export function StudentStageExperience({
   const isCorrect = (isChoiceStage || isStructuredStage) && answer === activeQuestion.correctAnswer;
   const isStageComplete = completedSteps.includes(activeStage.step);
   const isLastStage = activeStageIndex === scene.stages.length - 1;
+  const usesFullStageBoard =
+    !isFinished &&
+    (activeQuestion.kind === "sequence" ||
+      activeQuestion.kind === "cardMatching" ||
+      activeQuestion.kind === "fillBlank" ||
+      isRealtimeStage);
 
   useEffect(() => {
     const resizeStageFrame = () => {
@@ -2191,9 +2234,7 @@ export function StudentStageExperience({
 
             <section
               className={`grid h-[calc(100%-92px)] gap-4 px-7 py-5 ${
-                ((activeQuestion.kind === "sequence" || activeQuestion.kind === "cardMatching") && !isFinished) || (isRealtimeStage && !isFinished)
-                  ? "grid-cols-1"
-                  : "grid-cols-[minmax(0,1fr)_minmax(350px,0.58fr)]"
+                usesFullStageBoard ? "grid-cols-1" : "grid-cols-[minmax(0,1fr)_minmax(350px,0.58fr)]"
               }`}
             >
               <div
@@ -2291,6 +2332,19 @@ export function StudentStageExperience({
                         onLeft={(id) => setSelectedMatchLeft(id)}
                         onRight={connectMatchingCard}
                       />
+                    ) : activeQuestion.kind === "fillBlank" ? (
+                      <FillBlankStageBoard
+                        visual={activeVisual}
+                        question={activeQuestion}
+                        slots={fillBlankAnswer}
+                        theme={theme}
+                        onPick={fillBlank}
+                        onReset={() => {
+                          setFillBlankAnswer([]);
+                          setAnswer(null);
+                          setWrongNotice(null);
+                        }}
+                      />
                     ) : isRealtimeStage ? (
                       <RealtimePracticeRoom
                         question={activeQuestion}
@@ -2333,7 +2387,7 @@ export function StudentStageExperience({
                   </div>
                 )}
 
-                {(activeQuestion.kind === "sequence" || activeQuestion.kind === "cardMatching") && !isFinished && (
+                {usesFullStageBoard && !isRealtimeStage && (
                   <div className="relative mt-3">
                     <FloatingStageFeedback
                       showSuccess={((answer && isCorrect) || isStageComplete) && !isFinished}
@@ -2361,7 +2415,7 @@ export function StudentStageExperience({
 
               <aside
                 className={`min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 overflow-hidden transition duration-200 ease-out ${
-                  ((activeQuestion.kind === "sequence" || activeQuestion.kind === "cardMatching") && !isFinished) || (isRealtimeStage && !isFinished) ? "hidden" : "grid"
+                  usesFullStageBoard ? "hidden" : "grid"
                 } ${
                   isTransitioning ? "opacity-70 blur-[1px]" : "opacity-100 blur-0"
                 }`}

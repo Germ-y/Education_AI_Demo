@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import { getStudentContextForRoute } from "@/lib/student-context-source";
+import { getStudentContextForRoute, isStudentRuntimePreviewOnlyError } from "@/lib/student-context-source";
+import { StudentPreviewOnlyNotice } from "./StudentPreviewOnlyNotice";
 
 function StarterStar() {
   return (
@@ -47,7 +48,17 @@ export default async function StudentStartPage({
   const params = await searchParams;
   const caseIdParam = Array.isArray(params.caseId) ? params.caseId[0] : params.caseId;
   const contentIdParam = Array.isArray(params.contentId) ? params.contentId[0] : params.contentId;
-  const { student, scene } = await getStudentContextForRoute({ caseId: caseIdParam, contentId: contentIdParam });
+  let context: Awaited<ReturnType<typeof getStudentContextForRoute>>;
+  try {
+    context = await getStudentContextForRoute({ caseId: caseIdParam, contentId: contentIdParam });
+  } catch (error) {
+    if (isStudentRuntimePreviewOnlyError(error)) {
+      return <StudentPreviewOnlyNotice error={error} />;
+    }
+    throw error;
+  }
+
+  const { student, scene } = context;
   const theme = scene.theme;
   const nextStage = scene.stages[scene.currentStep - 1] ?? scene.stages[0];
   const caseQuery = `caseId=${encodeURIComponent(scene.caseId)}${scene.contentId ? `&contentId=${encodeURIComponent(scene.contentId)}` : ""}`;
