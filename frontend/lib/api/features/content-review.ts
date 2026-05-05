@@ -1,7 +1,7 @@
 import { apiFetch } from "../api-fetch";
 import type { ApiAdapterOptions } from "../adapter";
 import { getApiAdapter, type ApiDataSource } from "../client";
-import type { MissionContent } from "../contracts";
+import type { ContentApprovalRequest, ContentRejectRequest, ContentReviewUpdateRequest, MissionContent } from "../contracts";
 
 export function getReviewableContent(contentId: string, options?: ApiAdapterOptions & { source?: ApiDataSource }) {
   return getApiAdapter(options?.source).getReviewableContent(contentId, options);
@@ -9,7 +9,7 @@ export function getReviewableContent(contentId: string, options?: ApiAdapterOpti
 
 export function approveContent(
   contentId: string,
-  payload: { approvedStageIds: string[]; approvedAssetIds: string[]; reviewNote?: string | null },
+  payload: ContentApprovalRequest,
   options?: ApiAdapterOptions,
 ) {
   return apiFetch<MissionContent>(`/api/contents/${encodeURIComponent(contentId)}/approve`, {
@@ -21,7 +21,7 @@ export function approveContent(
 
 export function rejectContent(
   contentId: string,
-  payload: { reason: string; requestedChanges?: string[] },
+  payload: ContentRejectRequest,
   options?: ApiAdapterOptions,
 ) {
   return apiFetch<MissionContent>(`/api/contents/${encodeURIComponent(contentId)}/reject`, {
@@ -33,15 +33,7 @@ export function rejectContent(
 
 export function updateContentReview(
   contentId: string,
-  payload: {
-    stages: Array<{
-      stageId: string;
-      studentInstruction?: string;
-      question?: string;
-      choices?: string[];
-      realtimeStudentGoal?: string;
-    }>;
-  },
+  payload: ContentReviewUpdateRequest,
   options?: ApiAdapterOptions,
 ) {
   return apiFetch<MissionContent>(`/api/contents/${encodeURIComponent(contentId)}/review`, {

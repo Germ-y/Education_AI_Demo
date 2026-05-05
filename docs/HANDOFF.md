@@ -6,6 +6,8 @@
 
 이 문서는 팀원이 바로 이어받기 위한 현재 상태 요약이다. 남은 이슈와 병목은 [ISSUES.md](ISSUES.md), 상세 API는 [API.md](API.md), DB 복원은 [../backend/data/README.md](../backend/data/README.md)를 기준으로 한다.
 
+API/프론트 계약은 `docs/API.md`의 계약 기준 표와 `frontend/lib/api/contracts.ts`를 함께 본다. 학생등록, 콘텐츠 검토 수정, 승인/반려, asset generation job, student runtime 요청/응답 타입은 프론트 계약 파일에 이름을 맞춰 둔다.
+
 ## 현재 완성된 흐름
 
 - 데모 학생 3명 seed가 교사 대시보드, 학생 홈, 학생 미션 화면에서 같은 데이터로 연결된다.

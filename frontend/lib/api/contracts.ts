@@ -481,6 +481,29 @@ export type MissionContent = {
   publishedAt?: string | null;
 };
 
+export type ContentApprovalRequest = {
+  approvedStageIds: string[];
+  approvedAssetIds: string[];
+  reviewNote?: string | null;
+};
+
+export type ContentRejectRequest = {
+  reason: string;
+  requestedChanges?: string[];
+};
+
+export type ContentStagePatch = {
+  stageId: string;
+  studentInstruction?: string | null;
+  question?: string | null;
+  choices?: string[] | null;
+  realtimeStudentGoal?: string | null;
+};
+
+export type ContentReviewUpdateRequest = {
+  stages: ContentStagePatch[];
+};
+
 export type SeedContext = {
   organization: Organization;
   teacher: UserProfile;

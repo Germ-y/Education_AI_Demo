@@ -141,13 +141,18 @@ backend/generated/assets/students/{studentId}/{contentId}/{assetId}.mp3
 - 현재 로컬의 `backend/data/eduyj_demo.db` 변경과 untracked generated asset은 공유 기준으로 확정하지 않았다.
 - 최종 push 전 공유 기준 DB를 갱신할지, 현 추적 dump/asset 기준으로 둘지 다시 확인한다.
 
-### P2. API/프론트 계약 정리
+### 완료. API/프론트 계약 정리
 
-해야 할 일:
+현재 상태:
 
-- `frontend/lib/api/contracts.ts`와 `backend/app/domain/schemas.py`의 신규 학생등록 계약 동기화.
-- `docs/API.md`에 학생등록 payload 예시 추가.
-- asset generation job 계약은 `frontend/lib/api/contracts.ts`와 `docs/API.md`에 반영됨. P2에서는 최종 E2E 기준으로 남은 field/상태명을 다시 정리한다.
+- `frontend/lib/api/contracts.ts`와 `backend/app/domain/schemas.py`의 신규 학생등록 계약이 동기화되어 있다.
+- 콘텐츠 검토 수정, 승인, 반려 payload 타입을 프론트 `contracts.ts`에 명시했다.
+- `docs/API.md`에 학교검색, 학생등록, 콘텐츠 검토, asset job, student runtime 계약 기준 표를 추가했다.
+- asset generation job 계약은 `AssetGenerationJob`과 `docs/API.md`에 반영되어 있다.
+
+남은 확인:
+
+- 최종 E2E를 작성하면서 실제 브라우저 흐름에서 추가 field가 필요하면 이 섹션과 `docs/API.md`를 마지막으로 갱신한다.
 
 ### P2. E2E 회귀 테스트
 

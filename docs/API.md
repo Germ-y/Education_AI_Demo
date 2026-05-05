@@ -4,6 +4,17 @@
 
 모든 성공 응답은 기본적으로 `ok(...)` 래퍼를 사용한다. 프론트 계약은 `frontend/lib/api/contracts.ts`, 백엔드 스키마는 `backend/app/domain/schemas.py`를 함께 확인한다.
 
+## 계약 기준
+
+| 흐름 | Backend schema/route | Frontend contract/helper |
+| --- | --- | --- |
+| 학교검색 | `GET /api/public-data/schools/search` | `SchoolSearchRequest`, `SchoolSearchResponse`, `searchSchools` |
+| 학생등록 | `StudentRegistrationRequest`, `POST /api/teacher/students` | `StudentRegistrationRequest`, `StudentRegistrationResponse`, `createTeacherStudent` |
+| 콘텐츠 검토 수정 | `ContentReviewUpdateRequest`, `PATCH /api/contents/{contentId}/review` | `ContentReviewUpdateRequest`, `updateContentReview` |
+| 승인/반려/배포 | `ContentApprovalRequest`, `ContentRejectRequest`, content routes | `ContentApprovalRequest`, `ContentRejectRequest`, `approveContent`, `rejectContent`, `publishContent` |
+| asset generation job | content asset job routes | `AssetGenerationJob`, `createContentAssetGenerationJob`, `getContentAssetGenerationJob` |
+| student runtime | `AttemptRequest`, `StageSubmitRequest`, `RealtimeSession*Request` | matching request/response types in `contracts.ts` |
+
 ## Health
 
 - `GET /health`: 서버 상태 확인
