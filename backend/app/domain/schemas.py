@@ -411,3 +411,29 @@ class PublicDataSyncRequest(BaseModel):
     class_name: str | None = Field(default=None, alias="className")
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class StudentRegistrationRequest(BaseModel):
+    display_name: str = Field(alias="displayName", min_length=1)
+    school_code: str | None = Field(default=None, alias="schoolCode")
+    school_name: str | None = Field(default=None, alias="schoolName")
+    office_code: str = Field(default="R10", alias="officeCode")
+    grade: str
+    grade_number: str | None = Field(default=None, alias="gradeNumber")
+    class_name: str | None = Field(default=None, alias="className")
+    student_type: StudentType = Field(alias="studentType")
+    track_label: str | None = Field(default=None, alias="trackLabel")
+    current_goal: str = Field(alias="currentGoal", min_length=1)
+    observation_note: str | None = Field(default=None, alias="observationNote")
+    strengths: list[str] = Field(default_factory=list)
+    weaknesses: list[str] = Field(default_factory=list)
+    preferred_supports: list[str] = Field(default_factory=list, alias="preferredSupports")
+    timetable_date: str | None = Field(default=None, alias="timetableDate")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @model_validator(mode="after")
+    def validate_school_lookup_key(self) -> "StudentRegistrationRequest":
+        if not self.school_code and not self.school_name:
+            raise ValueError("schoolCode 또는 schoolName 중 하나가 필요합니다.")
+        return self

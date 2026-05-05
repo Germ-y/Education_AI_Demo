@@ -21,6 +21,56 @@ def list_schools(_: SessionPrincipal = Depends(require_teacher), demo_store: Dem
     return ok(demo_store.list_schools())
 
 
+@router.get("/schools/search")
+def search_schools(
+    q: str | None = None,
+    office_code: str = Query(default="R10", alias="officeCode"),
+    sync_if_missing: bool = Query(default=True, alias="syncIfMissing"),
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+) -> dict:
+    cached = demo_store.list_schools(q=q)
+    if cached and not sync_if_missing:
+        return ok({"schools": cached, "source": {"provider": "cache", "cacheStatus": "cached"}})
+
+    settings = get_settings()
+    if not sync_if_missing:
+        return ok({"schools": cached, "source": {"provider": "cache", "cacheStatus": "empty" if not cached else "cached"}})
+    if not q:
+        return ok({"schools": cached, "source": {"provider": "cache", "cacheStatus": "cached" if cached else "empty"}})
+    if not settings.neis_api_key:
+        if cached:
+            return ok({"schools": cached, "source": {"provider": "cache", "cacheStatus": "cached", "neisStatus": "missing_key"}})
+        raise HTTPException(
+            status_code=424,
+            detail={
+                "code": "NEIS_API_KEY_MISSING",
+                "message": "학교 검색을 위해 NEIS_API_KEY가 필요합니다.",
+                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+            },
+        )
+
+    try:
+        schools = NeisClient(settings).search_schools(office_code=office_code, school_name=q)
+    except AiProviderError as exc:
+        raise HTTPException(
+            status_code=424,
+            detail={
+                "code": exc.code,
+                "message": exc.message,
+                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+            },
+        ) from exc
+    counts = demo_store.upsert_public_school_context(schools=schools, calendar=[], timetable=[])
+    demo_store.record_audit(
+        actor_user_id=principal.id,
+        action="search_neis_school",
+        resource_type="school_profile",
+        payload_json={"q": q, "officeCode": office_code, "counts": counts},
+    )
+    return ok({"schools": demo_store.list_schools(q=q), "source": {"provider": "NEIS", "cacheStatus": "synced", "counts": counts}})
+
+
 @router.get("/schools/{school_code}/context")
 def get_school_context(
     school_code: str,

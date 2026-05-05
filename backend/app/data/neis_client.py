@@ -11,6 +11,25 @@ class NeisClient:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
+    def search_schools(self, *, office_code: str, school_name: str | None = None, school_code: str | None = None) -> list[dict[str, Any]]:
+        if not self.settings.neis_api_key:
+            raise ProviderConfigurationError("NEIS_API_KEY_MISSING", "NEIS_API_KEY가 없어 NEIS 학교 조회를 실행할 수 없습니다.")
+
+        rows = self._fetch_rows(
+            "schoolInfo",
+            {
+                "ATPT_OFCDC_SC_CODE": office_code,
+                "SCHUL_NM": school_name,
+                "SD_SCHUL_CODE": school_code,
+            },
+        )
+        if school_code:
+            rows = [row for row in rows if row.get("SD_SCHUL_CODE") == school_code]
+        if school_name:
+            exact = [row for row in rows if row.get("SCHUL_NM") == school_name]
+            rows = exact or [row for row in rows if school_name in str(row.get("SCHUL_NM") or "")]
+        return [_normalize_school(row) for row in rows]
+
     def sync_school_context(
         self,
         *,

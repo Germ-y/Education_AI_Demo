@@ -14,13 +14,17 @@ from app.domain.models import (
     ContentAttempt,
     DemoDatabase,
     MemoryCard,
+    PlannerItem,
     RealtimePracticeSession,
     ReviewSummary,
     SchoolCalendarEvent,
     SchoolProfile,
     SchoolTimetableSlot,
+    Student,
+    StudentAccount,
+    SupportCase,
 )
-from app.domain.schemas import ContentAsset, ContentStagePatch, MissionContent
+from app.domain.schemas import ContentAsset, ContentStagePatch, MissionContent, StudentRegistrationRequest
 from app.repositories.demo_repository import DemoRepository
 
 
@@ -218,6 +222,141 @@ class DemoStore:
                 }
             )
         return students
+
+    def create_teacher_student(
+        self,
+        payload: StudentRegistrationRequest,
+        *,
+        teacher_id: str,
+        organization_id: str,
+        school: SchoolProfile,
+    ) -> dict:
+        self.refresh()
+        existing_student = next(
+            (
+                student
+                for student in self.db.students
+                if student.display_name == payload.display_name and student.school_code == school.school_code and student.status == "active"
+            ),
+            None,
+        )
+        if existing_student is not None:
+            return {
+                "student": self.get_student_case_file(existing_student.id),
+                "created": False,
+                "accessCode": next(
+                    (account.access_code for account in self.db.student_accounts if account.student_id == existing_student.id and account.status == "active"),
+                    None,
+                ),
+            }
+
+        student_id = f"student_{_safe_id_segment(payload.display_name)}_{uuid4().hex[:8]}"
+        case_id = f"case_{student_id}"
+        grade = _normalize_registration_grade(payload.grade)
+        grade_number = payload.grade_number or _grade_number(grade) or ""
+        class_name = payload.class_name or ""
+        strengths = _registration_strengths(payload)
+        weaknesses = _registration_weaknesses(payload)
+        preferred_supports = _registration_preferred_supports(payload)
+        track_label = payload.track_label or _registration_track_label(payload)
+        primary_need = _teacher_facing_text(_ensure_suggestion_sentence(payload.current_goal))
+        dashboard = {
+            "attendanceRate": None,
+            "gradeLabel": _grade_label(grade),
+            "studentTypeLabel": _student_type_label(payload.student_type),
+            "trackLabel": track_label,
+            "statusLabel": "자료 생성 전",
+            "attendanceLabel": "기록 전",
+            "summaryLine": primary_need,
+            "primaryNeedTitle": _registration_primary_need_title(payload),
+            "primaryNeedDetail": primary_need,
+            "supportStrategyTitle": "등록 관찰 기반 지원 전략",
+            "supportStrategyDetail": _registration_support_strategy(payload),
+            "strengths": strengths,
+            "weaknesses": weaknesses,
+            "emotionalNote": payload.observation_note,
+            "responsePattern": _registration_response_pattern(payload),
+            "guardianCooperation": None,
+            "schoolContextNote": "NEIS 학교 기본정보를 연결했습니다. 시간표 날짜와 반 정보가 있으면 시간표 snapshot도 함께 참고합니다.",
+            "nextSessionFocus": [payload.current_goal, *preferred_supports[:2]],
+            "aiContextSummary": _registration_ai_context_summary(payload, track_label, primary_need),
+        }
+        student = Student(
+            id=student_id,
+            organizationId=organization_id,
+            externalKey=f"registered_{student_id}",
+            displayName=payload.display_name,
+            grade=grade,
+            schoolCode=school.school_code,
+            studentType=payload.student_type,
+            primaryNeed=primary_need,
+            profileJson={
+                "ageBand": _registration_age_band(payload),
+                "gradeNumber": grade_number,
+                "className": class_name,
+                "readingLoad": "very_low" if "긴 문장" in " ".join(weaknesses) else "low",
+                "choiceCountLimit": 2 if payload.student_type == "life_support" else 3,
+                "registration": {
+                    "observationNote": payload.observation_note,
+                    "preferredSupports": preferred_supports,
+                    "createdAt": _now(),
+                    "source": "teacher_registration",
+                },
+                "dashboard": dashboard,
+            },
+        )
+        support_case = SupportCase(
+            id=case_id,
+            studentId=student_id,
+            ownerTeacherId=teacher_id,
+            caseStatus="open",
+            currentGoal=primary_need,
+            dashboardStage="material_generation",
+            supportStrategy=dashboard["supportStrategyDetail"],
+            openedAt=_now(),
+        )
+        memory_card = MemoryCard(
+            id=f"memory_{student_id}",
+            studentId=student_id,
+            caseId=case_id,
+            version=1,
+            learningProblemTypes=[payload.current_goal],
+            recent4wResponseJson={
+                "registrationObservation": payload.observation_note,
+                "strengths": strengths,
+                "weaknesses": weaknesses,
+                "preferredSupports": preferred_supports,
+            },
+            emotionalStateNote=payload.observation_note,
+            effectiveExplanationStyles=preferred_supports,
+            frequentBlockingUnits=weaknesses[:4],
+            guardianCooperationStatus=None,
+            nextSessionCautions=weaknesses[:4],
+            teacherVerifiedAt=_now(),
+            status="active",
+        )
+        planner = PlannerItem(
+            id=f"planner_{student_id}_next",
+            studentId=student_id,
+            caseId=case_id,
+            periodType="next_session",
+            goalText=primary_need,
+            checklistJson={"source": "student_registration", "preferredSupports": preferred_supports},
+            status="planned",
+        )
+        account = StudentAccount(
+            id=f"student_account_{student_id}",
+            studentId=student_id,
+            accessCode=_new_student_access_code(self.db.student_accounts),
+            status="active",
+        )
+        self.db.students.append(student)
+        self.db.support_cases.append(support_case)
+        self.db.memory_cards.append(memory_card)
+        self.db.planner_items.append(planner)
+        self.db.student_accounts.append(account)
+        self.persist()
+        return {"student": self.get_student_case_file(student_id), "created": True, "accessCode": account.access_code}
 
     def get_student_case_file(self, student_id: str) -> dict | None:
         self.refresh()
@@ -695,9 +834,16 @@ class DemoStore:
             return None
         return next((school for school in self.db.schools if school.school_code == school_code), None)
 
-    def list_schools(self) -> list[dict]:
+    def list_schools(self, q: str | None = None) -> list[dict]:
         self.refresh()
-        return [school.model_dump(by_alias=True) for school in self.db.schools]
+        schools = self.db.schools
+        if q:
+            schools = [
+                school
+                for school in schools
+                if q in school.school_name or q in school.school_code or q in school.region_name or q in school.school_kind
+            ]
+        return [school.model_dump(by_alias=True) for school in schools]
 
     def list_school_calendar_events(self, school_code: str, from_date: str | None = None, to_date: str | None = None) -> list[dict]:
         self.refresh()
@@ -1319,6 +1465,128 @@ def _orchestrator_hints_from_subjects(subjects: list[str]) -> list[str]:
     if not hints:
         hints.append("저장된 시간표 snapshot을 참고하되 학생 개인 능력 판단에는 사용하지 않습니다.")
     return hints
+
+
+def _normalize_registration_grade(value: str) -> str:
+    cleaned = value.strip()
+    if cleaned.startswith(("elementary_", "middle_", "high_")):
+        return cleaned
+    if cleaned.startswith("초"):
+        return f"elementary_{''.join(character for character in cleaned if character.isdigit()) or '1'}"
+    if cleaned.startswith("중"):
+        return f"middle_{''.join(character for character in cleaned if character.isdigit()) or '1'}"
+    if cleaned.startswith("고"):
+        return f"high_{''.join(character for character in cleaned if character.isdigit()) or '1'}"
+    return cleaned
+
+
+def _registration_track_label(payload: StudentRegistrationRequest) -> str:
+    grade = _normalize_registration_grade(payload.grade)
+    if payload.student_type == "life_support":
+        return "일상생활 지원형"
+    if grade.startswith("middle_") or grade.startswith("high_"):
+        return "고연령 학습지원형"
+    return "저연령 학습지원형"
+
+
+def _registration_age_band(payload: StudentRegistrationRequest) -> str:
+    grade = _normalize_registration_grade(payload.grade)
+    if payload.student_type == "life_support":
+        return "life_support"
+    if grade.startswith("middle_") or grade.startswith("high_"):
+        return "older"
+    return "younger"
+
+
+def _registration_primary_need_title(payload: StudentRegistrationRequest) -> str:
+    if payload.student_type == "life_support":
+        return "생활 상황 지원 수업"
+    return "학습 개념 보완 수업"
+
+
+def _registration_support_strategy(payload: StudentRegistrationRequest) -> str:
+    supports = _registration_preferred_supports(payload)
+    if supports:
+        return f"{', '.join(supports[:3])}을 활용해 학생이 부담 없이 시작할 수 있는 콘텐츠가 좋겠어요."
+    if payload.student_type == "life_support":
+        return "상황 그림, 순서 카드, 짧은 모델 문장을 활용한 실생활 역할 연습 콘텐츠가 좋겠어요."
+    return "시각 자료, 짧은 단계 카드, 선택지를 활용해 개념을 차근차근 확인하는 콘텐츠가 좋겠어요."
+
+
+def _registration_response_pattern(payload: StudentRegistrationRequest) -> str:
+    supports = _registration_preferred_supports(payload)
+    if supports:
+        return f"{', '.join(supports[:2])}을 먼저 제공하면 반응을 관찰하기 좋습니다."
+    return "등록 직후에는 짧은 지시와 쉬운 첫 문항으로 반응을 확인합니다."
+
+
+def _registration_ai_context_summary(payload: StudentRegistrationRequest, track_label: str, primary_need: str) -> str:
+    note = f" {payload.observation_note}" if payload.observation_note else ""
+    return f"{_grade_label(_normalize_registration_grade(payload.grade))} {track_label} 학생. {primary_need}{note}"
+
+
+def _registration_strengths(payload: StudentRegistrationRequest) -> list[str]:
+    if payload.strengths:
+        return [_registration_sentence(item, positive=True) for item in payload.strengths[:5]]
+    supports = _registration_preferred_supports(payload)
+    if supports:
+        return [f"{support}이 제공되면 수업에 참여하기 쉬워 보여요." for support in supports[:3]]
+    return ["짧고 쉬운 첫 과제에서 반응을 확인하면 강점을 더 구체화할 수 있어요."]
+
+
+def _registration_weaknesses(payload: StudentRegistrationRequest) -> list[str]:
+    if payload.weaknesses:
+        return [_registration_sentence(item, positive=False) for item in payload.weaknesses[:5]]
+    if payload.student_type == "life_support":
+        return ["낯선 상황에서는 다음 행동을 확인해 주는 단서가 필요할 수 있어요."]
+    return ["설명이 길어지면 중요한 조건을 놓칠 수 있어 짧은 단계화가 필요할 수 있어요."]
+
+
+def _registration_preferred_supports(payload: StudentRegistrationRequest) -> list[str]:
+    if payload.preferred_supports:
+        return [_teacher_facing_text(item) for item in payload.preferred_supports if item][:5]
+    return []
+
+
+def _registration_sentence(value: str, *, positive: bool) -> str:
+    text = _teacher_facing_text(value)
+    if text.endswith(("요.", "다.", "습니다.")):
+        return text
+    if positive and text.endswith("잘 찾음"):
+        return f"{text.removesuffix('잘 찾음').strip()} 잘 찾아요."
+    if positive and text.endswith("반응 좋음"):
+        return f"{text.removesuffix('반응 좋음').strip()}에 반응이 좋아요."
+    if not positive and text.endswith("부담됨"):
+        return f"{text.removesuffix('부담됨').strip()}부담될 수 있어요."
+    if not positive and text.endswith("어려움"):
+        return f"{text.removesuffix('어려움').strip()}어려울 수 있어요."
+    if positive:
+        return f"{text} 지원을 활용하면 참여가 좋아질 수 있어요."
+    return f"{text} 상황에서 지원이 필요할 수 있어요."
+
+
+def _ensure_suggestion_sentence(value: str) -> str:
+    text = _teacher_facing_text(value.strip())
+    if text.endswith(("좋겠어요.", "맞아 보여요.", "필요해요.")):
+        return text
+    if text.endswith("."):
+        text = text[:-1]
+    return f"{text} 수업이 좋겠어요."
+
+
+def _new_student_access_code(accounts: list[StudentAccount]) -> str:
+    used = {account.access_code for account in accounts}
+    for index in range(1, 10000):
+        code = f"STAR-{index:03d}"
+        if code not in used:
+            return code
+    return f"STAR-{uuid4().hex[:6].upper()}"
+
+
+def _safe_id_segment(value: str) -> str:
+    segment = "".join(character.lower() if character.isalnum() else "_" for character in value.strip())
+    segment = "_".join(part for part in segment.split("_") if part)
+    return segment[:32] or "registered"
 
 
 def _now() -> str:

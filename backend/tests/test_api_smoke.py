@@ -12,6 +12,7 @@ from app.api.deps import get_store_instance
 from app.api.routes.ai import _normalize_orchestrator_plan_candidate
 from app.core.config import get_settings
 from app.data.demo_data import create_demo_database
+from app.data.neis_client import NeisClient
 from app.db.session import get_engine, get_session_maker
 from app.main import create_app
 
@@ -490,6 +491,81 @@ def test_teacher_can_persist_content_review_edits() -> None:
     )
     persisted_stage = next(stage for stage in persisted.json()["data"]["stages"] if stage["id"] == "stage_clock_2")
     assert persisted_stage["templateJson"]["choices"][0]["text"] == "4시"
+
+
+def test_teacher_can_search_neis_school_and_register_student(monkeypatch) -> None:
+    os.environ["NEIS_API_KEY"] = "test-neis-key"
+    get_settings.cache_clear()
+    search_calls = {"count": 0}
+
+    def fake_search_schools(self, *, office_code, school_name=None, school_code=None):
+        search_calls["count"] += 1
+        assert office_code == "R10"
+        return [
+            {
+                "id": "school_8888001",
+                "officeCode": "R10",
+                "schoolCode": "8888001",
+                "schoolName": "풍기초등학교",
+                "schoolKind": "초등학교",
+                "regionName": "경상북도 영주시",
+                "roadAddress": "경상북도 영주시 풍기로 1",
+                "sourceCode": "neis_open_api",
+            }
+        ]
+
+    monkeypatch.setattr(NeisClient, "search_schools", fake_search_schools)
+
+    client = TestClient(create_app())
+    teacher_login = client.post(
+        "/api/auth/demo-login",
+        json={"role": "teacher", "email": "teacher.demo@eduyj.local"},
+    )
+    teacher_token = teacher_login.json()["data"]["session"]["accessToken"]
+
+    search = client.get(
+        "/api/public-data/schools/search?q=풍기초등학교&officeCode=R10",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert search.status_code == 200
+    assert search.json()["data"]["source"]["provider"] == "NEIS"
+    assert search.json()["data"]["schools"][0]["schoolCode"] == "8888001"
+
+    created = client.post(
+        "/api/teacher/students",
+        headers={"authorization": f"Bearer {teacher_token}"},
+        json={
+            "displayName": "최하늘",
+            "schoolName": "풍기초등학교",
+            "officeCode": "R10",
+            "grade": "초4",
+            "gradeNumber": "4",
+            "className": "1",
+            "studentType": "learning_focus",
+            "currentGoal": "영어 단어를 그림 카드와 연결하기",
+            "observationNote": "그림 단서가 있으면 먼저 손으로 가리키며 반응합니다.",
+            "strengths": ["그림 단서를 잘 찾음"],
+            "weaknesses": ["긴 문장 지시가 부담됨"],
+            "preferredSupports": ["그림 카드", "2개 선택지"],
+        },
+    )
+    assert created.status_code == 200, created.json()
+    payload = created.json()["data"]
+    assert payload["created"] is True
+    assert payload["accessCode"].startswith("STAR-")
+    student = payload["student"]
+    assert student["profile"]["displayName"] == "최하늘"
+    assert student["profile"]["schoolCode"] == "8888001"
+    assert student["profile"]["gradeLabel"] == "초4"
+    assert student["dashboardProfile"]["headline"] == "풍기초등학교 · 초4 · 저연령 학습지원형"
+    assert student["dashboardProfile"]["strengths"][0] == "그림 단서를 잘 찾아요."
+    assert "자료 생성" in student["dashboardProfile"]["currentStageLabel"]
+
+    students = client.get("/api/teacher/students?q=최하늘", headers={"authorization": f"Bearer {teacher_token}"})
+    assert students.status_code == 200
+    assert students.json()["data"][0]["displayName"] == "최하늘"
+    assert students.json()["data"][0]["schoolName"] == "풍기초등학교"
+    assert search_calls["count"] == 1
 
 
 def test_completed_mission_stays_completed_after_restart() -> None:
