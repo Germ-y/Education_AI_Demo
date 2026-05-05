@@ -142,7 +142,7 @@ def generate_content_asset(
 
     if asset.asset_type == AssetType.IMAGE:
         _refresh_image_prompts_or_raise(content)
-    _generate_asset_or_raise(content_id, asset)
+    _generate_asset_or_raise(content, asset)
 
     demo_store.save_generated_mission_content(content)
     demo_store.record_audit(
@@ -189,7 +189,7 @@ def generate_content_asset_package(
             len(image_assets),
             min(IMAGE_PACKAGE_PARALLELISM, len(image_assets)),
         )
-        generated.extend(_generate_image_assets_in_parallel(content_id, image_assets, total_assets=total_assets))
+        generated.extend(_generate_image_assets_in_parallel(content, image_assets, total_assets=total_assets))
         demo_store.save_generated_mission_content(content)
 
     for index, asset in enumerate(audio_assets, start=len(image_assets) + 1):
@@ -203,7 +203,7 @@ def generate_content_asset_package(
             asset.asset_role,
             asset.stage_id,
         )
-        _generate_asset_or_raise(content_id, asset)
+        _generate_asset_or_raise(content, asset)
         generated.append(asset.model_dump(by_alias=True))
         demo_store.save_generated_mission_content(content)
 
@@ -285,14 +285,14 @@ def create_preview_realtime_session(
     )
 
 
-def _generate_image_assets_in_parallel(content_id: str, image_assets: list, *, total_assets: int) -> list[dict]:
+def _generate_image_assets_in_parallel(content, image_assets: list, *, total_assets: int) -> list[dict]:
     generated_by_id: dict[str, dict] = {}
     with ThreadPoolExecutor(max_workers=min(IMAGE_PACKAGE_PARALLELISM, len(image_assets))) as executor:
         futures = {}
         for index, asset in enumerate(image_assets, start=1):
             logger.info(
                 "contents.assets.generating content_id=%s progress=%s/%s asset_id=%s type=%s role=%s stage_id=%s",
-                content_id,
+                content.id,
                 index,
                 total_assets,
                 asset.id,
@@ -300,7 +300,7 @@ def _generate_image_assets_in_parallel(content_id: str, image_assets: list, *, t
                 asset.asset_role,
                 asset.stage_id,
             )
-            futures[executor.submit(_generate_asset_or_raise, content_id, asset)] = asset
+            futures[executor.submit(_generate_asset_or_raise, content, asset)] = asset
 
         for future in as_completed(futures):
             asset = futures[future]
@@ -387,18 +387,18 @@ def publish_content(
     return ok(content.model_dump(by_alias=True))
 
 
-def _generate_asset_or_raise(content_id: str, asset) -> None:
+def _generate_asset_or_raise(content, asset) -> None:
     settings = get_settings()
     asset_started_at = time.perf_counter()
     try:
         if asset.asset_type == AssetType.IMAGE:
             prompt = _extract_image_prompt(asset.prompt_json)
-            relative_path = _generated_asset_relative_path(content_id, asset)
+            relative_path = _generated_asset_relative_path(content.student_id, content.id, asset)
             output_path = _generated_file_path(relative_path)
             if not _is_generated_file_ready(output_path):
                 logger.info(
                     "contents.asset.image_started content_id=%s asset_id=%s role=%s stage_id=%s path=%s",
-                    content_id,
+                    content.id,
                     asset.id,
                     asset.asset_role,
                     asset.stage_id,
@@ -413,7 +413,7 @@ def _generate_asset_or_raise(content_id: str, asset) -> None:
             else:
                 logger.info(
                     "contents.asset.image_skipped_existing content_id=%s asset_id=%s role=%s stage_id=%s path=%s",
-                    content_id,
+                    content.id,
                     asset.id,
                     asset.asset_role,
                     asset.stage_id,
@@ -423,12 +423,12 @@ def _generate_asset_or_raise(content_id: str, asset) -> None:
         elif asset.asset_type == AssetType.AUDIO:
             if not asset.source_text:
                 raise HTTPException(status_code=400, detail={"code": "ASSET_SOURCE_TEXT_MISSING", "message": "TTS asset sourceText가 필요합니다."})
-            relative_path = _generated_asset_relative_path(content_id, asset)
+            relative_path = _generated_asset_relative_path(content.student_id, content.id, asset)
             output_path = _generated_file_path(relative_path)
             if not _is_generated_file_ready(output_path):
                 logger.info(
                     "contents.asset.audio_started content_id=%s asset_id=%s role=%s stage_id=%s path=%s",
-                    content_id,
+                    content.id,
                     asset.id,
                     asset.asset_role,
                     asset.stage_id,
@@ -438,7 +438,7 @@ def _generate_asset_or_raise(content_id: str, asset) -> None:
             else:
                 logger.info(
                     "contents.asset.audio_skipped_existing content_id=%s asset_id=%s role=%s stage_id=%s path=%s",
-                    content_id,
+                    content.id,
                     asset.id,
                     asset.asset_role,
                     asset.stage_id,
@@ -449,7 +449,7 @@ def _generate_asset_or_raise(content_id: str, asset) -> None:
             raise HTTPException(status_code=400, detail={"code": "ASSET_TYPE_NOT_SUPPORTED", "message": "지원하지 않는 assetType입니다."})
         logger.info(
             "contents.asset.succeeded content_id=%s asset_id=%s type=%s role=%s stage_id=%s elapsed_sec=%.1f",
-            content_id,
+            content.id,
             asset.id,
             asset.asset_type,
             asset.asset_role,
@@ -459,7 +459,7 @@ def _generate_asset_or_raise(content_id: str, asset) -> None:
     except AiProviderError as exc:
         logger.warning(
             "contents.asset.failed content_id=%s asset_id=%s type=%s role=%s stage_id=%s code=%s elapsed_sec=%.1f message=%s",
-            content_id,
+            content.id,
             asset.id,
             asset.asset_type,
             asset.asset_role,
@@ -755,9 +755,13 @@ def _extract_visual_anchors(template_json: dict[str, Any]) -> list[str]:
     return anchors[:8]
 
 
-def _generated_asset_relative_path(content_id: str, asset) -> str:
+def _generated_asset_relative_path(student_id: str, content_id: str, asset) -> str:
     extension = "png" if asset.asset_type == AssetType.IMAGE else "mp3"
-    return f"assets/{content_id}/{asset.id}.{extension}"
+    return f"assets/students/{_safe_path_segment(student_id)}/{_safe_path_segment(content_id)}/{_safe_path_segment(asset.id)}.{extension}"
+
+
+def _safe_path_segment(value: str) -> str:
+    return "".join(character if character.isalnum() or character in {"_", "-"} else "_" for character in value)
 
 
 def _is_generated_file_ready(path: Path) -> bool:

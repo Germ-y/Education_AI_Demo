@@ -749,7 +749,8 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     assert package_data["generatedCount"] == 10
     assert image_brief_calls["count"] == 1
     assert image_parallel_probe["max"] >= 2
-    assert all(asset["storageUrl"].startswith("/generated/assets/content_generated_contract_001/") for asset in package_data["assets"])
+    expected_asset_prefix = f"/generated/assets/students/{student_id}/content_generated_contract_001/"
+    assert all(asset["storageUrl"].startswith(expected_asset_prefix) for asset in package_data["assets"])
     assert all(asset["qaStatus"] == "passed" for asset in package_data["assets"])
     assert all(
         asset["promptJson"].get("promptVersion") == "image_brief_v1"
@@ -764,5 +765,5 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
 
     reviewable = client.get("/api/contents/content_generated_contract_001")
     assert reviewable.status_code == 200
-    assert reviewable.json()["data"]["assets"][0]["previewUrl"].startswith("/generated/assets/content_generated_contract_001/")
+    assert reviewable.json()["data"]["assets"][0]["previewUrl"].startswith(expected_asset_prefix)
     assert reviewable.json()["data"]["assets"][0]["qaStatus"] == "passed"
