@@ -514,8 +514,28 @@ function findPendingGenerationContent(job: PendingGenerationJob, caseFile?: Stud
   return caseFile.recentContents.find((content) => content.id === job.contentId) ?? null;
 }
 
+function findCompletedReviewContentForGenerationJob(job: PendingGenerationJob, caseFile?: StudentCaseFile | null) {
+  if (!caseFile) return null;
+  const exactContent = findPendingGenerationContent(job, caseFile);
+  if (isPendingGenerationContentComplete(exactContent)) return exactContent;
+
+  const matchesSelectedCase =
+    job.caseId === caseFile.openCase.id || Boolean(job.studentId && job.studentId === caseFile.profile.id);
+  if (!matchesSelectedCase) return null;
+
+  return (
+    caseFile.recentContents
+      .filter(isReviewQueueContent)
+      .filter(isPendingGenerationContentComplete)
+      .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left))[0] ?? null
+  );
+}
+
 function isPendingGenerationContentUsable(content: MissionContent | null): content is MissionContent {
-  return content !== null && content.status === "teacher_review";
+  return (
+    content !== null &&
+    (content.status === "teacher_review" || content.status === "approved" || content.status === "published")
+  );
 }
 
 function isPendingGenerationContentComplete(content: MissionContent | null): content is MissionContent {
@@ -990,8 +1010,7 @@ export default function DashboardPage() {
     if (!activeCaseFile) return;
 
     const completedJobIds = Object.values(pendingGenerationJobs)
-      .filter((job) => job.phase === "assets" && Boolean(job.contentId))
-      .filter((job) => isPendingGenerationContentComplete(findPendingGenerationContent(job, activeCaseFile)))
+      .filter((job) => Boolean(findCompletedReviewContentForGenerationJob(job, activeCaseFile)))
       .map((job) => job.caseId);
     if (completedJobIds.length === 0) return;
 
@@ -1140,7 +1159,12 @@ export default function DashboardPage() {
   const selectedPendingGenerationContent = selectedPendingGenerationJob
     ? findPendingGenerationContent(selectedPendingGenerationJob, activeCaseFile)
     : null;
-  const isSelectedPendingGenerationComplete = isPendingGenerationContentComplete(selectedPendingGenerationContent);
+  const selectedCompletedReviewContent = selectedPendingGenerationJob
+    ? findCompletedReviewContentForGenerationJob(selectedPendingGenerationJob, activeCaseFile)
+    : null;
+  const isSelectedPendingGenerationComplete =
+    isPendingGenerationContentComplete(selectedPendingGenerationContent) ||
+    isPendingGenerationContentComplete(selectedCompletedReviewContent);
   const selectedPendingGenerationStatus: GenerationStatus | undefined = selectedPendingGenerationJob
     ? {
         state: isSelectedPendingGenerationComplete
@@ -1511,6 +1535,17 @@ export default function DashboardPage() {
 
   useEffect(() => {
     Object.values(pendingGenerationJobs).forEach((job) => {
+      if (findCompletedReviewContentForGenerationJob(job, activeCaseFile)) {
+        setGenerationStatuses((current) => ({
+          ...current,
+          [job.caseId]: {
+            state: "succeeded",
+            message: "이미지와 음성까지 준비된 검토 자료가 만들어졌습니다.",
+          },
+        }));
+        return;
+      }
+
       setGenerationStatuses((current) => ({
         ...current,
         [job.caseId]: {
@@ -1533,7 +1568,7 @@ export default function DashboardPage() {
       });
     }, 3000);
     return () => window.clearInterval(timer);
-  }, [continueGenerationJob, pendingGenerationJobs]);
+  }, [activeCaseFile, continueGenerationJob, pendingGenerationJobs]);
 
   const handleGenerateContent = async () => {
     if (!selectedCase.id || !selectedCase.studentId || isGeneratingContent) return;
@@ -3031,7 +3066,7 @@ export default function DashboardPage() {
                                   />
                                 ) : (
                                   <div
-                                    key={choice}
+                                    key={`${stage.step}-${choiceIndex}`}
                                     className={`rounded-md border px-3 py-2 text-sm font-black ${
                                       choiceIndex === 0
                                         ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
