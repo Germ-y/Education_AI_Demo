@@ -20,6 +20,9 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+_ALLOWED_REPORT_HEADINGS = {"## 수업 반응", "## 이해 변화", "## 다음 수업 제안"}
+
+
 @router.post("/{review_id}/report-drafts/stream")
 def stream_teacher_report_draft(
     review_id: str,
@@ -39,6 +42,8 @@ def stream_teacher_report_draft(
 
     def events():
         chunks: list[str] = []
+        line_buffer = ""
+        blocked_section = False
         try:
             for delta in provider.stream_text_response(
                 model=settings.openai_report_model,
@@ -46,8 +51,21 @@ def stream_teacher_report_draft(
                 input_snapshot=report_input,
                 timeout_sec=settings.openai_report_timeout_sec,
             ):
-                chunks.append(delta)
-                yield _sse("draft_delta", {"text": delta})
+                if blocked_section:
+                    continue
+                line_buffer += delta
+                while "\n" in line_buffer:
+                    line, line_buffer = line_buffer.split("\n", 1)
+                    rendered_line = f"{line}\n"
+                    if _should_stop_report_markdown_at_line(line):
+                        blocked_section = True
+                        line_buffer = ""
+                        break
+                    chunks.append(rendered_line)
+                    yield _sse("draft_delta", {"text": rendered_line})
+            if line_buffer and not blocked_section and not _should_stop_report_markdown_at_line(line_buffer):
+                chunks.append(line_buffer)
+                yield _sse("draft_delta", {"text": line_buffer})
             body_markdown = "".join(chunks).strip()
             if not body_markdown:
                 yield _sse("error", {"code": "REPORT_DRAFT_EMPTY", "message": "리포트 초안 본문이 비어 있습니다."})
@@ -80,6 +98,17 @@ def stream_teacher_report_draft(
             yield _sse("error", {"code": "REPORT_DRAFT_STREAM_FAILED", "message": str(exc)})
 
     return StreamingResponse(events(), media_type="text/event-stream")
+
+
+def _should_stop_report_markdown_at_line(line: str) -> bool:
+    text = line.strip()
+    if not text:
+        return False
+    if "기억장치 반영 후보" in text or "메모리 반영 후보" in text:
+        return True
+    if text.startswith("## ") and text not in _ALLOWED_REPORT_HEADINGS:
+        return True
+    return False
 
 
 def _teacher_report_generation_input(snapshot: dict, *, teacher_observation: str) -> dict:

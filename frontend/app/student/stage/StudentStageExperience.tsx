@@ -1082,6 +1082,14 @@ function formatRealtimeStartError(error: unknown, previewMode: boolean) {
     : "실시간 대화를 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.";
 }
 
+function isMicrophoneAccessError(error: unknown) {
+  return (
+    typeof DOMException !== "undefined" &&
+    error instanceof DOMException &&
+    (error.name === "NotAllowedError" || error.name === "NotFoundError")
+  );
+}
+
 function RealtimePracticeRoom({
   question,
   scene,
@@ -1373,6 +1381,14 @@ function RealtimePracticeRoom({
     } catch (error) {
       if (!isCurrentRealtimeAttempt(connectionAttemptId)) return;
       const message = formatRealtimeStartError(error, previewMode);
+      if (isMicrophoneAccessError(error) && realtimeSessionIdRef.current && (realtimeTokenRef.current || token || previewMode)) {
+        closeRealtimeConnection();
+        setConnectionState("connected");
+        setStatusMessage("마이크 없이 채팅으로 연습할 수 있어요. 아래 입력칸에 말할 문장을 적어 주세요.");
+        appendMessage("system", previewMode ? "마이크 없이 검토용 채팅 연습을 시작했어요." : "마이크 없이 채팅 연습을 시작했어요.");
+        sendSessionEvent("realtime_text_fallback_started", { reason: (error as DOMException).name, preview: Boolean(previewMode) });
+        return;
+      }
       closeRealtimeConnection();
       setConnectionState("error");
       setStatusMessage(message);
@@ -1494,6 +1510,14 @@ function RealtimePracticeRoom({
         setConnectionState("error");
         setStatusMessage("대화 채널이 끊어졌어요. 다시 시작해 주세요.");
       }
+    } else if (realtimeSessionIdRef.current) {
+      const fallbackReply =
+        nextTurn >= minimumStudentTurns
+          ? "좋아요. 지금처럼 짧게 물어보면 안전하게 확인할 수 있어요. 이제 마치기를 눌러도 돼요."
+          : "좋아요. 한 문장으로 더 말해볼까요?";
+      appendMessage("partner", fallbackReply);
+      sendSessionEvent("realtime_text_fallback_reply", { text: fallbackReply });
+      setStatusMessage("채팅으로 연습 중이에요. 끝났으면 마치기를 눌러 주세요.");
     }
   };
 
@@ -1590,7 +1614,7 @@ function RealtimePracticeRoom({
         <div className="border-b border-[#e2e8f0] bg-white px-5 py-4">
           <p className="text-sm font-black text-[#172033]">실시간 채팅</p>
           <p className="mt-1 text-xs font-bold text-[#64748b]">
-            마이크와 채팅을 함께 사용할 수 있어요 · 목표 시간 {timeLimitMinutes}분 · 내 말 {studentTurns}/{minimumStudentTurns}
+            마이크가 안 되면 채팅으로 연습할 수 있어요 · 목표 시간 {timeLimitMinutes}분 · 내 말 {studentTurns}/{minimumStudentTurns}
           </p>
         </div>
 

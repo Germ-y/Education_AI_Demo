@@ -2322,6 +2322,16 @@ def _abstract_context_pattern(value: str) -> str:
     text = str(value or "").strip()
     if not text:
         return ""
+    text = text.replace("선생님 관찰:", "").replace("교사 관찰:", "").strip()
+    if "정답률" in text and "지원 방식" in text:
+        supports = []
+        for keyword in ("지시를 짧게 나누기", "예시를 먼저 보여주기", "선택지를 줄이기", "기다릴 시간 주기"):
+            if keyword in text:
+                supports.append(keyword)
+        if supports:
+            return f"{', '.join(supports[:3])} 조건에서 다음 시도에 연결하기"
+    if "안내판" in text and "질문" in text:
+        return "시각 단서를 먼저 확인한 뒤 짧은 질문으로 연결하기"
     if "정답률 100" in text and "첫 단서" in text:
         return "짧은 첫 단서를 제시하면 다음 시도에 연결하기"
     if "짧은 시각 단서" in text and "끝까지 수행" in text:
@@ -2375,11 +2385,13 @@ def _build_teacher_report_draft_text(snapshot: dict[str, Any]) -> tuple[str, lis
     reflection_note = _reflection_note_for_report(reflection)
     scaffold_text = _join_support_phrases((context_brief.get("recommendedScaffolds") or [])[:3]) or "짧은 예시와 단계 단서"
     next_suggestion = _next_teacher_report_suggestion(content, reflection, scaffold_text)
+    memory_supports = (context_brief.get("recommendedScaffolds") or [])[:3]
+    has_student_utterance = "학생이 " in transcript_summary and "주요 표현" in transcript_summary
     memory_candidates = _dedupe(
         [
-            f"{student['displayName']} 학생은 정답률 {accuracy}%였고, {scaffold_text} 같은 지원 방식을 유지하면 다음 시도에 연결하기 좋습니다.",
-            reflection_note,
-            *(context_brief.get("recommendedScaffolds") or []),
+            f"{scaffold_text} 조건에서 수행이 안정됨" if accuracy >= 80 and completion >= 80 else "",
+            "말하기 단계에서는 학생 발화를 한 문장씩 분리해 기록하기" if has_student_utterance else "말하기 단계에서는 실제 학생 발화를 다시 확인하기",
+            *memory_supports,
         ]
     )[:5]
     body = "\n".join(

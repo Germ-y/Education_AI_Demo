@@ -1092,6 +1092,7 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
         yield "- 학생 회고에서 “전체를 먼저 세니 쉬웠어요.”라고 응답했습니다.\n\n"
         yield "## 이해 변화\n\n- 전체 조각 수를 먼저 확인하는 조건에서 수행이 안정되었습니다.\n\n"
         yield "## 다음 수업 제안\n\n- 유지: 그림 근거를 먼저 보고 짧게 설명하는 흐름을 유지합니다.\n"
+        yield "## 기억장치 반영 후보\n\n- 이 섹션은 리포트 본문에 노출되면 안 됩니다.\n"
 
     monkeypatch.setattr(OpenAiProvider, "create_json_response", fake_json_response)
     monkeypatch.setattr(OpenAiProvider, "create_image_file", fake_image_file)
@@ -1280,7 +1281,9 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
     metadata = next(data for event, data in report_events if event == "draft_metadata")
     done = next(data for event, data in report_events if event == "done")
     assert "## 수업 반응" in draft_text
+    assert "기억장치 반영 후보" not in draft_text
     assert metadata["memoryCandidates"]
+    assert all("정답률" not in candidate for candidate in metadata["memoryCandidates"])
     saved_report = client.post(
         "/api/teacher-reports",
         headers=teacher_headers,
@@ -1301,7 +1304,12 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
     refreshed_after_report = client.post(f"/api/teacher/students/{student_id}/context-brief/refresh", headers=teacher_headers)
     assert refreshed_after_report.status_code == 200
     assert refreshed_after_report.json()["data"]["dirty"] is False
-    assert any("정답률" in pattern for pattern in refreshed_after_report.json()["data"]["recentSuccessPatterns"])
+    refreshed_report_brief = refreshed_after_report.json()["data"]
+    recent_success_patterns = refreshed_report_brief["recentSuccessPatterns"]
+    assert recent_success_patterns
+    assert any("짧은 지시" in pattern or "전체" in pattern for pattern in recent_success_patterns)
+    assert all("정답률" not in pattern and "선생님 관찰" not in pattern for pattern in recent_success_patterns)
+    assert any("지시를 짧게" in scaffold or "예시를 먼저" in scaffold for scaffold in refreshed_report_brief["recommendedScaffolds"])
     report_after_save = client.get(f"/api/teacher/students/{student_id}/report", headers=teacher_headers)
     assert report_after_save.status_code == 200
     assert report_after_save.json()["data"]["reports"][0]["teacherReports"][0]["id"] == saved_report.json()["data"]["id"]
