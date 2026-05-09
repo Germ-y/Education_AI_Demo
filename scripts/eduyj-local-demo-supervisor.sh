@@ -15,10 +15,6 @@ log() {
   printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" | tee -a "$LOG_DIR/supervisor.log"
 }
 
-screen_exists() {
-  screen -ls | grep -q "[.]$1[[:space:]]"
-}
-
 network_ready() {
   curl -fsS --max-time 5 https://www.cloudflare.com/cdn-cgi/trace >/dev/null 2>&1
 }
@@ -27,8 +23,12 @@ port_ready() {
   lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1
 }
 
+eduyj_tunnel_ready() {
+  pgrep -f "cloudflared tunnel --no-autoupdate --loglevel info run --token-file .*summit1123[.]token" >/dev/null 2>&1
+}
+
 start_backend() {
-  if screen_exists "eduyj-backend" && port_ready "$BACKEND_PORT"; then
+  if port_ready "$BACKEND_PORT"; then
     return
   fi
   screen -S eduyj-backend -X quit >/dev/null 2>&1 || true
@@ -43,7 +43,7 @@ start_backend() {
 }
 
 start_frontend() {
-  if screen_exists "eduyj-frontend" && port_ready "$FRONTEND_PORT"; then
+  if port_ready "$FRONTEND_PORT"; then
     return
   fi
   screen -S eduyj-frontend -X quit >/dev/null 2>&1 || true
@@ -58,7 +58,7 @@ start_frontend() {
 }
 
 start_tunnel() {
-  if screen_exists "eduyj-tunnel" && pgrep -f "cloudflared.*summit1123.token" >/dev/null 2>&1; then
+  if eduyj_tunnel_ready; then
     return
   fi
   screen -S eduyj-tunnel -X quit >/dev/null 2>&1 || true
