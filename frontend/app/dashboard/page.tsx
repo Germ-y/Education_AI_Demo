@@ -1210,6 +1210,15 @@ export default function DashboardPage() {
           challengeTags: [],
           planTags: [],
         };
+  const isLearningFocusStudent = (activeCaseFile?.profile.studentType ?? selectedApiStudent?.studentType) === "learning_focus";
+  const academicStrategyItems = replacementSkills.filter((item) =>
+    /단서|풀이|정답|이유|단어|조건|순서|오답|문제|설명|빈칸|개념/u.test(item),
+  );
+  const supportSkillItems = isLearningFocusStudent
+    ? academicStrategyItems.length > 0
+      ? academicStrategyItems
+      : recommendedScaffolds.slice(0, 4)
+    : replacementSkills;
   const lessonDesignDirection =
     supportProfileLessonHints[0] ??
     dashboardProfile?.supportStrategyDetail ??
@@ -2569,8 +2578,8 @@ export default function DashboardPage() {
                       tone="green"
                     />
                     <ChipGroup
-                      title="연습할 표현·기술"
-                      items={replacementSkills.length ? replacementSkills : ["확정 프로필 저장 뒤 표시"]}
+                      title={isLearningFocusStudent ? "학습 전략" : "연습할 표현·기술"}
+                      items={supportSkillItems.length ? supportSkillItems : ["확정 프로필 저장 뒤 표시"]}
                       tone="slate"
                     />
                   </div>

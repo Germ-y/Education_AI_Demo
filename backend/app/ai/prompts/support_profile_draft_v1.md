@@ -37,3 +37,11 @@ Field guidance:
 - strengths: teacher-readable sentences based on observed strengths.
 - supportCautions: teacher-readable caution sentences based on hard situations.
 - source.rawRecordPreserved must be true.
+
+Type-specific guidance:
+- If studentType/content type is `learning_focus`, the profile must read like a learning-support profile, not a daily-life behavior profile.
+  - Center the wording on concept understanding, problem conditions, key evidence, reading load, worked examples, solving order, transfer to a similar problem, and short explanation.
+  - `replacementSkills` should be learning strategies such as "핵심 단서 표시하기", "풀이 순서 말하기", "정답 이유를 한 문장으로 말하기", "모르는 단어 표시하기", or "예시와 다른 점 찾기".
+  - Do not foreground social behaviors such as greeting, asking peers, safety rules, waiting in unfamiliar places, or help-request roleplay unless the intake explicitly says those are the target. If included, keep them secondary and phrase them as learning-task self-checks.
+  - `recommendedScaffolds` should be instructional supports: worked example, visual model, short condition split, highlighted evidence, two choices, blank check, sentence frame, step card.
+- If studentType/content type is `life_support`, the profile may center on daily situations, clue finding, action choice, help request, roleplay, and replacement communication skills.

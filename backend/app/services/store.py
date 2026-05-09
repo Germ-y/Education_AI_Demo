@@ -2033,7 +2033,13 @@ def _build_support_profile_draft_json(
         effective_supports = ["지시를 짧게 나눔"]
     if not recommended_scaffolds:
         recommended_scaffolds = _registration_support_hints(effective_supports, calming_supports, communication_needs, student.student_type)
-    if not replacement_skills and student.student_type == "life_support":
+    if student.student_type == "learning_focus":
+        replacement_skills = _learning_strategy_skills(
+            hard_situations=hard_situations,
+            effective_supports=effective_supports,
+            communication_needs=communication_needs,
+        )
+    elif not replacement_skills:
         replacement_skills = ["도움 요청하기", "순서 확인하기"]
 
     choice_limit = (
@@ -2048,10 +2054,16 @@ def _build_support_profile_draft_json(
     )
     can_be_hard = _dedupe([*hard_situations, *instruction_burdens])[:5] or ["긴 설명 뒤 바로 시작하기"]
 
-    lesson_hint = (
-        f"관찰된 강점은 {', '.join(observed_strengths[:2])}입니다. "
-        f"수업에서는 {', '.join(recommended_scaffolds[:2])}을 먼저 적용해 {', '.join(can_be_hard[:2])} 부담을 줄입니다."
-    )
+    if student.student_type == "learning_focus":
+        lesson_hint = (
+            f"수업은 {', '.join(recommended_scaffolds[:2])}을 먼저 적용해 핵심 단서와 풀이 순서를 확인하는 흐름으로 시작합니다. "
+            f"{', '.join(can_be_hard[:2])}은 한 번에 처리하지 않도록 문제 조건을 짧게 나눕니다."
+        )
+    else:
+        lesson_hint = (
+            f"관찰된 강점은 {', '.join(observed_strengths[:2])}입니다. "
+            f"수업에서는 {', '.join(recommended_scaffolds[:2])}을 먼저 적용해 {', '.join(can_be_hard[:2])} 부담을 줄입니다."
+        )
     if teacher_note:
         lesson_hint = f"{lesson_hint} 교사 메모: {teacher_note.strip()}"
 
@@ -2747,6 +2759,35 @@ def _registration_choice_count_limit(student_type: str, effective_supports: list
     return 2 if student_type == "life_support" else 3
 
 
+def _learning_strategy_skills(
+    *,
+    hard_situations: list[str],
+    effective_supports: list[str],
+    communication_needs: list[str],
+) -> list[str]:
+    joined = " ".join([*hard_situations, *effective_supports, *communication_needs])
+    skills: list[str] = []
+    if any(keyword in joined for keyword in ["조건", "긴 글", "긴 지문", "긴 문제", "단서"]):
+        skills.append("문제에서 핵심 단서 표시하기")
+    if any(keyword in joined for keyword in ["순서", "단계", "절차", "계산"]):
+        skills.append("풀이 순서를 짧게 말하기")
+    if any(keyword in joined for keyword in ["설명", "이유", "말로"]):
+        skills.append("정답 이유를 한 문장으로 말하기")
+    if any(keyword in joined for keyword in ["읽기", "단어", "영어", "낱말"]):
+        skills.append("모르는 단어와 아는 단어 나누기")
+    if any(keyword in joined for keyword in ["응용", "전이", "비슷한"]):
+        skills.append("예시 문제와 다른 점 찾기")
+    if any(keyword in joined for keyword in ["오류", "오답", "다시"]):
+        skills.append("틀린 부분을 표시하고 한 번 더 풀기")
+
+    skills.extend(
+        item
+        for item in communication_needs
+        if any(keyword in item for keyword in ["다시 설명", "어디부터", "핵심 단서", "풀이", "정답 이유", "모르는 단어"])
+    )
+    return _dedupe(skills or ["핵심 단서 표시하기", "풀이 순서 말하기"])[:6]
+
+
 def _registration_support_hints(
     effective_supports: list[str],
     calming_supports: list[str],
@@ -2759,17 +2800,20 @@ def _registration_support_hints(
         if "짧게" in item or "나눔" in item:
             mapped.append("지시를 짧게 나누기")
         elif "예시" in item or "모델" in item:
-            mapped.append("예시를 먼저 보여주기")
+            mapped.append("예시 문제를 먼저 보여주기" if student_type == "learning_focus" else "예시를 먼저 보여주기")
         elif "선택지" in item:
             mapped.append("선택지 수 줄이기")
         elif "순서" in item:
-            mapped.append("과제 순서 먼저 확인하기")
+            mapped.append("풀이 순서 먼저 확인하기" if student_type == "learning_focus" else "과제 순서 먼저 확인하기")
         elif "기다" in item:
             mapped.append("대답 전 기다릴 시간 주기")
+        elif student_type == "learning_focus" and any(keyword in item for keyword in ["단서", "조건", "빈칸", "그림", "표"]):
+            mapped.append(item)
         elif "도움 요청" in item or "다시 말" in item or "쉬기" in item or "거절" in item:
-            mapped.append("필요한 표현을 짧게 연습하기")
+            mapped.append("확인 질문을 짧게 연습하기" if student_type == "learning_focus" else "필요한 표현을 짧게 연습하기")
         elif "안전" in item:
-            mapped.append("안전 규칙 먼저 확인하기")
+            if student_type == "life_support":
+                mapped.append("안전 규칙 먼저 확인하기")
         elif "조용" in item:
             mapped.append("환경 자극을 줄이고 시작하기")
         elif item:
