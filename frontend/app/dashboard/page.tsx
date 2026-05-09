@@ -776,41 +776,25 @@ function getActivePublishedContentIds(contents: MissionContent[] = []) {
   return new Set(Array.from(latestByCase.values()).map((content) => content.id));
 }
 
-function choicesFromTemplate(templateJson: Record<string, unknown>): string[] {
-  const choices = templateJson.choices;
-  if (Array.isArray(choices)) {
-    return choices
+function textListFromTemplateValue(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
       .map((choice) => {
         if (typeof choice === "string") return choice;
         if (choice && typeof choice === "object" && "text" in choice && typeof choice.text === "string") return choice.text;
         if (choice && typeof choice === "object" && "label" in choice && typeof choice.label === "string") return choice.label;
+        if (choice && typeof choice === "object" && "title" in choice && typeof choice.title === "string") return choice.title;
         return null;
       })
       .filter((choice): choice is string => Boolean(choice));
-  }
+}
 
-  const rightCards = templateJson.rightCards;
-  if (Array.isArray(rightCards)) {
-    return rightCards
-      .map((card) => {
-        if (typeof card === "string") return card;
-        if (card && typeof card === "object" && "text" in card && typeof card.text === "string") return card.text;
-        if (card && typeof card === "object" && "label" in card && typeof card.label === "string") return card.label;
-        return null;
-      })
-      .filter((choice): choice is string => Boolean(choice));
-  }
-
-  const cards = templateJson.cards;
-  if (Array.isArray(cards)) {
-    return cards
-      .map((card) => {
-        if (typeof card === "string") return card;
-        if (card && typeof card === "object" && "text" in card && typeof card.text === "string") return card.text;
-        if (card && typeof card === "object" && "label" in card && typeof card.label === "string") return card.label;
-        return null;
-      })
-      .filter((choice): choice is string => Boolean(choice));
+function choicesFromTemplate(templateJson: Record<string, unknown>): string[] {
+  const choiceKeys = ["choices", "tiles", "options", "items", "rightCards", "cards"] as const;
+  for (const key of choiceKeys) {
+    const choices = textListFromTemplateValue(templateJson[key]);
+    if (choices.length > 0) return choices;
   }
 
   return [];
@@ -3422,11 +3406,11 @@ export default function DashboardPage() {
                             </div>
                           )}
 
-                          {!stage.isRealtimeStage && (
+                          {!stage.isRealtimeStage && (stage.choices.length > 0 || isReviewEditing) && (
                           <div className="rounded-md bg-white p-4">
                             <p className="text-xs font-black text-[#64748b]">선택지</p>
                             <div className="mt-2 space-y-2">
-                              {stage.choices.map((choice, choiceIndex) =>
+                              {(stage.choices.length > 0 ? stage.choices : [""]).map((choice, choiceIndex) =>
                                 isReviewEditing ? (
                                   <input
                                     key={`${stage.step}-${choiceIndex}`}
