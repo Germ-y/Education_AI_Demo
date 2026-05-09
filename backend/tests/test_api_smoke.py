@@ -983,6 +983,20 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
     ):
         assert output_schema_name
         assert output_json_schema
+        if output_schema_name == "StudentMemoryBriefV1":
+            return (
+                {
+                    "briefText": "짧은 지시를 이해함에서 시작이 안정적입니다. 기억장치는 새 수업 주제를 정하는 값이 아니라 제시 방식 조정에만 사용합니다.",
+                    "readingLoad": "low",
+                    "choiceCount": 2,
+                    "recentSuccessPatterns": ["짧은 지시를 이해함"],
+                    "recentDifficultyPatterns": ["긴 지시 이해"],
+                    "recommendedScaffolds": ["지시를 짧게 나누기"],
+                    "avoidTopicRegression": ["피자 조각"],
+                    "sourceWatermark": "ai_memory_test",
+                },
+                {"input_tokens": 4, "output_tokens": 4},
+            )
         if "Content Quality Critic" in instructions:
             return (
                 {

@@ -1,5 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.ai.openai_provider import OpenAiProvider
+from app.ai.output_schemas import output_json_schema
+from app.ai.prompt_registry import PROMPT_SPECS, load_prompt
 from app.ai.provider_errors import AiProviderError
 from app.api.deps import get_store, require_teacher
 from app.api.response import ok
@@ -146,7 +149,28 @@ def refresh_student_context_brief(
     principal: SessionPrincipal = Depends(require_teacher),
     demo_store: DemoStore = Depends(get_store),
 ) -> dict:
-    brief = demo_store.refresh_student_context_brief(student_id, teacher_id=principal.id if principal.role == "teacher" else None)
+    settings = get_settings()
+    memory_override: dict | None = None
+    generation_mode = "local_fallback"
+    if settings.openai_api_key:
+        try:
+            memory_override = _generate_memory_brief_with_ai(student_id, principal.id, demo_store)
+            generation_mode = settings.openai_memory_model
+        except AiProviderError as exc:
+            demo_store.record_audit(
+                actor_user_id=principal.id,
+                student_id=student_id,
+                action="refresh_context_brief_ai_failed",
+                resource_type="student_context_brief",
+                resource_id=student_id,
+                payload_json={"code": exc.code, "message": exc.message},
+            )
+    brief = demo_store.refresh_student_context_brief(
+        student_id,
+        teacher_id=principal.id if principal.role == "teacher" else None,
+        brief_override=memory_override,
+        model=generation_mode,
+    )
     if brief is None:
         raise HTTPException(status_code=404, detail={"code": "CONTEXT_BRIEF_NOT_FOUND", "message": "학생 ContextBrief를 갱신할 수 없습니다."})
     demo_store.record_audit(
@@ -155,9 +179,9 @@ def refresh_student_context_brief(
         action="refresh_context_brief",
         resource_type="student_context_brief",
         resource_id=brief.id,
-        payload_json={"dirty": brief.dirty},
+        payload_json={"dirty": brief.dirty, "generationMode": generation_mode},
     )
-    return ok(brief.model_dump(by_alias=True))
+    return ok({**brief.model_dump(by_alias=True), "generationMode": generation_mode})
 
 
 @router.post("/students/{student_id}/support-profile-drafts")
@@ -169,11 +193,35 @@ def create_support_profile_draft(
 ) -> dict:
     if principal.role != "teacher":
         raise HTTPException(status_code=403, detail={"code": "FORBIDDEN", "message": "교사만 지원 프로필 초안을 만들 수 있습니다."})
+    settings = get_settings()
+    profile_override: dict | None = None
+    generation_mode = "local_fallback"
+    if settings.openai_api_key:
+        try:
+            profile_override = _generate_support_profile_draft_with_ai(
+                student_id,
+                principal.id,
+                demo_store,
+                support_intake=payload.support_intake if payload else None,
+                teacher_note=payload.teacher_note if payload else None,
+            )
+            generation_mode = settings.openai_support_profile_model
+        except AiProviderError as exc:
+            demo_store.record_audit(
+                actor_user_id=principal.id,
+                student_id=student_id,
+                action="create_support_profile_draft_ai_failed",
+                resource_type="student_support_profile",
+                resource_id=student_id,
+                payload_json={"code": exc.code, "message": exc.message},
+            )
     draft = demo_store.create_support_profile_draft(
         student_id,
         teacher_id=principal.id,
         support_intake=payload.support_intake if payload else None,
         teacher_note=payload.teacher_note if payload else None,
+        profile_json_override=profile_override,
+        generated_by=generation_mode,
     )
     if draft is None:
         raise HTTPException(status_code=404, detail={"code": "STUDENT_NOT_FOUND", "message": "지원 프로필 초안을 만들 학생을 찾을 수 없습니다."})
@@ -183,13 +231,14 @@ def create_support_profile_draft(
         action="create_support_profile_draft",
         resource_type="student_support_profile",
         resource_id=draft.id,
-        payload_json={"generatedBy": draft.generated_by, "sourceIntakeId": draft.source_intake_id},
+        payload_json={"generatedBy": draft.generated_by, "sourceIntakeId": draft.source_intake_id, "generationMode": generation_mode},
     )
     return ok(
         {
             "draftId": draft.id,
             "studentId": draft.student_id,
             "status": "completed",
+            "generationMode": generation_mode,
             "profileDraft": draft.profile_json,
             "supportProfile": draft.model_dump(by_alias=True),
         }
@@ -269,6 +318,83 @@ def patch_memory_card(
     if updated is None:
         raise HTTPException(status_code=404, detail={"code": "MEMORY_CARD_NOT_FOUND", "message": "활성 메모리 카드를 찾을 수 없습니다."})
     return ok(updated.model_dump(by_alias=True))
+
+
+def _generate_support_profile_draft_with_ai(
+    student_id: str,
+    teacher_id: str,
+    demo_store: DemoStore,
+    *,
+    support_intake: dict | None,
+    teacher_note: str | None,
+) -> dict:
+    settings = get_settings()
+    spec = PROMPT_SPECS["support_profile_draft"]
+    output, _ = OpenAiProvider(settings).create_json_response(
+        model=settings.openai_support_profile_model,
+        instructions=load_prompt("support_profile_draft"),
+        input_snapshot={
+            **_student_ai_snapshot(student_id, teacher_id, demo_store),
+            "registrationSupportIntake": support_intake or {},
+            "teacherNote": teacher_note or "",
+            "schemaContract": spec.output_schema_name,
+        },
+        output_schema_name=spec.output_schema_name,
+        output_json_schema=output_json_schema(spec.output_schema_name),
+        timeout_sec=settings.openai_support_profile_timeout_sec,
+        max_output_tokens=2500,
+    )
+    return output
+
+
+def _generate_memory_brief_with_ai(student_id: str, teacher_id: str, demo_store: DemoStore) -> dict:
+    settings = get_settings()
+    spec = PROMPT_SPECS["student_memory_brief"]
+    output, _ = OpenAiProvider(settings).create_json_response(
+        model=settings.openai_memory_model,
+        instructions=load_prompt("student_memory_brief"),
+        input_snapshot={
+            **_student_ai_snapshot(student_id, teacher_id, demo_store),
+            "schemaContract": spec.output_schema_name,
+        },
+        output_schema_name=spec.output_schema_name,
+        output_json_schema=output_json_schema(spec.output_schema_name),
+        timeout_sec=settings.openai_memory_timeout_sec,
+        max_output_tokens=2500,
+    )
+    return output
+
+
+def _student_ai_snapshot(student_id: str, teacher_id: str, demo_store: DemoStore) -> dict:
+    case_file = demo_store.get_student_case_file(student_id) or {}
+    history = demo_store.get_student_history(student_id, teacher_id=teacher_id) or {}
+    dashboard_profile = case_file.get("dashboardProfile") if isinstance(case_file.get("dashboardProfile"), dict) else {}
+    context_bundle = case_file.get("contextBundle") if isinstance(case_file.get("contextBundle"), dict) else {}
+    return {
+        "student": case_file.get("profile") or {},
+        "studentType": (case_file.get("profile") or {}).get("studentType"),
+        "openCase": case_file.get("openCase") or {},
+        "dashboardProfile": dashboard_profile,
+        "confirmedSupportProfile": case_file.get("supportProfile") or {},
+        "memoryCard": case_file.get("memoryCard") or {},
+        "contextBrief": case_file.get("contextBrief") or {},
+        "contextBundle": {
+            "studentRecord": context_bundle.get("studentRecord"),
+            "previousLessons": context_bundle.get("previousLessons"),
+            "teacherNotes": context_bundle.get("teacherNotes"),
+            "nextGoal": context_bundle.get("nextGoal"),
+        },
+        "recentHistory": {
+            "contents": history.get("contents") if isinstance(history, dict) else [],
+            "reports": history.get("reports") if isinstance(history, dict) else [],
+            "reviewSummaries": history.get("reviewSummaries") if isinstance(history, dict) else [],
+        },
+        "generationPolicy": {
+            "profileAndMemoryAreScaffoldingOnly": True,
+            "doNotUsePastScenarioAsNextTopic": True,
+            "teacherContentRequestDecidesTopic": True,
+        },
+    }
 
 
 def _resolve_registration_school(payload: StudentRegistrationRequest, demo_store: DemoStore) -> SchoolProfile:

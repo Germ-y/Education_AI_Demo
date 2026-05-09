@@ -455,10 +455,59 @@ _CONTENT_QUALITY_CRITIQUE_SCHEMA = _object_schema(
     }
 )
 
+_SUPPORT_PROFILE_DRAFT_SCHEMA = _object_schema(
+    {
+        "profileVersion": {"type": "string", "enum": ["support_profile_v1"]},
+        "draftLabel": {"type": "string"},
+        "lessonDesignHints": _string_array(),
+        "learningResponsePattern": _object_schema(
+            {
+                "worksWell": _string_array(),
+                "canBeHard": _string_array(),
+                "choiceCountLimit": {"type": "integer"},
+                "readingLoad": {"type": "string", "enum": ["low", "medium", "high"]},
+                "explanationStyle": {"type": "string"},
+            }
+        ),
+        "behaviorSupportProfile": _object_schema(
+            {
+                "priorityBehaviors": _string_array(),
+                "functionHypotheses": _string_array(),
+                "replacementSkills": _string_array(),
+                "recommendedScaffolds": _string_array(),
+            }
+        ),
+        "strengths": _string_array(),
+        "supportCautions": _string_array(),
+        "source": _object_schema(
+            {
+                "intakeSourceId": {"type": ["string", "null"]},
+                "generatedBy": {"type": "string"},
+                "rawRecordPreserved": {"type": "boolean"},
+            }
+        ),
+    }
+)
+
+_STUDENT_MEMORY_BRIEF_SCHEMA = _object_schema(
+    {
+        "briefText": {"type": "string"},
+        "readingLoad": {"type": "string", "enum": ["low", "medium", "high"]},
+        "choiceCount": {"type": "integer"},
+        "recentSuccessPatterns": _string_array(),
+        "recentDifficultyPatterns": _string_array(),
+        "recommendedScaffolds": _string_array(),
+        "avoidTopicRegression": _string_array(),
+        "sourceWatermark": {"type": "string"},
+    }
+)
+
 _OUTPUT_JSON_SCHEMAS: dict[str, dict[str, Any]] = {
     "OrchestratorPlanV1": _ORCHESTRATOR_PLAN_SCHEMA,
     "MissionContentPackageV1": _MISSION_CONTENT_SCHEMA,
     "ImageBriefPackageV1": _IMAGE_BRIEF_SCHEMA,
     "TtsScriptPackageV1": _TTS_SCRIPT_SCHEMA,
     "ContentQualityCritiqueV1": _CONTENT_QUALITY_CRITIQUE_SCHEMA,
+    "SupportProfileDraftV1": _SUPPORT_PROFILE_DRAFT_SCHEMA,
+    "StudentMemoryBriefV1": _STUDENT_MEMORY_BRIEF_SCHEMA,
 }

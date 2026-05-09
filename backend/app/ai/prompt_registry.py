@@ -50,6 +50,18 @@ PROMPT_SPECS: dict[str, PromptSpec] = {
         file_name="teacher_report_draft_v1.md",
         output_schema_name="",
     ),
+    "support_profile_draft": PromptSpec(
+        key="support_profile_draft",
+        version="support_profile_draft_v1",
+        file_name="support_profile_draft_v1.md",
+        output_schema_name="SupportProfileDraftV1",
+    ),
+    "student_memory_brief": PromptSpec(
+        key="student_memory_brief",
+        version="student_memory_brief_v1",
+        file_name="student_memory_brief_v1.md",
+        output_schema_name="StudentMemoryBriefV1",
+    ),
 }
 
 

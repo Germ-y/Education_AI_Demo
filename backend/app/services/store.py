@@ -902,6 +902,8 @@ class DemoStore:
         teacher_id: str,
         support_intake: dict[str, Any] | None = None,
         teacher_note: str | None = None,
+        profile_json_override: dict[str, Any] | None = None,
+        generated_by: str = "local_demo_ai",
     ) -> StudentSupportProfile | None:
         self.refresh()
         student = next((candidate for candidate in self.db.students if candidate.id == student_id), None)
@@ -918,19 +920,26 @@ class DemoStore:
                 createdAt=_now(),
             )
             self.db.student_support_intake_sources.append(source)
-        profile_json = _build_support_profile_draft_json(
-            student=student,
-            open_case=open_case,
-            intake_source=source,
-            teacher_note=teacher_note,
-        )
+        if profile_json_override is not None:
+            profile_json = _normalize_support_profile_draft_json(
+                profile_json_override,
+                intake_source=source,
+                generated_by=generated_by,
+            )
+        else:
+            profile_json = _build_support_profile_draft_json(
+                student=student,
+                open_case=open_case,
+                intake_source=source,
+                teacher_note=teacher_note,
+            )
         draft = StudentSupportProfile(
             id=f"support_profile_draft_{student_id}_{uuid4().hex[:8]}",
             studentId=student_id,
             sourceIntakeId=source.id if source else None,
             status="draft",
             profileJson=profile_json,
-            generatedBy="local_demo_ai",
+            generatedBy=generated_by,
             createdAt=_now(),
         )
         self.db.student_support_profiles.append(draft)
@@ -1015,7 +1024,14 @@ class DemoStore:
         self.db.student_context_briefs = [updated if brief.id == latest.id else brief for brief in self.db.student_context_briefs]
         return updated
 
-    def refresh_student_context_brief(self, student_id: str, *, teacher_id: str | None = None) -> StudentContextBrief | None:
+    def refresh_student_context_brief(
+        self,
+        student_id: str,
+        *,
+        teacher_id: str | None = None,
+        brief_override: dict[str, Any] | None = None,
+        model: str = "local_demo_ai",
+    ) -> StudentContextBrief | None:
         self.refresh()
         student = next((candidate for candidate in self.db.students if candidate.id == student_id), None)
         open_case = next((case for case in self.db.support_cases if case.student_id == student_id and case.case_status == "open"), None)
@@ -1033,6 +1049,25 @@ class DemoStore:
             status="refreshed",
             source_json={"trigger": "manual_refresh", "reportCount": len(reports)},
         )
+        if brief_override is not None:
+            brief = brief.model_copy(
+                update={
+                    "brief_text": str(brief_override.get("briefText") or brief.brief_text),
+                    "reading_load": str(brief_override.get("readingLoad") or brief.reading_load),
+                    "choice_count": _safe_int(brief_override.get("choiceCount"), brief.choice_count),
+                    "recent_success_patterns": _list_value(brief_override.get("recentSuccessPatterns"))[:8],
+                    "recent_difficulty_patterns": _list_value(brief_override.get("recentDifficultyPatterns"))[:8],
+                    "recommended_scaffolds": _list_value(brief_override.get("recommendedScaffolds"))[:8],
+                    "avoid_topic_regression": _list_value(brief_override.get("avoidTopicRegression"))[:6],
+                    "source_watermark": str(brief_override.get("sourceWatermark") or brief.source_watermark),
+                    "source_json": {
+                        **brief.source_json,
+                        "aiGenerated": True,
+                        "model": model,
+                    },
+                    "model": model,
+                }
+            )
         self.db.student_context_briefs = [item for item in self.db.student_context_briefs if item.student_id != student_id]
         self.db.student_context_briefs.append(brief)
         self.persist()
@@ -2047,6 +2082,43 @@ def _build_support_profile_draft_json(
     }
 
 
+def _normalize_support_profile_draft_json(
+    profile_json: dict[str, Any],
+    *,
+    intake_source: StudentSupportIntakeSource | None,
+    generated_by: str,
+) -> dict[str, Any]:
+    learning_response = profile_json.get("learningResponsePattern") if isinstance(profile_json.get("learningResponsePattern"), dict) else {}
+    behavior_profile = profile_json.get("behaviorSupportProfile") if isinstance(profile_json.get("behaviorSupportProfile"), dict) else {}
+    source = profile_json.get("source") if isinstance(profile_json.get("source"), dict) else {}
+    return {
+        "profileVersion": "support_profile_v1",
+        "draftLabel": str(profile_json.get("draftLabel") or "수업 설계 초안"),
+        "lessonDesignHints": _list_value(profile_json.get("lessonDesignHints"))[:4],
+        "learningResponsePattern": {
+            "worksWell": _list_value(learning_response.get("worksWell"))[:6],
+            "canBeHard": _list_value(learning_response.get("canBeHard"))[:6],
+            "choiceCountLimit": _safe_int(learning_response.get("choiceCountLimit"), 2),
+            "readingLoad": str(learning_response.get("readingLoad") or "medium"),
+            "explanationStyle": str(learning_response.get("explanationStyle") or "짧은 단계로 확인"),
+        },
+        "behaviorSupportProfile": {
+            "priorityBehaviors": _list_value(behavior_profile.get("priorityBehaviors"))[:6],
+            "functionHypotheses": _list_value(behavior_profile.get("functionHypotheses"))[:6],
+            "replacementSkills": _list_value(behavior_profile.get("replacementSkills"))[:6],
+            "recommendedScaffolds": _list_value(behavior_profile.get("recommendedScaffolds"))[:6],
+        },
+        "strengths": _list_value(profile_json.get("strengths"))[:6],
+        "supportCautions": _list_value(profile_json.get("supportCautions"))[:6],
+        "source": {
+            **source,
+            "intakeSourceId": intake_source.id if intake_source else source.get("intakeSourceId"),
+            "generatedBy": generated_by,
+            "rawRecordPreserved": True,
+        },
+    }
+
+
 def _apply_support_profile_to_student_dashboard(student: Student, open_case: SupportCase, profile_json: dict[str, Any]) -> None:
     dashboard = dict(_student_dashboard(student.profile_json))
     hints = _list_value(profile_json.get("lessonDesignHints"))
@@ -2472,6 +2544,13 @@ def _list_value(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [_teacher_facing_text(str(item).strip()) for item in value if str(item).strip()]
+
+
+def _safe_int(value: Any, fallback: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
 
 
 def _list_dict_value(value: Any) -> list[dict[str, Any]]:

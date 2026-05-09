@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     openai_critique_model: str = "gpt-5.1"
     openai_image_brief_model: str = "gpt-5.1"
     openai_report_model: str = "gpt-5.1"
+    openai_support_profile_model: str = "gpt-5.1"
+    openai_memory_model: str = "gpt-5.1"
     openai_reasoning_effort: str | None = "none"
     openai_text_verbosity: str | None = "low"
     openai_orchestrator_max_output_tokens: int = 6000
@@ -31,6 +33,8 @@ class Settings(BaseSettings):
     openai_content_timeout_sec: float = 180
     openai_critique_timeout_sec: float = 180
     openai_report_timeout_sec: float = 90
+    openai_support_profile_timeout_sec: float = 90
+    openai_memory_timeout_sec: float = 90
     openai_content_critique_enabled: bool = False
     openai_image_model: str = "gpt-image-2"
     openai_image_timeout_sec: float = 360

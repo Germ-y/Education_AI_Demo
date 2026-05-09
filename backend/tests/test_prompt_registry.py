@@ -11,6 +11,8 @@ def test_prompt_registry_loads_all_versioned_prompts() -> None:
         "image_brief",
         "tts_script",
         "teacher_report_draft",
+        "support_profile_draft",
+        "student_memory_brief",
     }
 
     for spec in specs:
