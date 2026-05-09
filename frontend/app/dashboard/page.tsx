@@ -380,6 +380,25 @@ function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
 }
 
+function toReadingLoadLabel(value: unknown) {
+  if (value === "low") return "짧은 문장";
+  if (value === "medium") return "보통 문장";
+  if (value === "high") return "긴 글 주의";
+  return "확인 중";
+}
+
+function toChoiceCountLabel(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return `선택지 ${value}개부터`;
+  if (typeof value === "string" && value.trim()) return `선택지 ${value}개부터`;
+  return "선택지 확인 중";
+}
+
+function supportProfileStatusLabel(status: "confirmed" | "draft" | "none") {
+  if (status === "confirmed") return "선생님 확인 완료";
+  if (status === "draft") return "초안 확인 필요";
+  return "작성 전";
+}
+
 function compactGoalText(value: string) {
   return value
     .replace(/\s*수업이 좋겠어요\.?$/u, "")
@@ -1146,6 +1165,8 @@ export default function DashboardPage() {
   const supportProfileCautions = stringList(visibleSupportProfileJson.supportCautions);
   const supportProfileLessonHints = stringList(visibleSupportProfileJson.lessonDesignHints);
   const activeContextBrief = activeCaseFile?.contextBrief ?? activeCaseFile?.contextBundle?.contextBrief ?? null;
+  const firstReadingLoad = learningResponsePattern.readingLoad ?? activeContextBrief?.readingLoad;
+  const firstChoiceCount = learningResponsePattern.choiceCountLimit ?? activeContextBrief?.choiceCount;
 
   useEffect(() => {
     if (!activeCaseFile) return;
@@ -2401,14 +2422,14 @@ export default function DashboardPage() {
                         helper="콘텐츠 주제가 아니라 제시 방식 조정 기준입니다."
                       />
                       <SignalCard
-                        label="초기 프로필"
-                        value={supportProfileStatus === "confirmed" ? "교사 확인 완료" : supportProfileStatus === "draft" ? "초안 확인 필요" : "작성 전"}
-                        helper="등록 원자료를 AI가 수업 방식 프로필로 정리합니다."
+                        label="수업 방식 프로필"
+                        value={supportProfileStatusLabel(supportProfileStatus)}
+                        helper="학생에게 자료를 어떤 순서와 방식으로 보여줄지 정리한 값입니다."
                       />
                       <SignalCard
-                        label="읽기·선택 부담"
-                        value={`${String(learningResponsePattern.readingLoad ?? activeContextBrief?.readingLoad ?? "확인 중")} · ${String(learningResponsePattern.choiceCountLimit ?? activeContextBrief?.choiceCount ?? "-")}개 안팎`}
-                        helper="처음 제시할 문장 길이와 선택지 수입니다."
+                        label="처음 제시 기준"
+                        value={`${toReadingLoadLabel(firstReadingLoad)} · ${toChoiceCountLabel(firstChoiceCount)}`}
+                        helper="첫 문제에서 시작할 문장 길이와 보기 수입니다."
                       />
                     </div>
 
@@ -2503,7 +2524,7 @@ export default function DashboardPage() {
                                 : "bg-[#f1f5f9] text-[#64748b]"
                           }`}
                         >
-                          {supportProfileStatus === "confirmed" ? "교사 확인 완료" : supportProfileStatus === "draft" ? "초안" : "작성 전"}
+                          {supportProfileStatus === "confirmed" ? "선생님 확인 완료" : supportProfileStatus === "draft" ? "초안" : "작성 전"}
                         </span>
                       </div>
                       <p className="mt-1 text-sm font-semibold text-[#64748b]">
@@ -2537,7 +2558,7 @@ export default function DashboardPage() {
                           disabled={Boolean(supportProfileAction)}
                           className="rounded-md bg-[#1f3a5f] px-4 py-2 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
                         >
-                          {supportProfileAction === "confirm" ? "저장 중" : "교사 확인 완료"}
+                          {supportProfileAction === "confirm" ? "저장 중" : "선생님 확인 완료"}
                         </button>
                       </div>
                     </div>
