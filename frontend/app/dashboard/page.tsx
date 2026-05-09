@@ -2712,7 +2712,6 @@ export default function DashboardPage() {
                       const isActionRunning = reviewActionId === item.id;
                       const needsMediaGeneration = hasMissingGeneratedMedia(item.content);
                       const teacherPreviewHref = `/student/stage?caseId=${encodeURIComponent(item.caseId)}&contentId=${encodeURIComponent(item.content.id)}&preview=1`;
-                      const studentRuntimeHref = `/student/stage?caseId=${encodeURIComponent(item.caseId)}&contentId=${encodeURIComponent(item.content.id)}`;
 
                       return (
                         <div key={item.id} className="rounded-md border border-[#e5e9f0] bg-white p-4">
@@ -2748,7 +2747,7 @@ export default function DashboardPage() {
                                       : item.state}
                             </span>
                           </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
                             <button
                               onClick={() => {
                                 setReviewPreviewStep(1);
@@ -2765,19 +2764,6 @@ export default function DashboardPage() {
                             >
                               교사용 미리보기
                             </Link>
-                            {materialApplied ? (
-                              <Link
-                                href={studentRuntimeHref}
-                                target="_blank"
-                                className="rounded-md border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm font-bold text-[#15803d]"
-                              >
-                                학생 배포 화면
-                              </Link>
-                            ) : (
-                              <span className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 text-sm font-bold text-[#94a3b8]">
-                                배포 후 학생 URL
-                              </span>
-                            )}
                             {needsMediaGeneration && (
                               <button
                                 onClick={() => handleRetryMaterialAssets(item)}
