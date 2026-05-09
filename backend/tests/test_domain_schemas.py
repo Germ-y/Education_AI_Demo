@@ -88,6 +88,25 @@ def test_image_brief_allows_stage_visual_scene_text_from_visible_prompt() -> Non
     assert blocked is None
 
 
+def test_image_brief_allows_source_text_substrings_from_visible_prompt() -> None:
+    mission = MissionContent.model_validate(_generated_life_support_content())
+    stage = next(stage for stage in mission.stages if stage.step == 2)
+    stage.template_json = {
+        **stage.template_json,
+        "sourceTextLines": ["복도에서 줄을 서서 이동해요.", "뛰지 말고 천천히 걸어요."],
+    }
+    asset = next(asset for asset in mission.assets if asset.asset_type == "image" and asset.asset_role == "stage_2")
+
+    blocked = _blocked_visible_text_in_image_prompt(
+        mission,
+        asset,
+        "학교 복도 안내문에 '줄을 서서 이동해요'라는 원자료 문구가 자연스럽게 보입니다.",
+        extra_allowed_scene_texts=["복도에서는 천천히 걸어요"],
+    )
+
+    assert blocked is None
+
+
 def test_image_brief_keeps_source_text_but_filters_ui_question_from_prompt() -> None:
     mission = MissionContent.model_validate(_generated_life_support_content())
     stage = next(stage for stage in mission.stages if stage.step == 2)

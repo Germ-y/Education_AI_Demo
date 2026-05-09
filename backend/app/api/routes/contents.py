@@ -1422,7 +1422,12 @@ def _apply_image_brief_output(content, output_json: dict) -> None:
                         "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "assetId": asset.id},
                     },
                 )
-        blocked_text = _blocked_visible_text_in_image_prompt(content, asset, prompt)
+        blocked_text = _blocked_visible_text_in_image_prompt(
+            content,
+            asset,
+            prompt,
+            extra_allowed_scene_texts=_string_list(brief.get("sceneTextLines")) if isinstance(brief, dict) else [],
+        )
         if blocked_text:
             raise HTTPException(
                 status_code=424,
@@ -1459,7 +1464,13 @@ def _requests_problem_answer_image_text(prompt: str, term: str) -> bool:
     return False
 
 
-def _blocked_visible_text_in_image_prompt(content, asset, prompt: str) -> str | None:
+def _blocked_visible_text_in_image_prompt(
+    content,
+    asset,
+    prompt: str,
+    *,
+    extra_allowed_scene_texts: list[str] | None = None,
+) -> str | None:
     allowed_scene_texts = set()
     blocked_texts = []
     stages = list(content.stages)
@@ -1469,6 +1480,7 @@ def _blocked_visible_text_in_image_prompt(content, asset, prompt: str) -> str | 
         allowed_scene_texts.update(_string_list(template_json.get("sourceTextLines")))
         allowed_scene_texts.update(_string_list(template_json.get("sceneTextLines")))
     allowed_scene_texts.update(_allowed_scene_text_for_asset(content, asset, stages, stage_visual_specs))
+    allowed_scene_texts.update(extra_allowed_scene_texts or [])
 
     if asset.asset_role == AssetRole.HERO:
         target_stages = stages
@@ -1491,11 +1503,28 @@ def _blocked_visible_text_in_image_prompt(content, asset, prompt: str) -> str | 
         cleaned = text.strip()
         if not _is_meaningful_image_ui_text(cleaned):
             continue
-        if cleaned in allowed_scene_texts:
+        if _is_allowed_scene_text(cleaned, allowed_scene_texts):
             continue
         if _contains_non_negated_prompt_text(prompt, cleaned):
             return cleaned
     return None
+
+
+def _is_allowed_scene_text(text: str, allowed_scene_texts: set[str]) -> bool:
+    normalized = _normalize_scene_text(text)
+    if not normalized:
+        return False
+    for allowed in allowed_scene_texts:
+        allowed_normalized = _normalize_scene_text(allowed)
+        if not allowed_normalized:
+            continue
+        if normalized == allowed_normalized or normalized in allowed_normalized or allowed_normalized in normalized:
+            return True
+    return False
+
+
+def _normalize_scene_text(text: str) -> str:
+    return "".join(character for character in text.strip() if not character.isspace() and character not in ".,!?\"'“”‘’")
 
 
 def _contains_non_negated_prompt_text(prompt: str, text: str) -> bool:
