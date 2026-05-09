@@ -745,7 +745,7 @@ def test_teacher_can_search_neis_school_and_register_student(monkeypatch) -> Non
     assert student["profile"]["displayName"] == "최하늘"
     assert student["profile"]["schoolCode"] == "8888001"
     assert student["profile"]["gradeLabel"] == "초4"
-    assert student["dashboardProfile"]["headline"] == "풍기초등학교 · 초4 · 저연령 학습지원형"
+    assert student["dashboardProfile"]["headline"] == "풍기초등학교 · 초4 · 고학년 학습지원형"
     assert student["dashboardProfile"]["strengths"][0] == "짧은 지시를 이해합니다."
     assert "자료 생성" in student["dashboardProfile"]["currentStageLabel"]
 

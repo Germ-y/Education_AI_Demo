@@ -2639,18 +2639,28 @@ def _registration_track_label(payload: StudentRegistrationRequest) -> str:
     grade = _normalize_registration_grade(payload.grade)
     if payload.student_type == "life_support":
         return "일상생활 지원형"
+    if grade.startswith("elementary_"):
+        grade_number = _registration_grade_number(grade)
+        return "고학년 학습지원형" if grade_number >= 4 else "저학년 학습지원형"
     if grade.startswith("middle_") or grade.startswith("high_"):
         return "고연령 학습지원형"
-    return "저연령 학습지원형"
+    return "학습지원형"
 
 
 def _registration_age_band(payload: StudentRegistrationRequest) -> str:
     grade = _normalize_registration_grade(payload.grade)
     if payload.student_type == "life_support":
         return "life_support"
+    if grade.startswith("elementary_"):
+        return "older" if _registration_grade_number(grade) >= 4 else "younger"
     if grade.startswith("middle_") or grade.startswith("high_"):
         return "older"
     return "younger"
+
+
+def _registration_grade_number(normalized_grade: str) -> int:
+    digits = "".join(character for character in normalized_grade if character.isdigit())
+    return int(digits or "1")
 
 
 def _registration_primary_need_title(payload: StudentRegistrationRequest) -> str:
