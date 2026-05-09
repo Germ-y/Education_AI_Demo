@@ -31,12 +31,12 @@
 | 영역 | 완성도 | 판단 |
 | --- | ---: | --- |
 | 교사 대시보드 데이터 연결 | 90% | seed/등록 학생, context bundle, 리포트, 콘텐츠 상태가 연결됨. 운영 회원/권한 확장만 남음. |
-| 백엔드 API 기반 | 88% | 교사/학생/콘텐츠/공공데이터/NEIS 학교검색/학생등록/지원 프로필/AI 리포트/ContextBrief API가 연결됨. 운영 migration과 durable job queue는 미완성. |
+| 백엔드 API 기반 | 88% | 교사/학생/콘텐츠/공공데이터/NEIS 학교검색/학생등록/지원 프로필/AI 리포트/기억장치 API가 연결됨. 운영 migration과 durable job queue는 미완성. |
 | 콘텐츠 생성 품질 | 76% | scenario/stage/visual unit과 작성 전 설계 필드가 검증됨. 실제 provider 반복 샘플 품질 확인은 남음. |
 | 이미지/음성 asset 파이프라인 | 82% | background job 생성/polling과 asset별 성공·실패 상태 저장이 연결됨. provider 실패 UX와 운영 queue 전환이 남음. |
 | 학생 런타임/realtime | 88% | published 미션, 제출, 회고, 완료, realtime preview/runtime API 성공 경로가 E2E로 고정됨. 실제 provider 음성 송수신 확인은 남음. |
 | 학생등록 UX | 90% | 학교검색/기본 등록/access code와 지원 intake 보존, AI 초기 지원 프로필 초안, 교사 확정, 학생정보 탭 반영이 연결됨. 센터 원자료 파일 업로드/버전 UI는 남음. |
-| AI 리포트/메모리 폐루프 | 78% | 학생 완료 뒤 자동 요약, AI 리포트 SSE 초안, 교사 확정 리포트 저장, memory candidate 반영, ContextBrief dirty/refresh가 E2E로 연결됨. 실제 provider 리포트 품질 검증은 남음. |
+| AI 리포트/메모리 폐루프 | 78% | 학생 완료 뒤 자동 요약, AI 리포트 SSE 초안, 교사 확정 리포트 저장, memory candidate 반영, 기억장치 dirty/refresh가 E2E로 연결됨. 실제 provider 리포트 품질 검증은 남음. |
 | 문서/인수인계 | 90% | DB dump와 generated asset 공유 기준, API/프론트 계약, E2E 범위, 검증 결과가 정리됨. |
 
 ## 현재 완성된 흐름
@@ -62,11 +62,11 @@
 - `POST /api/teacher/students`는 학교검색 결과를 기반으로 학생, 케이스, 메모리카드, 다음 목표, 학생 access code를 만든다.
 - 교사 대시보드의 `학생 등록` 버튼은 학교검색, 학교 선택, 학생 강점/약점/지원 입력, 등록 후 access code 확인과 자료 생성 탭 이동까지 연결되어 있다.
 - 학생등록 원자료는 `student_support_intake_sources`에 보존되고, `POST /api/teacher/students/{studentId}/support-profile-drafts`로 초기 지원 프로필 초안을 만든다.
-- 교사가 `POST /api/teacher/students/{studentId}/support-profiles`로 초안을 확인/저장하면 학생정보 탭, memory card, ContextBrief dirty source에 반영된다.
+- 교사가 `POST /api/teacher/students/{studentId}/support-profiles`로 초안을 확인/저장하면 학생정보 탭, memory card, 기억장치 dirty source에 반영된다.
 - `GET /api/teacher/students/{studentId}/context-brief`와 `POST /api/teacher/students/{studentId}/context-brief/refresh`가 최신 생성용 압축 맥락을 조회/갱신한다.
-- 콘텐츠 생성 오케스트레이터 입력에는 `studentContextBrief`와 `generationContext.contextBriefPriority`가 함께 들어가며, 교사 요청 주제를 우선하고 ContextBrief는 scaffold 조정에만 쓴다.
+- 콘텐츠 생성 오케스트레이터 입력에는 내부 필드 `studentContextBrief`가 들어가며, 교사 화면에서는 이를 `기억장치`로 설명한다. 교사 요청 주제를 우선하고 기억장치는 지원 방식 조정에만 쓴다.
 - 학생 완료 뒤 `POST /api/review-summaries/{reviewId}/report-drafts/stream`이 AI 리포트 초안을 SSE로 반환한다.
-- `POST /api/teacher-reports`는 교사가 확정한 리포트와 memory candidate를 저장하고, memory card와 ContextBrief dirty 상태를 갱신한다.
+- `POST /api/teacher-reports`는 교사가 확정한 리포트와 memory candidate를 저장하고, memory card와 기억장치 dirty 상태를 갱신한다.
 - 이미지 프롬프트 생성은 별도 LLM 호출 없이 `briefJson.stageVisualSpecs`와 `templateJson` 기반 deterministic builder를 사용한다.
 - 이미지 5장은 `gpt-image-2`로 병렬 생성한다.
 - 프론트는 `POST /api/contents/{contentId}/assets/generation-jobs`로 background job을 만들고 `GET /api/contents/{contentId}/assets/generation-jobs/{jobId}`를 polling한다.
@@ -172,40 +172,42 @@
 
 이 맥락은 콘텐츠를 미리 정해두는 용도가 아니다. 교사가 입력한 수업 주제와 충돌하지 않도록, 학생에게 어떤 수업 방식이 필요한지 판단하는 보조 입력이다.
 
-현재 구현은 `context-bundle` 전체와 별도로 학생별 `ContextBrief`를 오케스트레이터 입력에 전달한다. `ContextBrief`는 선생님 요청 주제와 합쳐질 1~2KB 생성용 요약이며, 학생 유형, 읽기 부담, 선택지 수, 최근 성공/실패 패턴, 쓰면 좋은 scaffold, 피해야 할 과거 주제 회귀를 담는다.
+현재 구현은 `context-bundle` 전체와 별도로 학생별 기억장치를 오케스트레이터 입력에 전달한다. 내부 API 필드명은 `studentContextBrief`를 유지하지만, 교사 화면과 문서에서는 `기억장치`로 설명한다. 기억장치는 선생님 요청 주제와 합쳐질 1~2KB 생성용 요약이며, 학생 유형, 읽기 부담, 선택지 수, 최근 성공/실패 패턴, 쓰면 좋은 지원 방식, 피해야 할 과거 주제 회귀를 담는다.
 
 ## 다음 큰 작업 1. 학생등록과 초기 지원 프로필
 
 현재 상태:
 
-- 학생등록은 기본정보, 학교검색, 현재 목표, 관찰 메모, 강점, 약점, 선호 지원을 받는다.
+- 학생등록은 기본정보, 학교검색, 현재 목표, 관찰 메모, 관찰된 강점, 지원이 필요한 상황, 효과가 확인된 지원을 받는다.
 - 등록 payload의 `supportIntake`는 `student_support_intake_sources`에 원자료로 보존한다.
 - 저장 시 `profileJson.dashboard`, `memoryCard`, 초기 dirty `student_context_briefs`를 만든다.
 - `POST /api/teacher/students/{studentId}/support-profile-drafts`가 등록 원자료를 바탕으로 `수업 설계 초안`을 만든다.
-- `POST /api/teacher/students/{studentId}/support-profiles`가 교사 확정 프로필을 저장하고 학생정보 탭, memory card, ContextBrief dirty 상태에 반영한다.
-- 학생정보 탭은 현재 목표, 학습 반응 패턴, 지원 유의점, 강점/어려움, 교사 메모 중심으로 재구성했다.
+- `POST /api/teacher/students/{studentId}/support-profiles`가 교사 확정 프로필을 저장하고 학생정보 탭, memory card, 기억장치 dirty 상태에 반영한다.
+- 학생정보 탭은 현재 목표, 관찰된 강점, 지원이 필요한 상황, 수업 적용 힌트, 교사 메모 중심으로 재구성했다.
 - 대시보드 왼쪽 목록의 긴 `~수업이 좋겠어요` 문장은 프론트에서 짧은 현재 목표로 압축한다.
 
 남은 확장:
 
 - 센터에서 받는 기능평가/PBS 자료를 그대로 화면에 옮기지 않는다.
-- 제품용 간단 체크리스트와 AI 초기 지원 프로필로 바꾼다.
+- 근거 기반 관찰 체크리스트와 초기 지원 프로필로 바꾼다.
 - 센터 양식 파일 업로드와 원자료 버전 관리 UI를 추가한다.
 - 현재 초안 생성은 데모 안정성을 위해 local demo AI builder를 사용한다. 실제 provider 기반 문장 품질 검증은 남아 있다.
 
-등록 화면 추가 후보:
+등록 화면 구성:
 
-- 학습 반응: 그림 단서, 짧은 문장, 선택지 수, 따라 말하기, 역할놀이
-- 부담 요인: 긴 설명, 실패 후 재시도, 전환, 기다림, 소음, 과제 시작
-- 행동지원 정보: 우선 지원 행동, 발생 맥락, 기능 가설
-- 대체기술: 도움 요청하기, 쉬기 요청하기, 다시 말해달라고 하기, 순서 확인하기
+- 현재 잘 되는 수행: 짧은 지시 이해, 익숙한 과제 시작, 한 문항씩 수행, 오류 뒤 재시도
+- 지원이 필요한 상황: 긴 지시 이해, 여러 조건 처리, 긴 글 읽고 시작, 과제 시작, 활동 전환, 기다림, 낯선 상황, 감각·환경 자극
+- 효과가 확인된 지원: 지시 나누기, 예시 먼저 제시, 선택지 축소, 과제 순서 확인, 기다릴 시간 제공
+- 의사소통·대체기술: 도움 요청, 다시 말해달라고 요청, 쉬기 요청, 순서 확인 질문
+- 정서·행동 안정 조건: 예고, 기다릴 시간, 선택권, 교사 모델, 조용한 환경
+- 피해야 할 조건: 오류 직후 재촉, 틀림 강조, 갑작스러운 전환, 과도한 선택지, 소음이 큰 자리
 
 학생정보 탭 목표 구성:
 
 - 기본 프로필: 학교, 학년, 학생 유형, 현재 목표
 - 수업 설계 힌트: 등록 정보와 이후 기록을 수업 설계 언어로 번역한 AI 초안/교사 확정 문장
-- 학습 반응 패턴: 잘 반응하는 단서, 부담되는 방식, 적정 선택지 수, 읽기 부담
-- 행동지원 프로필: 우선 지원 행동, 발생 맥락, 기능 가설, 대체기술
+- 학습 반응 패턴: 관찰된 강점, 부담되는 방식, 적정 선택지 수, 읽기 부담
+- 행동지원 프로필: 우선 지원 행동, 발생 맥락, 기능 가설, 연습할 표현·기술
 - 강점/어려움: 교사용 문장형 chip
 - 교사 메모: 저장 시 메모리 source로 남는 자유 기록
 
@@ -213,22 +215,22 @@
 
 - 왼쪽 학생 목록의 긴 `~수업이 좋겠어요` 문장은 제거하거나 아주 짧은 현재 목표로 바꾼다.
 - 학생정보 탭의 `수업 제안`, `콘텐츠 방향 제안`, `수업 유의점`은 하드코딩/규칙 제안처럼 보이면 안 된다.
-- 학생정보 탭은 `현재 목표`, `학습 반응 패턴`, `지원 유의점`, `강점`, `어려움`, `교사 메모` 중심으로 재구성한다.
+- 학생정보 탭은 `현재 목표`, `관찰된 강점`, `지원이 필요한 상황`, `수업 적용 힌트`, `교사 메모` 중심으로 재구성한다.
 - AI 초기 지원 프로필이 도입되면 `AI 초안`과 `교사 확인 완료` 상태를 구분한다.
 
 권장 DB:
 
 - `student_support_intake_sources`: 등록 당시 원자료, 센터 양식 요약, 체크리스트 응답, 파일 출처를 보존
 - `student_support_profiles`: AI 초안과 교사 확정 지원 프로필을 버전 관리
-- `student_context_briefs`: 콘텐츠 생성용 1~2KB 압축 맥락. 등록 확정 뒤 dirty 또는 refreshed 상태로 관리
+- `student_context_briefs`: 교사 화면에서는 기억장치로 부르는 콘텐츠 생성용 1~2KB 압축 맥락. 등록 확정 뒤 dirty 또는 refreshed 상태로 관리
 
 지원 프로필 필드 후보:
 
-- `learningResponse`: 잘 반응하는 단서, 읽기 부담, 선택지 수, 설명 방식
+- `learningResponse`: 관찰된 강점, 효과가 확인된 지원, 읽기 부담, 선택지 수, 설명 방식
 - `challengeBehaviorPriorities`: 우선 지원 행동, 위험도, 빈도, 지속시간, 독립기술 관련성
 - `behaviorFunctionHypotheses`: 관심, 회피, 감각/자동강화, 신체 불편, 원하는 물건/활동
 - `replacementSkills`: 도움 요청, 쉬기 요청, 다시 말해달라고 하기, 순서 확인하기
-- `recommendedScaffolds`: 먼저-그다음, 시각 일정, 짧은 성공 경험, 선택권 제공
+- `recommendedScaffolds`: 내부 필드명은 유지하되 교사 화면에서는 수업 적용 힌트로 표시한다.
 - `avoidGuidance`: 피해야 할 자극, 지시 방식, 과거 주제 회귀
 
 현재 수용 기준:
@@ -237,7 +239,7 @@
 - 원자료와 AI 초안, 교사 확정값을 분리한다.
 - 학생정보 탭은 선생님이 다음 수업을 바로 설계할 수 있는 문장으로 보인다.
 - 학생등록 직후 AI 초기 지원 프로필 초안을 만들 수 있다. E2E 테스트가 검증한다.
-- 교사가 초안을 확인/수정/저장하면 메모리 seed와 ContextBrief source로 이어진다. E2E 테스트가 검증한다.
+- 교사가 초안을 확인/수정/저장하면 메모리 seed와 기억장치 source로 이어진다. E2E 테스트가 검증한다.
 
 ## 다음 큰 작업 2. AI 리포트와 메모리 폐루프
 
@@ -248,7 +250,7 @@
 - `POST /api/review-summaries/{reviewId}/apply-to-memory`로 교사가 수동 반영하면 `memory_cards`가 갱신된다.
 - `POST /api/review-summaries/{reviewId}/report-drafts/stream`이 마크다운 AI 리포트 초안을 SSE로 반환한다.
 - `POST /api/teacher-reports`가 교사 확정 리포트와 선택한 memory candidate를 저장한다.
-- 확정 리포트 저장 시 `memory_cards.recent4wResponseJson`, `nextSessionCautions`가 갱신되고 ContextBrief가 dirty 상태가 된다.
+- 확정 리포트 저장 시 `memory_cards.recent4wResponseJson`, `nextSessionCautions`가 갱신되고 기억장치가 dirty 상태가 된다.
 - 교사 대시보드 학습 기록 탭에서 AI 리포트 초안 생성, 수정, 최근 기록 저장까지 연결된다.
 
 현재 UX:
@@ -257,7 +259,7 @@
 - 그 아래 `AI 리포트 초안` 영역을 추가한다.
 - 교사가 `생성하기`를 누르면 수업 반응, 이해 변화, 다음 수업 제안, 메모리 반영 후보가 마크다운 초안으로 채워진다.
 - 교사는 초안을 수정하고 `최근 기록으로 저장`한다.
-- 저장된 교사 리포트와 선택된 메모리 후보가 다음 ContextBrief 갱신 source가 된다.
+- 저장된 교사 리포트와 선택된 메모리 후보가 다음 기억장치 갱신 source가 된다.
 
 AI 리포트 입력:
 
@@ -272,31 +274,31 @@ AI 리포트 입력:
 
 - `teacher_report_drafts`: AI 리포트 초안, 입력 snapshot, 스트리밍 결과, 다음 학습 제안, 메모리 후보, 모델, 상태 저장
 - `teacher_reports`: 교사가 확정 저장한 공식 리포트와 선택된 메모리 후보 저장
-- `student_context_briefs`: 학생별 최신 생성용 요약, source watermark, dirty 상태, 갱신 시간, 모델 저장
+- `student_context_briefs`: 교사 화면에서는 기억장치로 부르는 학생별 최신 생성용 요약, source watermark, dirty 상태, 갱신 시간, 모델 저장
 - 필요하면 `student_memory_sources`: 회고, 교사 리포트, 메모리 카드, 리뷰 요약을 한곳에서 추적하는 source ledger
 
 현재 수용 기준:
 
 - 리포트 초안은 SSE 이벤트로 즉시 반환된다.
 - 최종 저장 전까지 memory card를 자동 overwrite하지 않는다.
-- 저장된 원문 기록은 보존하고, ContextBrief는 캐시처럼 재생성 가능하다.
-- 콘텐츠 생성에는 `studentContextBrief`와 현재 교사 요청이 함께 전달된다.
+- 저장된 원문 기록은 보존하고, 기억장치는 캐시처럼 재생성 가능하다.
+- 콘텐츠 생성에는 내부 필드 `studentContextBrief`와 현재 교사 요청이 함께 전달된다.
 - 콘텐츠 fallback은 기존처럼 최대 1회 targeted repair만 허용한다.
 
-## 다음 큰 작업 3. ContextBrief
+## 다음 큰 작업 3. 기억장치
 
 현재 상태:
 
 - 학생별 `student_context_briefs`를 저장한다.
 - `GET /api/teacher/students/{studentId}/context-brief`와 `POST /api/teacher/students/{studentId}/context-brief/refresh`로 조회/갱신한다.
 - 등록 시 dirty brief를 만들고, 지원 프로필 확정/리포트 저장/메모리 반영 뒤 dirty 처리한다.
-- refresh는 학생 유형, 읽기 부담, 선택지 수, 최근 성공/어려움 패턴, 추천 scaffold, 피해야 할 주제 회귀를 1~2KB 요약으로 다시 만든다.
-- 오케스트레이터 입력에는 ContextBrief가 별도 필드로 전달된다.
+- refresh는 학생 유형, 읽기 부담, 선택지 수, 최근 성공/어려움 패턴, 수업 적용 힌트, 피해야 할 주제 회귀를 1~2KB 요약으로 다시 만든다.
+- 오케스트레이터 입력에는 기억장치가 별도 필드로 전달된다.
 
 남은 확장:
 
 - 현재 refresh는 요청 즉시 실행된다. 운영에서는 durable background job으로 승격한다.
-- 실제 provider 기반 ContextBrief 압축 품질과 watermark 정책을 검증한다.
+- 실제 provider 기반 기억장치 압축 품질과 watermark 정책을 검증한다.
 
 필수 필드 후보:
 
@@ -357,7 +359,7 @@ E2E 검증 흐름:
 18. AI 리포트 초안 생성
 19. 교사 리포트 수정/저장
 20. memory candidate 선택 저장
-21. ContextBrief dirty/refresh 확인
+21. 기억장치 dirty/refresh 확인
 22. 같은 학생으로 두 번째 콘텐츠 생성
 23. 이전 리포트/메모리가 새 콘텐츠 생성에 반영되는지 확인
 
@@ -406,7 +408,7 @@ E2E 검증 흐름:
 | 승인/반려/배포 | `ContentApprovalRequest`, `ContentRejectRequest`, content routes | `ContentApprovalRequest`, `ContentRejectRequest`, `approveContent`, `rejectContent`, `publishContent` |
 | asset generation job | content asset job routes | `AssetGenerationJob`, `createContentAssetGenerationJob`, `getContentAssetGenerationJob` |
 | student runtime | `AttemptRequest`, `StageSubmitRequest`, `RealtimeSession*Request` | matching request/response types in `contracts.ts` |
-| AI 리포트/ContextBrief | `TeacherReportDraft`, `TeacherReport`, `StudentContextBrief`, report/context routes | `createTeacherReportDraft`, `saveTeacherReport`, `getStudentContextBrief`, `refreshStudentContextBrief` |
+| AI 리포트/기억장치 | `TeacherReportDraft`, `TeacherReport`, `StudentContextBrief`, report/context routes | `createTeacherReportDraft`, `saveTeacherReport`, `getStudentContextBrief`, `refreshStudentContextBrief` |
 
 ### Health
 
@@ -427,7 +429,7 @@ E2E 검증 흐름:
 - `GET /api/teacher/students/{studentId}/history`: 사례 메모, 콘텐츠, 시도, 이벤트, realtime 세션 이력 조회
 - `GET /api/teacher/students/{studentId}/context-bundle`: AI 생성 전 학생 맥락 bundle 조회
 - `GET /api/teacher/students/{studentId}/context-brief`: 최신 AI 생성용 압축 맥락 조회. 없으면 즉시 생성을 시도한다.
-- `POST /api/teacher/students/{studentId}/context-brief/refresh`: 학생별 ContextBrief 즉시 갱신 요청
+- `POST /api/teacher/students/{studentId}/context-brief/refresh`: 학생별 기억장치 즉시 갱신 요청
 - `GET /api/teacher/students/{studentId}/report`: 리뷰 요약 기반 학습 기록 조회
 - `POST /api/teacher/students/{studentId}/notes`: 교사 메모 저장
 - `PATCH /api/teacher/students/{studentId}/memory-card`: 메모리 카드 부분 수정
@@ -461,11 +463,11 @@ E2E 검증 흐름:
   "gradeNumber": "4",
   "className": "1",
   "studentType": "learning_focus",
-  "currentGoal": "영어 단어를 그림 카드와 연결하기",
-  "observationNote": "그림 단서가 있으면 먼저 손으로 가리키며 반응합니다.",
-  "strengths": ["그림 단서를 잘 찾음"],
-  "weaknesses": ["긴 문장 지시가 부담됨"],
-  "preferredSupports": ["그림 카드", "2개 선택지"]
+  "currentGoal": "짧은 영어 안내문에서 장소 단어 찾기",
+  "observationNote": "짧은 지시를 들으면 과제를 시작하지만 조건이 길어지면 다시 확인이 필요합니다.",
+  "strengths": ["짧은 지시를 이해함"],
+  "weaknesses": ["긴 지시 이해"],
+  "preferredSupports": ["지시를 짧게 나눔", "예시를 먼저 보여줌"]
 }
 ```
 
@@ -613,9 +615,9 @@ Payload 예시:
 - `teacher_reports`에 확정 리포트를 남긴다.
 - 선택된 memory candidate는 장기 메모리 source로 기록한다.
 - 해당 학생의 `student_context_briefs`를 dirty 상태로 만든다.
-- 다음 콘텐츠 생성 전 최신 ContextBrief가 없거나 dirty면 프론트/운영자가 refresh 요청을 먼저 보낼 수 있다.
+- 다음 콘텐츠 생성 전 최신 기억장치가 없거나 dirty면 프론트/운영자가 refresh 요청을 먼저 보낼 수 있다.
 
-### 학생 ContextBrief
+### 학생 기억장치
 
 - `GET /api/teacher/students/{studentId}/context-brief`
 - `POST /api/teacher/students/{studentId}/context-brief/refresh`
@@ -712,7 +714,7 @@ git diff --check
 - `cd frontend && npm run lint`: 통과
 - `cd frontend && npx tsc --noEmit`: 통과
 
-`test_registered_student_generation_review_student_completion_e2e`는 교사 대시보드 진입, NEIS 학교검색, 학생등록, AI 초기 지원 프로필 초안, 교사 확정, ContextBrief refresh, 콘텐츠 생성, asset job, 교사 preview, 승인/배포, 학생 플레이, 1~3단계 제출, 4단계 realtime, 회고/완료, AI 리포트 SSE 초안, 교사 리포트 저장, memory candidate 반영, ContextBrief dirty/refresh, 같은 학생 두 번째 콘텐츠 생성까지 검증한다.
+`test_registered_student_generation_review_student_completion_e2e`는 교사 대시보드 진입, NEIS 학교검색, 학생등록, AI 초기 지원 프로필 초안, 교사 확정, 기억장치 refresh, 콘텐츠 생성, asset job, 교사 preview, 승인/배포, 학생 플레이, 1~3단계 제출, 4단계 realtime, 회고/완료, AI 리포트 SSE 초안, 교사 리포트 저장, memory candidate 반영, 기억장치 dirty/refresh, 같은 학생 두 번째 콘텐츠 생성까지 검증한다.
 
 2026-05-05 기준 `dev`에서 아래 검증을 완료했다.
 
@@ -740,8 +742,8 @@ git diff --check
 
 ## 다음 개선 우선순위
 
-1. 실제 provider 기반 지원 프로필/AI 리포트/ContextBrief 문장 품질 샘플 검증
-2. ContextBrief refresh와 asset generation job의 durable worker/queue 전환
+1. 실제 provider 기반 지원 프로필/AI 리포트/기억장치 문장 품질 샘플 검증
+2. 기억장치 refresh와 asset generation job의 durable worker/queue 전환
 3. 운영 DB 기준 Alembic/PostgreSQL migration 확정
 4. 콘텐츠 생성 안정성 normalizer와 schema mismatch 반복 방지 샘플 확대
 5. 실제 provider 반복 생성과 realtime 음성 송수신 확인
@@ -753,5 +755,5 @@ git diff --check
 아래처럼 짧게 넣고, 세부사항은 이 문서를 읽게 한다.
 
 ```text
-/goal EduYJ dev 브랜치에서 GOAL.md와 docs/GOAL_CONTEXT.md 기준으로 학생등록, AI 초기 지원 프로필, 콘텐츠 생성 안정화, 검토/배포/학생 플레이/AI 리포트/메모리/ContextBrief까지 전체 E2E 플로우를 구현·검증·문서화·커밋·푸시한다. 작업 루트는 /Users/gimdonghyeon/Desktop/educationforyeongju-backend 이며 교사 로그인은 만들지 않는다.
+/goal EduYJ dev 브랜치에서 GOAL.md와 docs/GOAL_CONTEXT.md 기준으로 학생등록, AI 초기 지원 프로필, 콘텐츠 생성 안정화, 검토/배포/학생 플레이/AI 리포트/메모리/기억장치까지 전체 E2E 플로우를 구현·검증·문서화·커밋·푸시한다. 작업 루트는 /Users/gimdonghyeon/Desktop/educationforyeongju-backend 이며 교사 로그인은 만들지 않는다.
 ```
