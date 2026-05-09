@@ -10,12 +10,14 @@ def test_prompt_registry_loads_all_versioned_prompts() -> None:
         "content_quality_critique",
         "image_brief",
         "tts_script",
+        "teacher_report_draft",
     }
 
     for spec in specs:
         prompt = load_prompt(spec.key)
         assert spec.version in prompt
-        assert spec.output_schema_name
+        if spec.key != "teacher_report_draft":
+            assert spec.output_schema_name
 
 
 def test_prompts_keep_image_text_and_ui_text_separate() -> None:
@@ -32,12 +34,13 @@ def test_prompts_keep_image_text_and_ui_text_separate() -> None:
     assert "사람은 필요할 때만 보조 맥락으로 둡니다." in image_prompt
 
 
-def test_generation_prompts_lock_stage_labels_and_profile_based_templates() -> None:
+def test_generation_prompts_lock_stage_labels_and_randomized_templates() -> None:
     orchestrator_prompt = load_prompt("orchestrator_plan")
     content_prompt = load_prompt("mission_content_package")
 
-    assert "템플릿 선택은 랜덤이 아니라 학생 프로필 기반입니다." in orchestrator_prompt
-    assert "템플릿 선택은 오케스트레이터 계획과 학생 맥락에 근거해야 하며, 임의 랜덤이 아닙니다." in content_prompt
+    assert "templateRandomization.forcedStageTemplates" in orchestrator_prompt
+    assert "백엔드가 매 생성마다 후보 중 랜덤으로 정합니다." in orchestrator_prompt
+    assert "오케스트레이터 계획과 학생 맥락에 근거" in content_prompt
 
     for label in ["상황 만나기", "단서 찾기", "행동 고르기", "한 번 해보기", "개념 열기", "문제 1", "문제 2", "설명해보기"]:
         assert label in orchestrator_prompt

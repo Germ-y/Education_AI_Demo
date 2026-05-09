@@ -44,6 +44,12 @@ PROMPT_SPECS: dict[str, PromptSpec] = {
         file_name="tts_script_v1.md",
         output_schema_name="TtsScriptPackageV1",
     ),
+    "teacher_report_draft": PromptSpec(
+        key="teacher_report_draft",
+        version="teacher_report_draft_v1",
+        file_name="teacher_report_draft_v1.md",
+        output_schema_name="",
+    ),
 }
 
 

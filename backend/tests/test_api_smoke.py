@@ -1002,7 +1002,7 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
             assert input_snapshot["caseFile"]["contextBrief"]["dirty"] is False
             return copy.deepcopy(generated_content), {"input_tokens": 12, "output_tokens": 24}
         assert input_snapshot["studentContextBrief"]["dirty"] is False
-        assert "짧은 지시를 이해함" in input_snapshot["studentContextBrief"]["briefText"]
+        assert "기억장치는 새 수업 주제를 정하는 값이 아니라" in input_snapshot["studentContextBrief"]["briefText"]
         return (
             {
                 "planVersion": "orchestrator_plan_v1",
@@ -1083,9 +1083,20 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
         assert "전체" in instructions
         return {"value": "test-realtime-client-secret", "expiresAt": 1893456000, "raw": {}}
 
+    def fake_stream_text_response(self, *, model, instructions, input_snapshot, timeout_sec=90):
+        assert "특수교육 수업 후" in instructions
+        assert input_snapshot["performance"]["completionRate"] == 1
+        yield "## 수업 반응\n\n"
+        yield "> 4단계 활동을 끝까지 수행하고 긍정적인 회고를 남겼습니다.\n\n"
+        yield "- 완료율 100%, 정답률 100%로 제시된 활동을 모두 마쳤습니다.\n"
+        yield "- 학생 회고에서 “전체를 먼저 세니 쉬웠어요.”라고 응답했습니다.\n\n"
+        yield "## 이해 변화\n\n- 전체 조각 수를 먼저 확인하는 조건에서 수행이 안정되었습니다.\n\n"
+        yield "## 다음 수업 제안\n\n- 유지: 그림 근거를 먼저 보고 짧게 설명하는 흐름을 유지합니다.\n"
+
     monkeypatch.setattr(OpenAiProvider, "create_json_response", fake_json_response)
     monkeypatch.setattr(OpenAiProvider, "create_image_file", fake_image_file)
     monkeypatch.setattr(OpenAiProvider, "create_realtime_client_secret", fake_realtime_client_secret)
+    monkeypatch.setattr(OpenAiProvider, "stream_text_response", fake_stream_text_response)
     monkeypatch.setattr(ElevenLabsProvider, "create_speech_file", fake_speech_file)
 
     orchestrator = client.post(
@@ -1262,8 +1273,10 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
     )
     assert report_draft_response.status_code == 200, report_draft_response.text
     report_events = _sse_events(report_draft_response.text)
-    assert [event for event, _ in report_events] == ["draft_delta", "draft_metadata", "done"]
-    draft_text = next(data["text"] for event, data in report_events if event == "draft_delta")
+    event_names = [event for event, _ in report_events]
+    assert event_names.count("draft_delta") >= 1
+    assert event_names[-2:] == ["draft_metadata", "done"]
+    draft_text = "".join(data["text"] for event, data in report_events if event == "draft_delta")
     metadata = next(data for event, data in report_events if event == "draft_metadata")
     done = next(data for event, data in report_events if event == "done")
     assert "## 수업 반응" in draft_text
