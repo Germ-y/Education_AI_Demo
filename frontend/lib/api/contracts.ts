@@ -205,6 +205,29 @@ export type PublicContextBundle = {
   lastSyncedAt?: string | null;
 };
 
+export type SchoolTimetableDay = {
+  date: string;
+  weekdayLabel: string;
+  subjects: string[];
+  slots: SchoolTimetableSlot[];
+  cacheStatus: string;
+};
+
+export type SchoolWeeklyTimetable = {
+  school: SchoolProfile;
+  weekStart: string;
+  weekEnd: string;
+  grade: string;
+  className: string;
+  days: SchoolTimetableDay[];
+  source: {
+    provider: string;
+    cacheStatus: string;
+    counts?: Record<string, unknown> | null;
+  };
+  orchestratorHints: string[];
+};
+
 export type StudentListItem = {
   studentId: string;
   displayName: string;

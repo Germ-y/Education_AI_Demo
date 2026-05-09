@@ -5,6 +5,7 @@ import type {
   CaseNote,
   CaseNoteCreate,
   MemoryCard,
+  SchoolWeeklyTimetable,
   StudentContextBrief,
   SupportProfileConfirmRequest,
   SupportProfileDraftResponse,
@@ -77,28 +78,83 @@ export function refreshStudentContextBrief(studentId: string, options?: ApiAdapt
   });
 }
 
-export async function createTeacherReportDraft(reviewId: string, options?: ApiAdapterOptions) {
+export function getSchoolWeeklyTimetable(
+  schoolCode: string,
+  params: { weekStart?: string; grade: string; className: string; syncIfMissing?: boolean },
+  options?: ApiAdapterOptions,
+) {
+  const searchParams = new URLSearchParams();
+  if (params.weekStart) searchParams.set("weekStart", params.weekStart);
+  searchParams.set("grade", params.grade);
+  searchParams.set("className", params.className);
+  if (params.syncIfMissing !== undefined) searchParams.set("syncIfMissing", String(params.syncIfMissing));
+  return apiFetch<SchoolWeeklyTimetable>(
+    `/api/public-data/schools/${encodeURIComponent(schoolCode)}/weekly-timetable?${searchParams.toString()}`,
+    { token: options?.token },
+  );
+}
+
+export async function createTeacherReportDraft(
+  reviewId: string,
+  options?: ApiAdapterOptions & {
+    onDelta?: (text: string) => void;
+    teacherObservation?: string;
+  },
+) {
   const response = await fetch(`${API_BASE_URL}/api/review-summaries/${encodeURIComponent(reviewId)}/report-drafts/stream`, {
     method: "POST",
-    headers: options?.token ? { Authorization: `Bearer ${options.token}` } : undefined,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options?.token ? { Authorization: `Bearer ${options.token}` } : {}),
+    },
+    body: JSON.stringify({ teacherObservation: options?.teacherObservation ?? "" }),
   });
-  if (!response.ok) throw new Error("AI 리포트 초안을 만들지 못했습니다.");
-  const raw = await response.text();
+  if (!response.ok) throw new Error("리포트 초안을 만들지 못했습니다.");
   let bodyMarkdown = "";
   let draftId = "";
   let memoryCandidates: string[] = [];
-  raw.split("\n\n").forEach((block) => {
+  let streamError: string | null = null;
+
+  const handleBlock = (block: string) => {
     const eventLine = block.split("\n").find((line) => line.startsWith("event: "));
     const dataLine = block.split("\n").find((line) => line.startsWith("data: "));
     if (!eventLine || !dataLine) return;
     const event = eventLine.replace("event: ", "");
     const data = JSON.parse(dataLine.replace("data: ", "")) as Record<string, unknown>;
-    if (event === "draft_delta" && typeof data.text === "string") bodyMarkdown += data.text;
+    if (event === "draft_delta" && typeof data.text === "string") {
+      bodyMarkdown += data.text;
+      options?.onDelta?.(data.text);
+    }
     if (event === "draft_metadata" && Array.isArray(data.memoryCandidates)) {
       memoryCandidates = data.memoryCandidates.filter((item): item is string => typeof item === "string");
     }
+    if (event === "error") {
+      streamError = typeof data.message === "string" ? data.message : "리포트 초안 생성 중 오류가 발생했습니다.";
+    }
     if (event === "done" && typeof data.draftId === "string") draftId = data.draftId;
-  });
+  };
+
+  if (!response.body) {
+    const raw = await response.text();
+    raw.split("\n\n").forEach(handleBlock);
+    if (streamError) throw new Error(streamError);
+    return { draftId, bodyMarkdown, memoryCandidates };
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop() ?? "";
+    blocks.forEach(handleBlock);
+  }
+  buffer += decoder.decode();
+  if (buffer.trim()) handleBlock(buffer);
+  if (streamError) throw new Error(streamError);
   return { draftId, bodyMarkdown, memoryCandidates };
 }
 

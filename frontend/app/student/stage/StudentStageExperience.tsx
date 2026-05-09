@@ -372,7 +372,7 @@ function StageMedia({
                 ? dense
                   ? "h-[clamp(220px,23vh,250px)] w-auto max-w-full"
                   : featured
-                    ? "h-[clamp(150px,20vh,190px)]"
+                    ? "h-[clamp(180px,24vh,230px)]"
                     : "h-[clamp(190px,28vh,280px)]"
                 : "h-[clamp(260px,42vh,420px)]"
           }`}
@@ -800,7 +800,7 @@ function CardMatchingTemplate({
       </div>
 
       {(question.imageUrl || question.audioUrl) && (
-        <div className="mx-auto min-h-[260px] w-full max-w-[860px]">
+        <div className="mx-auto w-full max-w-[460px]">
           <StageMedia question={question} theme={theme} compact featured />
         </div>
       )}
@@ -1535,17 +1535,17 @@ function RealtimePracticeRoom({
   };
 
   return (
-    <div className="grid h-full min-h-[440px] grid-cols-[minmax(360px,0.9fr)_minmax(390px,1fr)] gap-4 rounded-[24px] border border-[#dce5ec] bg-white p-4 shadow-[0_18px_48px_rgba(57,78,97,0.10)]">
-      <div className="relative flex min-h-0 flex-col overflow-hidden rounded-[22px] border p-4" style={{ borderColor: theme.border, backgroundColor: theme.accentPale }}>
+    <div className="grid h-full min-h-0 grid-cols-[minmax(320px,0.82fr)_minmax(390px,1fr)] gap-3 rounded-[24px] border border-[#dce5ec] bg-white p-3 shadow-[0_18px_48px_rgba(57,78,97,0.10)]">
+      <div className="relative flex min-h-0 flex-col overflow-y-auto rounded-[22px] border p-3" style={{ borderColor: theme.border, backgroundColor: theme.accentPale }}>
         <div className="relative z-10">
           <p className="text-sm font-black" style={{ color: theme.accentStrong }}>
             {practice.label}
           </p>
-          <h3 className="mt-1.5 text-[1.65rem] font-black leading-tight break-keep text-[#172033]">{practice.title}</h3>
-          <div className="mt-3">
+          <h3 className="mt-1 text-[1.45rem] font-black leading-tight break-keep text-[#172033]">{practice.title}</h3>
+          <div className="mt-2">
             <StageMedia question={question} theme={theme} compact featured />
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-2" aria-live="polite">
+          <div className="mt-2 grid grid-cols-3 gap-2" aria-live="polite">
             {realtimeStatusItems.map((item) => {
               const isReady = item.state === "준비됨" || item.state === "연결됨" || item.state === "완료";
               const needsAttention = item.state === "확인 필요" || item.state === "없음";
@@ -1569,12 +1569,12 @@ function RealtimePracticeRoom({
           </div>
         </div>
 
-        <div className="relative z-10 mt-4 grid grid-cols-[minmax(0,1fr)_128px] items-end gap-3">
-          <div className="relative rounded-[20px] border border-white/80 bg-white/90 p-3.5 shadow-sm before:absolute before:right-[-12px] before:top-1/2 before:h-6 before:w-6 before:-translate-y-1/2 before:rotate-45 before:border-r before:border-t before:border-white/80 before:bg-white/90">
+        <div className="relative z-10 mt-3 grid grid-cols-[minmax(0,1fr)_96px] items-end gap-2">
+          <div className="relative rounded-[18px] border border-white/80 bg-white/90 p-3 shadow-sm before:absolute before:right-[-10px] before:top-1/2 before:h-5 before:w-5 before:-translate-y-1/2 before:rotate-45 before:border-r before:border-t before:border-white/80 before:bg-white/90">
             <p className="text-xs font-black" style={{ color: theme.accentStrong }}>
               {practice.partner}
             </p>
-            <p className="mt-1.5 text-[clamp(0.9rem,1.9vh,1.15rem)] font-black leading-snug break-keep text-[#25312a]">
+            <p className="mt-1 text-[clamp(0.85rem,1.7vh,1.05rem)] font-black leading-snug break-keep text-[#25312a]">
               {practice.partnerLine}
             </p>
           </div>
@@ -1800,12 +1800,12 @@ function HintStar() {
 
 function QuestionStar() {
   return (
-    <div className="relative h-32 w-32 shrink-0" aria-hidden="true">
+    <div className="relative h-24 w-24 shrink-0" aria-hidden="true">
       <Image
         src="/assets/question-star/without-eyes-question.svg"
         alt=""
         fill
-        sizes="128px"
+        sizes="96px"
         className="object-contain"
         draggable={false}
       />
@@ -1813,7 +1813,7 @@ function QuestionStar() {
         src="/assets/question-star/eyes.svg"
         alt=""
         fill
-        sizes="128px"
+        sizes="96px"
         className="animate-[hintStarBlink_4.2s_ease-in-out_infinite] object-contain"
         draggable={false}
       />
@@ -1821,7 +1821,7 @@ function QuestionStar() {
         src="/assets/question-star/question.svg"
         alt=""
         fill
-        sizes="128px"
+        sizes="96px"
         className="animate-[questionStarWiggle_2.4s_ease-in-out_infinite] object-contain"
         draggable={false}
       />

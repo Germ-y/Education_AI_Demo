@@ -226,7 +226,7 @@ type GeneratedReportDraft = {
 
 const tabs: Array<{ id: DashboardTab; label: string; description: string }> = [
   { id: "info", label: "학생 정보", description: "기본 정보와 현재 학습 상태" },
-  { id: "materials", label: "자료 제안·검토", description: "AI 수업 자료 제안을 확인" },
+  { id: "materials", label: "자료 제안·검토", description: "수업 자료 제안을 확인" },
   { id: "records", label: "학습 기록", description: "피드백과 관찰 기록" },
 ];
 
@@ -260,7 +260,7 @@ const learningStatus: Record<CaseStatus, { label: string; progress: number; curr
     nextLesson: "확인 문항 생성",
   },
   scene_review: {
-    label: "AI 자료 확인",
+    label: "자료 제안 확인",
     progress: 63,
     currentUnit: "분수 1/4 이해",
     nextLesson: "빛나는 구역 찾기",
@@ -276,8 +276,8 @@ const learningStatus: Record<CaseStatus, { label: string; progress: number; curr
 const workflowSteps = ["자료 제안", "제안 검토", "학습", "학습 피드백"];
 const reportFeedbackNotePrefix = "review_summary_feedback:";
 const studentPreviewViewport = {
-  width: 1125,
-  height: 852,
+  width: 1160,
+  height: 890,
 };
 
 const reviewStagePreviews: ReviewStageDraft[] = [];
@@ -333,10 +333,10 @@ function toSupportCaseFromCaseFile(caseFile: StudentCaseFile, listItem?: Student
     status,
     statusLabel: dashboard?.currentStageLabel ?? listItem?.statusLabel ?? learningStatus[status].label,
     caseType: caseFile.profile.trackLabel ?? caseFile.profile.studentTypeLabel ?? (caseFile.profile.studentType === "learning_focus" ? "학습지원형" : "일상생활 지원형"),
-    primaryNeed: dashboard?.primaryNeedTitle ?? compactGoalText(caseFile.profile.primaryNeed),
+    primaryNeed: dashboard?.primaryNeedDetail ?? compactGoalText(caseFile.profile.primaryNeed),
     sessionGoal: caseFile.openCase.currentGoal,
     supportStrategy:
-      dashboard?.supportStrategyTitle ??
+      dashboard?.supportStrategyDetail ??
       caseFile.openCase.supportStrategy ??
       toDisplayLabels(caseFile.memoryCard?.effectiveExplanationStyles, ["정적 콘텐츠", "실시간 연습"]).join(", "),
     nextAction: listItem?.nextSessionSuggestion ?? "다음 미션 확인",
@@ -390,7 +390,7 @@ function compactGoalText(value: string) {
 function toProposalLabel(label: string) {
   if (label === "자료 생성") return "자료 제안";
   if (label === "자료 검토") return "제안 검토";
-  if (label === "AI 자료 확인") return "AI 제안 확인";
+  if (label === "AI 자료 확인") return "자료 제안 확인";
   return label;
 }
 
@@ -422,6 +422,93 @@ function parseReportFeedbackNote(note: CaseNote): SavedFeedbackRecord | null {
   };
 }
 
+function markdownToPlainSummary(markdown: string, maxLength = 120) {
+  const plain = markdown
+    .split("\n")
+    .map((line) => line.replace(/^#{1,6}\s*/, "").replace(/^-\s*/, "").trim())
+    .filter(Boolean)
+    .join(" ");
+  return plain.length > maxLength ? `${plain.slice(0, maxLength).trim()}...` : plain;
+}
+
+function composeTeacherReportBody(aiDraftMarkdown: string | undefined, teacherMemo: string | undefined) {
+  const parts = [];
+  if (aiDraftMarkdown?.trim()) parts.push(aiDraftMarkdown.trim());
+  if (teacherMemo?.trim()) {
+    parts.push(["## 선생님 관찰 기록", teacherMemo.trim()].join("\n"));
+  }
+  return parts.join("\n\n").trim();
+}
+
+function teacherObservationMemoryCandidate(teacherMemo: string | undefined) {
+  const cleaned = teacherMemo?.trim();
+  if (!cleaned) return null;
+  return `선생님 관찰: ${markdownToPlainSummary(cleaned, 180)}`;
+}
+
+function MarkdownReport({ markdown }: { markdown: string }) {
+  const blocks: Array<{ type: "heading"; text: string } | { type: "list"; items: string[] } | { type: "paragraph"; text: string }> = [];
+  let pendingList: string[] = [];
+
+  const flushList = () => {
+    if (pendingList.length > 0) {
+      blocks.push({ type: "list", items: pendingList });
+      pendingList = [];
+    }
+  };
+
+  markdown.split("\n").forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushList();
+      return;
+    }
+    if (trimmed.startsWith("## ")) {
+      flushList();
+      blocks.push({ type: "heading", text: trimmed.replace(/^##\s*/, "") });
+      return;
+    }
+    if (trimmed.startsWith("- ")) {
+      pendingList.push(trimmed.replace(/^-\s*/, ""));
+      return;
+    }
+    flushList();
+    blocks.push({ type: "paragraph", text: trimmed.replace(/^#{1,6}\s*/, "") });
+  });
+  flushList();
+
+  return (
+    <div className="space-y-3 text-sm leading-6 text-[#334155]">
+      {blocks.map((block, index) => {
+        if (block.type === "heading") {
+          return (
+            <h4 key={`${block.type}-${index}`} className="pt-1 text-sm font-black text-[#172033]">
+              {block.text}
+            </h4>
+          );
+        }
+        if (block.type === "list") {
+          return (
+            <ul key={`${block.type}-${index}`} className="space-y-1.5">
+              {block.items.map((item, itemIndex) => (
+                <li key={`${item}-${itemIndex}`} className="flex gap-2 font-semibold">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1f3a5f]" />
+                  <span className="min-w-0 break-keep [overflow-wrap:anywhere]">{item}</span>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+        return (
+          <p key={`${block.type}-${index}`} className="font-semibold break-keep [overflow-wrap:anywhere]">
+            {block.text}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 function toRecordLevel(percent: number): "상" | "중" | "하" {
   if (percent >= 80) return "상";
   if (percent >= 50) return "중";
@@ -434,23 +521,23 @@ function describeContentType(content: MissionContent) {
 
 function getReviewStageReason(stage: ReviewStageDraft) {
   if (stage.step === 4) {
-    return "앞 단계에서 익힌 내용을 실제 말하기 상황으로 옮기는 실시간 발화 연습을 넣으면 좋겠어요.";
+    return "앞 단계에서 익힌 내용을 실제 말하기 상황으로 옮기는 실시간 발화 연습으로 연결합니다.";
   }
 
   if (stage.step === 1) {
-    return "긴 설명 전에 그림 단서를 먼저 확인하며 쉬운 성공 경험으로 시작하면 좋겠어요.";
+    return "긴 설명 전에 그림 단서를 먼저 확인하며 쉬운 성공 경험으로 시작합니다.";
   }
 
   if (stage.step === 2) {
-    return "짧은 선택지나 카드로 핵심 단서를 한 번 더 고르게 하면 좋겠어요.";
+    return "짧은 선택지나 카드로 핵심 단서를 한 번 더 확인합니다.";
   }
 
-  return "앞 단계에서 고른 단서를 문장이나 기호와 연결해 수업 목표로 정리하면 좋겠어요.";
+  return "앞 단계에서 고른 단서를 문장이나 기호와 연결해 수업 목표로 정리합니다.";
 }
 
 function getAiGenerationFailureMessage(agentRun?: AgentRun | null) {
   if (agentRun?.errorCode === "OPENAI_API_KEY_MISSING") {
-    return "서버에 AI 생성 설정이 없어 실제 자료 생성은 아직 실행되지 않았습니다. 설정을 연결하면 같은 버튼으로 생성됩니다.";
+    return "서버에 자료 생성 설정이 없어 실제 자료 생성은 아직 실행되지 않았습니다. 설정을 연결하면 같은 버튼으로 생성됩니다.";
   }
 
   if (agentRun?.errorMessage) {
@@ -463,7 +550,7 @@ function getAiGenerationFailureMessage(agentRun?: AgentRun | null) {
 function getClientGenerationErrorMessage(error: unknown) {
   const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
   if (code === "OPENAI_API_KEY_MISSING") {
-    return "서버에 AI 생성 설정이 없어 실제 자료 생성은 아직 실행되지 않았습니다. 설정을 연결하면 같은 버튼으로 생성됩니다.";
+    return "서버에 자료 생성 설정이 없어 실제 자료 생성은 아직 실행되지 않았습니다. 설정을 연결하면 같은 버튼으로 생성됩니다.";
   }
 
   if (error instanceof Error && error.message && !error.message.includes("OPENAI_API_KEY")) {
@@ -985,12 +1072,33 @@ export default function DashboardPage() {
   const activeCaseFile = selectedCaseFile?.profile.id === selectedStudent.id ? selectedCaseFile : null;
   const activeReport = selectedReport?.student.id === selectedStudent.id ? selectedReport : null;
   const dashboardProfile = activeCaseFile?.dashboardProfile;
-  const learningResponsePattern = (dashboardProfile?.learningResponsePattern ?? {}) as Record<string, unknown>;
-  const behaviorSupportProfile = (dashboardProfile?.behaviorSupportProfile ?? {}) as Record<string, unknown>;
+  const visibleSupportProfileJson =
+    activeCaseFile?.supportProfile?.profileJson ??
+    supportProfileDraft?.profileDraft ??
+    activeCaseFile?.supportProfileDraft?.profileJson ??
+    {};
+  const supportProfileStatus = activeCaseFile?.supportProfile
+    ? "confirmed"
+    : supportProfileDraft || activeCaseFile?.supportProfileDraft
+      ? "draft"
+      : "none";
+  const learningResponsePattern = (
+    visibleSupportProfileJson.learningResponsePattern ??
+    dashboardProfile?.learningResponsePattern ??
+    {}
+  ) as Record<string, unknown>;
+  const behaviorSupportProfile = (
+    visibleSupportProfileJson.behaviorSupportProfile ??
+    dashboardProfile?.behaviorSupportProfile ??
+    {}
+  ) as Record<string, unknown>;
   const responseWorksWell = stringList(learningResponsePattern.worksWell);
   const responseCanBeHard = stringList(learningResponsePattern.canBeHard);
   const replacementSkills = stringList(behaviorSupportProfile.replacementSkills);
   const recommendedScaffolds = stringList(behaviorSupportProfile.recommendedScaffolds);
+  const supportProfileStrengths = stringList(visibleSupportProfileJson.strengths);
+  const supportProfileCautions = stringList(visibleSupportProfileJson.supportCautions);
+  const supportProfileLessonHints = stringList(visibleSupportProfileJson.lessonDesignHints);
   const activeContextBrief = activeCaseFile?.contextBrief ?? activeCaseFile?.contextBundle?.contextBrief ?? null;
 
   useEffect(() => {
@@ -1080,6 +1188,9 @@ export default function DashboardPage() {
     .filter(isReviewQueueContent)
     .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left))
     .map((content) => mapContentToReviewItem(content));
+  const selectedPublishedContents = (activeCaseFile?.recentContents ?? [])
+    .filter((content) => content.status === "published")
+    .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left));
   const selectedRecords: SessionLog[] = (activeReport?.reports ?? []).map((record) => {
     const durationMinutes = Math.max(1, Math.round((record.durationSec ?? 0) / 60));
     const attemptCount = Math.max(1, record.answerCount);
@@ -1153,6 +1264,30 @@ export default function DashboardPage() {
   const isSavingMemo = savingMemoCaseId === selectedCase.id;
   const canSaveMemo = isMemoDirty && memoValue.trim().length > 0 && !isSavingMemo;
   const lessonDraftValue = lessonDrafts[selectedCase.id] ?? "";
+  const aiRecommendedGoal = useMemo(() => {
+    const presentationSupports = [...(activeContextBrief?.recommendedScaffolds ?? [])].slice(0, 3);
+    const observedStrengths = [...(activeContextBrief?.recentSuccessPatterns ?? [])].slice(0, 2);
+    const regressionGuards = [
+      selectedCase.primaryNeed,
+      ...(activeContextBrief?.avoidTopicRegression ?? []),
+    ].filter(Boolean);
+    return [
+      "[AI 추천 생성]",
+      "선생님 추가 입력 없이 학생 기억장치의 지원 방식만 참고해 오늘 사용할 새 수업 주제와 활동을 추천 생성합니다.",
+      "기억장치에 남은 과거 상황은 예시 소재일 뿐이며, 새 수업 주제를 덮어쓰지 않습니다.",
+      "수업 적용 힌트는 문제 수준을 낮추는 지시가 아니라 화면 제시 방식입니다.",
+      observedStrengths.length ? `관찰된 수행 강점: ${observedStrengths.join(" / ")}` : "",
+      presentationSupports.length ? `제시 방식 조정: ${presentationSupports.join(" / ")}` : "",
+      regressionGuards.length ? `반복하지 않을 과거 예시 소재: ${regressionGuards.join(" / ")}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }, [
+    activeContextBrief?.avoidTopicRegression,
+    activeContextBrief?.recentSuccessPatterns,
+    activeContextBrief?.recommendedScaffolds,
+    selectedCase.primaryNeed,
+  ]);
   const selectedPendingGenerationJob = Object.values(pendingGenerationJobs).find(
     (job) => job.caseId === selectedCase.id || (selectedCase.studentId && job.studentId === selectedCase.studentId),
   );
@@ -1570,20 +1705,23 @@ export default function DashboardPage() {
     return () => window.clearInterval(timer);
   }, [activeCaseFile, continueGenerationJob, pendingGenerationJobs]);
 
-  const handleGenerateContent = async () => {
+  const handleGenerateContent = async (mode: "teacher_request" | "ai_recommendation" = "teacher_request") => {
     if (!selectedCase.id || !selectedCase.studentId || isGeneratingContent) return;
 
-    const requestedGoal = lessonDraftValue.trim() || selectedCase.primaryNeed;
+    const requestedGoal = mode === "ai_recommendation" ? aiRecommendedGoal : lessonDraftValue.trim() || selectedCase.primaryNeed;
     const contentType = activeCaseFile?.profile.studentType ?? selectedApiStudent?.studentType ?? "learning_focus";
     setActiveTab("materials");
 
     setGenerationStatuses((current) => ({
-      ...current,
-      [selectedCase.id]: {
-        state: "running",
-        message: "학생 기록을 바탕으로 수업 방향을 정리하는 중입니다.",
-      },
-    }));
+          ...current,
+          [selectedCase.id]: {
+            state: "running",
+            message:
+              mode === "ai_recommendation"
+                ? "기억장치를 바탕으로 AI 추천 수업 방향을 정리하는 중입니다."
+                : "학생 기록을 바탕으로 수업 방향을 정리하는 중입니다.",
+          },
+        }));
 
     try {
       const orchestratorResult = await createAgentRun({
@@ -1760,36 +1898,55 @@ export default function DashboardPage() {
   const handleGenerateTeacherReportDraft = async (record: SessionLog) => {
     if (generatingReportDraftId) return;
     setGeneratingReportDraftId(record.id);
+    setGeneratedReportDrafts((current) => ({
+      ...current,
+      [record.id]: { draftId: "", bodyMarkdown: "", memoryCandidates: [] },
+    }));
     try {
-      const draft = await createTeacherReportDraft(record.id);
+      const draft = await createTeacherReportDraft(record.id, {
+        teacherObservation: feedbackDrafts[record.id] ?? "",
+        onDelta: (text) => {
+          setGeneratedReportDrafts((current) => ({
+            ...current,
+            [record.id]: {
+              ...(current[record.id] ?? { draftId: "", bodyMarkdown: "", memoryCandidates: [] }),
+              bodyMarkdown: `${current[record.id]?.bodyMarkdown ?? ""}${text}`,
+            },
+          }));
+        },
+      });
       setGeneratedReportDrafts((current) => ({ ...current, [record.id]: draft }));
-      setFeedbackDrafts((current) => ({ ...current, [record.id]: draft.bodyMarkdown }));
     } finally {
       setGeneratingReportDraftId(null);
     }
   };
 
   const handleSaveTeacherFeedback = async (record: SessionLog) => {
-    const feedback = feedbackDrafts[record.id]?.trim();
-    if (!feedback || !selectedCase.studentId || savingFeedbackRecordId) return;
+    const teacherMemo = feedbackDrafts[record.id]?.trim();
+    const generatedDraft = generatedReportDrafts[record.id];
+    const reportBody = composeTeacherReportBody(generatedDraft?.bodyMarkdown, teacherMemo);
+    if (!reportBody || !selectedCase.studentId || savingFeedbackRecordId) return;
 
     setSavingFeedbackRecordId(record.id);
     try {
-      const generatedDraft = generatedReportDrafts[record.id];
-      const selectedMemoryCandidates = generatedDraft?.memoryCandidates?.slice(0, 3) ?? [record.note];
+      const teacherObservationCandidate = teacherObservationMemoryCandidate(teacherMemo);
+      const selectedMemoryCandidates = [
+        ...(teacherObservationCandidate ? [teacherObservationCandidate] : []),
+        ...(generatedDraft?.memoryCandidates ?? [record.note]),
+      ].slice(0, 3);
       await saveTeacherReport({
         draftId: generatedDraft?.draftId || null,
         reviewSummaryId: record.id,
         studentId: selectedCase.studentId,
         contentId: record.contentId,
-        teacherBody: feedback,
+        teacherBody: reportBody,
         selectedMemoryCandidates,
       });
       setSavedFeedbackRecords((current) => [
         {
           id: `feedback-${record.id}-${Date.now()}`,
           recordId: record.id,
-          feedback,
+          feedback: reportBody,
           savedAt: "방금 저장",
         },
         ...current.filter((item) => item.recordId !== record.id),
@@ -2172,10 +2329,10 @@ export default function DashboardPage() {
             {activeTab === "info" && (
               <section className="space-y-6 p-6">
                 <section className="grid gap-5 lg:grid-cols-3">
-                  <InfoBlock label="현재 목표" value={dashboardProfile?.primaryNeedDetail ?? selectedCase.primaryNeed} />
-                  <InfoBlock label="학습 반응 패턴" value={dashboardProfile?.supportStrategyDetail ?? selectedCase.supportStrategy} />
+                  <InfoBlock label="현재 지원 목표" value={dashboardProfile?.primaryNeedDetail ?? selectedCase.primaryNeed} />
+                  <InfoBlock label="수업 설계 힌트" value={dashboardProfile?.supportStrategyDetail ?? selectedCase.supportStrategy} />
                   <InfoBlock
-                    label="ContextBrief"
+                    label="기억장치 상태"
                     value={
                       activeContextBrief
                         ? activeContextBrief.dirty
@@ -2186,12 +2343,100 @@ export default function DashboardPage() {
                   />
                 </section>
 
+                <section className="rounded-lg border border-[#d8dee8] bg-white p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-xl font-black">기억장치</h3>
+                      <p className="mt-1 text-sm font-semibold text-[#64748b]">
+                        매주 또는 새 수업 기록이 생길 때 다시 정리되는 AI용 학생 맥락입니다.
+                      </p>
+                    </div>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-black ${
+                        activeContextBrief
+                          ? activeContextBrief.dirty
+                            ? "bg-[#fff7ed] text-[#9a3412]"
+                            : "bg-[#f0fdf4] text-[#15803d]"
+                          : "bg-[#f1f5f9] text-[#64748b]"
+                      }`}
+                    >
+                      {activeContextBrief ? (activeContextBrief.dirty ? "갱신 필요" : "갱신 완료") : "생성 전"}
+                    </span>
+                  </div>
+
+                  {activeContextBrief?.briefText ? (
+                    <>
+                      <p className="mt-4 rounded-md bg-[#f8fafc] px-4 py-3 text-sm font-semibold leading-6 text-[#334155]">
+                        {activeContextBrief.briefText}
+                      </p>
+                      <div className="mt-4 grid gap-4 md:grid-cols-3">
+                        <div>
+                          <p className="text-sm font-black text-[#64748b]">관찰된 수행 강점</p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-[#94a3b8]">
+                            실제 반응 기록에서 확인된 시작점입니다.
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {(activeContextBrief.recentSuccessPatterns.length ? activeContextBrief.recentSuccessPatterns : ["기록 확인 중"]).map((item) => (
+                              <span key={item} className="rounded-full bg-[#eef4fb] px-3 py-1 text-xs font-bold text-[#1f3a5f]">
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-[#64748b]">주의할 흐름</p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-[#94a3b8]">
+                            다음 수업에서 먼저 확인할 부담 조건입니다.
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {(activeContextBrief.recentDifficultyPatterns.length ? activeContextBrief.recentDifficultyPatterns : ["기록 확인 중"]).map((item) => (
+                              <span key={item} className="rounded-full bg-[#fff7ed] px-3 py-1 text-xs font-bold text-[#9a3412]">
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-[#64748b]">제시 방식 조정</p>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-[#94a3b8]">
+                            문제 수준을 낮추는 값이 아니라 화면과 안내 방식을 조정하는 값입니다.
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {(activeContextBrief.recommendedScaffolds.length ? activeContextBrief.recommendedScaffolds : ["기록 확인 중"]).map((item) => (
+                              <span key={item} className="rounded-full bg-[#f0fdf4] px-3 py-1 text-xs font-bold text-[#15803d]">
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="mt-4 rounded-md bg-[#f8fafc] px-4 py-3 text-sm font-semibold leading-6 text-[#64748b]">
+                      아직 생성된 기억장치가 없습니다. 지원 초안을 확정하거나 수업 기록을 저장하면 다음 자료 생성에 반영할 요약을 만들 수 있습니다.
+                    </p>
+                  )}
+                </section>
+
                 <section className="rounded-lg border border-[#d8dee8] bg-[#fbfcfe] p-5">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                      <h3 className="text-xl font-black">초기 지원 프로필</h3>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-xl font-black">초기 지원 프로필</h3>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-black ${
+                            supportProfileStatus === "confirmed"
+                              ? "bg-[#dcfce7] text-[#15803d]"
+                              : supportProfileStatus === "draft"
+                                ? "bg-[#eff6ff] text-[#1d4ed8]"
+                                : "bg-[#f1f5f9] text-[#64748b]"
+                          }`}
+                        >
+                          {supportProfileStatus === "confirmed" ? "교사 확인 완료" : supportProfileStatus === "draft" ? "초안" : "작성 전"}
+                        </span>
+                      </div>
                       <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                        등록 원자료와 교사 확인 프로필을 분리해 다음 자료 생성의 수업 방식에만 반영합니다.
+                        학생 등록 원자료에서 만든 수업 방식 프로필입니다. 기억장치와 별도로 관리되고, 교사 확인 뒤 다음 자료 생성에 반영됩니다.
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -2201,7 +2446,7 @@ export default function DashboardPage() {
                         disabled={!selectedCase.studentId || Boolean(supportProfileAction)}
                         className="rounded-md border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-black text-[#334155] disabled:cursor-not-allowed disabled:text-[#94a3b8]"
                       >
-                        {supportProfileAction === "draft" ? "생성 중" : "AI 초안 생성"}
+                        {supportProfileAction === "draft" ? "생성 중" : "지원 초안 생성"}
                       </button>
                       <button
                         type="button"
@@ -2209,10 +2454,13 @@ export default function DashboardPage() {
                         disabled={!selectedCase.studentId || Boolean(supportProfileAction)}
                         className="rounded-md border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-black text-[#334155] disabled:cursor-not-allowed disabled:text-[#94a3b8]"
                       >
-                        {supportProfileAction === "refresh" ? "갱신 중" : "ContextBrief 갱신"}
+                        {supportProfileAction === "refresh" ? "갱신 중" : "기억장치 갱신"}
                       </button>
                     </div>
                   </div>
+                  <p className="mt-3 rounded-md bg-white px-4 py-3 text-sm font-semibold leading-6 text-[#64748b]">
+                    기억장치 갱신은 수업 기록, 선생님 관찰 기록, 확정된 지원 프로필을 다시 요약합니다. 초기 지원 프로필 초안은 바꾸지 않습니다.
+                  </p>
 
                   {supportProfileDraft && (
                     <div className="mt-4 rounded-lg border border-[#bfdbfe] bg-white p-4">
@@ -2237,27 +2485,36 @@ export default function DashboardPage() {
 
                   <div className="mt-5 grid gap-4 md:grid-cols-2">
                     <InfoBlock
-                      label="잘 반응하는 단서"
-                      value={(responseWorksWell.length ? responseWorksWell : dashboardProfile?.lessonDesignHints ?? ["AI 초안 생성 전"]).join(", ")}
+                      label="관찰된 강점"
+                      value={(
+                        responseWorksWell.length
+                          ? responseWorksWell
+                          : supportProfileStrengths.length
+                            ? supportProfileStrengths
+                            : supportProfileLessonHints.length
+                              ? supportProfileLessonHints
+                              : ["지원 초안 생성 전"]
+                      ).join(", ")}
                     />
                     <InfoBlock
-                      label="지원 유의점"
-                      value={(responseCanBeHard.length ? responseCanBeHard : dashboardProfile?.supportCautions ?? selectedCase.challengeTags).join(", ")}
+                      label="지원이 필요한 상황"
+                      value={(
+                        responseCanBeHard.length
+                          ? responseCanBeHard
+                          : supportProfileCautions.length
+                            ? supportProfileCautions
+                            : selectedCase.challengeTags
+                      ).join(", ")}
                     />
                     <InfoBlock
-                      label="권장 scaffold"
-                      value={(recommendedScaffolds.length ? recommendedScaffolds : selectedCase.planTags).join(", ")}
+                      label="수업 적용 힌트"
+                      value={(recommendedScaffolds.length ? recommendedScaffolds : supportProfileLessonHints.length ? supportProfileLessonHints : selectedCase.planTags).join(", ")}
                     />
                     <InfoBlock
-                      label="대체기술"
+                      label="연습할 표현·기술"
                       value={(replacementSkills.length ? replacementSkills : ["확정 프로필 저장 뒤 표시"]).join(", ")}
                     />
                   </div>
-                  {activeContextBrief?.briefText && (
-                    <p className="mt-4 rounded-md bg-white px-4 py-3 text-sm font-semibold leading-6 text-[#334155]">
-                      {activeContextBrief.briefText}
-                    </p>
-                  )}
                 </section>
 
                 <section className="grid gap-5 lg:grid-cols-2">
@@ -2281,7 +2538,7 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="rounded-lg border border-[#e5e9f0] bg-white p-5">
-                    <h3 className="text-xl font-black">약점</h3>
+                    <h3 className="text-xl font-black">주의할 점</h3>
                     <div className="mt-4 flex flex-wrap gap-2">
                       {(dashboardProfile?.weaknesses?.length ? dashboardProfile.weaknesses : selectedCase.challengeTags).map((tag) => (
                         <span
@@ -2298,9 +2555,9 @@ export default function DashboardPage() {
                 <section className="rounded-lg border border-[#e5e9f0] bg-white p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-xl font-black">교사 메모</h3>
+                      <h3 className="text-xl font-black">선생님 통합 메모</h3>
                       <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                        저장한 메모는 다음 자료 제안에서 AI가 참고할 학생 메모리로 이어집니다.
+                        특정 콘텐츠가 아니라 학생 전체에 대해 계속 참고할 관찰과 조정점을 남깁니다.
                       </p>
                     </div>
                     {savedMemo && (
@@ -2311,7 +2568,7 @@ export default function DashboardPage() {
                   </div>
                   <textarea
                     value={memoValue}
-                    placeholder="AI가 다음 자료를 제안할 때 기억해야 할 반응, 수업 조정점, 보호자 공유 전 확인할 내용을 적어주세요."
+                    placeholder="예: 긴 설명보다 그림 단서를 먼저 볼 때 안정적입니다. 실패 직후에는 바로 재촉하기보다 쉬운 선택지로 다시 시작하면 좋습니다."
                     onChange={(event) =>
                       setMemoDrafts((current) => ({
                         ...current,
@@ -2379,17 +2636,30 @@ export default function DashboardPage() {
                         </select>
                       </label>
 
-                      <button
-                        disabled={!selectedCase.id || isGeneratingContent}
-                        onClick={handleGenerateContent}
-                        className={`w-full rounded-md px-4 py-3 text-sm font-bold text-white ${
-                          !selectedCase.id || isGeneratingContent
-                            ? "cursor-not-allowed bg-[#94a3b8]"
-                            : "bg-[#1f3a5f] hover:bg-[#172b47]"
-                        }`}
-                      >
-                        {isGeneratingContent ? "AI가 자료를 제안하는 중" : "AI 수업 자료 제안받기"}
-                      </button>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <button
+                          disabled={!selectedCase.id || isGeneratingContent}
+                          onClick={() => void handleGenerateContent("teacher_request")}
+                          className={`rounded-md px-4 py-3 text-sm font-bold text-white ${
+                            !selectedCase.id || isGeneratingContent
+                              ? "cursor-not-allowed bg-[#94a3b8]"
+                              : "bg-[#1f3a5f] hover:bg-[#172b47]"
+                          }`}
+                        >
+                          {isGeneratingContent ? "자료를 제안하는 중" : "입력 내용으로 생성"}
+                        </button>
+                        <button
+                          disabled={!selectedCase.id || isGeneratingContent}
+                          onClick={() => void handleGenerateContent("ai_recommendation")}
+                          className={`rounded-md border px-4 py-3 text-sm font-bold ${
+                            !selectedCase.id || isGeneratingContent
+                              ? "cursor-not-allowed border-[#cbd5e1] bg-[#f1f5f9] text-[#94a3b8]"
+                              : "border-[#bfdbfe] bg-[#eff6ff] text-[#1f3a5f] hover:bg-[#dbeafe]"
+                          }`}
+                        >
+                          {isGeneratingContent ? "추천 준비 중" : "AI 추천 생성"}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </section>
@@ -2399,7 +2669,7 @@ export default function DashboardPage() {
                     <div>
                       <h3 className="text-xl font-black">검토할 수업 자료 제안</h3>
                       <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                        AI가 제안한 자료를 확인하고 선생님 판단으로 적용합니다.
+                        제안된 자료를 확인하고 선생님 판단으로 적용합니다.
                       </p>
                     </div>
                     {generationStatus && generationStatus.state !== "succeeded" && (
@@ -2541,6 +2811,57 @@ export default function DashboardPage() {
                       );
                     })}
                   </section>
+
+                  <section className="space-y-3">
+                    <div>
+                      <h3 className="text-xl font-black">현재 배포된 수업 자료</h3>
+                      <p className="mt-1 text-sm font-semibold text-[#64748b]">
+                        학생 화면에서 바로 열 수 있는 자료입니다.
+                      </p>
+                    </div>
+                    {selectedPublishedContents.length === 0 ? (
+                      <div className="rounded-md border border-[#e5e9f0] bg-white p-4 text-sm font-bold leading-6 text-[#64748b]">
+                        아직 학생에게 배포된 수업 자료가 없습니다.
+                      </div>
+                    ) : (
+                      selectedPublishedContents.map((content) => {
+                        const contentCompleted = completedContentIds.has(content.id);
+                        const generatedAtLabel = formatContentGeneratedAt(content);
+                        return (
+                          <div key={content.id} className="rounded-md border border-[#bbf7d0] bg-[#f0fdf4] p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-base font-black text-[#172033]">{content.title}</p>
+                                <p className="mt-1 truncate text-sm font-semibold text-[#15803d]">{describeContentType(content)}</p>
+                                {generatedAtLabel && (
+                                  <p className="mt-1 text-xs font-black text-[#64748b]">생성 {generatedAtLabel}</p>
+                                )}
+                              </div>
+                              <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-black text-[#15803d]">
+                                {contentCompleted ? "학습 완료" : "배포됨"}
+                              </span>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <Link
+                                href={`/student/stage?caseId=${encodeURIComponent(content.caseId)}&contentId=${encodeURIComponent(content.id)}&preview=1`}
+                                target="_blank"
+                                className="rounded-md border border-[#bbf7d0] bg-white px-3 py-2 text-sm font-bold text-[#15803d]"
+                              >
+                                교사용 미리보기
+                              </Link>
+                              <Link
+                                href={`/student/stage?caseId=${encodeURIComponent(content.caseId)}&contentId=${encodeURIComponent(content.id)}`}
+                                target="_blank"
+                                className="rounded-md bg-[#15803d] px-3 py-2 text-sm font-bold text-white"
+                              >
+                                학생 화면 열기
+                              </Link>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </section>
                 </div>
               </section>
             )}
@@ -2652,9 +2973,9 @@ export default function DashboardPage() {
                           </div>
                           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#bfdbfe] bg-white px-4 py-3">
                             <div>
-                              <p className="text-xs font-black text-[#1d4ed8]">AI 리포트 초안</p>
+                              <p className="text-xs font-black text-[#1d4ed8]">리포트 초안</p>
                               <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                                수업 반응, 이해 변화, 다음 수업 제안, 메모리 후보를 초안으로 만듭니다.
+                                학생 수행 결과, 회고, 선생님 관찰 기록을 바탕으로 마크다운 초안을 실시간으로 받아 표시합니다.
                               </p>
                             </div>
                             <button
@@ -2663,12 +2984,25 @@ export default function DashboardPage() {
                               disabled={Boolean(generatingReportDraftId)}
                               className="rounded-md border border-[#cbd5e1] bg-[#eef4fb] px-4 py-2 text-sm font-black text-[#1f3a5f] disabled:cursor-not-allowed disabled:text-[#94a3b8]"
                             >
-                              {generatingReportDraftId === record.id ? "생성 중" : "생성하기"}
+                              {generatingReportDraftId === record.id ? "생성 중" : "리포트 초안 생성"}
                             </button>
                           </div>
+                          {generatedReportDrafts[record.id]?.bodyMarkdown && (
+                            <div className="mt-3 rounded-md border border-[#bfdbfe] bg-[#f8fbff] px-4 py-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs font-black text-[#1d4ed8]">리포트 초안 미리보기</p>
+                                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-[#64748b]">
+                                  이번 콘텐츠 기록
+                                </span>
+                              </div>
+                              <div className="mt-3 rounded-md bg-white px-4 py-3">
+                                <MarkdownReport markdown={generatedReportDrafts[record.id].bodyMarkdown} />
+                              </div>
+                            </div>
+                          )}
                           {(generatedReportDrafts[record.id]?.memoryCandidates.length ?? 0) > 0 && (
                             <div className="mt-3 rounded-md border border-[#d9ebc9] bg-white px-4 py-3">
-                              <p className="text-xs font-black text-[#16803c]">메모리 반영 후보</p>
+                              <p className="text-xs font-black text-[#16803c]">기억장치 반영 후보</p>
                               <div className="mt-2 flex flex-wrap gap-2">
                                 {generatedReportDrafts[record.id].memoryCandidates.map((candidate) => (
                                   <span key={candidate} className="rounded-full bg-[#f0fdf4] px-3 py-1 text-xs font-bold text-[#15803d]">
@@ -2678,7 +3012,15 @@ export default function DashboardPage() {
                               </div>
                             </div>
                           )}
+                          <div className="mt-4">
+                            <label className="text-xs font-black text-[#64748b]" htmlFor={`teacher-report-memo-${record.id}`}>
+                              선생님 수업 관찰 기록
+                            </label>
+                            <p className="mt-1 text-xs font-semibold text-[#94a3b8]">
+                              이번 콘텐츠를 지켜보며 확인한 잘된 점, 부족한 점, 다음 수업 반영점을 적습니다.
+                            </p>
                           <textarea
+                            id={`teacher-report-memo-${record.id}`}
                             value={feedbackDrafts[record.id] ?? ""}
                             onChange={(event) => {
                               setFeedbackDrafts((current) => ({
@@ -2686,16 +3028,17 @@ export default function DashboardPage() {
                                 [record.id]: event.target.value,
                               }));
                             }}
-                            className="mt-4 h-40 w-full resize-none rounded-md border border-[#cbd5e1] bg-white p-4 outline-none focus:border-[#1f3a5f]"
-                            placeholder="선생님 리포트를 작성하세요. 학생 반응, 이해도 변화, 다음 수업에서 반영할 내용을 남깁니다."
+                            className="mt-2 h-28 w-full resize-none rounded-md border border-[#cbd5e1] bg-white p-4 outline-none focus:border-[#1f3a5f]"
+                            placeholder="예: 그림 단서는 바로 찾았지만 실제 말하기에서는 먼저 물어보는 표현이 부족했습니다. 다음에는 더 현실적인 상황에서 확인 질문을 연습하면 좋겠습니다."
                           />
+                          </div>
                           <div className="mt-3 flex justify-end">
                             <button
                               onClick={() => void handleSaveTeacherFeedback(record)}
-                              disabled={!feedbackDrafts[record.id]?.trim() || Boolean(savingFeedbackRecordId)}
+                              disabled={!composeTeacherReportBody(generatedReportDrafts[record.id]?.bodyMarkdown, feedbackDrafts[record.id]).trim() || Boolean(savingFeedbackRecordId)}
                               className="rounded-md bg-[#1f3a5f] px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
                             >
-                              {isSavingFeedback ? "저장 중" : "최근 기록으로 저장"}
+                              {isSavingFeedback ? "저장 중" : "리포트 확인 후 저장"}
                             </button>
                           </div>
                         </section>
@@ -2727,7 +3070,9 @@ export default function DashboardPage() {
                           <p className="mt-1 text-sm font-bold text-[#64748b]">
                             선생님 리포트 · {feedbackRecord.savedAt}
                           </p>
-                          <p className="mt-2 text-sm leading-6">{feedbackRecord.feedback}</p>
+                          <p className="mt-2 line-clamp-3 text-sm font-semibold leading-6 text-[#334155]">
+                            {markdownToPlainSummary(feedbackRecord.feedback)}
+                          </p>
                           <p className="mt-3 text-sm font-black text-[#1f3a5f]">리포트 보기</p>
                         </button>
                       );
@@ -2837,9 +3182,15 @@ export default function DashboardPage() {
                       </span>
                     )}
                   </div>
-                  <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">
-                    {openReportTeacherFeedback?.feedback ?? "아직 선생님 리포트가 저장되지 않았습니다."}
-                  </p>
+                  {openReportTeacherFeedback?.feedback ? (
+                    <div className="mt-3">
+                      <MarkdownReport markdown={openReportTeacherFeedback.feedback} />
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">
+                      아직 선생님 리포트가 저장되지 않았습니다.
+                    </p>
+                  )}
                 </div>
                 <div className="rounded-lg border border-[#d9ebc9] bg-[#f4fbef] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
