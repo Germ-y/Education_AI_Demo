@@ -1,7 +1,12 @@
 import pytest
 
 from app.api.routes.ai import _mission_from_generation
-from app.api.routes.contents import _blocked_visible_text_in_image_prompt, _pairs_from_left_right_cards, _requests_problem_answer_image_text
+from app.api.routes.contents import (
+    _blocked_visible_text_in_image_prompt,
+    _build_image_brief_output,
+    _pairs_from_left_right_cards,
+    _requests_problem_answer_image_text,
+)
 from app.data.demo_data import create_demo_database
 from app.domain.schemas import ContentAsset, ContentStage, MissionContent
 from app.services.content_quality import ContentQualityError, validate_mission_content_quality, validate_orchestrator_plan_quality
@@ -81,6 +86,46 @@ def test_image_brief_allows_stage_visual_scene_text_from_visible_prompt() -> Non
     )
 
     assert blocked is None
+
+
+def test_image_brief_keeps_source_text_but_filters_ui_question_from_prompt() -> None:
+    mission = MissionContent.model_validate(_generated_life_support_content())
+    stage = next(stage for stage in mission.stages if stage.step == 2)
+    stage.template_json = {
+        **stage.template_json,
+        "question": "무엇을 준비해 오나요?",
+        "choices": [
+            {"id": "a", "text": "운동화와 물통"},
+            {"id": "b", "text": "색연필과 가위"},
+        ],
+        "sourceTextLines": ["체육 행사 안내", "준비물: 운동화, 물통", "장소: 운동장"],
+    }
+    mission.brief_json = {
+        "stageVisualSpecs": [
+            {
+                "assetRole": "stage_2",
+                "visualPurpose": "알림장 원자료에서 준비물을 찾는 근거를 보여줍니다.",
+                "sceneSummary": "학교 알림장 본문을 가까이 보여주는 장면",
+                "primaryEvidenceObject": "학교 알림장",
+                "mustShow": ["학교 알림장", "준비물 줄"],
+                "allowedSceneText": ["무엇을 준비해 오나요?", "체육 행사 안내", "준비물: 운동화, 물통"],
+                "doNotRenderText": [],
+                "composition": "실제 문장 내용은 판독 불가한 수준으로 표현한다.",
+            }
+        ]
+    }
+    asset = next(asset for asset in mission.assets if asset.asset_type == "image" and asset.asset_role == "stage_2")
+
+    output = _build_image_brief_output(mission, [asset])
+    prompt = output["imageBriefs"][0]["prompt"]
+    scene_text_lines = output["imageBriefs"][0]["sceneTextLines"]
+
+    assert "무엇을 준비해 오나요?" not in prompt
+    assert "준비물: 운동화, 물통" in prompt
+    assert "준비물: 운동화, 물통" in scene_text_lines
+    assert "무엇을 준비해 오나요?" not in scene_text_lines
+    assert "판독 불가" not in prompt
+    assert "sharp, legible, and not blurred" in prompt
 
 
 def test_rejects_fifth_stage() -> None:

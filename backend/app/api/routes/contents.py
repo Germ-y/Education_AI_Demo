@@ -1019,6 +1019,7 @@ def _build_image_brief_for_asset(content, asset, stages: list, stage_visual_spec
     scene_summary = _sanitize_image_prompt_meta(_as_text(spec.get("sceneSummary"))) or content.title
     visual_purpose = _sanitize_image_prompt_meta(_as_text(spec.get("visualPurpose"))) or "학생이 확인할 장면 근거를 보여줍니다."
     composition = _sanitize_image_prompt_meta(_as_text(spec.get("composition"))) or "학습 근거가 화면 중심에 보이도록 가까운 구도로 구성합니다."
+    composition = _normalize_source_text_composition(composition, has_readable_source=bool(allowed_scene_text))
     camera = _camera_for_asset(asset.asset_role)
     human_presence = _human_presence_for_asset(content, asset, stage)
     ocr_required = bool(allowed_scene_text)
@@ -1043,7 +1044,9 @@ def _build_image_brief_for_asset(content, asset, stages: list, stage_visual_spec
     if allowed_scene_text:
         prompt_parts.append(
             "Readable real-world scene text is required only on the natural object in the scene. "
-            f"Render exactly these short source lines: {' / '.join(allowed_scene_text)}."
+            "The source text is the learning evidence, so render it sharp, legible, and not blurred. "
+            "Do not highlight the answer or add guide marks; the student must inspect the source naturally. "
+            f"Render exactly these source material lines: {' / '.join(allowed_scene_text)}."
         )
     else:
         prompt_parts.append(
@@ -1126,6 +1129,24 @@ def _sanitize_image_prompt_meta(value: str) -> str:
     for term, replacement in replacements.items():
         sanitized = sanitized.replace(term, replacement)
     return sanitized.strip()
+
+
+def _normalize_source_text_composition(value: str, *, has_readable_source: bool) -> str:
+    if not value or not has_readable_source:
+        return value
+    replacements = {
+        "글 내용은 흐릿하거나 의미 없이 표현하고": "원자료 문장은 선명하게 읽히도록 표현하고",
+        "실제 문장 내용은 판독 불가한 수준으로 표현한다": "실제 원자료 문장은 읽을 수 있게 표현한다",
+        "실제 문장 내용은 판독 불가한 수준으로 표현하고": "실제 원자료 문장은 읽을 수 있게 표현하고",
+        "본문은 흐릿하게": "본문은 선명하게",
+        "흐릿하거나 의미 없이": "선명하고 의미 있게",
+        "판독 불가": "판독 가능",
+        "흐릿하게": "선명하게",
+    }
+    normalized = value
+    for before, after in replacements.items():
+        normalized = normalized.replace(before, after)
+    return normalized
 
 
 def _filter_prompt_anchors(values: list[str], *, blocked_texts: list[str], allowed_scene_text: list[str]) -> list[str]:
@@ -1249,9 +1270,13 @@ def _allowed_scene_text_for_asset(content, asset, stages: list, stage_visual_spe
     spec = _stage_visual_spec_for_asset(content, asset, stages, stage_visual_specs)
     spec_lines = _string_list(spec.get("allowedSceneText")) if isinstance(spec, dict) else []
     if asset.asset_role == AssetRole.HERO:
-        return _filter_allowed_scene_text(spec_lines + _allowed_scene_text_from_stages(stages))
+        source_lines = _allowed_scene_text_from_stages(stages)
+        blocked_texts = _do_not_render_text_from_stages(stages)
+        return _filter_allowed_scene_text(spec_lines + source_lines, blocked_texts=blocked_texts, source_lines=source_lines)
     stage = next((candidate for candidate in stages if candidate.id == asset.stage_id), None)
-    return _filter_allowed_scene_text(spec_lines + (_allowed_scene_text_from_stage(stage) if stage else []))
+    source_lines = _allowed_scene_text_from_stage(stage) if stage else []
+    blocked_texts = _stage_do_not_render_text(stage) if stage else []
+    return _filter_allowed_scene_text(spec_lines + source_lines, blocked_texts=blocked_texts, source_lines=source_lines)
 
 
 def _do_not_render_text_for_asset(content, asset, stages: list, stage_visual_specs: dict[str, dict[str, Any]]) -> list[str]:
@@ -1264,8 +1289,20 @@ def _do_not_render_text_for_asset(content, asset, stages: list, stage_visual_spe
     return _dedupe_strings(spec_lines + (_stage_do_not_render_text(stage) if stage else []))
 
 
-def _filter_allowed_scene_text(lines: list[str]) -> list[str]:
-    return _dedupe_strings(line for line in lines if not _is_answer_cue_image_text(line))
+def _filter_allowed_scene_text(
+    lines: list[str],
+    *,
+    blocked_texts: list[str] | None = None,
+    source_lines: list[str] | None = None,
+) -> list[str]:
+    blocked = {text.strip() for text in (blocked_texts or []) if isinstance(text, str) and text.strip()}
+    source = {text.strip() for text in (source_lines or []) if isinstance(text, str) and text.strip()}
+    return _dedupe_strings(
+        line
+        for line in lines
+        if not _is_answer_cue_image_text(line)
+        and not (line.strip() in blocked and line.strip() not in source)
+    )
 
 
 def _is_answer_cue_image_text(value: str) -> bool:

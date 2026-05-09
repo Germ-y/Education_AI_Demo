@@ -74,7 +74,8 @@ asset role과 stage 연결:
 - `briefJson.stageVisualSpecs`가 이미지 생성의 기준입니다.
 - 이미지는 장면, 사물, 관계, 이동, 조작 자료를 보여줍니다.
 - 문제 지시, 선택지, 정답, 힌트, 피드백은 이미지가 아니라 `templateJson`에 들어갑니다.
-- 실제 읽기 자료가 과제의 근거라면 짧은 장면 텍스트를 `templateJson.sourceTextLines` 또는 `templateJson.sceneTextLines`와 `briefJson.stageVisualSpecs[*].allowedSceneText`에 함께 넣습니다.
+- 실제 읽기 자료가 과제의 근거라면 학생이 읽고 판단해야 하는 원자료 텍스트를 `templateJson.sourceTextLines` 또는 `templateJson.sceneTextLines`와 `briefJson.stageVisualSpecs[*].allowedSceneText`에 함께 넣습니다. 일기장, 알림장, 안내문, 포스터 원문은 흐릿한 더미 텍스트가 아니라 선명한 학습 근거여야 합니다.
+- `question`, `choices`, `answer`, `correctFeedback`, `wrongFeedback`처럼 화면 UI가 따로 렌더링할 문구는 `allowedSceneText`에 넣지 않습니다. 단, 정답 단서가 원자료 텍스트 안에 자연스럽게 포함되는 것은 허용합니다.
 - 포스터 문장을 판단하는 과제는 포스터 맥락이 보여야 하고, 이동/일정 과제는 경로/일정 맥락이 보여야 하며, 측정/비교 과제는 조작물이나 비교 대상이 보여야 합니다.
 - 사람은 필요할 때만 보조로 등장합니다. 학습 근거 사물이 화면의 주인공이어야 합니다.
 - 답안 bucket 라벨이나 UI category 카드는 `allowedSceneText`에 넣지 않습니다. 예: `확인할 수 있는 사실`, `생각이나 권유가 담긴 의견`, `정답`, `오답`, `도움 요청`, `먼저 할 일`.
