@@ -78,19 +78,113 @@ type ChecklistField =
   | "calmingSupportsText"
   | "avoidGuidanceText";
 
-const supportChecklistGroups: Array<{
+type ChecklistGroupDefinition = {
   key: ChecklistField;
   title: string;
   description: string;
   required?: boolean;
   options: string[];
-}> = [
+};
+
+const supportChecklistGroupsByType: Record<ContentType, ChecklistGroupDefinition[]> = {
+  learning_focus: [
+  {
+    key: "strengthsText",
+    title: "학습에서 잘 되는 반응",
+    description: "개념 학습이나 문제 풀이에서 확인된 시작점",
+    required: true,
+    options: [
+      "짧은 예시를 보고 이해함",
+      "그림·표·자료 단서를 먼저 찾음",
+      "한 문항씩 끝까지 풂",
+      "선택지가 적으면 답을 고름",
+      "계산 절차를 따라감",
+      "읽은 내용을 짧게 말함",
+      "오답 뒤 다시 시도함",
+      "선생님 질문에 짧게 답함",
+    ],
+  },
+  {
+    key: "weaknessesText",
+    title: "학습에서 막히는 지점",
+    description: "다음 자료에서 먼저 낮춰야 할 학습 부담",
+    required: true,
+    options: [
+      "긴 문제 조건 이해",
+      "여러 조건을 한 번에 처리",
+      "문제에서 핵심 단서 찾기",
+      "긴 글을 읽고 시작",
+      "풀이 순서 유지",
+      "개념을 말로 설명하기",
+      "응용 문제로 옮기기",
+      "오류 후 다시 시도",
+    ],
+  },
+  {
+    key: "preferredSupportsText",
+    title: "효과가 확인된 학습 지원",
+    description: "콘텐츠 생성 때 반영할 설명·문제 제시 방식",
+    required: true,
+    options: [
+      "예시 문제를 먼저 보여줌",
+      "핵심 단서를 표시함",
+      "지시를 짧게 나눔",
+      "선택지를 줄임",
+      "풀이 순서를 카드로 보여줌",
+      "그림·표와 함께 설명함",
+      "빈칸으로 일부만 확인함",
+      "말로 설명하기 전에 문장 틀을 줌",
+    ],
+  },
+  {
+    key: "communicationNeedText",
+    title: "학습 표현·확인 기술",
+    description: "문제 풀이 중 키워야 할 말하기와 확인 방식",
+    options: [
+      "다시 설명해달라고 요청",
+      "어디부터 풀지 묻기",
+      "핵심 단서 말하기",
+      "풀이 순서 말하기",
+      "모르는 단어 묻기",
+      "정답 이유 짧게 말하기",
+      "틀린 부분 다시 확인하기",
+    ],
+  },
+  {
+    key: "calmingSupportsText",
+    title: "학습 부담을 낮추는 조건",
+    description: "수업 진입과 재시도를 안정시키는 조건",
+    options: [
+      "쉬운 첫 문항이 있을 때 안정됨",
+      "예시 풀이를 본 뒤 안정됨",
+      "생각할 시간이 있을 때 안정됨",
+      "선택지가 적을 때 안정됨",
+      "문제량이 나뉘어 있을 때 안정됨",
+      "오답 뒤 힌트가 있으면 재시도함",
+    ],
+  },
+  {
+    key: "avoidGuidanceText",
+    title: "피해야 할 학습 제시 방식",
+    description: "학습 시작과 이해를 방해할 수 있는 방식",
+    options: [
+      "긴 설명부터 시작",
+      "긴 지문을 한 번에 제시",
+      "조건을 여러 개 한꺼번에 제시",
+      "선택지를 많이 제시",
+      "풀이 순서 없이 바로 문제 제시",
+      "오답 직후 재촉",
+      "정답 이유를 길게 요구",
+    ],
+  },
+  ],
+  life_support: [
   {
     key: "strengthsText",
     title: "현재 잘 되는 수행",
     description: "관찰된 강점과 독립적으로 가능한 행동",
     required: true,
-    options: ["짧은 지시를 이해함", "익숙한 과제를 시작함", "한 문항씩 끝까지 수행함", "오류 뒤 다시 시도함", "교사 질문에 짧게 답함", "또래 활동을 관찰함"],
+    options: ["짧은 지시를 이해함", "익숙한 과제를 시작함", "한 문항씩 끝까지 수행함", "오류 뒤 다시 시도함", "선생님 질문에 짧게 답함", "또래 활동을 관찰함"],
   },
   {
     key: "weaknessesText",
@@ -135,7 +229,29 @@ const supportChecklistGroups: Array<{
     description: "문제행동이나 부담을 키울 수 있는 상황",
     options: ["오류 직후 재촉", "틀림을 강조", "갑작스러운 전환", "선택지를 많이 제시", "소음이 큰 자리", "낯선 역할을 바로 요구", "긴 설명부터 시작"],
   },
-];
+  ],
+};
+
+const checklistIntroByType: Record<ContentType, { title: string; description: string }> = {
+  learning_focus: {
+    title: "학습 반응 관점으로 빠르게 선택",
+    description: "개념 이해, 문제 조건 처리, 읽기 부담, 설명하기 반응을 등록 흐름에 맞게 줄인 항목입니다.",
+  },
+  life_support: {
+    title: "센터 관찰 관점으로 빠르게 선택",
+    description: "기능평가, 행동 기능 설문, 도전적 행동 우선순위 관점을 교사용 등록 흐름에 맞게 줄인 항목입니다.",
+  },
+};
+
+const currentGoalPlaceholderByType: Record<ContentType, string> = {
+  learning_focus: "예: 짧은 영어 안내문에서 장소와 해야 할 행동을 구분해 읽기",
+  life_support: "예: 친구에게 먼저 물어보고 공을 안전하게 돌려주기",
+};
+
+const observationPlaceholderByType: Record<ContentType, string> = {
+  learning_focus: "예: 그림이나 예시가 먼저 있으면 문제를 시작하고, 긴 조건을 한 번에 읽으면 핵심 단서를 놓칠 수 있음",
+  life_support: "예: 수업 관찰에서 확인한 반응이나 조정점",
+};
 
 const inputClass =
   "mt-2 w-full rounded-md border border-[#cbd5e1] bg-white px-3 py-3 text-sm font-bold text-[#172033] outline-none transition placeholder:text-[#94a3b8] focus:border-[#1f3a5f]";
@@ -194,13 +310,13 @@ function supportIntakeFromForm(form: RegistrationFormState, strengths: string[],
   const communicationNeeds = splitList(form.communicationNeedText);
   const calmingSupports = splitList(form.calmingSupportsText);
   const avoidGuidance = splitList(form.avoidGuidanceText);
+  const sourceBasis =
+    form.studentType === "learning_focus"
+      ? ["기초학력 지원 관찰 관점", "학습 과제 반응 관점", "문제 조건·읽기 부담 조정 관점"]
+      : ["센터 관찰 자료의 기능평가 관점", "QABF의 행동 기능 가설 관점", "도전적 행동 우선순위 체크리스트의 지원 우선순위 관점"];
 
   return {
-    sourceBasis: [
-      "센터 관찰 자료의 기능평가 관점",
-      "QABF의 행동 기능 가설 관점",
-      "도전적 행동 우선순위 체크리스트의 지원 우선순위 관점",
-    ],
+    sourceBasis,
     learningResponse: {
       observedStrengths: strengths,
       effectiveSupports: preferredSupports,
@@ -315,6 +431,8 @@ export function StudentRegistrationModal({
   const strengths = useMemo(() => splitList(form.strengthsText), [form.strengthsText]);
   const weaknesses = useMemo(() => splitList(form.weaknessesText), [form.weaknessesText]);
   const preferredSupports = useMemo(() => splitList(form.preferredSupportsText), [form.preferredSupportsText]);
+  const activeChecklistGroups = supportChecklistGroupsByType[form.studentType];
+  const checklistIntro = checklistIntroByType[form.studentType];
   const canSubmit =
     Boolean(form.displayName.trim()) &&
     Boolean(selectedSchool?.schoolCode) &&
@@ -347,6 +465,20 @@ export function StudentRegistrationModal({
         [key]: nextValues.join("\n"),
       };
     });
+  };
+
+  const handleStudentTypeChange = (studentType: ContentType) => {
+    setForm((current) => ({
+      ...current,
+      studentType,
+      strengthsText: "",
+      weaknessesText: "",
+      preferredSupportsText: "",
+      instructionBurdenText: "",
+      communicationNeedText: "",
+      calmingSupportsText: "",
+      avoidGuidanceText: "",
+    }));
   };
 
   const handleSearchSchools = async () => {
@@ -630,7 +762,7 @@ export function StudentRegistrationModal({
                           name="studentType"
                           value={option.value}
                           checked={selected}
-                          onChange={() => updateForm("studentType", option.value)}
+                          onChange={() => handleStudentTypeChange(option.value)}
                           className="sr-only"
                         />
                         <span className="block text-base font-black text-[#172033]">{option.label}</span>
@@ -649,7 +781,7 @@ export function StudentRegistrationModal({
                   value={form.currentGoal}
                   onChange={(event) => updateForm("currentGoal", event.target.value)}
                   className={`${textareaClass} h-20`}
-                  placeholder="예: 친구에게 먼저 물어보고 공을 안전하게 돌려주기"
+                  placeholder={currentGoalPlaceholderByType[form.studentType]}
                   required
                 />
               </label>
@@ -659,7 +791,7 @@ export function StudentRegistrationModal({
                   value={form.observationNote}
                   onChange={(event) => updateForm("observationNote", event.target.value)}
                   className={`${textareaClass} h-20`}
-                  placeholder="수업 관찰에서 확인한 반응이나 조정점"
+                  placeholder={observationPlaceholderByType[form.studentType]}
                   required
                 />
               </label>
@@ -670,17 +802,17 @@ export function StudentRegistrationModal({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-black text-[#1f3a5f]">지원 체크리스트</p>
-                    <h3 className="mt-1 text-xl font-black text-[#172033]">센터 관찰 관점으로 빠르게 선택</h3>
+                    <h3 className="mt-1 text-xl font-black text-[#172033]">{checklistIntro.title}</h3>
                   </div>
                   <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#64748b]">필수 3개 영역</span>
                 </div>
                 <p className="mt-2 text-sm font-semibold leading-6 text-[#64748b]">
-                  기능평가, 행동 기능 설문, 도전적 행동 우선순위 관점을 교사용 등록 흐름에 맞게 줄인 항목입니다.
+                  {checklistIntro.description}
                 </p>
               </section>
 
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {supportChecklistGroups.map((group) => (
+                {activeChecklistGroups.map((group) => (
                   <ChecklistGroup
                     key={group.key}
                     title={group.title}
