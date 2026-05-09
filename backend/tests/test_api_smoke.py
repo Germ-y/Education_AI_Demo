@@ -23,6 +23,7 @@ def use_sqlite_demo_db(tmp_path) -> None:
     os.environ["DATABASE_URL"] = f"sqlite+pysqlite:///{tmp_path / 'eduyj-test.db'}"
     os.environ["DEMO_SEED_MODE"] = "true"
     os.environ["DEMO_SEED_RESET"] = "true"
+    os.environ["DEMO_BLANK_START"] = "false"
     os.environ["OPENAI_API_KEY"] = ""
     os.environ["ELEVENLABS_API_KEY"] = ""
     os.environ["NEIS_API_KEY"] = ""
@@ -35,6 +36,7 @@ def use_sqlite_demo_db(tmp_path) -> None:
     get_session_maker.cache_clear()
     get_engine.cache_clear()
     get_settings.cache_clear()
+    os.environ.pop("DEMO_BLANK_START", None)
 
 
 def assert_no_teacher_raw_terms(payload: object) -> None:
@@ -226,7 +228,7 @@ def test_teacher_and_student_demo_flows() -> None:
     assert clock_student["dashboardStageLabel"] == "자료 생성"
     assert clock_student["attendanceLabel"] == "기록 전"
     assert "시간 읽기 기초" in clock_student["primaryNeed"]
-    assert "좋겠어요" in clock_student["primaryNeed"]
+    assert "좋겠어요" not in clock_student["primaryNeed"]
     assert "시간 읽기 기초" in clock_student["summaryLine"]
     assert clock_student["strengths"][0] == "그림에서 중요한 단서를 먼저 찾으면 바로 반응해요."
     assert clock_student["weaknesses"][0] == "문장이 길어지면 무엇부터 해야 할지 멈칫할 수 있어요."
@@ -277,6 +279,16 @@ def test_teacher_and_student_demo_flows() -> None:
         "과학",
         "창의적체험활동",
     ]
+    weekly_timetable = client.get(
+        "/api/public-data/schools/8811046/weekly-timetable?weekStart=2026-04-27&grade=3&className=1&syncIfMissing=false",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert weekly_timetable.status_code == 200
+    weekly_payload = weekly_timetable.json()["data"]
+    assert weekly_payload["weekStart"] == "2026-04-27"
+    assert weekly_payload["weekEnd"] == "2026-05-01"
+    assert [day["weekdayLabel"] for day in weekly_payload["days"]] == ["월", "화", "수", "목", "금"]
+    assert weekly_payload["days"][-1]["subjects"] == ["국어", "수학", "사회", "과학", "창의적체험활동"]
     missing_timetable = client.get(
         "/api/public-data/schools/8811046/timetable?date=2026-05-03&grade=3&className=1&syncIfMissing=false",
         headers={"authorization": f"Bearer {teacher_token}"},
@@ -300,16 +312,16 @@ def test_teacher_and_student_demo_flows() -> None:
     assert fraction_case.status_code == 200
     assert fraction_case.json()["data"]["profile"]["displayName"] == "이민준"
     assert fraction_case.json()["data"]["dashboardProfile"]["headline"] == "영주중학교 · 중2 · 고연령 학습지원형"
-    assert fraction_case.json()["data"]["dashboardProfile"]["primaryNeedTitle"] == "정보 읽기 근거 설명 수업"
-    assert "수업이 좋겠어요" in fraction_case.json()["data"]["dashboardProfile"]["primaryNeedDetail"]
+    assert fraction_case.json()["data"]["dashboardProfile"]["primaryNeedTitle"] == "현재 지원 목표"
+    assert "좋겠어요" not in fraction_case.json()["data"]["dashboardProfile"]["primaryNeedDetail"]
     assert "근거" in fraction_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
-    assert "좋겠어요" in fraction_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
+    assert "좋겠어요" not in fraction_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
     assert fraction_case.json()["data"]["dashboardProfile"]["strengths"][0] == "포스터나 안내문처럼 실제 장면이 있으면 읽어야 할 문장을 더 잘 찾습니다."
     assert fraction_case.json()["data"]["dashboardProfile"]["weaknesses"][0] == "확인할 수 있는 사실과 생각·권유가 담긴 의견을 가끔 섞어 판단합니다."
     assert_no_teacher_raw_terms(fraction_case.json()["data"]["dashboardProfile"])
     life_case = client.get("/api/teacher/students/student_life_bus", headers={"authorization": f"Bearer {teacher_token}"})
     assert life_case.status_code == 200
-    assert life_case.json()["data"]["dashboardProfile"]["primaryNeedTitle"] == "일상생활 의사소통 수업"
+    assert life_case.json()["data"]["dashboardProfile"]["primaryNeedTitle"] == "현재 지원 목표"
     assert "실시간 역할 발화 연습" in life_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
     assert life_case.json()["data"]["dashboardProfile"]["strengths"][0] == "상황 그림을 보면 지금 어디서 무엇을 해야 하는지 잘 파악해요."
     assert life_case.json()["data"]["dashboardProfile"]["weaknesses"][0] == "여러 이동 단계를 한 번에 정리하면 순서가 헷갈릴 수 있어요."
@@ -424,6 +436,13 @@ def test_teacher_and_student_demo_flows() -> None:
     )
     assert note.status_code == 200
     assert note.json()["data"]["caseId"] == "case_learning_fraction"
+    dirty_brief = client.get(
+        "/api/teacher/students/student_learning_fraction/context-brief",
+        headers={"authorization": f"Bearer {teacher_token}"},
+    )
+    assert dirty_brief.status_code == 200
+    assert dirty_brief.json()["data"]["dirty"] is True
+    assert dirty_brief.json()["data"]["sourceJson"]["lastDirtySource"]["trigger"] == "teacher_note_added"
 
     student_login = client.post("/api/auth/student-access", json={"accessCode": "STAR-001"})
     assert student_login.status_code == 200
@@ -598,6 +617,31 @@ def test_orchestrator_plan_normalizer_maps_contract_aliases() -> None:
     assert normalized["normalizationNotes"]
 
 
+def test_orchestrator_plan_normalizer_uses_randomized_template_contract() -> None:
+    plan = {
+        "stagePlan": [
+            {"step": 1, "stageRole": "scenario_intro", "templateType": "scenario_intro", "studentTitle": "상황 만나기"},
+            {"step": 2, "stageRole": "clue_identification", "templateType": "highlight_clue", "studentTitle": "단서 찾기"},
+            {"step": 3, "stageRole": "action_selection", "templateType": "action_choice", "studentTitle": "행동 고르기"},
+            {"step": 4, "stageRole": "realtime_practice", "templateType": "realtime_roleplay", "studentTitle": "한 번 해보기"},
+        ]
+    }
+
+    normalized = _normalize_orchestrator_plan_candidate(
+        plan,
+        content_type="life_support",
+        template_randomization={
+            "forcedStageTemplates": [
+                {"step": 2, "templateType": "card_match"},
+                {"step": 3, "templateType": "sequence_ordering"},
+            ]
+        },
+    )
+
+    assert normalized["stagePlan"][1]["templateType"] == "card_match"
+    assert normalized["stagePlan"][2]["templateType"] == "sequence_ordering"
+
+
 def test_teacher_can_persist_content_review_edits() -> None:
     client = TestClient(create_app())
     teacher_login = client.post(
@@ -685,11 +729,11 @@ def test_teacher_can_search_neis_school_and_register_student(monkeypatch) -> Non
             "gradeNumber": "4",
             "className": "1",
             "studentType": "learning_focus",
-            "currentGoal": "영어 단어를 그림 카드와 연결하기",
-            "observationNote": "그림 단서가 있으면 먼저 손으로 가리키며 반응합니다.",
-            "strengths": ["그림 단서를 잘 찾음"],
-            "weaknesses": ["긴 문장 지시가 부담됨"],
-            "preferredSupports": ["그림 카드", "2개 선택지"],
+            "currentGoal": "짧은 영어 안내문에서 장소 단어 찾기",
+            "observationNote": "짧은 지시를 들으면 과제를 시작하지만 조건이 길어지면 다시 확인이 필요합니다.",
+            "strengths": ["짧은 지시를 이해함"],
+            "weaknesses": ["긴 지시 이해"],
+            "preferredSupports": ["지시를 짧게 나눔", "예시를 먼저 보여줌"],
         },
     )
     assert created.status_code == 200, created.json()
@@ -701,7 +745,7 @@ def test_teacher_can_search_neis_school_and_register_student(monkeypatch) -> Non
     assert student["profile"]["schoolCode"] == "8888001"
     assert student["profile"]["gradeLabel"] == "초4"
     assert student["dashboardProfile"]["headline"] == "풍기초등학교 · 초4 · 저연령 학습지원형"
-    assert student["dashboardProfile"]["strengths"][0] == "그림 단서를 잘 찾아요."
+    assert student["dashboardProfile"]["strengths"][0] == "짧은 지시를 이해합니다."
     assert "자료 생성" in student["dashboardProfile"]["currentStageLabel"]
 
     students = client.get("/api/teacher/students?q=최하늘", headers={"authorization": f"Bearer {teacher_token}"})
@@ -846,9 +890,27 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
             "studentType": "learning_focus",
             "currentGoal": "피자 그림에서 전체와 부분을 보고 분수로 말하기",
             "observationNote": "그림 단서가 있으면 먼저 손으로 가리키며 반응합니다.",
-            "strengths": ["그림 단서를 잘 찾음"],
-            "weaknesses": ["긴 문장 지시가 부담됨"],
-            "preferredSupports": ["그림 카드", "2개 선택지"],
+            "strengths": ["짧은 지시를 이해함"],
+            "weaknesses": ["긴 지시 이해"],
+            "preferredSupports": ["지시를 짧게 나눔", "예시를 먼저 보여줌"],
+            "supportIntake": {
+                "sourceBasis": ["센터 관찰 자료의 기능평가 관점", "행동 기능 설문 관점"],
+                "learningResponse": {
+                    "observedStrengths": ["짧은 지시를 이해함"],
+                    "effectiveSupports": ["지시를 짧게 나눔", "예시를 먼저 보여줌"],
+                    "instructionBurdens": ["여러 조건을 한 번에 들음"],
+                    "communicationNeeds": ["순서 확인 질문"],
+                },
+                "checklistSummary": {
+                    "observedStrengths": ["짧은 지시를 이해함"],
+                    "hardSituations": ["긴 지시 이해", "과제 시작"],
+                    "effectiveSupports": ["지시를 짧게 나눔", "예시를 먼저 보여줌"],
+                    "instructionBurdens": ["여러 조건을 한 번에 들음"],
+                    "communicationNeeds": ["순서 확인 질문"],
+                    "calmingSupports": ["기다릴 시간이 있을 때 안정됨"],
+                    "avoidGuidance": ["오류 직후 재촉"],
+                },
+            },
         },
     )
     assert created_student.status_code == 200, created_student.json()
@@ -874,7 +936,8 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
     support_draft_payload = support_draft.json()["data"]
     assert support_draft_payload["profileDraft"]["draftLabel"] == "수업 설계 초안"
     assert support_draft_payload["profileDraft"]["source"]["rawRecordPreserved"] is True
-    assert "그림 카드" in support_draft_payload["profileDraft"]["learningResponsePattern"]["worksWell"]
+    assert "짧은 지시를 이해함" in support_draft_payload["profileDraft"]["learningResponsePattern"]["worksWell"]
+    assert "지시를 짧게 나누기" in support_draft_payload["profileDraft"]["behaviorSupportProfile"]["recommendedScaffolds"]
 
     confirmed_support = client.post(
         f"/api/teacher/students/{student_id}/support-profiles",
@@ -891,7 +954,7 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
     assert detail_after_profile.status_code == 200
     assert detail_after_profile.json()["data"]["supportProfile"]["status"] == "confirmed"
     assert detail_after_profile.json()["data"]["dashboardProfile"]["supportProfileStatus"] == "confirmed"
-    assert detail_after_profile.json()["data"]["dashboardProfile"]["primaryNeedTitle"] == "현재 목표"
+    assert detail_after_profile.json()["data"]["dashboardProfile"]["primaryNeedTitle"] == "현재 지원 목표"
 
     context_brief = client.get(f"/api/teacher/students/{student_id}/context-brief", headers=teacher_headers)
     assert context_brief.status_code == 200
@@ -899,14 +962,26 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
     refreshed_brief = client.post(f"/api/teacher/students/{student_id}/context-brief/refresh", headers=teacher_headers)
     assert refreshed_brief.status_code == 200
     assert refreshed_brief.json()["data"]["dirty"] is False
-    assert "그림 카드" in refreshed_brief.json()["data"]["briefText"]
+    assert "짧은 지시를 이해함" in refreshed_brief.json()["data"]["briefText"]
 
     scenario_spine = _pizza_scenario_spine()
     stage_visual_specs = _pizza_stage_visual_specs()
     generated_content = _generated_learning_focus_content_payload(student_id, case_id)
     content_generation_calls = {"count": 0}
 
-    def fake_json_response(self, *, model, instructions, input_snapshot, timeout_sec=90, max_output_tokens=None):
+    def fake_json_response(
+        self,
+        *,
+        model,
+        instructions,
+        input_snapshot,
+        output_schema_name=None,
+        output_json_schema=None,
+        timeout_sec=90,
+        max_output_tokens=None,
+    ):
+        assert output_schema_name
+        assert output_json_schema
         if "Content Quality Critic" in instructions:
             return (
                 {
@@ -927,7 +1002,7 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
             assert input_snapshot["caseFile"]["contextBrief"]["dirty"] is False
             return copy.deepcopy(generated_content), {"input_tokens": 12, "output_tokens": 24}
         assert input_snapshot["studentContextBrief"]["dirty"] is False
-        assert "그림 카드" in input_snapshot["studentContextBrief"]["briefText"]
+        assert "짧은 지시를 이해함" in input_snapshot["studentContextBrief"]["briefText"]
         return (
             {
                 "planVersion": "orchestrator_plan_v1",
@@ -1403,13 +1478,23 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
         asset["qaStatus"] = "pending"
         asset["approvalStatus"] = "pending"
 
-    invalid_generated_content = copy.deepcopy(generated_content)
-    invalid_generated_content["stages"][3]["studentTitle"] = "realtime practice"
     content_generation_calls = {"count": 0}
     image_parallel_probe = {"active": 0, "max": 0}
     image_parallel_lock = threading.Lock()
 
-    def fake_json_response(self, *, model, instructions, input_snapshot, timeout_sec=90, max_output_tokens=None):
+    def fake_json_response(
+        self,
+        *,
+        model,
+        instructions,
+        input_snapshot,
+        output_schema_name=None,
+        output_json_schema=None,
+        timeout_sec=90,
+        max_output_tokens=None,
+    ):
+        assert output_schema_name
+        assert output_json_schema
         if "Content Quality Critic" in instructions:
             return (
                 {
@@ -1425,13 +1510,7 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
             assert input_snapshot["generationPlan"]["unitVersion"] == "content_generation_units_v1"
             assert len(input_snapshot["generationPlan"]["stagePlans"]) == 4
             assert len(input_snapshot["generationPlan"]["visualSpecDrafts"]) == 5
-            if content_generation_calls["count"] == 1:
-                assert "qualityRepair" not in input_snapshot
-                return invalid_generated_content, {"input_tokens": 10, "output_tokens": 20}
-            assert input_snapshot["qualityRepair"]["validationErrors"]
-            assert input_snapshot["qualityRepair"]["repairMode"] == "targeted_stage_or_visual_repair"
-            assert input_snapshot["qualityRepair"]["stageContentDrafts"]
-            assert input_snapshot["qualityRepair"]["stageRepairTargets"][0]["step"] == 4
+            assert "qualityRepair" not in input_snapshot
             return generated_content, {"input_tokens": 10, "output_tokens": 20}
         return (
             {
@@ -1562,7 +1641,7 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     assert content_id.startswith(f"content_{student_id}_")
     assert content["status"] == "teacher_review"
     assert content["totalSteps"] == 4
-    assert content_generation_calls["count"] == 2
+    assert content_generation_calls["count"] == 1
     assert [stage["step"] for stage in content["stages"]] == [1, 2, 3, 4]
     assert len([asset for asset in content["assets"] if asset["assetType"] == "image"]) == 5
     assert len([asset for asset in content["assets"] if asset["assetType"] == "audio"]) == 5

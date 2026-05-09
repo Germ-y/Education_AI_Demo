@@ -1,4 +1,8 @@
+import pytest
+
 from app.ai.openai_provider import OpenAiProvider
+from app.ai.output_schemas import output_json_schema
+from app.ai.provider_errors import ProviderOutputError
 from app.core.config import Settings
 
 
@@ -92,6 +96,90 @@ def test_json_response_disables_reasoning_for_gpt_5_1(monkeypatch) -> None:
     assert captured["payload"]["reasoning"] == {"effort": "none"}
     assert captured["payload"]["text"] == {"verbosity": "low"}
     assert captured["payload"]["max_output_tokens"] == 1200
+
+
+def test_json_response_sends_openai_json_schema_contract(monkeypatch) -> None:
+    captured: dict = {}
+    settings = Settings(openai_api_key="test-key", openai_reasoning_effort="none", openai_text_verbosity="low")
+    provider = OpenAiProvider(settings)
+    schema = {
+        "type": "object",
+        "properties": {"ok": {"type": "boolean"}},
+        "required": ["ok"],
+        "additionalProperties": False,
+    }
+
+    def fake_post(path: str, payload: dict, *, timeout_sec: float) -> dict:
+        captured["payload"] = payload
+        return {"output_text": "{\"ok\": true}"}
+
+    monkeypatch.setattr(provider, "_post", fake_post)
+
+    data, _ = provider.create_json_response(
+        model="gpt-5.1",
+        instructions="JSON만 반환합니다.",
+        input_snapshot={"topic": "테스트"},
+        output_schema_name="TestSchema",
+        output_json_schema=schema,
+        timeout_sec=10,
+    )
+
+    assert data == {"ok": True}
+    assert captured["payload"]["text"] == {
+        "format": {
+            "type": "json_schema",
+            "name": "TestSchema",
+            "schema": schema,
+            "strict": True,
+        },
+        "verbosity": "low",
+    }
+
+
+def test_mission_content_output_schema_requires_renderable_package_fields() -> None:
+    schema = output_json_schema("MissionContentPackageV1")
+
+    assert schema["required"] == [
+        "id",
+        "studentId",
+        "caseId",
+        "contentType",
+        "title",
+        "sessionGoal",
+        "status",
+        "totalSteps",
+        "briefJson",
+        "stages",
+        "assets",
+        "teacherReviewSummary",
+    ]
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["stages"]["type"] == "array"
+    assert schema["properties"]["assets"]["type"] == "array"
+
+
+def test_json_response_reports_incomplete_before_json_parse(monkeypatch) -> None:
+    provider = OpenAiProvider(Settings(openai_api_key="test-key"))
+
+    def fake_post(path: str, payload: dict, *, timeout_sec: float) -> dict:
+        return {
+            "status": "incomplete",
+            "incomplete_details": {"reason": "max_output_tokens"},
+            "output_text": "{\"ok\":",
+        }
+
+    monkeypatch.setattr(provider, "_post", fake_post)
+
+    with pytest.raises(ProviderOutputError) as exc_info:
+        provider.create_json_response(
+            model="gpt-5.1",
+            instructions="JSON만 반환합니다.",
+            input_snapshot={"topic": "테스트"},
+            timeout_sec=10,
+        )
+
+    assert exc_info.value.code == "OPENAI_RESPONSE_INCOMPLETE"
+    assert "max_output_tokens" in exc_info.value.message
 
 
 def test_json_response_downgrades_none_reasoning_for_older_gpt_5_models(monkeypatch) -> None:

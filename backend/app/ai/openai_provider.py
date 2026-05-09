@@ -3,6 +3,7 @@ import json
 import logging
 import random
 import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,8 @@ class OpenAiProvider:
         model: str,
         instructions: str,
         input_snapshot: dict[str, Any],
+        output_schema_name: str | None = None,
+        output_json_schema: dict[str, Any] | None = None,
         timeout_sec: float | None = None,
         max_output_tokens: int | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any] | None]:
@@ -45,12 +48,18 @@ class OpenAiProvider:
         reasoning_effort = _reasoning_effort_for_model(model, self.settings.openai_reasoning_effort)
         if reasoning_effort:
             payload["reasoning"] = {"effort": reasoning_effort}
+        text_options: dict[str, Any] = {}
+        if output_schema_name and output_json_schema:
+            text_options["format"] = _json_schema_text_format(output_schema_name, output_json_schema)
         if _supports_text_verbosity(model) and self.settings.openai_text_verbosity:
-            payload["text"] = {"verbosity": self.settings.openai_text_verbosity}
+            text_options["verbosity"] = self.settings.openai_text_verbosity
+        if text_options:
+            payload["text"] = text_options
         if max_output_tokens:
             payload["max_output_tokens"] = max_output_tokens
         response = self._post("/v1/responses", payload, timeout_sec=timeout_sec)
         logger.info("openai.responses.returned model=%s elapsed_sec=%.1f", model, time.perf_counter() - started_at)
+        _raise_if_response_incomplete(response)
         output_text = _extract_output_text(response)
         try:
             parsed = json.loads(output_text)
@@ -60,6 +69,69 @@ class OpenAiProvider:
             raise ProviderOutputError("OPENAI_OUTPUT_NOT_OBJECT", "OpenAI 응답 JSON 최상위 값은 object여야 합니다.")
         usage = response.get("usage") if isinstance(response.get("usage"), dict) else None
         return parsed, usage
+
+    def stream_text_response(
+        self,
+        *,
+        model: str,
+        instructions: str,
+        input_snapshot: dict[str, Any],
+        timeout_sec: float | None = None,
+    ) -> Iterator[str]:
+        if not self.settings.openai_api_key:
+            raise ProviderConfigurationError("OPENAI_API_KEY_MISSING", "OPENAI_API_KEY가 없어 실제 AI 생성을 실행할 수 없습니다.")
+
+        timeout_sec = timeout_sec or self.settings.openai_response_timeout_sec
+        started_at = time.perf_counter()
+        logger.info("openai.responses.stream.started model=%s timeout_sec=%s", model, timeout_sec)
+        payload = {
+            "model": model,
+            "instructions": instructions,
+            "input": json.dumps(input_snapshot, ensure_ascii=False),
+            "store": True,
+            "stream": True,
+        }
+        reasoning_effort = _reasoning_effort_for_model(model, self.settings.openai_reasoning_effort)
+        if reasoning_effort:
+            payload["reasoning"] = {"effort": reasoning_effort}
+        if _supports_text_verbosity(model) and self.settings.openai_text_verbosity:
+            payload["text"] = {"verbosity": self.settings.openai_text_verbosity}
+
+        with httpx.Client(timeout=timeout_sec) as client:
+            with client.stream(
+                "POST",
+                "https://api.openai.com/v1/responses",
+                headers={
+                    "Authorization": f"Bearer {self.settings.openai_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            ) as response:
+                if response.status_code >= 400:
+                    body = response.read().decode("utf-8", errors="replace")
+                    raise ProviderRequestError("OPENAI_HTTP_ERROR", f"OpenAI HTTP {response.status_code}: {body[:500]}")
+                for line in response.iter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    raw = line.removeprefix("data: ").strip()
+                    if not raw or raw == "[DONE]":
+                        continue
+                    try:
+                        event = json.loads(raw)
+                    except json.JSONDecodeError as exc:
+                        raise ProviderOutputError("OPENAI_STREAM_JSON_PARSE_FAILED", "OpenAI 스트림 이벤트를 JSON으로 파싱할 수 없습니다.") from exc
+                    if not isinstance(event, dict):
+                        continue
+                    event_type = event.get("type")
+                    if event_type == "response.output_text.delta" and isinstance(event.get("delta"), str):
+                        yield event["delta"]
+                    elif event_type in {"response.failed", "response.incomplete"}:
+                        response_payload = event.get("response") if isinstance(event.get("response"), dict) else {}
+                        error = event.get("error") or response_payload.get("error")
+                        raise ProviderRequestError("OPENAI_STREAM_FAILED", f"OpenAI 스트림 생성 실패: {error or event_type}")
+                    elif event_type == "error":
+                        raise ProviderRequestError("OPENAI_STREAM_ERROR", f"OpenAI 스트림 오류: {event.get('message') or event}")
+        logger.info("openai.responses.stream.returned model=%s elapsed_sec=%.1f", model, time.perf_counter() - started_at)
 
     def create_realtime_client_secret(
         self,
@@ -213,6 +285,26 @@ def _supports_reasoning_none(model: str) -> bool:
 
 def _supports_text_verbosity(model: str) -> bool:
     return model.startswith("gpt-5")
+
+
+def _json_schema_text_format(name: str, schema: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "type": "json_schema",
+        "name": name,
+        "schema": schema,
+        "strict": True,
+    }
+
+
+def _raise_if_response_incomplete(response: dict[str, Any]) -> None:
+    if response.get("status") != "incomplete":
+        return
+    details = response.get("incomplete_details")
+    reason = details.get("reason") if isinstance(details, dict) else None
+    message = "OpenAI 응답이 완료되기 전에 잘렸습니다."
+    if reason:
+        message = f"{message} reason={reason}"
+    raise ProviderOutputError("OPENAI_RESPONSE_INCOMPLETE", message)
 
 
 def _extract_output_text(response: dict[str, Any]) -> str:

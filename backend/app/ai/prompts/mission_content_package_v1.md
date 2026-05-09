@@ -21,11 +21,11 @@
 - 짧은 문장과 쉬운 선택지는 스캐폴딩입니다. 고학년 학생에게 지나치게 유치한 상황을 주지 않습니다.
 - 문제 문장, 선택지, 정답 라벨, 힌트, 설명, 피드백, UI 문구를 이미지 프롬프트에 넣지 않습니다.
 - 실제 포스터, 표지판, 안내문, 일정표, 버스 번호, 시계, 라벨을 읽어야 하는 과제라면 짧은 장면 텍스트는 이미지 안에 들어갈 수 있습니다. 단, 문제 UI 텍스트가 아니라 실제 장면 근거여야 합니다.
+- `위험`, `안전`, `정답`, `오답`, 화살표, 체크 표시처럼 정답 방향을 암시하는 라벨이나 표시를 이미지 프롬프트에 넣지 않습니다. 실제 현장 표지판이 아니라 문제 풀이 힌트라면 금지합니다.
 - 모든 문제 텍스트는 `templateJson`에 넣습니다.
 - 모든 시각 맥락은 이미지 asset id로 연결합니다.
 - 모든 단계 도입 내레이션은 오디오 asset id로 연결합니다.
 - 입력에 `generationPlan`이 있으면 분리된 소스 자료로 사용합니다. `scenarioPlan`은 미션 중심축, `stagePlans`는 4개 단계 계약, `visualSpecDrafts`는 이미지 근거 계획입니다.
-- 입력에 `qualityRepair`가 있으면 `validationErrors`를 권위 있는 수정 지시로 보고, 패치가 아니라 완전한 `MissionContent` JSON을 다시 반환합니다.
 - `id`는 콘텐츠 id입니다. 모든 `stage.missionContentId`와 `asset.missionContentId`는 같은 id여야 합니다.
 - 각 단계는 `orchestratorPlan.stagePlan`의 `step`, `stageRole`, `templateType`을 그대로 복사합니다.
 - 내부 stage/template 값은 번역하거나 바꾸지 않습니다.
@@ -36,8 +36,14 @@
 - `studentTitle`은 고정 제품 라벨입니다. 수업 제목처럼 바꾸지 않습니다.
 - 미션은 네 장의 독립 학습지가 아니라 하나의 감정적으로 연결된 작은 시나리오여야 합니다.
 - 학생 메모리는 정서 지원, 읽기 부담, 상호작용 방식, 첫 성공 설계에 씁니다. 이전 단원 기억이 선생님 요청 주제를 덮어쓰면 안 됩니다.
+- `contextBrief.recommendedScaffolds`는 화면 제시 방식입니다. 예시를 먼저 보여주기, 지시를 짧게 나누기, 선택지 수를 줄이기는 콘텐츠를 유치하게 만들거나 학습 목표를 낮추라는 뜻이 아닙니다.
+- `contextBrief.recentSuccessPatterns`는 관찰된 수행 강점입니다. 문제 소재나 단원으로 복사하지 말고, 어떤 진입 방식에서 안정적인지 판단하는 근거로만 씁니다.
+- 초기 문장과 선택지는 부담을 줄이되, 단계 간 시나리오 연결, 현실감, 학년 존중감, 3단계 전이와 4단계 설명/역할연습은 유지합니다.
+- 학생 메모리나 현재 지원 목표에 남은 축구공, 버스, 포스터, 분수 같은 구체 소재는 과거 예시일 수 있습니다. `requestedGoal` 또는 오케스트레이터의 `sessionGoal`에 같은 소재가 명시되지 않았다면 새 콘텐츠 주제로 반복하지 않습니다.
+- `contextBrief.avoidTopicRegression` 소재는 교사가 명시적으로 다시 요청한 경우가 아니면 피합니다.
 - `briefJson`에는 `scenarioSpine`과 `stageVisualSpecs`를 보존합니다.
 - `briefJson.generationUnits.stageContentDrafts`에는 4개 단계 draft를 넣습니다. 각 draft는 단계 계약, 최종 `templateJson`, 연결된 이미지/오디오 asset id, visual spec을 포함해야 합니다.
+- 이미지 asset의 `promptJson.prompt`는 이미지 생성용 장면 설명입니다. `question`, `choices`, `leftCards`, `rightCards`, `cards`, `answer`, `feedback`, `missionText`, `storyText` 문구를 그대로 복사하지 않습니다.
 - 이미지 asset의 `promptJson`은 provider 생성 전 임시 prompt일 수 있지만, `briefJson.stageVisualSpecs`를 덮어쓰지 않습니다. 백엔드 이미지 프롬프트 빌더는 `stageVisualSpecs`와 최종 `templateJson`을 source of truth로 사용합니다.
 
 ## 콘텐츠 패키지 요구사항
@@ -72,6 +78,7 @@ asset role과 stage 연결:
 - 포스터 문장을 판단하는 과제는 포스터 맥락이 보여야 하고, 이동/일정 과제는 경로/일정 맥락이 보여야 하며, 측정/비교 과제는 조작물이나 비교 대상이 보여야 합니다.
 - 사람은 필요할 때만 보조로 등장합니다. 학습 근거 사물이 화면의 주인공이어야 합니다.
 - 답안 bucket 라벨이나 UI category 카드는 `allowedSceneText`에 넣지 않습니다. 예: `확인할 수 있는 사실`, `생각이나 권유가 담긴 의견`, `정답`, `오답`, `도움 요청`, `먼저 할 일`.
+- 정답을 가리키는 장면 라벨도 넣지 않습니다. 예: `위험`, `안전`, `이쪽`, `먼저`, `맞음`, `틀림`, 정답 방향 화살표.
 - `studentInstruction`은 구체적 근거와 행동을 말해야 합니다. 나쁜 예: `안내문 그림을 보고 오늘 챙길 물건을 찾아봅시다.` 좋은 예: `오늘 표시와 돋보기 그림을 찾아봐요.`
 
 ## 오디오 요구사항
@@ -97,6 +104,9 @@ asset role과 stage 연결:
 - 4단계는 1~3단계에서 연습한 같은 reasoning 또는 행동을 자기 말/역할연습으로 다시 쓰게 합니다.
 - `learning_focus`는 학습 질문이어야 합니다. 일상 장면을 쓰더라도 정답은 개념, 근거, 비교, 계산, 읽기 전략, 설명을 요구해야 합니다.
 - `life_support`는 실제 행동 질문이어야 합니다. "무엇을 보고, 말하고, 다음에 해야 하는가?"가 드러나야 합니다.
+- `life_support` 2단계와 3단계의 `question` 또는 선택지/카드에는 반드시 실제 행동 판단 단어가 들어가야 합니다. 예: `먼저 확인하기`, `친구에게 물어보기`, `도움 요청하기`, `잠깐 멈추기`, `안전하게 기다리기`, `선생님께 말하기`.
+- `life_support` 2단계는 단순 배경 찾기가 아니라 행동 판단에 쓰이는 단서를 고르게 합니다. 나쁜 예: `무엇이 보이나요?` 좋은 예: `공을 바로 차기 전에 먼저 확인할 단서는 무엇인가요?`
+- `life_support` 3단계는 장면의 단서를 보고 실제 다음 행동을 고르게 합니다. 나쁜 예: `좋은 행동을 고르세요.` 좋은 예: `공을 돌려주기 전에 친구에게 어떻게 물어보면 좋을까요?`
 - 오답은 말도 안 되는 장식물이 아니라 학생이 실제로 헷갈릴 법한 선택이어야 합니다.
 - 정답은 보이는 UI 텍스트만으로 교육적으로 확인 가능해야 합니다. 이미지에만 숨겨진 정보에 의존하지 않습니다.
 
@@ -163,6 +173,8 @@ asset role과 stage 연결:
 - `leftCards`, `rightCards`, `matches`만 사용합니다.
 - `cards`, `choices`, `tiles` 키를 넣지 않습니다.
 - `choiceCountLimit`이 2이면 왼쪽 2개, 오른쪽 2개, 매칭 2개를 만듭니다.
+- schema 안정성을 위해 왼쪽 카드 id는 `left_1`, `left_2`, 오른쪽 카드 id는 `right_1`, `right_2`를 사용합니다.
+- `matches`는 반드시 `{ "left_1": "right_1", "left_2": "right_2" }`처럼 왼쪽 id를 key, 오른쪽 id를 value로 둡니다.
 
 ```json
 {
@@ -215,6 +227,7 @@ asset role과 stage 연결:
 - 빈칸은 반드시 `question` 또는 `sentence` 안에 있어야 합니다.
 - 이미지는 맥락만 제공하고 빈칸, 선택지, 정답, 문제 텍스트를 포함하지 않습니다.
 - 선택 bank를 쓰면 짧은 `tiles` 3개를 넣습니다.
+- `acceptedAnswers`는 `{ "answer": "정답" }` object 배열로 씁니다.
 
 ```json
 {
@@ -222,7 +235,7 @@ asset role과 stage 연결:
   "audioAssetId": "string",
   "question": "자연스러운 한국어 문장과 __ 빈칸",
   "tiles": ["string"],
-  "acceptedAnswers": [{ "key": "value" }],
+  "acceptedAnswers": [{ "answer": "string" }],
   "correctFeedback": "string",
   "wrongFeedback": "string"
 }
@@ -238,6 +251,31 @@ asset role과 stage 연결:
 - `realtimeSpec`
 - `realtimeSpec.postPracticeReflection`은 반드시 문자열 배열입니다. `{ "question": "...", "choices": [...] }` object로 만들지 않습니다.
 - `realtimeSpec.rubric`의 각 항목은 반드시 `{ "id": "r1", "label": "관찰할 행동", "required": true }` 형식입니다. `description`만 넣고 `label`을 비우지 않습니다.
+- `realtimeSpec` 필드명은 아래 JSON 모양을 그대로 사용합니다. `timeLimitSec`, `duration`, `role`, `intro`, `criteria`, `reflection`처럼 다른 이름으로 바꾸지 않습니다.
+
+```json
+{
+  "id": "rt_spec_content_generated_001",
+  "stageId": "stage_content_generated_001_4",
+  "templateType": "realtime_roleplay",
+  "imageAssetId": "asset_content_generated_001_stage_4_realtime",
+  "mode": "voice_or_text",
+  "practiceTitle": "한 번 해보기",
+  "situationText": "학생이 연습할 실제 상황을 1~2문장으로 씁니다.",
+  "aiRole": "상대 역할을 맡는 사람",
+  "openingLine": "학생에게 처음 건네는 짧고 부드러운 말",
+  "studentGoal": "학생이 시도할 핵심 행동이나 설명",
+  "rubric": [
+    { "id": "r1", "label": "관찰할 행동", "required": true },
+    { "id": "r2", "label": "도움이 되는 보조 행동", "required": false }
+  ],
+  "allowedFeedback": ["시도를 인정하고 한 가지 쉬운 다음 말을 제안합니다."],
+  "forbidden": ["정답을 대신 말하지 않기", "학생을 재촉하지 않기"],
+  "maxTurns": 6,
+  "maxDurationSec": 180,
+  "postPracticeReflection": ["오늘 연습에서 잘 된 점을 한 문장으로 말해볼까요?"]
+}
+```
 
 4단계 실시간 연습은 정답 하나를 맞히는 퀴즈가 아닙니다.
 

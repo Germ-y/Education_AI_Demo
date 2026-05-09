@@ -1,5 +1,6 @@
 import logging
 import time
+from random import SystemRandom
 from typing import Any
 from uuid import uuid4
 
@@ -7,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import ValidationError
 
 from app.ai.openai_provider import OpenAiProvider
+from app.ai.output_schemas import output_json_schema
 from app.ai.prompt_registry import PROMPT_SPECS, load_prompt
 from app.ai.provider_errors import AiProviderError
 from app.api.deps import get_agent_run_repository, get_store, require_teacher
@@ -18,8 +20,8 @@ from app.services.content_quality import ContentQualityError, validate_mission_c
 from app.services.store import DemoStore, SessionPrincipal
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
-MAX_CONTENT_GENERATION_ATTEMPTS = 2
 logger = logging.getLogger(__name__)
+_template_random = SystemRandom()
 
 ORCHESTRATOR_STAGE_CONTRACTS: dict[str, dict[int, dict[str, Any]]] = {
     "learning_focus": {
@@ -125,17 +127,35 @@ def create_orchestrator_run(
     settings = get_settings()
     spec = PROMPT_SPECS["orchestrator_plan"]
     context_brief = demo_store.get_student_context_brief(payload.student_id)
+    if context_brief is None or context_brief.dirty:
+        context_brief = (
+            demo_store.refresh_student_context_brief(
+                payload.student_id,
+                teacher_id=principal.id if principal.role == "teacher" else None,
+            )
+            or context_brief
+        )
+        case_file = demo_store.get_student_case_file(payload.student_id) or case_file
+    content_type = str(payload.content_type or case_file["profile"]["studentType"])
+    template_randomization = _build_template_randomization(content_type, case_file=case_file)
     input_snapshot = {
         "teacherId": principal.id,
         "studentId": payload.student_id,
         "caseId": payload.case_id,
         "requestedGoal": payload.requested_goal,
         "contentType": payload.content_type,
+        "templateRandomization": template_randomization,
         "studentContextBrief": context_brief.model_dump(by_alias=True) if context_brief else None,
         "generationContext": {
             "teacherRequestedGoal": payload.requested_goal,
             "contextBriefPriority": "use_context_brief_for_scaffolding_not_topic_override",
             "contextBriefDirty": context_brief.dirty if context_brief else True,
+            "templateSelectionPolicy": "use_backend_randomized_stage_templates_exactly",
+            "topicPolicy": (
+                "requestedGoal is the source of truth for subject/topic. "
+                "caseFile.openCase.currentGoal and contextBrief examples are support-pattern history only; "
+                "do not reuse their concrete scenario unless requestedGoal explicitly asks for it."
+            ),
         },
         "caseFile": case_file,
     }
@@ -154,8 +174,6 @@ def create_orchestrator_run(
         payload.content_type,
         payload.requested_goal,
     )
-
-    content_type = str(payload.content_type or case_file["profile"]["studentType"])
 
     background_tasks.add_task(
         _run_orchestrator_agent,
@@ -295,10 +313,16 @@ def _run_orchestrator_agent(
             model=settings.openai_orchestrator_model,
             instructions=load_prompt("orchestrator_plan"),
             input_snapshot=input_snapshot,
+            output_schema_name=PROMPT_SPECS["orchestrator_plan"].output_schema_name,
+            output_json_schema=output_json_schema(PROMPT_SPECS["orchestrator_plan"].output_schema_name),
             timeout_sec=settings.openai_orchestrator_timeout_sec,
             max_output_tokens=settings.openai_orchestrator_max_output_tokens,
         )
-        output_json = _normalize_orchestrator_plan_candidate(output_json, content_type=content_type)
+        output_json = _normalize_orchestrator_plan_candidate(
+            output_json,
+            content_type=content_type,
+            template_randomization=input_snapshot.get("templateRandomization"),
+        )
         validate_orchestrator_plan_quality(
             output_json,
             student_id=student_id,
@@ -339,7 +363,12 @@ def _run_orchestrator_agent(
     )
 
 
-def _normalize_orchestrator_plan_candidate(plan: Any, *, content_type: str) -> dict:
+def _normalize_orchestrator_plan_candidate(
+    plan: Any,
+    *,
+    content_type: str,
+    template_randomization: Any = None,
+) -> dict:
     if not isinstance(plan, dict):
         return plan
 
@@ -352,6 +381,7 @@ def _normalize_orchestrator_plan_candidate(plan: Any, *, content_type: str) -> d
     if not isinstance(stage_plan, list):
         return normalized
 
+    forced_templates = _forced_templates_from_randomization(template_randomization)
     normalized_stages: list[Any] = []
     changes: list[dict[str, Any]] = []
     for item in stage_plan:
@@ -378,6 +408,9 @@ def _normalize_orchestrator_plan_candidate(plan: Any, *, content_type: str) -> d
         template_aliases = contract.get("templateAliases", {})
         if template_type not in allowed_templates:
             template_type = template_aliases.get(template_type, contract["defaultTemplate"])
+        forced_template = forced_templates.get(step)
+        if forced_template in allowed_templates:
+            template_type = forced_template
         stage["templateType"] = template_type
 
         after = {
@@ -397,6 +430,126 @@ def _normalize_orchestrator_plan_candidate(plan: Any, *, content_type: str) -> d
         ]
         logger.info("ai.orchestrator.normalized content_type=%s changes=%s", content_type, changes)
     return normalized
+
+
+def _build_template_randomization(content_type: str, *, case_file: dict[str, Any]) -> dict[str, Any]:
+    contracts = ORCHESTRATOR_STAGE_CONTRACTS.get(content_type, {})
+    recent_templates = _recent_template_types_by_step(case_file)
+    forced_stage_templates: list[dict[str, Any]] = []
+    candidate_templates: dict[str, list[str]] = {}
+    avoided_recent_templates: dict[str, list[str]] = {}
+    for step in (2, 3):
+        contract = contracts.get(step)
+        if not contract:
+            continue
+        all_candidates = sorted(str(template) for template in contract["allowedTemplates"])
+        candidates = _template_candidates_for_case(
+            all_candidates,
+            step=step,
+            case_file=case_file,
+            recent_templates=recent_templates,
+        )
+        candidate_templates[str(step)] = candidates
+        avoided = [template for template in recent_templates.get(step, []) if template in all_candidates and template not in candidates]
+        if avoided:
+            avoided_recent_templates[str(step)] = avoided
+        if candidates:
+            forced_stage_templates.append({"step": step, "templateType": _template_random.choice(candidates)})
+
+    _ensure_randomized_template_quality(content_type, forced_stage_templates, case_file=case_file)
+    return {
+        "mode": "random_per_generation",
+        "randomId": uuid4().hex,
+        "policy": "2~3단계 템플릿은 매 생성마다 후보 중 랜덤으로 정하고 오케스트레이터가 그대로 사용합니다.",
+        "candidateTemplates": candidate_templates,
+        "recentTemplates": {str(step): templates for step, templates in recent_templates.items()},
+        "avoidedRecentTemplates": avoided_recent_templates,
+        "forcedStageTemplates": forced_stage_templates,
+    }
+
+
+def _template_candidates_for_case(
+    candidates: list[str],
+    *,
+    step: int,
+    case_file: dict[str, Any],
+    recent_templates: dict[int, list[str]],
+) -> list[str]:
+    filtered = list(candidates)
+    choice_count = _choice_count_limit_from_case_file(case_file)
+    if choice_count is not None and choice_count < 3:
+        filtered = [template for template in filtered if template != "image_quiz"] or filtered
+
+    recent = recent_templates.get(step, [])[:2]
+    without_recent = [template for template in filtered if template not in recent]
+    return without_recent or filtered
+
+
+def _recent_template_types_by_step(case_file: dict[str, Any]) -> dict[int, list[str]]:
+    contents = case_file.get("recentContents") if isinstance(case_file.get("recentContents"), list) else []
+    result: dict[int, list[str]] = {2: [], 3: []}
+    for content in reversed(contents[-6:]):
+        stages = content.get("stages") if isinstance(content, dict) and isinstance(content.get("stages"), list) else []
+        for stage in stages:
+            if not isinstance(stage, dict):
+                continue
+            step = stage.get("step")
+            template_type = stage.get("templateType") or stage.get("template_type")
+            if step in result and isinstance(template_type, str) and template_type not in result[step]:
+                result[step].append(template_type)
+    return result
+
+
+def _ensure_randomized_template_quality(content_type: str, forced_stage_templates: list[dict[str, Any]], *, case_file: dict[str, Any]) -> None:
+    if _allows_choice_first_case_file(case_file):
+        return
+    structured_templates = {"card_match", "sequence_ordering", "blank_fill"}
+    if any(item.get("templateType") in structured_templates for item in forced_stage_templates):
+        return
+
+    replaceable = [item for item in forced_stage_templates if item.get("step") in {2, 3}]
+    if not replaceable:
+        return
+    target = _template_random.choice(replaceable)
+    allowed = ORCHESTRATOR_STAGE_CONTRACTS.get(content_type, {}).get(target["step"], {}).get("allowedTemplates", set())
+    structured_allowed = sorted(template for template in allowed if template in structured_templates)
+    if structured_allowed:
+        target["templateType"] = _template_random.choice(structured_allowed)
+
+
+def _allows_choice_first_case_file(case_file: dict[str, Any]) -> bool:
+    choice_count = _choice_count_limit_from_case_file(case_file)
+    profile = case_file.get("profile") if isinstance(case_file.get("profile"), dict) else {}
+    profile_json = profile.get("profileJson") if isinstance(profile.get("profileJson"), dict) else {}
+    reading_load = str(profile_json.get("readingLoad") or "")
+    return reading_load == "very_low" or (choice_count is not None and choice_count <= 2)
+
+
+def _choice_count_limit_from_case_file(case_file: dict[str, Any]) -> int | None:
+    profile = case_file.get("profile") if isinstance(case_file.get("profile"), dict) else {}
+    profile_json = profile.get("profileJson") if isinstance(profile.get("profileJson"), dict) else {}
+    choice_count_value = profile_json.get("choiceCountLimit")
+    try:
+        return int(choice_count_value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _forced_templates_from_randomization(template_randomization: Any) -> dict[int, str]:
+    if not isinstance(template_randomization, dict):
+        return {}
+    forced = template_randomization.get("forcedStageTemplates")
+    if not isinstance(forced, list):
+        return {}
+    result: dict[int, str] = {}
+    for item in forced:
+        if not isinstance(item, dict):
+            continue
+        step = item.get("step")
+        template_type = item.get("templateType")
+        if isinstance(step, int) and isinstance(template_type, str):
+            result[step] = template_type
+    return result
 
 
 def _build_generation_plan(orchestrator_plan: dict[str, Any]) -> dict[str, Any]:
@@ -667,15 +820,54 @@ def _normalize_generated_stage(stage: Any) -> Any:
         normalized["templateJson"] = normalized_template_json
     realtime_spec = normalized.get("realtimeSpec")
     if isinstance(realtime_spec, dict):
-        normalized["realtimeSpec"] = _normalize_generated_realtime_spec(realtime_spec)
+        normalized["realtimeSpec"] = _normalize_generated_realtime_spec(realtime_spec, stage=normalized)
     return normalized
 
 
-def _normalize_generated_realtime_spec(realtime_spec: dict[str, Any]) -> dict[str, Any]:
+def _normalize_generated_realtime_spec(realtime_spec: dict[str, Any], *, stage: dict[str, Any] | None = None) -> dict[str, Any]:
     normalized = dict(realtime_spec)
+    stage = stage or {}
+    stage_template_type = stage.get("templateType")
+    template_type = normalized.get("templateType") or stage_template_type
+    if template_type not in {"realtime_roleplay", "realtime_teach_back"}:
+        template_type = "realtime_roleplay"
+    normalized["templateType"] = template_type
+
+    _set_string_default(normalized, "practiceTitle", stage.get("studentTitle") or "한 번 해보기")
+    _set_string_default(
+        normalized,
+        "situationText",
+        normalized.get("situation") or normalized.get("scenario") or stage.get("studentInstruction") or "지금 상황에서 한 번 말해봅니다.",
+    )
+    _set_string_default(normalized, "aiRole", normalized.get("role") or "연습 상대")
+    _set_string_default(normalized, "openingLine", normalized.get("intro") or "준비되면 한 문장으로 말해볼까요?")
+    _set_string_default(
+        normalized,
+        "studentGoal",
+        normalized.get("goal") or stage.get("studentInstruction") or "상황에 맞는 말을 짧게 시도합니다.",
+    )
+
+    allowed_feedback = normalized.get("allowedFeedback") or normalized.get("feedback")
+    if not isinstance(allowed_feedback, list) or not allowed_feedback:
+        normalized["allowedFeedback"] = ["학생의 시도를 먼저 인정하고, 다음에 말할 쉬운 한 문장을 제안합니다."]
+
+    forbidden = normalized.get("forbidden")
+    if not isinstance(forbidden, list) or not forbidden:
+        normalized["forbidden"] = ["정답을 대신 말하지 않기", "학생을 재촉하지 않기", "틀렸다고 단정하지 않기"]
+
+    max_turns = normalized.get("maxTurns") or normalized.get("turnLimit")
+    normalized["maxTurns"] = _coerce_bounded_int(max_turns, default=6, minimum=1, maximum=12)
+    max_duration_sec = normalized.get("maxDurationSec") or normalized.get("timeLimitSec") or normalized.get("durationSec")
+    normalized["maxDurationSec"] = _coerce_bounded_int(max_duration_sec, default=180, minimum=1, maximum=300)
+
     rubric = normalized.get("rubric")
     if isinstance(rubric, list):
         normalized["rubric"] = [_normalize_generated_rubric_item(item, index) for index, item in enumerate(rubric, start=1)]
+    else:
+        normalized["rubric"] = [
+            {"id": "r1", "label": "핵심 말을 한 번 시도한다", "required": True},
+            {"id": "r2", "label": "상황에 맞게 차분히 대답한다", "required": False},
+        ]
     reflection = normalized.get("postPracticeReflection")
     if isinstance(reflection, dict):
         candidates: list[str] = []
@@ -691,7 +883,25 @@ def _normalize_generated_realtime_spec(realtime_spec: dict[str, Any]) -> dict[st
             normalized["postPracticeReflection"] = ["오늘 연습에서 잘 된 점을 한 문장으로 말해볼까요?"]
     elif isinstance(reflection, str):
         normalized["postPracticeReflection"] = [reflection.strip()] if reflection.strip() else []
+    if not isinstance(normalized.get("postPracticeReflection"), list) or not normalized["postPracticeReflection"]:
+        normalized["postPracticeReflection"] = ["오늘 연습에서 잘 된 점을 한 문장으로 말해볼까요?"]
     return normalized
+
+
+def _set_string_default(target: dict[str, Any], key: str, default: Any) -> None:
+    value = target.get(key)
+    if isinstance(value, str) and value.strip():
+        target[key] = value.strip()
+        return
+    target[key] = str(default).strip() if str(default).strip() else "한 번 해보기"
+
+
+def _coerce_bounded_int(value: Any, *, default: int, minimum: int, maximum: int) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(maximum, number))
 
 
 def _normalize_generated_rubric_item(item: Any, index: int) -> Any:
@@ -844,116 +1054,53 @@ def _generate_valid_mission_content(
 ) -> tuple[MissionContent, dict, dict | None]:
     provider = OpenAiProvider(settings)
     instructions = load_prompt("mission_content_package")
-    attempt_usages: list[dict | None] = []
-    previous_output: dict | None = None
-    validation_errors: list[str] = []
+    generation_started_at = time.perf_counter()
+    logger.info("ai.content.generation_started student_id=%s case_id=%s", student_id, case_id)
+    output_json, token_usage = provider.create_json_response(
+        model=settings.openai_content_model,
+        instructions=instructions,
+        input_snapshot=input_snapshot,
+        output_schema_name=PROMPT_SPECS["mission_content_package"].output_schema_name,
+        output_json_schema=output_json_schema(PROMPT_SPECS["mission_content_package"].output_schema_name),
+        timeout_sec=settings.openai_content_timeout_sec,
+        max_output_tokens=settings.openai_content_max_output_tokens,
+    )
+    logger.info(
+        "ai.content.model_returned student_id=%s case_id=%s elapsed_sec=%.1f",
+        student_id,
+        case_id,
+        time.perf_counter() - generation_started_at,
+    )
 
-    for attempt in range(1, MAX_CONTENT_GENERATION_ATTEMPTS + 1):
-        attempt_started_at = time.perf_counter()
-        generation_snapshot = input_snapshot
-        if attempt > 1:
-            stage_repair_targets = _stage_repair_targets_from_errors(validation_errors, previous_output)
-            generation_snapshot = {
-                **input_snapshot,
-                "qualityRepair": {
-                    "attempt": attempt,
-                    "repairMode": "targeted_stage_or_visual_repair",
-                    "instruction": (
-                        "validationErrors와 stageRepairTargets에 해당하는 stage/visual unit만 고치고 "
-                        "나머지 stageContentDrafts는 그대로 보존한 완전한 MissionContent JSON을 반환하세요."
-                    ),
-                    "validationErrors": validation_errors,
-                    "stageRepairTargets": stage_repair_targets,
-                    "stageContentDrafts": _stage_content_drafts_from_output(previous_output, orchestrator_plan),
-                    "visualSpecDrafts": _visual_spec_drafts_from_orchestrator(orchestrator_plan),
-                    "previousOutput": previous_output,
-                },
-            }
-
-        logger.info(
-            "ai.content.attempt_started student_id=%s case_id=%s attempt=%s/%s",
+    try:
+        mission = _mission_from_generation(output_json, student_id=student_id, case_id=case_id)
+        mission = _attach_generation_units(mission, orchestrator_plan=orchestrator_plan)
+        validate_mission_content_quality(mission, case_file=case_file, orchestrator_plan=orchestrator_plan)
+    except ContentQualityError as exc:
+        logger.warning(
+            "ai.content.quality_invalid student_id=%s case_id=%s issues=%s",
             student_id,
             case_id,
-            attempt,
-            MAX_CONTENT_GENERATION_ATTEMPTS,
+            exc.issues,
         )
-        output_json, token_usage = provider.create_json_response(
-            model=settings.openai_content_model,
-            instructions=instructions,
-            input_snapshot=generation_snapshot,
-            timeout_sec=settings.openai_content_timeout_sec,
-            max_output_tokens=settings.openai_content_max_output_tokens,
-        )
-        logger.info(
-            "ai.content.attempt_model_returned student_id=%s case_id=%s attempt=%s elapsed_sec=%.1f",
+        raise
+    except ValueError as exc:
+        logger.warning(
+            "ai.content.schema_invalid student_id=%s case_id=%s error=%s",
             student_id,
             case_id,
-            attempt,
-            time.perf_counter() - attempt_started_at,
+            exc,
         )
-        attempt_usages.append(token_usage)
-        previous_output = output_json
-        try:
-            mission = _mission_from_generation(output_json, student_id=student_id, case_id=case_id)
-            mission = _attach_generation_units(mission, orchestrator_plan=orchestrator_plan)
-            validate_mission_content_quality(mission, case_file=case_file, orchestrator_plan=orchestrator_plan)
-            if settings.openai_content_critique_enabled:
-                critique = _critique_mission_content_quality(
-                    provider=provider,
-                    settings=settings,
-                    case_file=case_file,
-                    orchestrator_plan=orchestrator_plan,
-                    mission=mission,
-                )
-                if critique["verdict"] != "pass":
-                    raise ContentQualityError(_critique_issues(critique))
-            output_json = _replace_output_mission_content(output_json, mission)
-            logger.info(
-                "ai.content.attempt_validated student_id=%s case_id=%s attempt=%s content_id=%s",
-                student_id,
-                case_id,
-                attempt,
-                mission.id,
-            )
-            return mission, output_json, _merge_token_usage(attempt_usages)
-        except ContentQualityError as exc:
-            validation_errors = exc.issues
-            logger.warning(
-                "ai.content.attempt_quality_invalid student_id=%s case_id=%s attempt=%s issues=%s",
-                student_id,
-                case_id,
-                attempt,
-                validation_errors,
-            )
-            if attempt == MAX_CONTENT_GENERATION_ATTEMPTS:
-                raise
-            logger.info(
-                "ai.content.retrying_after_quality_invalid student_id=%s case_id=%s next_attempt=%s/%s",
-                student_id,
-                case_id,
-                attempt + 1,
-                MAX_CONTENT_GENERATION_ATTEMPTS,
-            )
-        except ValueError as exc:
-            validation_errors = [str(exc)]
-            logger.warning(
-                "ai.content.attempt_schema_invalid student_id=%s case_id=%s attempt=%s error=%s",
-                student_id,
-                case_id,
-                attempt,
-                exc,
-            )
-            if attempt == MAX_CONTENT_GENERATION_ATTEMPTS:
-                raise
-            logger.info(
-                "ai.content.retrying_after_schema_invalid student_id=%s case_id=%s next_attempt=%s/%s",
-                student_id,
-                case_id,
-                attempt + 1,
-                MAX_CONTENT_GENERATION_ATTEMPTS,
-            )
+        raise
 
-    raise ContentQualityError(["콘텐츠 생성 품질 재시도 흐름이 예기치 않게 종료되었습니다."])
+    output_json = _replace_output_mission_content(output_json, mission)
+    logger.info(
+        "ai.content.validated student_id=%s case_id=%s content_id=%s",
+        student_id,
+        case_id,
+        mission.id,
+    )
+    return mission, output_json, token_usage
 
 
 def _critique_mission_content_quality(
@@ -972,6 +1119,8 @@ def _critique_mission_content_quality(
             "orchestratorPlan": orchestrator_plan,
             "missionContent": mission.model_dump(by_alias=True),
         },
+        output_schema_name=PROMPT_SPECS["content_quality_critique"].output_schema_name,
+        output_json_schema=output_json_schema(PROMPT_SPECS["content_quality_critique"].output_schema_name),
         timeout_sec=settings.openai_critique_timeout_sec,
         max_output_tokens=settings.openai_critique_max_output_tokens,
     )
@@ -990,9 +1139,3 @@ def _critique_issues(critique: dict[str, Any]) -> list[str]:
     if isinstance(repair_instruction, str) and repair_instruction.strip():
         issues.append(repair_instruction.strip())
     return issues or ["콘텐츠 품질 비평 단계에서 수정이 필요하다고 판단했습니다."]
-
-
-def _merge_token_usage(attempt_usages: list[dict | None]) -> dict | None:
-    if len(attempt_usages) == 1:
-        return attempt_usages[0]
-    return {"attempts": [{"attempt": index + 1, "tokenUsage": usage} for index, usage in enumerate(attempt_usages)]}

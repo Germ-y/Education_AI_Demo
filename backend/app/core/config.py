@@ -20,15 +20,17 @@ class Settings(BaseSettings):
     openai_content_model: str = "gpt-5.1"
     openai_critique_model: str = "gpt-5.1"
     openai_image_brief_model: str = "gpt-5.1"
+    openai_report_model: str = "gpt-5.1"
     openai_reasoning_effort: str | None = "none"
     openai_text_verbosity: str | None = "low"
     openai_orchestrator_max_output_tokens: int = 6000
-    openai_content_max_output_tokens: int = 10000
+    openai_content_max_output_tokens: int = 0
     openai_critique_max_output_tokens: int = 4000
     openai_response_timeout_sec: float = 180
     openai_orchestrator_timeout_sec: float = 180
     openai_content_timeout_sec: float = 180
     openai_critique_timeout_sec: float = 180
+    openai_report_timeout_sec: float = 90
     openai_content_critique_enabled: bool = False
     openai_image_model: str = "gpt-image-2"
     openai_image_timeout_sec: float = 360
@@ -55,6 +57,7 @@ class Settings(BaseSettings):
     generation_log_file: str = str(BACKEND_DIR / "logs" / "generation.log")
     demo_seed_mode: bool = True
     demo_seed_reset: bool = False
+    demo_blank_start: bool = True
 
     model_config = SettingsConfigDict(
         env_file=(REPO_ROOT / ".env", BACKEND_DIR / ".env"),
