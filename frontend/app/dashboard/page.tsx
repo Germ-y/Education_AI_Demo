@@ -2705,7 +2705,7 @@ export default function DashboardPage() {
                         검토할 수업 자료 제안이 없습니다. 학생이 완료한 자료는 학습 기록에서 확인할 수 있어요.
                       </div>
                     )}
-                    {selectedReviewItems.map((item) => {
+                    {!isGeneratingContent && selectedReviewItems.map((item) => {
                       const materialApplied = isMaterialApplied(item);
                       const materialApproved = isMaterialApproved(item);
                       const materialRejected = isMaterialRejected(item);
