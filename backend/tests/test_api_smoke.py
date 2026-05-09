@@ -226,6 +226,7 @@ def test_teacher_and_student_demo_flows() -> None:
     assert clock_student["gradeLabel"] == "초3"
     assert clock_student["trackLabel"] == "저연령 학습지원형"
     assert clock_student["dashboardStageLabel"] == "자료 생성"
+    assert clock_student["statusLabel"] == clock_student["dashboardStageLabel"]
     assert clock_student["attendanceLabel"] == "기록 전"
     assert "시간 읽기 기초" in clock_student["primaryNeed"]
     assert "좋겠어요" not in clock_student["primaryNeed"]

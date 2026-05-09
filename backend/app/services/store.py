@@ -221,7 +221,7 @@ class DemoStore:
                     "latestContentStatus": latest_content.status if latest_content else "none",
                     "dashboardStage": open_case_by_student_id[student.id].dashboard_stage,
                     "dashboardStageLabel": stage_label,
-                    "statusLabel": dashboard.get("statusLabel") or stage_label,
+                    "statusLabel": stage_label,
                     "supportStrategy": _teacher_facing_text(open_case_by_student_id[student.id].support_strategy),
                     "summaryLine": _teacher_facing_text(dashboard.get("summaryLine") or student.primary_need),
                     "aiContextSummary": _teacher_facing_text(dashboard.get("aiContextSummary") or student.primary_need),
@@ -2518,6 +2518,12 @@ def _is_memory_noise(value: str) -> bool:
         "토큰",
         "OpenAI",
         "ElevenLabs",
+        "학생 회고가",
+        "수업의 소재와 난이도 조정",
+        "다음번엔",
+        "다음 번엔",
+        "문제를 하나 만들어",
+        "만들어보고 싶",
     )
     return any(term in text for term in noise_terms)
 
