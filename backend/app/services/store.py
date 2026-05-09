@@ -32,6 +32,8 @@ from app.domain.models import (
 from app.domain.schemas import ContentAsset, ContentStagePatch, MissionContent, StudentRegistrationRequest
 from app.repositories.demo_repository import DemoRepository
 
+CONTEXT_BRIEF_REFRESH_INTERVAL = timedelta(days=7)
+
 
 class SessionPrincipal(BaseModel):
     token: str
@@ -263,8 +265,18 @@ class DemoStore:
         strengths = _registration_strengths(payload)
         weaknesses = _registration_weaknesses(payload)
         preferred_supports = _registration_preferred_supports(payload)
+        support_intake = _registration_support_intake(payload)
+        learning_response = support_intake.get("learningResponse") if isinstance(support_intake.get("learningResponse"), dict) else {}
+        checklist_summary = support_intake.get("checklistSummary") if isinstance(support_intake.get("checklistSummary"), dict) else {}
+        derived_support_hints = _registration_support_hints(
+            _list_value(learning_response.get("effectiveSupports")),
+            _list_value(checklist_summary.get("calmingSupports")),
+            _list_value(checklist_summary.get("communicationNeeds")),
+            payload.student_type,
+        )
         track_label = payload.track_label or _registration_track_label(payload)
-        primary_need = _teacher_facing_text(_ensure_suggestion_sentence(payload.current_goal))
+        initial_requested_topic = _registration_goal_text(payload.current_goal)
+        primary_need = _registration_support_focus(payload)
         dashboard = {
             "attendanceRate": None,
             "gradeLabel": _grade_label(grade),
@@ -273,18 +285,20 @@ class DemoStore:
             "statusLabel": "자료 생성 전",
             "attendanceLabel": "기록 전",
             "summaryLine": primary_need,
-            "primaryNeedTitle": _registration_primary_need_title(payload),
+            "primaryNeedTitle": "현재 지원 목표",
             "primaryNeedDetail": primary_need,
-            "supportStrategyTitle": "등록 관찰 기반 지원 전략",
+            "supportStrategyTitle": "수업 설계 힌트",
             "supportStrategyDetail": _registration_support_strategy(payload),
             "strengths": strengths,
             "weaknesses": weaknesses,
             "emotionalNote": payload.observation_note,
             "responsePattern": _registration_response_pattern(payload),
-            "guardianCooperation": None,
+            "guardianCooperation": support_intake.get("guardianShareNote"),
             "schoolContextNote": "NEIS 학교 기본정보를 연결했습니다. 시간표 날짜와 반 정보가 있으면 시간표 snapshot도 함께 참고합니다.",
-            "nextSessionFocus": [payload.current_goal, *preferred_supports[:2]],
+            "nextSessionFocus": [primary_need, *derived_support_hints[:2]],
             "aiContextSummary": _registration_ai_context_summary(payload, track_label, primary_need),
+            "supportIntakeSummary": support_intake.get("checklistSummary", {}),
+            "initialRequestedTopic": initial_requested_topic,
         }
         student = Student(
             id=student_id,
@@ -299,11 +313,13 @@ class DemoStore:
                 "ageBand": _registration_age_band(payload),
                 "gradeNumber": grade_number,
                 "className": class_name,
-                "readingLoad": "very_low" if "긴 문장" in " ".join(weaknesses) else "low",
-                "choiceCountLimit": 2 if payload.student_type == "life_support" else 3,
+                "readingLoad": learning_response.get("readingLoad") or "medium",
+                "choiceCountLimit": learning_response.get("choiceCountLimit") or _registration_choice_count_limit(payload.student_type, preferred_supports),
                 "registration": {
                     "observationNote": payload.observation_note,
                     "preferredSupports": preferred_supports,
+                    "initialRequestedTopic": initial_requested_topic,
+                    "supportIntakeSummary": support_intake.get("checklistSummary", {}),
                     "createdAt": _now(),
                     "source": "teacher_registration",
                 },
@@ -325,12 +341,13 @@ class DemoStore:
             studentId=student_id,
             caseId=case_id,
             version=1,
-            learningProblemTypes=[payload.current_goal],
+            learningProblemTypes=[primary_need],
             recent4wResponseJson={
                 "registrationObservation": payload.observation_note,
                 "strengths": strengths,
                 "weaknesses": weaknesses,
                 "preferredSupports": preferred_supports,
+                "supportIntake": support_intake,
             },
             emotionalStateNote=payload.observation_note,
             effectiveExplanationStyles=preferred_supports,
@@ -355,7 +372,7 @@ class DemoStore:
             sourceType="teacher_registration",
             payloadJson={
                 "registration": payload.model_dump(by_alias=True),
-                "supportIntake": _registration_support_intake(payload),
+                "supportIntake": support_intake,
                 "school": school.model_dump(by_alias=True),
             },
             createdAt=_now(),
@@ -602,6 +619,8 @@ class DemoStore:
             attempt = attempts_by_id.get(summary.attempt_id)
             if attempt is None:
                 continue
+            if attempt.status != "completed":
+                continue
             content = contents_by_id.get(attempt.mission_content_id)
             realtime_session = next((session for session in self.db.realtime_sessions if session.attempt_id == attempt.id), None)
             activity_events = [event for event in self.db.activity_events if event.attempt_id == attempt.id]
@@ -772,10 +791,8 @@ class DemoStore:
         mission = self.get_mission_for_teacher(content_id, teacher_id)
         if mission is None:
             return None
-        attempts = sorted(
-            [attempt for attempt in self.db.attempts if attempt.mission_content_id == content_id],
-            key=lambda item: item.started_at,
-            reverse=True,
+        attempts = _sort_attempts_for_review_summary(
+            [attempt for attempt in self.db.attempts if attempt.mission_content_id == content_id]
         )
         if not attempts:
             return None
@@ -808,6 +825,7 @@ class DemoStore:
             realtimeResultJson=realtime_session.model_dump(by_alias=True) if realtime_session else {},
         )
         self.db.review_summaries.append(summary)
+        self.mark_context_brief_dirty(summary.student_id, source={"trigger": "review_summary_created", "reviewSummaryId": summary.id})
         self.persist()
         return summary
 
@@ -816,10 +834,8 @@ class DemoStore:
         mission = self.get_mission_for_teacher(content_id, teacher_id)
         if mission is None:
             return None
-        attempts = sorted(
-            [attempt for attempt in self.db.attempts if attempt.mission_content_id == content_id],
-            key=lambda item: item.started_at,
-            reverse=True,
+        attempts = _sort_attempts_for_review_summary(
+            [attempt for attempt in self.db.attempts if attempt.mission_content_id == content_id]
         )
         for attempt in attempts:
             summaries = [summary for summary in self.db.review_summaries if summary.attempt_id == attempt.id]
@@ -839,7 +855,8 @@ class DemoStore:
             if card.student_id != summary.student_id or card.status != "active":
                 continue
             cautions = list(card.next_session_cautions)
-            if summary.short_summary not in cautions:
+            summary_needs_caution = summary.completion_rate < 1 or summary.accuracy_rate < 0.9 or (summary.wrong_pattern_json.get("wrongCount") or 0) > 0
+            if summary_needs_caution and summary.short_summary not in cautions:
                 cautions.append(summary.short_summary)
             updated = card.model_copy(
                 update={
@@ -850,7 +867,7 @@ class DemoStore:
                         "latestAccuracyRate": summary.accuracy_rate,
                         "latestCompletionRate": summary.completion_rate,
                     },
-                    "next_session_cautions": cautions[-5:],
+                    "next_session_cautions": _memory_caution_candidates(cautions)[-5:],
                     "teacher_verified_at": _now(),
                 }
             )
@@ -972,7 +989,16 @@ class DemoStore:
     def get_student_context_brief(self, student_id: str) -> StudentContextBrief | None:
         self.refresh()
         briefs = [brief for brief in self.db.student_context_briefs if brief.student_id == student_id]
-        return sorted(briefs, key=lambda item: item.created_at, reverse=True)[0] if briefs else None
+        if not briefs:
+            return None
+        latest = sorted(briefs, key=lambda item: item.created_at, reverse=True)[0]
+        if not latest.dirty and _is_context_brief_refresh_due(latest):
+            latest = self.mark_context_brief_dirty(
+                student_id,
+                source={"trigger": "weekly_refresh_due", "intervalDays": CONTEXT_BRIEF_REFRESH_INTERVAL.days},
+            ) or latest
+            self.persist()
+        return latest
 
     def mark_context_brief_dirty(self, student_id: str, *, source: dict[str, Any] | None = None) -> StudentContextBrief | None:
         briefs = [brief for brief in self.db.student_context_briefs if brief.student_id == student_id]
@@ -982,6 +1008,9 @@ class DemoStore:
         source_json = dict(latest.source_json)
         if source:
             source_json["lastDirtySource"] = source
+            dirty_sources = list(source_json.get("dirtySources") or [])
+            dirty_sources.append({**source, "markedAt": _now()})
+            source_json["dirtySources"] = dirty_sources[-8:]
         updated = latest.model_copy(update={"dirty": True, "status": "dirty", "source_json": source_json})
         self.db.student_context_briefs = [updated if brief.id == latest.id else brief for brief in self.db.student_context_briefs]
         return updated
@@ -1033,6 +1062,37 @@ class DemoStore:
         self.persist()
         return draft
 
+    def get_teacher_report_input_snapshot(self, review_id: str, *, teacher_id: str | None = None) -> dict[str, Any] | None:
+        self.refresh()
+        return self._teacher_report_input_snapshot(review_id, teacher_id=teacher_id)
+
+    def save_teacher_report_draft_from_markdown(
+        self,
+        *,
+        review_id: str,
+        snapshot: dict[str, Any],
+        body_markdown: str,
+        model: str,
+    ) -> TeacherReportDraft:
+        _, suggestions, memory_candidates = _build_teacher_report_draft_text(snapshot)
+        draft = TeacherReportDraft(
+            id=f"report_draft_{uuid4()}",
+            reviewSummaryId=review_id,
+            studentId=snapshot["student"]["id"],
+            contentId=snapshot["content"]["id"],
+            status="completed",
+            bodyMarkdown=body_markdown.strip(),
+            nextLearningSuggestions=suggestions,
+            memoryCandidates=memory_candidates,
+            inputSnapshotJson=snapshot,
+            model=model,
+            createdAt=_now(),
+            completedAt=_now(),
+        )
+        self.db.teacher_report_drafts.append(draft)
+        self.persist()
+        return draft
+
     def save_teacher_report(
         self,
         *,
@@ -1049,6 +1109,7 @@ class DemoStore:
         summary = next((candidate for candidate in self.db.review_summaries if candidate.id == review_summary_id), None)
         if open_case is None or open_case.owner_teacher_id != teacher_id or summary is None or summary.student_id != student_id:
             return None
+        clean_memory_candidates = _clean_memory_candidates(selected_memory_candidates)
         report = TeacherReport(
             id=f"teacher_report_{uuid4()}",
             draftId=draft_id,
@@ -1056,7 +1117,7 @@ class DemoStore:
             studentId=student_id,
             contentId=content_id,
             teacherBody=teacher_body,
-            selectedMemoryCandidates=selected_memory_candidates,
+            selectedMemoryCandidates=clean_memory_candidates,
             createdByUserId=teacher_id,
             createdAt=_now(),
         )
@@ -1117,6 +1178,7 @@ class DemoStore:
         }
 
     def add_student_note(self, student_id: str, author_id: str, payload: dict[str, Any]) -> CaseNote | None:
+        self.refresh()
         open_case = next(
             (support_case for support_case in self.db.support_cases if support_case.student_id == student_id and support_case.case_status == "open"),
             None,
@@ -1133,6 +1195,7 @@ class DemoStore:
             createdAt=_now(),
         )
         self.db.case_notes.append(note)
+        self.mark_context_brief_dirty(student_id, source={"trigger": "teacher_note_added", "noteId": note.id, "noteType": note.note_type})
         self.persist()
         return note
 
@@ -1287,10 +1350,13 @@ class DemoStore:
 
     def save_generated_mission_content(self, mission: MissionContent) -> MissionContent:
         self.refresh()
+        existing = next((content for content in self.db.mission_contents if content.id == mission.id), None)
         if not isinstance(mission.brief_json.get("generatedAt"), str):
             mission.brief_json = {**mission.brief_json, "generatedAt": _now()}
         self.db.mission_contents = [content for content in self.db.mission_contents if content.id != mission.id]
         self.db.mission_contents.append(mission)
+        if existing is None:
+            self.mark_context_brief_dirty(mission.student_id, source={"trigger": "new_content_saved", "contentId": mission.id, "status": str(mission.status)})
         self.persist()
         return mission
 
@@ -1572,7 +1638,20 @@ def _teacher_facing_text(value: Any) -> Any:
     text = value
     for source, replacement in _TEACHER_TEXT_REPLACEMENTS:
         text = text.replace(source, replacement)
-    return text
+    return _clean_teacher_phrase(text)
+
+
+def _clean_teacher_phrase(text: str) -> str:
+    replacements = {
+        "상황 상황": "상황",
+        "장면 장면": "장면",
+        "환경 환경": "환경",
+        "조건 조건": "조건",
+    }
+    cleaned = text
+    for source, replacement in replacements.items():
+        cleaned = cleaned.replace(source, replacement)
+    return cleaned
 
 
 def _teacher_facing_list(values: Any) -> list[str]:
@@ -1785,18 +1864,88 @@ def _orchestrator_hints_from_subjects(subjects: list[str]) -> list[str]:
 
 def _registration_support_intake(payload: StudentRegistrationRequest) -> dict[str, Any]:
     if isinstance(payload.support_intake, dict):
-        return payload.support_intake
+        intake = dict(payload.support_intake)
+        learning_response = intake.get("learningResponse") if isinstance(intake.get("learningResponse"), dict) else {}
+        checklist = intake.get("checklistSummary") if isinstance(intake.get("checklistSummary"), dict) else {}
+        observed_strengths = (
+            _list_value(learning_response.get("observedStrengths"))
+            or _list_value(checklist.get("observedStrengths"))
+            or payload.strengths
+        )
+        effective_supports = (
+            _list_value(learning_response.get("effectiveSupports"))
+            or _list_value(checklist.get("effectiveSupports"))
+            or payload.preferred_supports
+        )
+        instruction_burdens = _list_value(learning_response.get("instructionBurdens")) or _list_value(checklist.get("instructionBurdens"))
+        communication_needs = _list_value(learning_response.get("communicationNeeds")) or _list_value(checklist.get("communicationNeeds"))
+        hard_situations = _list_value(checklist.get("hardSituations")) or payload.weaknesses
+        calming_supports = _list_value(checklist.get("calmingSupports"))
+        avoid_guidance = _list_value(checklist.get("avoidGuidance"))
+        normalized_learning_response = {
+            **learning_response,
+            "observedStrengths": observed_strengths,
+            "effectiveSupports": effective_supports,
+            "readingLoad": learning_response.get("readingLoad") or _registration_reading_load(hard_situations, instruction_burdens),
+            "choiceCountLimit": learning_response.get("choiceCountLimit") or _registration_choice_count_limit(payload.student_type, effective_supports),
+            "instructionBurdens": instruction_burdens,
+            "communicationNeeds": communication_needs,
+        }
+        normalized_checklist = {
+            **checklist,
+            "observedStrengths": observed_strengths,
+            "hardSituations": hard_situations,
+            "effectiveSupports": effective_supports,
+            "instructionBurdens": instruction_burdens,
+            "communicationNeeds": communication_needs,
+            "calmingSupports": calming_supports,
+            "avoidGuidance": avoid_guidance,
+        }
+        intake.setdefault(
+            "sourceBasis",
+            [
+                "센터 관찰 자료의 기능평가 관점",
+                "QABF 행동 기능 가설 관점",
+                "도전적 행동 우선순위 체크리스트 관점",
+            ],
+        )
+        intake["learningResponse"] = normalized_learning_response
+        intake["checklistSummary"] = normalized_checklist
+        intake.setdefault("recommendedScaffolds", _registration_support_hints(effective_supports, calming_supports, communication_needs, payload.student_type))
+        intake.setdefault("avoidGuidance", [*hard_situations, *avoid_guidance])
+        return intake
+    reading_load = _registration_reading_load(payload.weaknesses, [])
+    choice_limit = _registration_choice_count_limit(payload.student_type, payload.preferred_supports)
     return {
+        "sourceBasis": [
+            "센터 관찰 자료의 기능평가 관점",
+            "QABF 행동 기능 가설 관점",
+            "도전적 행동 우선순위 체크리스트 관점",
+        ],
         "learningResponse": {
-            "preferredCues": payload.preferred_supports,
-            "readingLoad": "low",
-            "choiceCountLimit": 2 if payload.student_type == "life_support" else 3,
+            "observedStrengths": payload.strengths,
+            "effectiveSupports": payload.preferred_supports,
+            "readingLoad": reading_load,
+            "choiceCountLimit": choice_limit,
+            "instructionBurdens": [],
+            "communicationNeeds": [],
         },
-        "challengeBehaviorPriorities": [],
+        "challengeBehaviorPriorities": [{"label": item, "priority": index + 1} for index, item in enumerate(payload.weaknesses[:5])],
         "behaviorFunctionHypotheses": [],
         "replacementSkills": [],
-        "recommendedScaffolds": payload.preferred_supports,
+        "recommendedScaffolds": _registration_support_hints(payload.preferred_supports, [], [], payload.student_type),
         "avoidGuidance": payload.weaknesses,
+        "teacherObservation": payload.observation_note,
+        "guardianShareNote": None,
+        "checklistSummary": {
+            "observedStrengths": payload.strengths,
+            "hardSituations": payload.weaknesses,
+            "effectiveSupports": payload.preferred_supports,
+            "instructionBurdens": [],
+            "communicationNeeds": [],
+            "calmingSupports": [],
+            "avoidGuidance": [],
+        },
     }
 
 
@@ -1811,11 +1960,31 @@ def _build_support_profile_draft_json(
     registration = intake.get("registration") if isinstance(intake.get("registration"), dict) else {}
     support_intake = intake.get("supportIntake") if isinstance(intake.get("supportIntake"), dict) else {}
     learning_response = support_intake.get("learningResponse") if isinstance(support_intake.get("learningResponse"), dict) else {}
-    preferred_cues = _list_value(learning_response.get("preferredCues")) or _list_value(registration.get("preferredSupports"))
-    strengths = _list_value(registration.get("strengths")) or _student_dashboard_list(student.profile_json, "strengths")
-    weaknesses = _list_value(registration.get("weaknesses")) or _student_dashboard_list(student.profile_json, "weaknesses")
-    recommended_scaffolds = _list_value(support_intake.get("recommendedScaffolds")) or preferred_cues
-    replacement_skills = _list_value(support_intake.get("replacementSkills"))
+    checklist = support_intake.get("checklistSummary") if isinstance(support_intake.get("checklistSummary"), dict) else {}
+    observed_strengths = (
+        _list_value(learning_response.get("observedStrengths"))
+        or _list_value(checklist.get("observedStrengths"))
+        or _list_value(registration.get("strengths"))
+        or _student_dashboard_list(student.profile_json, "strengths")
+    )
+    hard_situations = (
+        _list_value(checklist.get("hardSituations"))
+        or _list_value(registration.get("weaknesses"))
+        or _student_dashboard_list(student.profile_json, "weaknesses")
+    )
+    effective_supports = (
+        _list_value(learning_response.get("effectiveSupports"))
+        or _list_value(checklist.get("effectiveSupports"))
+        or _list_value(registration.get("preferredSupports"))
+    )
+    instruction_burdens = _list_value(learning_response.get("instructionBurdens")) or _list_value(checklist.get("instructionBurdens"))
+    communication_needs = _list_value(learning_response.get("communicationNeeds")) or _list_value(checklist.get("communicationNeeds"))
+    calming_supports = _list_value(checklist.get("calmingSupports"))
+    recommended_scaffolds = (
+        _list_value(support_intake.get("recommendedScaffolds"))
+        or _registration_support_hints(effective_supports, calming_supports, communication_needs, student.student_type)
+    )
+    replacement_skills = _list_value(support_intake.get("replacementSkills")) or communication_needs
     behavior_hypotheses = _list_value(support_intake.get("behaviorFunctionHypotheses"))
     priority_behaviors = [
         str(item.get("label"))
@@ -1823,20 +1992,30 @@ def _build_support_profile_draft_json(
         if item.get("label")
     ]
 
-    if not preferred_cues:
-        preferred_cues = ["짧은 지시", "그림 단서"]
+    if not observed_strengths:
+        observed_strengths = ["짧은 첫 과제에서 반응 확인 필요"]
+    if not effective_supports:
+        effective_supports = ["지시를 짧게 나눔"]
     if not recommended_scaffolds:
-        recommended_scaffolds = ["쉬운 첫 문항", "짧은 단계 안내"]
+        recommended_scaffolds = _registration_support_hints(effective_supports, calming_supports, communication_needs, student.student_type)
     if not replacement_skills and student.student_type == "life_support":
         replacement_skills = ["도움 요청하기", "순서 확인하기"]
 
-    choice_limit = learning_response.get("choiceCountLimit") or student.profile_json.get("choiceCountLimit") or 2
-    reading_load = learning_response.get("readingLoad") or student.profile_json.get("readingLoad") or "low"
-    can_be_hard = weaknesses[:3] or ["긴 설명 뒤 바로 시작하기"]
+    choice_limit = (
+        learning_response.get("choiceCountLimit")
+        or student.profile_json.get("choiceCountLimit")
+        or _registration_choice_count_limit(student.student_type, effective_supports)
+    )
+    reading_load = (
+        learning_response.get("readingLoad")
+        or student.profile_json.get("readingLoad")
+        or _registration_reading_load(hard_situations, instruction_burdens)
+    )
+    can_be_hard = _dedupe([*hard_situations, *instruction_burdens])[:5] or ["긴 설명 뒤 바로 시작하기"]
 
     lesson_hint = (
-        f"{', '.join(preferred_cues[:2])}를 먼저 제시하고 선택지는 {choice_limit}개부터 시작하면 "
-        "학생이 첫 반응을 안정적으로 보일 가능성이 높습니다."
+        f"관찰된 강점은 {', '.join(observed_strengths[:2])}입니다. "
+        f"수업에서는 {', '.join(recommended_scaffolds[:2])}을 먼저 적용해 {', '.join(can_be_hard[:2])} 부담을 줄입니다."
     )
     if teacher_note:
         lesson_hint = f"{lesson_hint} 교사 메모: {teacher_note.strip()}"
@@ -1844,9 +2023,9 @@ def _build_support_profile_draft_json(
     return {
         "profileVersion": "support_profile_v1",
         "draftLabel": "수업 설계 초안",
-        "lessonDesignHints": [lesson_hint, f"현재 목표는 '{open_case.current_goal}'이며 수업 방식 조정에만 활용합니다."],
+        "lessonDesignHints": [lesson_hint, "현재 지원 초점은 수업 방식 조정에만 활용하고, 콘텐츠 주제는 생성 요청을 우선합니다."],
         "learningResponsePattern": {
-            "worksWell": preferred_cues[:5],
+            "worksWell": observed_strengths[:5],
             "canBeHard": can_be_hard,
             "choiceCountLimit": int(choice_limit) if str(choice_limit).isdigit() else 2,
             "readingLoad": str(reading_load),
@@ -1858,7 +2037,7 @@ def _build_support_profile_draft_json(
             "replacementSkills": replacement_skills,
             "recommendedScaffolds": recommended_scaffolds[:5],
         },
-        "strengths": [_registration_sentence(item, positive=True) for item in strengths[:5]],
+        "strengths": [_registration_sentence(item, positive=True) for item in observed_strengths[:5]],
         "supportCautions": [_registration_sentence(item, positive=False) for item in can_be_hard[:5]],
         "source": {
             "intakeSourceId": intake_source.id if intake_source else None,
@@ -1879,21 +2058,20 @@ def _apply_support_profile_to_student_dashboard(student: Student, open_case: Sup
 
     dashboard.update(
         {
-            "primaryNeedTitle": "현재 목표",
-            "primaryNeedDetail": _teacher_facing_text(open_case.current_goal),
+            "primaryNeedTitle": "현재 지원 목표",
+            "primaryNeedDetail": _support_focus_from_support_profile(student, open_case, profile_json, dashboard),
             "supportStrategyTitle": "학습 반응 패턴",
             "supportStrategyDetail": hints[0] if hints else _teacher_facing_text(open_case.support_strategy),
             "strengths": strengths,
             "weaknesses": cautions,
             "responsePattern": hints[0] if hints else dashboard.get("responsePattern"),
-            "nextSessionFocus": [_teacher_facing_text(open_case.current_goal), *scaffolds[:3]],
+            "nextSessionFocus": [_support_focus_from_support_profile(student, open_case, profile_json, dashboard), *scaffolds[:3]],
             "aiContextSummary": _context_summary_from_support_profile(student, open_case, profile_json),
             "supportProfileStatus": "confirmed",
         }
     )
     student.profile_json = {**student.profile_json, "dashboard": dashboard, "supportProfile": profile_json}
     open_case.support_strategy = hints[0] if hints else open_case.support_strategy
-    open_case.current_goal = _teacher_facing_text(open_case.current_goal)
 
 
 def _apply_support_profile_to_memory(memory_card: MemoryCard, profile_json: dict[str, Any]) -> None:
@@ -1917,8 +2095,30 @@ def _context_summary_from_support_profile(student: Student, open_case: SupportCa
     can_be_hard = _list_value(response_pattern.get("canBeHard"))
     return (
         f"{student.display_name} 학생은 {', '.join(works_well[:2]) or '짧은 단서'}에서 시작이 안정적입니다. "
-        f"{', '.join(can_be_hard[:2]) or '긴 설명'}은 부담이 될 수 있어 현재 목표 '{open_case.current_goal}'의 방식 조정에만 반영합니다."
+        f"{', '.join(can_be_hard[:2]) or '긴 설명'}은 부담이 될 수 있어 지원 방식 조정에만 반영합니다. "
+        "새 콘텐츠 주제는 선생님 생성 요청을 우선합니다."
     )
+
+
+def _support_focus_from_support_profile(
+    student: Student,
+    open_case: SupportCase,
+    profile_json: dict[str, Any],
+    dashboard: dict[str, Any],
+) -> str:
+    response_pattern = profile_json.get("learningResponsePattern") if isinstance(profile_json.get("learningResponsePattern"), dict) else {}
+    behavior_profile = profile_json.get("behaviorSupportProfile") if isinstance(profile_json.get("behaviorSupportProfile"), dict) else {}
+    can_be_hard = _dedupe(_list_value(response_pattern.get("canBeHard")))[:2]
+    replacement_skills = _dedupe(_list_value(behavior_profile.get("replacementSkills")))[:2]
+    existing = _teacher_facing_text(dashboard.get("primaryNeedDetail") or student.primary_need)
+
+    if student.student_type == "life_support":
+        situation = ", ".join(can_be_hard) if can_be_hard else "낯선 생활 상황"
+        expression = ", ".join(replacement_skills) if replacement_skills else "도움 요청이나 확인 표현"
+        return f"{situation}에서 행동 전에 단서를 확인하고 {expression}을 짧게 사용하기"
+    if can_be_hard:
+        return f"{', '.join(can_be_hard)}에서 핵심 단서를 먼저 확인하고 짧은 단계로 개념을 설명하기"
+    return existing
 
 
 def _build_context_brief(
@@ -1939,26 +2139,46 @@ def _build_context_brief(
     reading_load = str(response_pattern.get("readingLoad") or student.profile_json.get("readingLoad") or "low")
     choice_count_value = response_pattern.get("choiceCountLimit") or student.profile_json.get("choiceCountLimit") or 2
     choice_count = int(choice_count_value) if str(choice_count_value).isdigit() else 2
-    recent_candidates = [candidate for report in reports[-3:] for candidate in report.selected_memory_candidates]
+    recent_candidates = _clean_memory_candidates(
+        [_abstract_context_pattern(candidate) for report in reports[-3:] for candidate in report.selected_memory_candidates]
+    )
+    recent_cautions = _memory_caution_candidates(recent_candidates)
+    recent_success_candidates = [candidate for candidate in recent_candidates if candidate not in recent_cautions]
+    profile_success_patterns = [_abstract_context_pattern(pattern) for pattern in _list_value(response_pattern.get("worksWell"))]
+    profile_scaffold_patterns = [_abstract_context_pattern(pattern) for pattern in _list_value(behavior_profile.get("recommendedScaffolds"))]
+    memory_style_patterns = _clean_memory_candidates(memory_card.effective_explanation_styles if memory_card else [])
     success_patterns = _dedupe([
-        *_list_value(response_pattern.get("worksWell")),
-        *(memory_card.effective_explanation_styles if memory_card else []),
-        *recent_candidates,
+        *[pattern for pattern in recent_success_candidates if not _is_presentation_scaffold(pattern)],
+        *[pattern for pattern in profile_success_patterns if not _is_presentation_scaffold(pattern)],
+        *[pattern for pattern in memory_style_patterns if not _is_presentation_scaffold(pattern)],
     ])[:6]
-    difficulty_patterns = _dedupe([
-        *_list_value(response_pattern.get("canBeHard")),
-        *(memory_card.next_session_cautions if memory_card else []),
-    ])[:6]
+    difficulty_patterns = _memory_caution_candidates(
+        _dedupe([
+            *[_abstract_context_pattern(pattern) for pattern in _list_value(response_pattern.get("canBeHard"))],
+            *recent_cautions,
+            *[_abstract_context_pattern(pattern) for pattern in (memory_card.next_session_cautions if memory_card else [])],
+        ])
+    )[:6]
     scaffolds = _dedupe([
-        *_list_value(behavior_profile.get("recommendedScaffolds")),
-        *(memory_card.effective_explanation_styles if memory_card else []),
+        *profile_scaffold_patterns,
+        *[pattern for pattern in profile_success_patterns if _is_presentation_scaffold(pattern)],
+        *[pattern for pattern in recent_success_candidates if _is_presentation_scaffold(pattern)],
+        *[pattern for pattern in memory_style_patterns if _is_presentation_scaffold(pattern)],
     ])[:6]
-    avoid_topics = _dedupe([content for content in (memory_card.learning_problem_types if memory_card else []) if content != open_case.current_goal])[:4]
+    difficulty_patterns = [pattern for pattern in difficulty_patterns if pattern not in success_patterns]
+    avoid_topics = _build_avoid_topic_regression(memory_card, current_goal=open_case.current_goal)
+    reading_load_label = _reading_load_label(reading_load)
+    strength_text = _join_context_items(success_patterns[:2]) or "짧은 첫 과제"
+    stable_basis_text = _join_context_items(success_patterns[:2]) or "짧은 단서"
+    caution_text = _join_context_items(difficulty_patterns[:2]) or "긴 설명 뒤 첫 행동 시작"
+    scaffold_text = _join_support_phrases(scaffolds[:2]) or "예시 먼저 보기"
     brief_text = (
-        f"{student.display_name} 학생은 {', '.join(success_patterns[:2]) or '짧은 단서'}에서 시작이 안정적입니다. "
-        f"읽기 부담은 {reading_load}, 선택지는 {choice_count}개 안팎이 적합합니다. "
-        f"최근 어려움은 {', '.join(difficulty_patterns[:2]) or '긴 설명 뒤 첫 행동 시작'}입니다. "
-        f"교사 요청 주제 '{open_case.current_goal}'를 우선하고, 지원 프로필은 수업 방식 조정에만 사용합니다."
+        f"{student.display_name} 학생은 {strength_text} 같은 강점이 관찰됩니다. "
+        f"이전 수업과 관찰 기록을 보면 {stable_basis_text} 같은 조건에서 안정적입니다. "
+        f"읽기 부담은 {reading_load_label}이며, 초기 응답 선택지는 {choice_count}개 안팎이 적합합니다. "
+        f"주의할 흐름: {caution_text}. "
+        f"수업 적용 힌트는 {scaffold_text}입니다. "
+        f"기억장치는 새 수업 주제를 정하는 값이 아니라, 선생님 요청 주제를 다루는 제시 순서와 반응 방식을 조정하는 값입니다."
     )
     now = _now()
     return StudentContextBrief(
@@ -1982,6 +2202,166 @@ def _build_context_brief(
     )
 
 
+def _join_support_phrases(values: list[str]) -> str:
+    return ", ".join(_naturalize_support_phrase(value) for value in values if value)
+
+
+def _join_context_items(values: list[str]) -> str:
+    return ", ".join(_strip_sentence_end(value) for value in values if _strip_sentence_end(value))
+
+
+def _build_avoid_topic_regression(memory_card: MemoryCard | None, *, current_goal: str) -> list[str]:
+    if memory_card is None:
+        return []
+    current = _teacher_facing_text(current_goal).strip()
+    candidates: list[str] = []
+    for value in memory_card.learning_problem_types:
+        text = _teacher_facing_text(str(value or "").strip())
+        if not text or text == current or _is_memory_noise(text):
+            continue
+        abstracted = _abstract_context_pattern(text)
+        if not abstracted or abstracted == current or _is_support_pattern_only(abstracted):
+            continue
+        candidates.append(abstracted)
+    return _dedupe(candidates)[:5]
+
+
+def _is_support_pattern_only(value: str) -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return True
+    topic_or_quality_markers = (
+        "소재",
+        "단원",
+        "시계",
+        "버스",
+        "간식",
+        "안내판",
+        "포스터",
+        "피자",
+        "분수",
+        "영어",
+        "수학",
+        "덧셈",
+        "문제 설명",
+        "이미지",
+    )
+    if any(marker in text for marker in topic_or_quality_markers):
+        return False
+    support_markers = (
+        "지시",
+        "선택지",
+        "예시",
+        "단서",
+        "읽기 부담",
+        "강점",
+        "설명",
+        "확인",
+        "도움 요청",
+        "행동 전에",
+        "상대에게",
+        "낯선 상황",
+        "기다",
+        "짧은",
+        "긴 글",
+        "여러 조건",
+    )
+    return any(marker in text for marker in support_markers)
+
+
+def _is_presentation_scaffold(value: str) -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return False
+    observed_markers = ("이해", "따라 말", "설명", "구분", "찾", "완료", "정답률", "발화", "사용할 수")
+    if any(marker in text for marker in observed_markers):
+        return False
+    scaffold_markers = (
+        "예시를 먼저",
+        "지시를 짧게",
+        "선택지",
+        "기다릴 시간",
+        "기다리는 시간",
+        "대답 전 기다",
+        "그림 카드",
+        "단계 카드",
+        "순서 카드",
+        "미리 보기",
+        "짧은 음성",
+        "한 단계씩",
+        "과제 순서",
+    )
+    return any(marker in text for marker in scaffold_markers)
+
+
+def _strip_sentence_end(value: str) -> str:
+    return str(value or "").strip().rstrip(".!?。")
+
+
+def _reading_load_label(value: str) -> str:
+    labels = {"low": "낮은 편", "medium": "보통", "high": "높은 편"}
+    return labels.get(value, value or "보통")
+
+
+def _naturalize_support_phrase(value: str) -> str:
+    text = str(value or "").strip()
+    if text.endswith("줌"):
+        return f"{text.removesuffix('줌')}주기"
+    if text.endswith("나눔"):
+        return f"{text.removesuffix('나눔')}나누기"
+    if text.endswith("줄임"):
+        return f"{text.removesuffix('줄임')}줄이기"
+    if text.endswith("봄"):
+        return f"{text.removesuffix('봄')}보기"
+    if text.endswith("함"):
+        return f"{text.removesuffix('함')}하기"
+    return text
+
+
+def _abstract_context_pattern(value: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if "정답률 100" in text and "첫 단서" in text:
+        return "짧은 첫 단서를 제시하면 다음 시도에 연결하기"
+    if "짧은 시각 단서" in text and "끝까지 수행" in text:
+        return "짧은 시각 단서와 2개 선택 구조에서 끝까지 수행하기"
+    if "과제" in text and "유치" in text:
+        return "과제가 너무 쉬우면 참여감이 낮아져 현실감과 판단 난이도 조정이 필요함"
+    if "먼저 물어보기" in text and "실시간 발화" in text:
+        return "실시간 발화에서는 먼저 물어보기 표현을 구체적으로 연습하기"
+    replacements = {
+        (
+            "운동장에서 친구가 찬 공이 내 쪽으로 왔을 때 바로 차기 전에 "
+            "친구에게 물어보고 안전하게 돌려주기"
+        ): "낯선 상황에서 행동 전에 멈추고 상대에게 먼저 확인하기",
+        (
+            "공을 바로 차기 전에 멈추고 친구에게 먼저 묻는 표현을 사용할 수 있음"
+        ): "행동 전에 멈추고 상대에게 먼저 묻기",
+        "행동 전에 멈추고 상대에게 먼저 묻는 표현을 사용할 수 있음": "행동 전에 멈추고 상대에게 먼저 묻기",
+        "낯선 상황은 짧은 예시 문장과 2개 선택지로 시작하면 안정적임": "낯선 상황은 짧은 예시 문장과 2개 선택지로 시작하기",
+        "낯선 운동장 상황": "낯선 상황",
+        "공을 바로 차기 전에": "행동하기 전에",
+        "공을": "상황 단서를",
+        "공이": "상황 단서가",
+        "축구공": "상황 단서",
+        "운동장 상황": "낯선 상황",
+        "운동장": "낯선 장소",
+        "차기": "행동하기",
+        "차서": "반응해서",
+        "돌려주기": "알맞게 반응하기",
+        "돌려주는": "알맞게 반응하는",
+    }
+    for source, target in replacements.items():
+        text = text.replace(source, target)
+    text = text.replace("낯선 낯선", "낯선")
+    text = text.replace(
+        "낯선 상황은 짧은 예시 문장과 2개 선택지로 시작하면 안정적임",
+        "낯선 상황은 짧은 예시 문장과 2개 선택지로 시작하기",
+    )
+    return text
+
+
 def _build_teacher_report_draft_text(snapshot: dict[str, Any]) -> tuple[str, list[str], list[str]]:
     summary = snapshot["reviewSummary"]
     student = snapshot["student"]
@@ -1991,33 +2371,63 @@ def _build_teacher_report_draft_text(snapshot: dict[str, Any]) -> tuple[str, lis
     reflection = _latest_reflection_from_snapshot(snapshot.get("activityEvents") or [])
     accuracy = round(float(summary.get("accuracyRate") or 0) * 100)
     completion = round(float(summary.get("completionRate") or 0) * 100)
-    transcript_summary = realtime.get("transcriptSummary") or "실시간 발화 요약은 아직 없습니다."
-    next_suggestion = f"다음 수업은 '{content['sessionGoal']}'에서 어려웠던 단서를 한 단계 줄여 다시 시작합니다."
+    transcript_summary = _summarize_realtime_for_report(realtime.get("transcriptSummary"))
+    reflection_note = _reflection_note_for_report(reflection)
+    scaffold_text = _join_support_phrases((context_brief.get("recommendedScaffolds") or [])[:3]) or "짧은 예시와 단계 단서"
+    next_suggestion = _next_teacher_report_suggestion(content, reflection, scaffold_text)
     memory_candidates = _dedupe(
         [
+            f"{student['displayName']} 학생은 정답률 {accuracy}%였고, {scaffold_text} 같은 지원 방식을 유지하면 다음 시도에 연결하기 좋습니다.",
+            reflection_note,
             *(context_brief.get("recommendedScaffolds") or []),
-            f"{student['displayName']} 학생은 정답률 {accuracy}%였고, 첫 단서를 짧게 제시하면 다음 시도에 연결하기 좋습니다.",
-            transcript_summary,
         ]
     )[:5]
     body = "\n".join(
         [
             "## 수업 반응",
-            f"- {content['title']}을 완료했습니다. 완료율은 {completion}%, 정답률은 {accuracy}%입니다.",
+            f"- {content['title']} 수업을 완료했습니다. 완료율은 {completion}%, 정답률은 {accuracy}%입니다.",
             f"- 학생 회고: {reflection or '저장된 회고가 없습니다.'}",
             "",
             "## 이해 변화",
-            f"- 자동 요약: {summary['shortSummary']}",
-            f"- 실시간 발화: {transcript_summary}",
+            f"- 기록 요약: {summary['shortSummary']}",
+            f"- 실시간 발화 관찰: {transcript_summary}",
+            f"- 교사 확인 포인트: {reflection_note}",
             "",
             "## 다음 수업 제안",
             f"- {next_suggestion}",
-            "",
-            "## 메모리 반영 후보",
-            *[f"- {candidate}" for candidate in memory_candidates],
         ]
     )
     return body, [next_suggestion], memory_candidates
+
+
+def _summarize_realtime_for_report(transcript_summary: str | None) -> str:
+    if not transcript_summary:
+        return "실시간 발화 기록은 아직 없습니다."
+    student_lines = []
+    for part in transcript_summary.split("/"):
+        cleaned = part.strip()
+        if cleaned.startswith("학생:"):
+            utterance = cleaned.replace("학생:", "", 1).strip()
+            if utterance and utterance not in student_lines:
+                student_lines.append(utterance)
+    if not student_lines:
+        return "학생 발화가 충분히 분리되어 기록되지 않아 다음 수업에서 다시 확인이 필요합니다."
+    preview = ", ".join(student_lines[:3])
+    return f"학생이 {len(student_lines)}회 발화했고, 주요 표현은 “{preview}”입니다."
+
+
+def _reflection_note_for_report(reflection: str | None) -> str:
+    if not reflection:
+        return "학생 회고가 없어 수업 직후 반응을 교사가 한 번 더 확인하면 좋습니다."
+    if any(term in reflection for term in ("유치", "쉬워", "시시", "재미없")):
+        return "학생이 과제 수준을 낮게 느낀 반응이 있어, 다음 자료는 같은 지원 방식은 유지하되 상황의 현실감과 난이도를 높이는 편이 좋습니다."
+    return "학생 회고가 남아 있어 다음 수업의 소재와 난이도 조정에 참고할 수 있습니다."
+
+
+def _next_teacher_report_suggestion(content: dict[str, Any], reflection: str | None, scaffold_text: str) -> str:
+    if reflection and any(term in reflection for term in ("유치", "쉬워", "시시", "재미없")):
+        return f"다음 수업은 {scaffold_text} 같은 지원 방식은 유지하되, 학생 나이에 맞는 더 현실적인 상황과 한 단계 높은 판단 과제로 조정합니다."
+    return f"다음 수업은 {scaffold_text} 같은 지원 방식을 유지하면서, 이번 수업의 목표를 다른 상황으로 옮겨 적용해 봅니다."
 
 
 def _latest_reflection_from_snapshot(events: list[dict[str, Any]]) -> str | None:
@@ -2033,14 +2443,16 @@ def _latest_reflection_from_snapshot(events: list[dict[str, Any]]) -> str | None
 
 
 def _apply_teacher_report_to_memory(memory_card: MemoryCard, report: TeacherReport) -> None:
-    candidates = [candidate for candidate in report.selected_memory_candidates if candidate.strip()]
+    candidates = _clean_memory_candidates(report.selected_memory_candidates)
+    caution_candidates = _memory_caution_candidates(candidates)
     memory_card.recent_4w_response_json = {
         **memory_card.recent_4w_response_json,
         "latestTeacherReportId": report.id,
         "latestTeacherReportSummary": report.teacher_body[:500],
         "selectedMemoryCandidates": candidates,
     }
-    memory_card.next_session_cautions = _dedupe([*memory_card.next_session_cautions, *candidates])[-8:]
+    memory_card.effective_explanation_styles = _dedupe([*memory_card.effective_explanation_styles, *candidates])[-8:]
+    memory_card.next_session_cautions = _memory_caution_candidates([*memory_card.next_session_cautions, *caution_candidates])[-8:]
     memory_card.teacher_verified_at = _now()
 
 
@@ -2064,6 +2476,38 @@ def _dedupe(values: list[str]) -> list[str]:
         seen.add(text)
         result.append(text)
     return result
+
+
+def _clean_memory_candidates(values: list[str]) -> list[str]:
+    return _dedupe([_abstract_context_pattern(value) for value in values if not _is_memory_noise(value)])
+
+
+def _is_memory_noise(value: str) -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return True
+    if len(text) > 260:
+        return True
+    noise_terms = (
+        "시스템:",
+        "상대:",
+        "마이크 입력",
+        "답변을 기다리는",
+        "실시간 연습 API",
+        "realtime",
+        "Realtime",
+        "provider",
+        "session",
+        "HTTP",
+        "fetch",
+        "오류",
+        "에러",
+        "timeout",
+        "토큰",
+        "OpenAI",
+        "ElevenLabs",
+    )
+    return any(term in text for term in noise_terms)
 
 
 def _normalize_registration_grade(value: str) -> str:
@@ -2103,25 +2547,64 @@ def _registration_primary_need_title(payload: StudentRegistrationRequest) -> str
     return "학습 개념 보완 수업"
 
 
-def _registration_support_strategy(payload: StudentRegistrationRequest) -> str:
-    supports = _registration_preferred_supports(payload)
-    if supports:
-        return f"{', '.join(supports[:3])}을 활용해 학생이 부담 없이 시작할 수 있는 콘텐츠가 좋겠어요."
+def _registration_support_focus(payload: StudentRegistrationRequest) -> str:
+    support_intake = _registration_support_intake(payload)
+    checklist = support_intake.get("checklistSummary") if isinstance(support_intake.get("checklistSummary"), dict) else {}
+    hard_situations = _dedupe(_list_value(checklist.get("hardSituations")) or _registration_weaknesses(payload))[:2]
+    communication_needs = _dedupe(_list_value(checklist.get("communicationNeeds")))[:2]
+    instruction_burdens = _dedupe(_list_value(checklist.get("instructionBurdens")))[:2]
+
     if payload.student_type == "life_support":
-        return "상황 그림, 순서 카드, 짧은 모델 문장을 활용한 실생활 역할 연습 콘텐츠가 좋겠어요."
-    return "시각 자료, 짧은 단계 카드, 선택지를 활용해 개념을 차근차근 확인하는 콘텐츠가 좋겠어요."
+        situation = ", ".join(hard_situations) if hard_situations else "낯선 생활 상황"
+        expression = ", ".join(communication_needs) if communication_needs else "도움 요청이나 확인 표현"
+        return f"{situation}에서 행동 전에 단서를 확인하고 {expression}을 짧게 사용하기"
+
+    burden = ", ".join([*hard_situations, *instruction_burdens][:2]) if [*hard_situations, *instruction_burdens] else "학습 과제"
+    return f"{burden}에서 핵심 단서를 먼저 확인하고 짧은 단계로 개념을 설명하기"
+
+
+def _registration_support_strategy(payload: StudentRegistrationRequest) -> str:
+    support_intake = _registration_support_intake(payload)
+    learning_response = support_intake.get("learningResponse") if isinstance(support_intake.get("learningResponse"), dict) else {}
+    checklist = support_intake.get("checklistSummary") if isinstance(support_intake.get("checklistSummary"), dict) else {}
+    supports = (
+        _list_value(learning_response.get("effectiveSupports"))
+        or _list_value(checklist.get("effectiveSupports"))
+        or _registration_preferred_supports(payload)
+    )
+    hard_situations = _list_value(checklist.get("hardSituations")) or _registration_weaknesses(payload)
+    instruction_burdens = _list_value(checklist.get("instructionBurdens"))
+    calming_supports = _list_value(checklist.get("calmingSupports"))
+    if supports:
+        support_hints = _registration_support_hints(supports, calming_supports, _list_value(checklist.get("communicationNeeds")), payload.student_type)
+        burden_candidates = _dedupe([*hard_situations, *instruction_burdens])[:2]
+        burden_text = f" {', '.join(burden_candidates)} 부담을 먼저 낮춥니다." if burden_candidates else ""
+        return f"관찰상 효과가 확인된 지원은 {', '.join(supports[:3])}입니다. 수업에서는 {', '.join(support_hints[:2])}을 적용합니다.{burden_text}"
+    if payload.student_type == "life_support":
+        return "생활 장면에서 어려워지는 조건을 먼저 확인하고, 도움 요청과 순서 확인을 수업 적용 힌트로 사용합니다."
+    return "학습 과제에서 어려워지는 조건을 먼저 확인하고, 지시를 나누어 개념 확인 순서를 안정화합니다."
 
 
 def _registration_response_pattern(payload: StudentRegistrationRequest) -> str:
-    supports = _registration_preferred_supports(payload)
-    if supports:
-        return f"{', '.join(supports[:2])}을 먼저 제공하면 반응을 관찰하기 좋습니다."
-    return "등록 직후에는 짧은 지시와 쉬운 첫 문항으로 반응을 확인합니다."
+    support_intake = _registration_support_intake(payload)
+    learning_response = support_intake.get("learningResponse") if isinstance(support_intake.get("learningResponse"), dict) else {}
+    checklist = support_intake.get("checklistSummary") if isinstance(support_intake.get("checklistSummary"), dict) else {}
+    strengths = _list_value(learning_response.get("observedStrengths")) or _list_value(checklist.get("observedStrengths")) or payload.strengths
+    supports = (
+        _list_value(learning_response.get("effectiveSupports"))
+        or _list_value(checklist.get("effectiveSupports"))
+        or _registration_preferred_supports(payload)
+    )
+    if strengths and supports:
+        return f"관찰된 강점은 {', '.join(strengths[:2])}입니다. 효과가 확인된 지원은 {', '.join(supports[:2])}입니다."
+    if strengths:
+        return f"관찰된 강점은 {', '.join(strengths[:2])}입니다."
+    return "등록 직후에는 쉬운 첫 과제로 반응을 확인하고 지원 조건을 보완합니다."
 
 
 def _registration_ai_context_summary(payload: StudentRegistrationRequest, track_label: str, primary_need: str) -> str:
     note = f" {payload.observation_note}" if payload.observation_note else ""
-    return f"{_grade_label(_normalize_registration_grade(payload.grade))} {track_label} 학생. {primary_need}{note}"
+    return f"{_grade_label(_normalize_registration_grade(payload.grade))} {track_label} 학생. 현재 지원 목표: {primary_need}.{note}"
 
 
 def _registration_strengths(payload: StudentRegistrationRequest) -> list[str]:
@@ -2129,8 +2612,8 @@ def _registration_strengths(payload: StudentRegistrationRequest) -> list[str]:
         return [_registration_sentence(item, positive=True) for item in payload.strengths[:5]]
     supports = _registration_preferred_supports(payload)
     if supports:
-        return [f"{support}이 제공되면 수업에 참여하기 쉬워 보여요." for support in supports[:3]]
-    return ["짧고 쉬운 첫 과제에서 반응을 확인하면 강점을 더 구체화할 수 있어요."]
+        return [f"{support}이 제공되면 수업 참여가 안정됩니다." for support in supports[:3]]
+    return ["짧고 쉬운 첫 과제에서 반응을 확인해 강점을 구체화합니다."]
 
 
 def _registration_weaknesses(payload: StudentRegistrationRequest) -> list[str]:
@@ -2147,6 +2630,56 @@ def _registration_preferred_supports(payload: StudentRegistrationRequest) -> lis
     return []
 
 
+def _registration_reading_load(hard_situations: list[str], instruction_burdens: list[str]) -> str:
+    joined = " ".join([*hard_situations, *instruction_burdens])
+    if any(keyword in joined for keyword in ["긴 글", "긴 문장", "긴 지시", "여러 조건", "읽고 시작"]):
+        return "low"
+    if any(keyword in joined for keyword in ["추상", "이유", "설명"]):
+        return "medium"
+    return "medium"
+
+
+def _registration_choice_count_limit(student_type: str, effective_supports: list[str]) -> int:
+    joined = " ".join(effective_supports)
+    if "선택지를 줄임" in joined or "선택지" in joined:
+        return 2
+    return 2 if student_type == "life_support" else 3
+
+
+def _registration_support_hints(
+    effective_supports: list[str],
+    calming_supports: list[str],
+    communication_needs: list[str],
+    student_type: str,
+) -> list[str]:
+    raw_items = _dedupe([*effective_supports, *calming_supports, *communication_needs])
+    mapped: list[str] = []
+    for item in raw_items:
+        if "짧게" in item or "나눔" in item:
+            mapped.append("지시를 짧게 나누기")
+        elif "예시" in item or "모델" in item:
+            mapped.append("예시를 먼저 보여주기")
+        elif "선택지" in item:
+            mapped.append("선택지 수 줄이기")
+        elif "순서" in item:
+            mapped.append("과제 순서 먼저 확인하기")
+        elif "기다" in item:
+            mapped.append("대답 전 기다릴 시간 주기")
+        elif "도움 요청" in item or "다시 말" in item or "쉬기" in item or "거절" in item:
+            mapped.append("필요한 표현을 짧게 연습하기")
+        elif "안전" in item:
+            mapped.append("안전 규칙 먼저 확인하기")
+        elif "조용" in item:
+            mapped.append("환경 자극을 줄이고 시작하기")
+        elif item:
+            mapped.append(item)
+    if mapped:
+        return _dedupe(mapped)[:6]
+    if student_type == "life_support":
+        return ["상황을 짧게 확인하기", "도움 요청 표현 연습하기"]
+    return ["지시를 짧게 나누기", "한 단계씩 확인하기"]
+
+
 def _registration_sentence(value: str, *, positive: bool) -> str:
     text = _teacher_facing_text(value)
     if text.endswith(("요.", "다.", "습니다.")):
@@ -2155,22 +2688,32 @@ def _registration_sentence(value: str, *, positive: bool) -> str:
         return f"{text.removesuffix('잘 찾음').strip()} 잘 찾아요."
     if positive and text.endswith("반응 좋음"):
         return f"{text.removesuffix('반응 좋음').strip()}에 반응이 좋아요."
+    if positive and text.endswith("함"):
+        return f"{text.removesuffix('함').strip()}합니다."
     if not positive and text.endswith("부담됨"):
         return f"{text.removesuffix('부담됨').strip()}부담될 수 있어요."
     if not positive and text.endswith("어려움"):
         return f"{text.removesuffix('어려움').strip()}어려울 수 있어요."
     if positive:
-        return f"{text} 지원을 활용하면 참여가 좋아질 수 있어요."
+        return f"{text}에서 강점이 관찰됩니다."
+    if text.endswith(("상황", "장면", "환경", "조건")):
+        return f"{text}에서 지원이 필요할 수 있어요."
     return f"{text} 상황에서 지원이 필요할 수 있어요."
 
 
 def _ensure_suggestion_sentence(value: str) -> str:
+    return _registration_goal_text(value)
+
+
+def _registration_goal_text(value: str) -> str:
     text = _teacher_facing_text(value.strip())
-    if text.endswith(("좋겠어요.", "맞아 보여요.", "필요해요.")):
-        return text
+    for suffix in ("수업이 좋겠어요.", "콘텐츠가 좋겠어요.", "해보면 좋겠어요.", "하면 좋겠어요.", "좋겠어요."):
+        if text.endswith(suffix):
+            text = text[: -len(suffix)].strip()
+            break
     if text.endswith("."):
         text = text[:-1]
-    return f"{text} 수업이 좋겠어요."
+    return text
 
 
 def _new_student_access_code(accounts: list[StudentAccount]) -> str:
@@ -2190,6 +2733,25 @@ def _safe_id_segment(value: str) -> str:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _is_context_brief_refresh_due(brief: StudentContextBrief) -> bool:
+    base_time = _parse_iso_datetime(brief.refreshed_at or brief.source_watermark or brief.created_at)
+    if base_time is None:
+        return True
+    return datetime.now(UTC) - base_time >= CONTEXT_BRIEF_REFRESH_INTERVAL
 
 
 def _mission_updated_at(content: MissionContent) -> str | None:
@@ -2313,6 +2875,31 @@ def _is_asset_ready_for_teacher_approval(asset: ContentAsset) -> bool:
 
 def _is_asset_ready_for_student_publish(asset: ContentAsset) -> bool:
     return asset.approval_status == "approved" and _is_asset_ready_for_teacher_approval(asset)
+
+
+def _sort_attempts_for_review_summary(attempts: list[ContentAttempt]) -> list[ContentAttempt]:
+    def sort_key(attempt: ContentAttempt) -> tuple[int, str]:
+        completed_rank = 1 if attempt.status == "completed" else 0
+        timestamp = attempt.completed_at or attempt.started_at
+        return completed_rank, timestamp
+
+    return sorted(attempts, key=sort_key, reverse=True)
+
+
+def _memory_caution_candidates(items: list[str]) -> list[str]:
+    caution_keywords = ("어려", "부담", "주의", "필요", "놓칠", "헷갈", "흔들", "낯선", "재촉", "오답", "실패")
+    hard_caution_keywords = ("어려", "부담", "주의", "필요", "놓칠", "헷갈", "흔들", "재촉", "오답", "실패")
+    positive_markers = ("100%", "정답률 100", "완료율 100", "사용할 수 있음", "안정적", "선택지로 시작", "잘 ", "가능", "성공")
+    cleaned: list[str] = []
+    for item in items:
+        text = _teacher_facing_text(str(item)).replace("상황 상황", "상황").strip()
+        if not text:
+            continue
+        if any(marker in text for marker in positive_markers) and not any(keyword in text for keyword in hard_caution_keywords):
+            continue
+        if any(keyword in text for keyword in caution_keywords):
+            cleaned.append(text)
+    return _dedupe(cleaned)
 
 
 def _build_korean_review_summary_text(
