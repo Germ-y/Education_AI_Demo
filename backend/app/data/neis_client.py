@@ -11,7 +11,7 @@ class NeisClient:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
-    def search_schools(self, *, office_code: str, school_name: str | None = None, school_code: str | None = None) -> list[dict[str, Any]]:
+    def search_schools(self, *, office_code: str | None = None, school_name: str | None = None, school_code: str | None = None) -> list[dict[str, Any]]:
         if not self.settings.neis_api_key:
             raise ProviderConfigurationError("NEIS_API_KEY_MISSING", "NEIS_API_KEY가 없어 NEIS 학교 조회를 실행할 수 없습니다.")
 
@@ -82,6 +82,37 @@ class NeisClient:
                     )
                 ]
         return {"schools": schools, "calendar": calendar, "timetable": timetable}
+
+    def fetch_timetable_day(
+        self,
+        *,
+        office_code: str,
+        school_code: str,
+        school_kind: str,
+        timetable_date: str,
+        grade: str,
+        class_name: str,
+    ) -> list[dict[str, Any]]:
+        if not self.settings.neis_api_key:
+            raise ProviderConfigurationError("NEIS_API_KEY_MISSING", "NEIS_API_KEY가 없어 NEIS 시간표 조회를 실행할 수 없습니다.")
+        endpoint = _timetable_endpoint(school_kind)
+        if not endpoint:
+            return []
+        return [
+            _normalize_timetable(row, office_code=office_code, school_code=school_code, endpoint=endpoint)
+            for row in self._fetch_rows(
+                endpoint,
+                {
+                    "ATPT_OFCDC_SC_CODE": office_code,
+                    "SD_SCHUL_CODE": school_code,
+                    "AY": (timetable_date or "")[:4],
+                    "SEM": "1",
+                    "ALL_TI_YMD": _compact_date(timetable_date),
+                    "GRADE": grade,
+                    "CLASS_NM": class_name,
+                },
+            )
+        ]
 
     def _fetch_rows(self, endpoint: str, params: dict[str, Any]) -> list[dict[str, Any]]:
         clean_params = {

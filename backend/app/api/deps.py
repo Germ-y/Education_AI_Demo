@@ -26,7 +26,12 @@ def get_store_instance() -> DemoStore:
         create_schema()
         repository = DemoRepository(get_session_maker())
         if settings.demo_seed_mode and (settings.demo_seed_reset or repository.is_empty()):
-            repository.replace_database(create_demo_database())
+            repository.replace_database(
+                create_demo_database(
+                    include_students=not settings.demo_blank_start,
+                    include_mission_contents=not settings.demo_blank_start,
+                )
+            )
         _store_instance = DemoStore(repository=repository)
         return _store_instance
 

@@ -530,7 +530,10 @@ def build_bus_content() -> MissionContent:
     )
 
 
-def create_demo_database() -> DemoDatabase:
+def create_demo_database(*, include_students: bool = True, include_mission_contents: bool = True) -> DemoDatabase:
+    include_student_records = include_students
+    include_content_records = include_students and include_mission_contents
+
     return DemoDatabase.model_validate(
         {
             "organizations": [
@@ -560,7 +563,7 @@ def create_demo_database() -> DemoDatabase:
                     "grade": "elementary_3",
                     "schoolCode": "8811046",
                     "studentType": "learning_focus",
-                    "primaryNeed": "시간 읽기 기초를 짧은 시각 단서와 2개 선택지로 익히는 수업이 좋겠어요.",
+                    "primaryNeed": "시간 읽기 기초를 짧은 시각 단서와 2개 선택지로 익히기",
                     "profileJson": {
                         "ageBand": "younger",
                         "gradeNumber": "3",
@@ -574,11 +577,11 @@ def create_demo_database() -> DemoDatabase:
                             "trackLabel": "저연령 학습지원형",
                             "statusLabel": "자료 생성",
                             "attendanceLabel": "기록 전",
-                            "summaryLine": "짧은 시각 단서와 2개 선택지로 시간 읽기 기초를 익히는 수업이 잘 맞아 보여요.",
-                            "primaryNeedTitle": "시간 읽기 기초 보완 수업",
-                            "primaryNeedDetail": "긴 설명보다 짧은 시각 단서로 시침과 분침을 구분하고 읽는 순서를 익히는 수업이 좋겠어요.",
-                            "supportStrategyTitle": "시각 단서 기반 2지선다 수업",
-                            "supportStrategyDetail": "한 문장 지시, 큰 그림 단서, 2개 선택지를 사용해 시간 읽기 순서를 안정화하는 콘텐츠가 좋겠어요.",
+                            "summaryLine": "짧은 시각 단서와 2개 선택지로 시간 읽기 기초를 익힙니다.",
+                            "primaryNeedTitle": "현재 지원 목표",
+                            "primaryNeedDetail": "짧은 시각 단서로 시침과 분침을 구분하고 읽는 순서를 익히기",
+                            "supportStrategyTitle": "수업 설계 힌트",
+                            "supportStrategyDetail": "한 문장 지시, 큰 그림 단서, 2개 선택지로 시간 읽기 순서를 안정화합니다.",
                             "strengths": [
                                 "그림에서 중요한 단서를 먼저 찾으면 바로 반응해요.",
                                 "선택지가 2개일 때 부담이 줄고 안정적으로 고를 수 있어요.",
@@ -594,7 +597,7 @@ def create_demo_database() -> DemoDatabase:
                             "guardianCooperation": "보호자는 가정에서 짧은 시계 읽기 연습을 도울 수 있으나, 긴 학습지는 부담이 큽니다.",
                             "schoolContextNote": "NEIS 학교 기본정보와 시간표를 연결해 학교 수업 흐름과 회기 목표를 함께 확인합니다.",
                             "nextSessionFocus": ["시간 읽기 순서 익히기", "2개 선택지로 정각 시간 확인하기", "첫 문항은 쉬운 성공 경험으로 시작"],
-                            "aiContextSummary": "초3 저연령 학습지원형 학생. 시간 읽기 기초 보완 수업이 잘 맞아 보여요. 긴 문장 설명보다 짧은 시각 단서와 2개 선택지를 중심으로 한 성공 경험형 콘텐츠로 시작하면 좋겠어요.",
+                            "aiContextSummary": "초3 저연령 학습지원형 학생. 짧은 시각 단서와 2개 선택지를 중심으로 한 성공 경험형 콘텐츠에서 시작이 안정적입니다.",
                         },
                     },
                 },
@@ -606,7 +609,7 @@ def create_demo_database() -> DemoDatabase:
                     "grade": "middle_2",
                     "schoolCode": "8811058",
                     "studentType": "learning_focus",
-                    "primaryNeed": "짧은 정보 문장을 읽고 확인 가능한 단서와 생각이 담긴 표현을 구분하는 수업이 좋겠어요.",
+                    "primaryNeed": "짧은 정보 문장에서 확인 가능한 단서와 생각이 담긴 표현 구분하기",
                     "profileJson": {
                         "ageBand": "older",
                         "gradeNumber": "2",
@@ -621,11 +624,11 @@ def create_demo_database() -> DemoDatabase:
                             "trackLabel": "고연령 학습지원형",
                             "statusLabel": "자료 검토",
                             "attendanceLabel": "95%",
-                            "summaryLine": "짧은 정보 문장을 보고 사실·의견을 구분한 뒤 판단 근거를 말하는 수업이 잘 맞아 보여요.",
-                            "primaryNeedTitle": "정보 읽기 근거 설명 수업",
-                            "primaryNeedDetail": "국어 읽기 자료의 포스터·안내문 원문에서 확인 가능한 단서와 생각이 담긴 표현을 구분하는 수업이 좋겠어요.",
-                            "supportStrategyTitle": "시각 자료 + 기준 카드 + 근거 말하기",
-                            "supportStrategyDetail": "포스터 원문을 먼저 읽고, 사실·의견 기준 카드를 확인한 뒤, 판단 근거를 한 문장으로 말해보는 콘텐츠가 좋겠어요.",
+                            "summaryLine": "짧은 정보 문장을 보고 사실·의견을 구분한 뒤 판단 근거를 말합니다.",
+                            "primaryNeedTitle": "현재 지원 목표",
+                            "primaryNeedDetail": "포스터·안내문 원문에서 확인 가능한 단서와 생각이 담긴 표현 구분하기",
+                            "supportStrategyTitle": "수업 설계 힌트",
+                            "supportStrategyDetail": "포스터 원문, 사실·의견 기준 카드, 한 문장 근거 말하기로 판단 과정을 나눕니다.",
                             "strengths": [
                                 "포스터나 안내문처럼 실제 장면이 있으면 읽어야 할 문장을 더 잘 찾습니다.",
                                 "판단 기준을 카드로 나누어 보여주면 끝까지 따라올 수 있습니다.",
@@ -641,7 +644,7 @@ def create_demo_database() -> DemoDatabase:
                             "guardianCooperation": "보호자 협조는 보통 수준이며, 가정 복습은 짧은 예시 1개 정도가 적합합니다.",
                             "schoolContextNote": "NEIS 시간표의 국어·사회·과학 등 읽기 자료가 많은 날에는 포스터·안내문 원문을 읽는 문장 판단 콘텐츠와 연결합니다.",
                             "nextSessionFocus": ["확인 가능한 단서 찾기", "사실·의견 구분하기", "판단 근거 한 문장으로 말하기"],
-                            "aiContextSummary": "중2 고연령 학습지원형 학생. 국어 읽기 자료의 짧은 정보 문장을 보고 확인 가능한 단서와 생각이 담긴 표현을 구분하는 수업이 잘 맞아 보여요. 포스터 원문과 기준 카드로 부담을 낮추고, 마지막에는 판단 근거를 한 문장으로 말하는 콘텐츠가 좋겠어요.",
+                            "aiContextSummary": "중2 고연령 학습지원형 학생. 포스터 원문과 기준 카드로 읽기 부담을 낮추고, 마지막에는 판단 근거를 한 문장으로 말하는 구성이 안정적입니다.",
                         },
                     },
                 },
@@ -653,7 +656,7 @@ def create_demo_database() -> DemoDatabase:
                     "grade": "elementary_6",
                     "schoolCode": "8811067",
                     "studentType": "life_support",
-                    "primaryNeed": "생활 상황에서 순서 확인과 도움 요청 표현을 연습하는 의사소통 수업이 좋겠어요.",
+                    "primaryNeed": "생활 상황에서 순서 확인과 도움 요청 표현 연습하기",
                     "profileJson": {
                         "ageBand": "life_support",
                         "gradeNumber": "6",
@@ -668,11 +671,11 @@ def create_demo_database() -> DemoDatabase:
                             "trackLabel": "일상생활 지원형",
                             "statusLabel": "학습",
                             "attendanceLabel": "91%",
-                            "summaryLine": "생활 상황에서 순서를 확인하고 도움 요청 표현을 말하는 의사소통 수업이 잘 맞아 보여요.",
-                            "primaryNeedTitle": "일상생활 의사소통 수업",
-                            "primaryNeedDetail": "낯선 생활 상황에서 단서를 확인하고 필요한 도움 요청 문장을 짧게 말하는 수업이 좋겠어요.",
-                            "supportStrategyTitle": "상황 그림 + 순서 카드 + 역할 발화",
-                            "supportStrategyDetail": "상황 그림, 순서 카드, 짧은 모델 문장, 실시간 역할 발화 연습을 조합한 콘텐츠가 좋겠어요.",
+                            "summaryLine": "생활 상황에서 순서를 확인하고 도움 요청 표현을 말합니다.",
+                            "primaryNeedTitle": "현재 지원 목표",
+                            "primaryNeedDetail": "낯선 생활 상황에서 단서를 확인하고 필요한 도움 요청 문장을 짧게 말하기",
+                            "supportStrategyTitle": "수업 설계 힌트",
+                            "supportStrategyDetail": "상황 그림, 순서 카드, 짧은 모델 문장, 실시간 역할 발화 연습을 연결합니다.",
                             "strengths": [
                                 "상황 그림을 보면 지금 어디서 무엇을 해야 하는지 잘 파악해요.",
                                 "역할 연습에서는 짧은 문장을 따라 말하려는 시도가 좋아요.",
@@ -688,16 +691,20 @@ def create_demo_database() -> DemoDatabase:
                             "guardianCooperation": "보호자와 센터 이동 동선을 함께 확인하면 실제 적용 가능성이 높습니다.",
                             "schoolContextNote": "NEIS 학교 일정과 시간표를 확인해 센터 방문 회기 전 피로도와 이동 시간을 함께 고려합니다.",
                             "nextSessionFocus": ["생활 상황 단서 확인하기", "도움 요청 문장 1개 말하기", "다음 행동 짧게 확인하기"],
-                            "aiContextSummary": "초6 일상생활 지원형 학생. 생활 상황에서 순서를 확인하고 도움 요청 표현을 말하는 의사소통 수업이 잘 맞아 보여요. 상황 그림과 순서 카드 뒤 실시간 역할 발화 연습으로 이어지는 콘텐츠가 좋겠어요.",
+                            "aiContextSummary": "초6 일상생활 지원형 학생. 상황 그림과 순서 카드 뒤 실시간 역할 발화 연습으로 이어질 때 참여가 안정적입니다.",
                         },
                     },
                 },
-            ],
+            ]
+            if include_student_records
+            else [],
             "studentAccounts": [
                 {"id": "student_account_learning", "studentId": "student_learning_fraction", "accessCode": "STAR-001"},
                 {"id": "student_account_life", "studentId": "student_life_bus", "accessCode": "STAR-002"},
                 {"id": "student_account_clock", "studentId": "student_learning_clock", "accessCode": "STAR-003"},
-            ],
+            ]
+            if include_student_records
+            else [],
             "schools": [
                 {
                     "id": "school_yeongju_jungang_elementary",
@@ -891,7 +898,7 @@ def create_demo_database() -> DemoDatabase:
                     "studentId": "student_learning_clock",
                     "ownerTeacherId": "user_teacher_demo",
                     "caseStatus": "open",
-                    "currentGoal": "시간 읽기 기초를 짧은 시각 단서와 2개 선택지로 익혀보면 좋겠어요.",
+                    "currentGoal": "시간 읽기 기초를 짧은 시각 단서와 2개 선택지로 익히기",
                     "dashboardStage": "material_generation",
                     "supportStrategy": "그림 먼저 보기와 2개 선택지로 첫 성공 경험을 만든 뒤 짧은 음성 안내를 연결",
                     "openedAt": NOW,
@@ -901,7 +908,7 @@ def create_demo_database() -> DemoDatabase:
                     "studentId": "student_learning_fraction",
                     "ownerTeacherId": "user_teacher_demo",
                     "caseStatus": "open",
-                    "currentGoal": "짧은 정보 문장에서 확인 가능한 단서와 생각이 담긴 표현을 구분해보면 좋겠어요.",
+                    "currentGoal": "짧은 정보 문장에서 확인 가능한 단서와 생각이 담긴 표현 구분하기",
                     "dashboardStage": "material_review",
                     "supportStrategy": "국어 읽기 자료와 기준 카드로 첫 판단을 쉽게 만든 뒤 한 문장 근거 말하기로 연결",
                     "openedAt": NOW,
@@ -911,12 +918,14 @@ def create_demo_database() -> DemoDatabase:
                     "studentId": "student_life_bus",
                     "ownerTeacherId": "user_teacher_demo",
                     "caseStatus": "open",
-                    "currentGoal": "생활 상황에서 순서 확인과 도움 요청 표현을 연습해보면 좋겠어요.",
+                    "currentGoal": "생활 상황에서 순서 확인과 도움 요청 표현 연습하기",
                     "dashboardStage": "learning",
                     "supportStrategy": "상황 그림과 역할 연습으로 도움 요청 문장을 짧게 반복",
                     "openedAt": NOW,
                 },
-            ],
+            ]
+            if include_student_records
+            else [],
             "caseNotes": [
                 {
                     "id": "note_clock_001",
@@ -942,7 +951,9 @@ def create_demo_database() -> DemoDatabase:
                     "body": "새로운 장소에 갈 때 순서를 놓치면 불안해함. 도움 요청 문장 연습 필요.",
                     "createdAt": NOW,
                 },
-            ],
+            ]
+            if include_student_records
+            else [],
             "memoryCards": [
                 {
                     "id": "memory_clock_active",
@@ -986,14 +997,99 @@ def create_demo_database() -> DemoDatabase:
                     "nextSessionCautions": ["도움 요청 문장을 먼저 연습", "선택지는 2개 위주로 제공"],
                     "teacherVerifiedAt": NOW,
                 },
-            ],
+            ]
+            if include_student_records
+            else [],
+            "studentContextBriefs": [
+                {
+                    "id": "context_brief_student_learning_clock_seed",
+                    "studentId": "student_learning_clock",
+                    "briefText": (
+                        "김지우 학생은 초3 저연령 학습지원형입니다. 시간 읽기 수업에서는 시계 그림을 먼저 보고 짧은 바늘을 찾는 활동에서 시작이 안정적입니다. "
+                        "읽기 부담은 매우 낮게 잡고, 선택지는 2개 안팎이 적합합니다. 긴 설명을 먼저 들으면 첫 행동 시작이 늦어질 수 있으므로 큰 시각 단서, 한 문장 지시, 짧은 음성 안내로 진행합니다. "
+                        "콘텐츠 생성 시 교사 요청 주제를 우선하고, 지원 정보는 난이도와 제시 방식 조정에만 사용합니다. 이전 시도에서 실패 직후 재촉하면 다시 시도까지 시간이 걸리므로 쉬운 첫 문항으로 성공 경험을 만든 뒤 확장합니다."
+                    ),
+                    "studentType": "저연령 학습지원형",
+                    "readingLoad": "very_low",
+                    "choiceCount": 2,
+                    "recentSuccessPatterns": ["시계 그림에서 짧은 바늘 먼저 찾기", "2개 선택지에서 안정적으로 고르기", "마스코트의 짧은 안내에 주의 모으기"],
+                    "recentDifficultyPatterns": ["긴 문장 지시 뒤 첫 행동 시작 부담", "시침과 분침을 보는 순서가 흔들림", "틀린 직후 다시 시도까지 시간이 필요함"],
+                    "recommendedScaffolds": ["큰 그림 단서 먼저 제시", "한 문장 지시", "2개 선택지", "짧은 음성 안내", "쉬운 첫 문항"],
+                    "avoidTopicRegression": ["긴 설명 중심 학습지", "여러 조건을 한 번에 주는 문제"],
+                    "sourceWatermark": NOW,
+                    "dirty": False,
+                    "status": "refreshed",
+                    "sourceJson": {"manualSeed": True, "sourceMemoryCardId": "memory_clock_active", "sourceCaseNoteIds": ["note_clock_001"]},
+                    "model": "manual_seed_20260507",
+                    "refreshedAt": NOW,
+                    "createdAt": NOW,
+                },
+                {
+                    "id": "context_brief_student_learning_fraction_seed",
+                    "studentId": "student_learning_fraction",
+                    "briefText": (
+                        "이민준 학생은 중2 고연령 학습지원형입니다. 포스터, 안내문, 학교 게시판처럼 실제 장면 안의 짧은 원문을 보고 확인 가능한 단서와 생각·권유 표현을 나누는 수업에서 참여가 좋습니다. "
+                        "읽기 부담은 낮게 잡되 중학생 수준의 소재를 유지하고, 선택지는 3개 안팎까지 가능합니다. 기준 카드를 먼저 제시하면 판단을 끝까지 따라오며, 답을 고른 뒤 판단 근거를 한 문장으로 말하는 단계에는 짧은 도움말이 필요합니다. "
+                        "콘텐츠 생성 시 교사 요청 주제를 우선하고 과거 분수 소재로 되돌아가지 않습니다. 이미지가 필요한 문제는 문제·정답·선택지 UI 문장을 이미지에 숨기지 않되, 포스터나 안내문처럼 장면 자체의 짧은 읽기 문구는 장면 안에 자연스럽게 포함할 수 있습니다."
+                    ),
+                    "studentType": "고연령 학습지원형",
+                    "readingLoad": "low",
+                    "choiceCount": 3,
+                    "recentSuccessPatterns": ["포스터나 안내문 원문에서 읽어야 할 문장 찾기", "기준 카드를 보고 사실과 의견 나누기", "학교생활 소재에서 짧게 자기 생각 말하기"],
+                    "recentDifficultyPatterns": ["확인 가능한 사실과 생각·권유가 담긴 의견을 섞어 판단함", "문제 설명이 길면 눈에 띄는 단어에 먼저 반응함", "판단 근거를 말할 때 짧은 지원이 필요함"],
+                    "recommendedScaffolds": ["실제 장면 자료", "사실·의견 기준 카드", "짧은 원문 2~3개", "근거 한 문장 말하기", "중학생에게 맞는 생활·교과 소재"],
+                    "avoidTopicRegression": ["분수 피자 소재 반복", "유아적 선택지", "문제 설명만 길고 읽기 근거가 없는 이미지"],
+                    "sourceWatermark": NOW,
+                    "dirty": False,
+                    "status": "refreshed",
+                    "sourceJson": {
+                        "manualSeed": True,
+                        "sourceMemoryCardId": "memory_fraction_active",
+                        "sourceCaseNoteIds": ["note_fraction_001"],
+                        "sourceReviewSummaryIds": ["review_fraction_20260502"],
+                    },
+                    "model": "manual_seed_20260507",
+                    "refreshedAt": NOW,
+                    "createdAt": NOW,
+                },
+                {
+                    "id": "context_brief_student_life_bus_seed",
+                    "studentId": "student_life_bus",
+                    "briefText": (
+                        "박수민 학생은 초6 일상생활 지원형입니다. 낯선 생활 상황에서도 상황 그림과 순서 카드를 먼저 보면 지금 해야 할 행동을 파악하기 쉽고, 짧은 모델 문장을 들은 뒤 역할 발화로 이어질 때 참여가 안정적입니다. "
+                        "읽기 부담은 매우 낮게 잡고, 선택지는 2개 안팎이 적합합니다. 이동 순서를 한 번에 많이 제시하면 헷갈릴 수 있고, 도움이 필요해도 먼저 말로 요청하는 단계는 부담이 있습니다. "
+                        "콘텐츠 생성 시 생활 상황의 목적지, 단서 확인, 행동 선택, 한 번 말해보기 흐름을 유지합니다. 마지막 실시간 연습에서는 정답을 맞히는 평가보다 안전하게 묻기, 도움 요청하기, 다음 행동 확인하기를 짧은 문장으로 연습하게 합니다."
+                    ),
+                    "studentType": "일상생활 지원형",
+                    "readingLoad": "very_low",
+                    "choiceCount": 2,
+                    "recentSuccessPatterns": ["상황 그림으로 장소와 해야 할 일 파악하기", "순서 카드에 맞춰 이동 흐름 확인하기", "짧은 모델 문장을 듣고 따라 말하기"],
+                    "recentDifficultyPatterns": ["여러 이동 단계를 한 번에 정리하면 순서가 헷갈림", "도움 요청 문장을 먼저 말하기 어려움", "낯선 장소에서 다음 행동 확인 단서가 필요함"],
+                    "recommendedScaffolds": ["상황 그림", "순서 카드", "2개 선택지", "짧은 모델 문장", "실제 상황처럼 말해보기"],
+                    "avoidTopicRegression": ["절차만 긴 글로 설명하기", "도움 요청 없이 행동만 고르는 문제", "생활 상황과 무관한 교과 문제"],
+                    "sourceWatermark": NOW,
+                    "dirty": False,
+                    "status": "refreshed",
+                    "sourceJson": {
+                        "manualSeed": True,
+                        "sourceMemoryCardId": "memory_bus_active",
+                        "sourceCaseNoteIds": ["note_bus_001"],
+                        "sourceReviewSummaryIds": ["review_bus_20260502"],
+                    },
+                    "model": "manual_seed_20260507",
+                    "refreshedAt": NOW,
+                    "createdAt": NOW,
+                },
+            ]
+            if include_student_records
+            else [],
             "plannerItems": [
                 {
                     "id": "planner_clock_next",
                     "studentId": "student_learning_clock",
                     "caseId": "case_learning_clock",
                     "periodType": "next_session",
-                    "goalText": "\uc2dc\uac04 \uc77d\uae30 \uae30\ucd08\ub97c \uc9e7\uc740 \uc2dc\uac01 \ub2e8\uc11c\uc640 2\uac1c \uc120\ud0dd\uc9c0\ub85c \uc775\ud600\ubcf4\uba74 \uc88b\uaca0\uc5b4\uc694.",
+                    "goalText": "시간 읽기 기초를 짧은 시각 단서와 2개 선택지로 익히기",
                     "checklistJson": {
                         "checks": ["\uc9e7\uc740 \ubc14\ub298 \ucc3e\uae30", "2\uac1c \uc120\ud0dd\uc9c0\uc5d0\uc11c \uc2dc\uac04 \uace0\ub974\uae30"]
                     },
@@ -1003,7 +1099,7 @@ def create_demo_database() -> DemoDatabase:
                     "studentId": "student_learning_fraction",
                     "caseId": "case_learning_fraction",
                     "periodType": "next_session",
-                    "goalText": "짧은 정보 문장에서 사실과 의견을 구분하고 판단 근거를 한 문장으로 설명해보면 좋겠어요.",
+                    "goalText": "짧은 정보 문장에서 사실과 의견을 구분하고 판단 근거를 한 문장으로 설명하기",
                     "checklistJson": {"checks": ["첫 문제 성공경험", "확인 가능한 단서 찾기", "근거 한 문장 말하기"]},
                 },
                 {
@@ -1011,11 +1107,13 @@ def create_demo_database() -> DemoDatabase:
                     "studentId": "student_life_bus",
                     "caseId": "case_life_bus",
                     "periodType": "next_session",
-                    "goalText": "생활 상황에서 도움 요청 문장 1개를 말해보면 좋겠어요.",
+                    "goalText": "생활 상황에서 도움 요청 문장 1개 말하기",
                     "checklistJson": {"checks": ["목적지 말하기", "도움 요청하기"]},
                 },
-            ],
-            "missionContents": [build_clock_content(), build_fraction_content(), build_bus_content()],
+            ]
+            if include_student_records
+            else [],
+            "missionContents": [build_clock_content(), build_fraction_content(), build_bus_content()] if include_content_records else [],
             "attempts": [
                 {
                     "id": "attempt_fraction_20260502",
@@ -1037,7 +1135,9 @@ def create_demo_database() -> DemoDatabase:
                     "completedAt": "2026-05-02T10:18:00.000Z",
                     "scoreJson": {"completionRate": 1, "accuracyRate": 1, "supportLevel": "modeled_prompt"},
                 },
-            ],
+            ]
+            if include_content_records
+            else [],
             "activityEvents": [
                 {
                     "id": "event_fraction_s1_viewed",
@@ -1111,7 +1211,9 @@ def create_demo_database() -> DemoDatabase:
                     "payloadJson": {"reflectionChoice": "다시 연습하고 싶어요", "shortText": "버스 번호는 알겠는데 말로 물어보는 건 더 연습하고 싶어요."},
                     "occurredAt": "2026-05-02T10:18:05.000Z",
                 },
-            ],
+            ]
+            if include_content_records
+            else [],
             "realtimeSessions": [
                 {
                     "id": "rt_session_fraction_20260502",
@@ -1157,7 +1259,9 @@ def create_demo_database() -> DemoDatabase:
                     },
                     "transcriptSummary": "목적지를 말하고 도움을 요청했지만, 다음에 무엇을 하면 되는지 확인하는 문장은 교사의 예시가 필요했습니다.",
                 },
-            ],
+            ]
+            if include_content_records
+            else [],
             "reviewSummaries": [
                 {
                     "id": "review_fraction_20260502",
@@ -1202,7 +1306,9 @@ def create_demo_database() -> DemoDatabase:
                         "nextSupport": "짧은 확인 문장 한 가지를 먼저 연습합니다. 예: '이제 어떤 버스를 타면 돼요?'",
                     },
                 },
-            ],
+            ]
+            if include_content_records
+            else [],
             "auditLogs": [
                 {
                     "id": "audit_fraction_content_approved",
@@ -1244,7 +1350,7 @@ def create_demo_database() -> DemoDatabase:
                     "payloadJson": {"reason": "최근 버스 이동 연습 리포트 확인"},
                     "createdAt": "2026-05-02T10:22:00.000Z",
                 },
-            ],
+            ] if include_content_records else [],
             "publicDataSources": [
                 {
                     "id": "source_neis",

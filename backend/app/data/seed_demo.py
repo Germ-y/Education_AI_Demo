@@ -7,7 +7,7 @@ from app.repositories.demo_repository import DemoRepository
 
 
 def main() -> None:
-    db = create_demo_database()
+    db = create_demo_database(include_students=False, include_mission_contents=False)
     create_schema()
     repository = DemoRepository(get_session_maker())
     repository.replace_database(db)
