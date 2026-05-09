@@ -1226,6 +1226,11 @@ export default function DashboardPage() {
           challengeTags: [],
           planTags: [],
         };
+  const lessonDesignDirection =
+    supportProfileLessonHints[0] ??
+    dashboardProfile?.supportStrategyDetail ??
+    selectedCase.supportStrategy ??
+    "지원 프로필을 생성하면 수업 설계 방향이 표시됩니다.";
   const serverSavedFeedbackRecords = useMemo(
     () => {
       const noteRecords = (activeCaseFile?.weeklyRecords ?? [])
@@ -2417,14 +2422,14 @@ export default function DashboardPage() {
 
                     <div className="mt-4 grid gap-3 md:grid-cols-3">
                       <SignalCard
-                        label="현재 지원 초점"
-                        value={dashboardProfile?.primaryNeedDetail ?? selectedCase.primaryNeed}
-                        helper="콘텐츠 주제가 아니라 제시 방식 조정 기준입니다."
+                        label="수업 설계 방향"
+                        value={lessonDesignDirection}
+                        helper="확정 프로필이나 AI 참고 요약에서 가져온 실제 제시 방식입니다."
                       />
                       <SignalCard
-                        label="수업 방식 프로필"
+                        label="프로필 상태"
                         value={supportProfileStatusLabel(supportProfileStatus)}
-                        helper="학생에게 자료를 어떤 순서와 방식으로 보여줄지 정리한 값입니다."
+                        helper="아래 강점, 주의 흐름, 제시 방식이 자료 생성에 반영됩니다."
                       />
                       <SignalCard
                         label="처음 제시 기준"

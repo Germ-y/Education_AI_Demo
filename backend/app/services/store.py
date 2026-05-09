@@ -2180,16 +2180,19 @@ def _support_focus_from_support_profile(
 ) -> str:
     response_pattern = profile_json.get("learningResponsePattern") if isinstance(profile_json.get("learningResponsePattern"), dict) else {}
     behavior_profile = profile_json.get("behaviorSupportProfile") if isinstance(profile_json.get("behaviorSupportProfile"), dict) else {}
+    hints = _dedupe(_list_value(profile_json.get("lessonDesignHints")))
     can_be_hard = _dedupe(_list_value(response_pattern.get("canBeHard")))[:2]
     replacement_skills = _dedupe(_list_value(behavior_profile.get("replacementSkills")))[:2]
     existing = _teacher_facing_text(dashboard.get("primaryNeedDetail") or student.primary_need)
 
+    if hints:
+        return hints[0]
     if student.student_type == "life_support":
         situation = ", ".join(can_be_hard) if can_be_hard else "낯선 생활 상황"
         expression = ", ".join(replacement_skills) if replacement_skills else "도움 요청이나 확인 표현"
-        return f"{situation}에서 행동 전에 단서를 확인하고 {expression}을 짧게 사용하기"
+        return f"{situation}에서는 먼저 단서를 확인하고, {expression}을 짧게 연습합니다."
     if can_be_hard:
-        return f"{', '.join(can_be_hard)}에서 핵심 단서를 먼저 확인하고 짧은 단계로 개념을 설명하기"
+        return "핵심 단서를 먼저 확인하고, 짧은 단계로 개념을 설명합니다."
     return existing
 
 
@@ -2654,10 +2657,11 @@ def _registration_support_focus(payload: StudentRegistrationRequest) -> str:
     if payload.student_type == "life_support":
         situation = ", ".join(hard_situations) if hard_situations else "낯선 생활 상황"
         expression = ", ".join(communication_needs) if communication_needs else "도움 요청이나 확인 표현"
-        return f"{situation}에서 행동 전에 단서를 확인하고 {expression}을 짧게 사용하기"
+        return f"{situation}에서는 먼저 단서를 확인하고, {expression}을 짧게 연습합니다."
 
-    burden = ", ".join([*hard_situations, *instruction_burdens][:2]) if [*hard_situations, *instruction_burdens] else "학습 과제"
-    return f"{burden}에서 핵심 단서를 먼저 확인하고 짧은 단계로 개념을 설명하기"
+    if [*hard_situations, *instruction_burdens]:
+        return "핵심 단서를 먼저 확인하고, 짧은 단계로 개념을 설명합니다."
+    return "짧은 예시와 핵심 단서로 학습 과제를 시작합니다."
 
 
 def _registration_support_strategy(payload: StudentRegistrationRequest) -> str:
