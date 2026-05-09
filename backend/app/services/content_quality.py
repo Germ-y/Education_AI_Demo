@@ -240,21 +240,13 @@ def validate_orchestrator_plan_quality(
     case_file: dict[str, Any] | None = None,
 ) -> None:
     issues: list[str] = []
-    profile_json = _profile_json_from_case_file(case_file)
-    reading_load = str(profile_json.get("readingLoad") or "default")
-    choice_limit = _positive_int(profile_json.get("choiceCountLimit"))
-
     _expect_equal(plan.get("studentId"), student_id, "orchestrator.studentId", issues)
     _expect_equal(plan.get("caseId"), case_id, "orchestrator.caseId", issues)
     _expect_equal(plan.get("contentType"), content_type, "orchestrator.contentType", issues)
 
-    _validate_korean_text(plan.get("sessionGoal"), "orchestrator.sessionGoal", issues)
-    _validate_korean_text(plan.get("targetSkill"), "orchestrator.targetSkill", issues)
-    _validate_korean_text(_nested(plan, "difficultyPolicy", "reason"), "orchestrator.difficultyPolicy.reason", issues)
-    _validate_scenario_spine(plan.get("scenarioSpine"), "orchestrator.scenarioSpine", issues)
-    _validate_text_list(plan.get("teacherReviewFocus"), "orchestrator.teacherReviewFocus", issues)
+    # 오케스트레이터 검수는 다음 단계 생성에 필요한 구조 계약만 차단한다.
+    # 설명 문구의 길이/한국어 여부/비어 있음 같은 품질 판단은 프롬프트와 교사 검토로 넘긴다.
     _validate_stage_plan(plan.get("stagePlan"), content_type, issues)
-    _validate_stage_plan_template_variety(plan.get("stagePlan"), issues, reading_load=reading_load, choice_limit=choice_limit)
     _validate_intent_roles(plan.get("imagePackageIntent"), "orchestrator.imagePackageIntent", issues)
     _validate_stage_visual_specs(plan.get("stageVisualSpecs"), "orchestrator.stageVisualSpecs", issues)
     _validate_intent_roles(plan.get("ttsNarrationIntent"), "orchestrator.ttsNarrationIntent", issues)
@@ -292,10 +284,9 @@ def validate_mission_content_quality(
     _validate_mission_template_variety(mission, issues, reading_load=reading_load, choice_limit=choice_limit)
     _validate_asset_package(mission, issues)
     _validate_stage_asset_links(mission, issues)
-    _validate_visible_content_text(mission, reading_load, choice_limit, issues)
-    _validate_source_material_evidence(mission, issues)
-    _validate_image_prompt_policy(mission, issues)
-    _validate_track_specific_problem_quality(mission, expected_content_type, issues)
+    # 생성 실패를 막는 품질검수는 렌더링/저장 계약 위주로 제한한다.
+    # 문장 길이, 문제 뉘앙스, 이미지 프롬프트 표현 같은 내용 품질은
+    # 프롬프트와 교사 검토에서 다루고, 여기서 콘텐츠 생성을 차단하지 않는다.
     _validate_mission_visual_brief_contract(mission, orchestrator_plan, issues)
 
     if issues:
@@ -327,12 +318,9 @@ def _validate_stage_plan(stage_plan: Any, content_type: str, issues: list[str]) 
         template_type = item.get("templateType")
         if template_type not in allowed_templates:
             issues.append(f"orchestrator.stagePlan[{step}].templateType이 허용 범위를 벗어났습니다: {template_type}")
-        _validate_korean_text(item.get("studentTitle"), f"orchestrator.stagePlan[{step}].studentTitle", issues)
         expected_title = STAGE_TITLE_RULES.get(content_type, {}).get(step)
         if expected_title and item.get("studentTitle") != expected_title:
             issues.append(f"orchestrator.stagePlan[{step}].studentTitle은 '{expected_title}'이어야 합니다.")
-        _validate_korean_text(item.get("purpose"), f"orchestrator.stagePlan[{step}].purpose", issues)
-        _validate_korean_text(item.get("templateRationale"), f"orchestrator.stagePlan[{step}].templateRationale", issues)
 
 
 def _validate_stage_plan_template_variety(stage_plan: Any, issues: list[str], *, reading_load: str = "default", choice_limit: int | None = None) -> None:
@@ -757,8 +745,6 @@ def _validate_stage_visual_specs(value: Any, path: str, issues: list[str]) -> No
         if not isinstance(item, dict):
             issues.append(f"{path}[{index}]는 object여야 합니다.")
             continue
-        for key in ("visualPurpose", "sceneSummary", "primaryEvidenceObject", "evidenceLocation", "composition"):
-            _validate_korean_text(item.get(key), f"{path}[{index}].{key}", issues)
         for key in ("mustShow", "allowedSceneText", "doNotRenderText"):
             if not isinstance(item.get(key), list):
                 issues.append(f"{path}[{index}].{key}는 list여야 합니다.")

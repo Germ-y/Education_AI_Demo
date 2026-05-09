@@ -61,6 +61,28 @@ def test_image_brief_blocks_choice_text_from_visible_prompt() -> None:
     assert blocked == "센터로 가는 버스 번호 확인하기"
 
 
+def test_image_brief_allows_stage_visual_scene_text_from_visible_prompt() -> None:
+    mission = MissionContent.model_validate(_generated_life_support_content())
+    mission.brief_json = {
+        "stageVisualSpecs": [
+            {
+                "assetRole": "stage_2",
+                "allowedSceneText": ["오늘 시간표"],
+                "doNotRenderText": [],
+            }
+        ]
+    }
+    asset = next(asset for asset in mission.assets if asset.asset_type == "image" and asset.asset_role == "stage_2")
+
+    blocked = _blocked_visible_text_in_image_prompt(
+        mission,
+        asset,
+        "교실 칠판에 실제 장면 단서로 '오늘 시간표'가 작게 보입니다.",
+    )
+
+    assert blocked is None
+
+
 def test_rejects_fifth_stage() -> None:
     content = create_demo_database().mission_contents[0].model_dump(by_alias=True)
     content["totalSteps"] = 5
@@ -310,24 +332,18 @@ def test_orchestrator_plan_quality_requires_track_matching_four_stage_flow() -> 
         )
 
 
-def test_orchestrator_plan_quality_requires_upfront_design_criteria() -> None:
+def test_orchestrator_plan_quality_leaves_prompt_level_design_criteria_to_generation() -> None:
     plan = _valid_learning_plan()
     del plan["scenarioSpine"]["stage2FirstSuccess"]
     del plan["stagePlan"][1]["templateRationale"]
     del plan["stageVisualSpecs"][1]["evidenceLocation"]
 
-    with pytest.raises(ContentQualityError) as exc:
-        validate_orchestrator_plan_quality(
-            plan,
-            student_id="student_learning_fraction",
-            case_id="case_learning_fraction",
-            content_type="learning_focus",
-        )
-
-    message = str(exc.value)
-    assert "scenarioSpine.stage2FirstSuccess" in message
-    assert "stagePlan[2].templateRationale" in message
-    assert "stageVisualSpecs[1].evidenceLocation" in message
+    validate_orchestrator_plan_quality(
+        plan,
+        student_id="student_learning_fraction",
+        case_id="case_learning_fraction",
+        content_type="learning_focus",
+    )
 
 
 def test_orchestrator_plan_quality_allows_choice_flow_for_very_low_reading_load() -> None:
@@ -362,7 +378,7 @@ def test_mission_quality_rejects_raw_internal_terms_in_student_text() -> None:
     content["stages"][3]["studentTitle"] = "realtime teach-back practice"
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="내부 영문 용어"):
+    with pytest.raises(ContentQualityError, match="studentTitle"):
         validate_mission_content_quality(
             mission,
             case_file=_fraction_case_file(),
@@ -370,7 +386,7 @@ def test_mission_quality_rejects_raw_internal_terms_in_student_text() -> None:
         )
 
 
-def test_mission_quality_respects_student_choice_limit() -> None:
+def test_mission_quality_leaves_choice_limit_nuance_to_teacher_review() -> None:
     content = _generated_fraction_content()
     content["stages"][1]["templateType"] = "card_match"
     content["stages"][1]["templateJson"] = {
@@ -388,12 +404,11 @@ def test_mission_quality_respects_student_choice_limit() -> None:
     case_file = _fraction_case_file()
     case_file["profile"]["profileJson"]["choiceCountLimit"] = 2
 
-    with pytest.raises(ContentQualityError, match="선택지 제한"):
-        validate_mission_content_quality(
-            mission,
-            case_file=case_file,
-            orchestrator_plan=_valid_learning_plan(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=case_file,
+        orchestrator_plan=_valid_learning_plan(),
+    )
 
 
 def test_mission_quality_allows_three_sequence_cards_with_two_choice_limit() -> None:
@@ -425,7 +440,7 @@ def test_mission_quality_allows_three_sequence_cards_with_two_choice_limit() -> 
     )
 
 
-def test_mission_quality_rejects_four_sequence_cards() -> None:
+def test_mission_quality_allows_four_sequence_cards_after_schema_passes() -> None:
     content = _generated_fraction_content()
     content["stages"][1]["templateJson"]["choices"] = [{"id": "a", "text": "1議곌컖"}, {"id": "b", "text": "4議곌컖"}]
     content["stages"][2]["templateType"] = "sequence_ordering"
@@ -448,12 +463,11 @@ def test_mission_quality_rejects_four_sequence_cards() -> None:
     case_file = _fraction_case_file()
     case_file["profile"]["profileJson"]["choiceCountLimit"] = 2
 
-    with pytest.raises(ContentQualityError, match="cards"):
-        validate_mission_content_quality(
-            mission,
-            case_file=case_file,
-            orchestrator_plan=_valid_learning_plan(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=case_file,
+        orchestrator_plan=_valid_learning_plan(),
+    )
 
 
 def test_mission_quality_allows_three_blank_fill_tiles_with_two_choice_limit() -> None:
@@ -471,7 +485,7 @@ def test_mission_quality_allows_three_blank_fill_tiles_with_two_choice_limit() -
     )
 
 
-def test_mission_quality_rejects_four_blank_fill_tiles() -> None:
+def test_mission_quality_allows_four_blank_fill_tiles_after_schema_passes() -> None:
     content = _generated_fraction_content()
     content["stages"][1]["templateJson"]["choices"] = [{"id": "a", "text": "1議곌컖"}, {"id": "b", "text": "4議곌컖"}]
     content["stages"][2]["templateJson"]["tiles"] = ["1", "2", "3", "4"]
@@ -479,12 +493,11 @@ def test_mission_quality_rejects_four_blank_fill_tiles() -> None:
     case_file = _fraction_case_file()
     case_file["profile"]["profileJson"]["choiceCountLimit"] = 2
 
-    with pytest.raises(ContentQualityError, match="tiles"):
-        validate_mission_content_quality(
-            mission,
-            case_file=case_file,
-            orchestrator_plan=_valid_learning_plan(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=case_file,
+        orchestrator_plan=_valid_learning_plan(),
+    )
 
 
 def test_blank_fill_rejects_generic_image_fill_instruction() -> None:
@@ -508,17 +521,16 @@ def test_mission_quality_requires_fixed_student_stage_titles() -> None:
         )
 
 
-def test_mission_quality_rejects_ui_text_inside_image_prompt() -> None:
+def test_mission_quality_leaves_ui_text_inside_image_prompt_to_asset_review() -> None:
     content = _generated_fraction_content()
     content["assets"][1]["promptJson"]["prompt"] += " 전체는 몇 조각인가요?"
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="UI 문구"):
-        validate_mission_content_quality(
-            mission,
-            case_file=_fraction_case_file(),
-            orchestrator_plan=_valid_learning_plan(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=_fraction_case_file(),
+        orchestrator_plan=_valid_learning_plan(),
+    )
 
 
 def test_mission_quality_leaves_ui_like_image_prompt_wording_to_pre_asset_review() -> None:
@@ -545,18 +557,17 @@ def test_mission_quality_allows_real_object_button_word_in_image_prompt() -> Non
     )
 
 
-def test_mission_quality_requires_source_lines_for_notice_or_poster_tasks() -> None:
+def test_mission_quality_allows_notice_or_poster_tasks_without_blocking_generation() -> None:
     content = _generated_fraction_content()
     content["stages"][0]["studentInstruction"] = "포스터 문구를 보고 단서를 찾아봅니다."
     content["stages"][0]["templateJson"]["storyText"] = "교실 게시판에 환경 포스터가 붙어 있어요."
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="sourceTextLines"):
-        validate_mission_content_quality(
-            mission,
-            case_file=_fraction_case_file(),
-            orchestrator_plan=_valid_learning_plan(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=_fraction_case_file(),
+        orchestrator_plan=_valid_learning_plan(),
+    )
 
 
 def test_mission_quality_allows_source_lines_for_notice_or_poster_tasks() -> None:
@@ -573,7 +584,7 @@ def test_mission_quality_allows_source_lines_for_notice_or_poster_tasks() -> Non
     )
 
 
-def test_mission_quality_rejects_life_support_background_only_distractor() -> None:
+def test_mission_quality_leaves_life_support_background_nuance_to_teacher_review() -> None:
     content = _generated_life_support_content()
     content["stages"][1]["templateJson"]["question"] = "무엇이 보이나요?"
     content["stages"][1]["templateJson"]["choices"] = [
@@ -582,11 +593,10 @@ def test_mission_quality_rejects_life_support_background_only_distractor() -> No
     ]
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="행동 판단"):
-        validate_mission_content_quality(
-            mission,
-            case_file=_life_support_case_file(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=_life_support_case_file(),
+    )
 
 
 def test_mission_quality_accepts_life_support_plausible_decision_fork() -> None:

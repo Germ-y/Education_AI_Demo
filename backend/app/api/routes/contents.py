@@ -39,6 +39,22 @@ PROBLEM_ANSWER_IMAGE_PROMPT_TERMS = (
     "채점",
     "오답",
 )
+ANSWER_CUE_IMAGE_TEXTS = (
+    "위험",
+    "안전",
+    "정답",
+    "오답",
+    "먼저",
+    "이쪽",
+    "맞음",
+    "틀림",
+    "체크",
+    "화살표",
+    "→",
+    "←",
+    "↑",
+    "↓",
+)
 
 
 @router.get("/{content_id}")
@@ -145,7 +161,7 @@ def generate_content_asset(
 
     if asset.asset_type == AssetType.IMAGE:
         _refresh_image_prompts_or_raise(content)
-    _generate_asset_or_raise(content, asset)
+    _generate_asset_or_raise(content, asset, force=True)
 
     demo_store.save_generated_mission_content(content)
     demo_store.record_audit(
@@ -856,7 +872,7 @@ def publish_content(
     return ok(content.model_dump(by_alias=True))
 
 
-def _generate_asset_or_raise(content, asset) -> None:
+def _generate_asset_or_raise(content, asset, *, force: bool = False) -> None:
     settings = get_settings()
     asset_started_at = time.perf_counter()
     try:
@@ -864,6 +880,8 @@ def _generate_asset_or_raise(content, asset) -> None:
             prompt = _extract_image_prompt(asset.prompt_json)
             relative_path = _generated_asset_relative_path(content.student_id, content.id, asset)
             output_path = _generated_file_path(relative_path)
+            if force and output_path.exists():
+                output_path.unlink()
             if not _is_generated_file_ready(output_path):
                 logger.info(
                     "contents.asset.image_started content_id=%s asset_id=%s role=%s stage_id=%s path=%s",
@@ -1028,10 +1046,15 @@ def _build_image_brief_for_asset(content, asset, stages: list, stage_visual_spec
             f"Render exactly these short source lines: {' / '.join(allowed_scene_text)}."
         )
     else:
-        prompt_parts.append("No readable text is needed inside the image.")
+        prompt_parts.append(
+            "Do not render any readable text inside the image. "
+            "Do not add Korean labels, speech bubbles, signs, captions, badges, arrows, colored guide marks, "
+            "check marks, X marks, or red/green answer cues."
+        )
     prompt_parts.append(
         "Avoid app UI, worksheet layout, answer panels, scoring marks, feedback bubbles, "
-        "category labels, long labels, watermarks, logos, and decorative generic scenes."
+        "category labels, long labels, watermarks, logos, decorative generic scenes, split-screen comparison diagrams, "
+        "warning/safety signs, and any visual overlay that tells the answer. The image must look like a natural scene, not an instructional diagram."
     )
 
     return {
@@ -1088,6 +1111,17 @@ def _sanitize_image_prompt_meta(value: str) -> str:
         "힌트": "도움 단서",
         "채점": "확인 표시",
         "오답": "다른 응답",
+        "위험한": "사람이 많은",
+        "위험": "사람이 많은 쪽",
+        "안전한": "비어 있는",
+        "안전": "빈 공간",
+        "어느 방향이 더 비어 있는지 생각하게 한다": "주변 사람 수와 빈 공간을 살펴보게 한다",
+        "어느 방향이 더": "주변 단서가 어떻게",
+        "두 방향": "두 공간",
+        "방향": "공간",
+        "화살표": "방향 표시 없는 장면 단서",
+        "빨간": "색으로 답을 암시하지 않는",
+        "초록": "색으로 답을 암시하지 않는",
     }
     for term, replacement in replacements.items():
         sanitized = sanitized.replace(term, replacement)
@@ -1215,18 +1249,30 @@ def _allowed_scene_text_for_asset(content, asset, stages: list, stage_visual_spe
     spec = _stage_visual_spec_for_asset(content, asset, stages, stage_visual_specs)
     spec_lines = _string_list(spec.get("allowedSceneText")) if isinstance(spec, dict) else []
     if asset.asset_role == AssetRole.HERO:
-        return _dedupe_strings(spec_lines + _allowed_scene_text_from_stages(stages))
+        return _filter_allowed_scene_text(spec_lines + _allowed_scene_text_from_stages(stages))
     stage = next((candidate for candidate in stages if candidate.id == asset.stage_id), None)
-    return _dedupe_strings(spec_lines + (_allowed_scene_text_from_stage(stage) if stage else []))
+    return _filter_allowed_scene_text(spec_lines + (_allowed_scene_text_from_stage(stage) if stage else []))
 
 
 def _do_not_render_text_for_asset(content, asset, stages: list, stage_visual_specs: dict[str, dict[str, Any]]) -> list[str]:
     spec = _stage_visual_spec_for_asset(content, asset, stages, stage_visual_specs)
     spec_lines = _string_list(spec.get("doNotRenderText")) if isinstance(spec, dict) else []
+    spec_lines.extend(ANSWER_CUE_IMAGE_TEXTS)
     if asset.asset_role == AssetRole.HERO:
         return _dedupe_strings(spec_lines + _do_not_render_text_from_stages(stages))
     stage = next((candidate for candidate in stages if candidate.id == asset.stage_id), None)
     return _dedupe_strings(spec_lines + (_stage_do_not_render_text(stage) if stage else []))
+
+
+def _filter_allowed_scene_text(lines: list[str]) -> list[str]:
+    return _dedupe_strings(line for line in lines if not _is_answer_cue_image_text(line))
+
+
+def _is_answer_cue_image_text(value: str) -> bool:
+    cleaned = value.strip()
+    if not cleaned:
+        return False
+    return any(term in cleaned for term in ANSWER_CUE_IMAGE_TEXTS)
 
 
 def _allowed_scene_text_from_stages(stages: list) -> list[str]:
