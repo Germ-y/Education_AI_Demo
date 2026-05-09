@@ -2436,8 +2436,11 @@ export default function DashboardPage() {
                   <div className="rounded-lg border border-[#d8dee8] bg-[#fbfcfe] p-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-black text-[#64748b]">기억장치</p>
-                        <h3 className="mt-1 text-xl font-black">다음 생성에 쓰는 요약</h3>
+                        <p className="text-sm font-black text-[#64748b]">AI 참고 요약</p>
+                        <h3 className="mt-1 text-xl font-black">핵심만 보기</h3>
+                        <p className="mt-1 text-xs font-semibold leading-5 text-[#94a3b8]">
+                          긴 기억장치 원문은 AI가 내부에서 참고하고, 화면에는 생성에 영향을 주는 신호만 보여줍니다.
+                        </p>
                       </div>
                       <button
                         type="button"
@@ -2451,16 +2454,30 @@ export default function DashboardPage() {
 
                     {activeContextBrief?.briefText ? (
                       <>
-                        <p className="mt-4 max-h-28 overflow-hidden rounded-md bg-white px-4 py-3 text-sm font-semibold leading-6 text-[#334155]">
-                          {activeContextBrief.briefText}
-                        </p>
+                        <div className="mt-4 space-y-3">
+                          <ChipGroup
+                            title="잘 먹히는 시작"
+                            items={activeContextBrief.recentSuccessPatterns.slice(0, 2)}
+                            tone="blue"
+                          />
+                          <ChipGroup
+                            title="먼저 줄일 부담"
+                            items={activeContextBrief.recentDifficultyPatterns.slice(0, 2)}
+                            tone="orange"
+                          />
+                          <ChipGroup
+                            title="적용할 지원"
+                            items={activeContextBrief.recommendedScaffolds.slice(0, 2)}
+                            tone="green"
+                          />
+                        </div>
                         <details className="mt-3 rounded-md border border-[#e2e8f0] bg-white px-4 py-3">
-                          <summary className="cursor-pointer text-sm font-black text-[#1f3a5f]">기억장치 자세히 보기</summary>
+                          <summary className="cursor-pointer text-sm font-black text-[#1f3a5f]">AI용 원문 보기</summary>
                           <p className="mt-3 text-sm font-semibold leading-7 text-[#334155]">{activeContextBrief.briefText}</p>
                           <div className="mt-4 space-y-3">
-                            <ChipGroup title="최근 성공 패턴" items={activeContextBrief.recentSuccessPatterns} tone="blue" />
-                            <ChipGroup title="최근 어려움" items={activeContextBrief.recentDifficultyPatterns} tone="orange" />
-                            <ChipGroup title="추천 지원" items={activeContextBrief.recommendedScaffolds} tone="green" />
+                            <ChipGroup title="성공 패턴 전체" items={activeContextBrief.recentSuccessPatterns} tone="blue" />
+                            <ChipGroup title="주의 흐름 전체" items={activeContextBrief.recentDifficultyPatterns} tone="orange" />
+                            <ChipGroup title="지원 방식 전체" items={activeContextBrief.recommendedScaffolds} tone="green" />
                           </div>
                         </details>
                       </>
