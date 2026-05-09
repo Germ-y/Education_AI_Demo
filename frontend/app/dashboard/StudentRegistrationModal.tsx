@@ -127,7 +127,7 @@ const supportChecklistGroups: Array<{
     key: "calmingSupportsText",
     title: "정서·행동 안정 조건",
     description: "불안이나 부담을 낮춘 관찰 조건",
-    options: ["예고가 있을 때 안정됨", "기다릴 시간이 있을 때 안정됨", "선택권이 있을 때 안정됨", "교사 모델을 본 뒤 안정됨", "조용한 환경에서 안정됨", "실패 뒤 격려가 필요함"],
+    options: ["예고가 있을 때 안정됨", "기다릴 시간이 있을 때 안정됨", "선택권이 있을 때 안정됨", "선생님 예시를 본 뒤 안정됨", "조용한 환경에서 안정됨", "실패 뒤 격려가 필요함"],
   },
   {
     key: "avoidGuidanceText",

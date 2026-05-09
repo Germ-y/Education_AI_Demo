@@ -871,6 +871,52 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
+function SignalCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
+  return (
+    <div className="rounded-lg border border-[#e2e8f0] bg-white p-4">
+      <p className="text-xs font-black text-[#64748b]">{label}</p>
+      <p className="mt-2 text-base font-black leading-6 text-[#172033]">{value}</p>
+      {helper && <p className="mt-2 text-xs font-semibold leading-5 text-[#94a3b8]">{helper}</p>}
+    </div>
+  );
+}
+
+function ChipGroup({
+  title,
+  description,
+  items,
+  empty = "기록 확인 중",
+  tone = "blue",
+}: {
+  title: string;
+  description?: string;
+  items: string[];
+  empty?: string;
+  tone?: "blue" | "green" | "orange" | "slate";
+}) {
+  const shownItems = items.length > 0 ? items : [empty];
+  const toneClass = {
+    blue: "bg-[#eef4fb] text-[#1f3a5f]",
+    green: "bg-[#f0fdf4] text-[#15803d]",
+    orange: "bg-[#fff7ed] text-[#9a3412]",
+    slate: "bg-[#f8fafc] text-[#475569]",
+  }[tone];
+
+  return (
+    <div className="rounded-lg border border-[#e2e8f0] bg-white p-4">
+      <p className="text-sm font-black text-[#172033]">{title}</p>
+      {description && <p className="mt-1 text-xs font-semibold leading-5 text-[#94a3b8]">{description}</p>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {shownItems.map((item, index) => (
+          <span key={`${item}-${index}`} className={`rounded-full px-3 py-1 text-xs font-bold ${toneClass}`}>
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [teacherStudentItems, setTeacherStudentItems] = useState<StudentListItem[]>([]);
@@ -2328,97 +2374,105 @@ export default function DashboardPage() {
             <div className="min-h-[560px]">
             {activeTab === "info" && (
               <section className="space-y-6 p-6">
-                <section className="grid gap-5 lg:grid-cols-3">
-                  <InfoBlock label="현재 지원 목표" value={dashboardProfile?.primaryNeedDetail ?? selectedCase.primaryNeed} />
-                  <InfoBlock label="수업 설계 힌트" value={dashboardProfile?.supportStrategyDetail ?? selectedCase.supportStrategy} />
-                  <InfoBlock
-                    label="기억장치 상태"
-                    value={
-                      activeContextBrief
-                        ? activeContextBrief.dirty
-                          ? "갱신 필요"
-                          : "갱신 완료"
-                        : "생성 전"
-                    }
-                  />
+                <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+                  <div className="rounded-lg border border-[#d8dee8] bg-white p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-[#64748b]">학생 정보</p>
+                        <h3 className="mt-1 text-2xl font-black">지원 흐름 요약</h3>
+                      </div>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-black ${
+                          activeContextBrief
+                            ? activeContextBrief.dirty
+                              ? "bg-[#fff7ed] text-[#9a3412]"
+                              : "bg-[#f0fdf4] text-[#15803d]"
+                            : "bg-[#f1f5f9] text-[#64748b]"
+                        }`}
+                      >
+                        {activeContextBrief ? (activeContextBrief.dirty ? "기억장치 갱신 필요" : "기억장치 갱신 완료") : "기억장치 생성 전"}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      <SignalCard
+                        label="현재 지원 초점"
+                        value={dashboardProfile?.primaryNeedDetail ?? selectedCase.primaryNeed}
+                        helper="콘텐츠 주제가 아니라 제시 방식 조정 기준입니다."
+                      />
+                      <SignalCard
+                        label="초기 프로필"
+                        value={supportProfileStatus === "confirmed" ? "교사 확인 완료" : supportProfileStatus === "draft" ? "초안 확인 필요" : "작성 전"}
+                        helper="등록 원자료를 AI가 수업 방식 프로필로 정리합니다."
+                      />
+                      <SignalCard
+                        label="읽기·선택 부담"
+                        value={`${String(learningResponsePattern.readingLoad ?? activeContextBrief?.readingLoad ?? "확인 중")} · ${String(learningResponsePattern.choiceCountLimit ?? activeContextBrief?.choiceCount ?? "-")}개 안팎`}
+                        helper="처음 제시할 문장 길이와 선택지 수입니다."
+                      />
+                    </div>
+
+                    <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                      <ChipGroup
+                        title="잘 되는 시작점"
+                        description="수업 첫 화면에서 살릴 반응입니다."
+                        items={responseWorksWell.length ? responseWorksWell : supportProfileStrengths.length ? supportProfileStrengths : dashboardProfile?.strengths?.length ? dashboardProfile.strengths : selectedStudent.strengths}
+                      />
+                      <ChipGroup
+                        title="주의할 흐름"
+                        description="부담을 먼저 낮춰야 할 장면입니다."
+                        items={responseCanBeHard.length ? responseCanBeHard : supportProfileCautions.length ? supportProfileCautions : dashboardProfile?.weaknesses?.length ? dashboardProfile.weaknesses : selectedCase.challengeTags}
+                        tone="orange"
+                      />
+                      <ChipGroup
+                        title="제시 방식"
+                        description="문제 난이도가 아니라 안내 방식을 조정합니다."
+                        items={recommendedScaffolds.length ? recommendedScaffolds : supportProfileLessonHints.length ? supportProfileLessonHints : selectedCase.planTags}
+                        tone="green"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-[#d8dee8] bg-[#fbfcfe] p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-[#64748b]">기억장치</p>
+                        <h3 className="mt-1 text-xl font-black">다음 생성에 쓰는 요약</h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleRefreshContextBrief()}
+                        disabled={!selectedCase.studentId || Boolean(supportProfileAction)}
+                        className="rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-xs font-black text-[#334155] disabled:cursor-not-allowed disabled:text-[#94a3b8]"
+                      >
+                        {supportProfileAction === "refresh" ? "갱신 중" : "기억장치 갱신"}
+                      </button>
+                    </div>
+
+                    {activeContextBrief?.briefText ? (
+                      <>
+                        <p className="mt-4 max-h-28 overflow-hidden rounded-md bg-white px-4 py-3 text-sm font-semibold leading-6 text-[#334155]">
+                          {activeContextBrief.briefText}
+                        </p>
+                        <details className="mt-3 rounded-md border border-[#e2e8f0] bg-white px-4 py-3">
+                          <summary className="cursor-pointer text-sm font-black text-[#1f3a5f]">기억장치 자세히 보기</summary>
+                          <p className="mt-3 text-sm font-semibold leading-7 text-[#334155]">{activeContextBrief.briefText}</p>
+                          <div className="mt-4 space-y-3">
+                            <ChipGroup title="최근 성공 패턴" items={activeContextBrief.recentSuccessPatterns} tone="blue" />
+                            <ChipGroup title="최근 어려움" items={activeContextBrief.recentDifficultyPatterns} tone="orange" />
+                            <ChipGroup title="추천 지원" items={activeContextBrief.recommendedScaffolds} tone="green" />
+                          </div>
+                        </details>
+                      </>
+                    ) : (
+                      <p className="mt-4 rounded-md bg-white px-4 py-3 text-sm font-semibold leading-6 text-[#64748b]">
+                        아직 생성된 기억장치가 없습니다. 지원 초안을 확정하거나 수업 기록을 저장하면 다음 자료 생성에 반영할 요약을 만들 수 있습니다.
+                      </p>
+                    )}
+                  </div>
                 </section>
 
                 <section className="rounded-lg border border-[#d8dee8] bg-white p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-xl font-black">기억장치</h3>
-                      <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                        매주 또는 새 수업 기록이 생길 때 다시 정리되는 AI용 학생 맥락입니다.
-                      </p>
-                    </div>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-black ${
-                        activeContextBrief
-                          ? activeContextBrief.dirty
-                            ? "bg-[#fff7ed] text-[#9a3412]"
-                            : "bg-[#f0fdf4] text-[#15803d]"
-                          : "bg-[#f1f5f9] text-[#64748b]"
-                      }`}
-                    >
-                      {activeContextBrief ? (activeContextBrief.dirty ? "갱신 필요" : "갱신 완료") : "생성 전"}
-                    </span>
-                  </div>
-
-                  {activeContextBrief?.briefText ? (
-                    <>
-                      <p className="mt-4 rounded-md bg-[#f8fafc] px-4 py-3 text-sm font-semibold leading-6 text-[#334155]">
-                        {activeContextBrief.briefText}
-                      </p>
-                      <div className="mt-4 grid gap-4 md:grid-cols-3">
-                        <div>
-                          <p className="text-sm font-black text-[#64748b]">관찰된 수행 강점</p>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-[#94a3b8]">
-                            실제 반응 기록에서 확인된 시작점입니다.
-                          </p>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {(activeContextBrief.recentSuccessPatterns.length ? activeContextBrief.recentSuccessPatterns : ["기록 확인 중"]).map((item) => (
-                              <span key={item} className="rounded-full bg-[#eef4fb] px-3 py-1 text-xs font-bold text-[#1f3a5f]">
-                                {item}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-sm font-black text-[#64748b]">주의할 흐름</p>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-[#94a3b8]">
-                            다음 수업에서 먼저 확인할 부담 조건입니다.
-                          </p>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {(activeContextBrief.recentDifficultyPatterns.length ? activeContextBrief.recentDifficultyPatterns : ["기록 확인 중"]).map((item) => (
-                              <span key={item} className="rounded-full bg-[#fff7ed] px-3 py-1 text-xs font-bold text-[#9a3412]">
-                                {item}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-sm font-black text-[#64748b]">제시 방식 조정</p>
-                          <p className="mt-1 text-xs font-semibold leading-5 text-[#94a3b8]">
-                            문제 수준을 낮추는 값이 아니라 화면과 안내 방식을 조정하는 값입니다.
-                          </p>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {(activeContextBrief.recommendedScaffolds.length ? activeContextBrief.recommendedScaffolds : ["기록 확인 중"]).map((item) => (
-                              <span key={item} className="rounded-full bg-[#f0fdf4] px-3 py-1 text-xs font-bold text-[#15803d]">
-                                {item}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="mt-4 rounded-md bg-[#f8fafc] px-4 py-3 text-sm font-semibold leading-6 text-[#64748b]">
-                      아직 생성된 기억장치가 없습니다. 지원 초안을 확정하거나 수업 기록을 저장하면 다음 자료 생성에 반영할 요약을 만들 수 있습니다.
-                    </p>
-                  )}
-                </section>
-
-                <section className="rounded-lg border border-[#d8dee8] bg-[#fbfcfe] p-5">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -2436,7 +2490,7 @@ export default function DashboardPage() {
                         </span>
                       </div>
                       <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                        학생 등록 원자료에서 만든 수업 방식 프로필입니다. 기억장치와 별도로 관리되고, 교사 확인 뒤 다음 자료 생성에 반영됩니다.
+                        등록 원자료를 수업 방식 프로필로 정리합니다. 콘텐츠 주제는 생성 요청이 우선합니다.
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -2448,29 +2502,18 @@ export default function DashboardPage() {
                       >
                         {supportProfileAction === "draft" ? "생성 중" : "지원 초안 생성"}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleRefreshContextBrief()}
-                        disabled={!selectedCase.studentId || Boolean(supportProfileAction)}
-                        className="rounded-md border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-black text-[#334155] disabled:cursor-not-allowed disabled:text-[#94a3b8]"
-                      >
-                        {supportProfileAction === "refresh" ? "갱신 중" : "기억장치 갱신"}
-                      </button>
                     </div>
                   </div>
-                  <p className="mt-3 rounded-md bg-white px-4 py-3 text-sm font-semibold leading-6 text-[#64748b]">
-                    기억장치 갱신은 수업 기록, 선생님 관찰 기록, 확정된 지원 프로필을 다시 요약합니다. 초기 지원 프로필 초안은 바꾸지 않습니다.
-                  </p>
 
                   {supportProfileDraft && (
-                    <div className="mt-4 rounded-lg border border-[#bfdbfe] bg-white p-4">
-                      <p className="text-sm font-black text-[#1d4ed8]">수업 설계 초안</p>
-                      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm font-semibold leading-6 text-[#334155]">
-                        {stringList(supportProfileDraft.profileDraft.lessonDesignHints).map((hint) => (
-                          <li key={hint}>{hint}</li>
-                        ))}
-                      </ul>
-                      <div className="mt-3 flex justify-end">
+                    <div className="mt-4 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-black text-[#1d4ed8]">AI 수업 방식 초안</p>
+                          <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">
+                            {stringList(supportProfileDraft.profileDraft.lessonDesignHints)[0] ?? "초안 내용을 확인한 뒤 저장할 수 있습니다."}
+                          </p>
+                        </div>
                         <button
                           type="button"
                           onClick={() => void handleConfirmSupportProfile()}
@@ -2483,72 +2526,26 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    <InfoBlock
-                      label="관찰된 강점"
-                      value={(
-                        responseWorksWell.length
-                          ? responseWorksWell
-                          : supportProfileStrengths.length
-                            ? supportProfileStrengths
-                            : supportProfileLessonHints.length
-                              ? supportProfileLessonHints
-                              : ["지원 초안 생성 전"]
-                      ).join(", ")}
+                  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <ChipGroup
+                      title="관찰된 강점"
+                      items={responseWorksWell.length ? responseWorksWell : supportProfileStrengths.length ? supportProfileStrengths : ["지원 초안 생성 전"]}
                     />
-                    <InfoBlock
-                      label="지원이 필요한 상황"
-                      value={(
-                        responseCanBeHard.length
-                          ? responseCanBeHard
-                          : supportProfileCautions.length
-                            ? supportProfileCautions
-                            : selectedCase.challengeTags
-                      ).join(", ")}
+                    <ChipGroup
+                      title="지원이 필요한 상황"
+                      items={responseCanBeHard.length ? responseCanBeHard : supportProfileCautions.length ? supportProfileCautions : selectedCase.challengeTags}
+                      tone="orange"
                     />
-                    <InfoBlock
-                      label="수업 적용 힌트"
-                      value={(recommendedScaffolds.length ? recommendedScaffolds : supportProfileLessonHints.length ? supportProfileLessonHints : selectedCase.planTags).join(", ")}
+                    <ChipGroup
+                      title="수업 적용 힌트"
+                      items={recommendedScaffolds.length ? recommendedScaffolds : supportProfileLessonHints.length ? supportProfileLessonHints : selectedCase.planTags}
+                      tone="green"
                     />
-                    <InfoBlock
-                      label="연습할 표현·기술"
-                      value={(replacementSkills.length ? replacementSkills : ["확정 프로필 저장 뒤 표시"]).join(", ")}
+                    <ChipGroup
+                      title="연습할 표현·기술"
+                      items={replacementSkills.length ? replacementSkills : ["확정 프로필 저장 뒤 표시"]}
+                      tone="slate"
                     />
-                  </div>
-                </section>
-
-                <section className="grid gap-5 lg:grid-cols-2">
-                  <div className="rounded-lg border border-[#e5e9f0] bg-white p-5">
-                    <h3 className="text-xl font-black">강점</h3>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {((dashboardProfile?.strengths?.length ? dashboardProfile.strengths : selectedStudent.strengths).length > 0
-                        ? dashboardProfile?.strengths?.length
-                          ? dashboardProfile.strengths
-                          : selectedStudent.strengths
-                        : ["기록 전"]
-                      ).map((strength) => (
-                        <span
-                          key={strength}
-                          className="rounded-full bg-[#eef4fb] px-3 py-1 text-sm font-bold text-[#1f3a5f]"
-                        >
-                          {strength}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-[#e5e9f0] bg-white p-5">
-                    <h3 className="text-xl font-black">주의할 점</h3>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {(dashboardProfile?.weaknesses?.length ? dashboardProfile.weaknesses : selectedCase.challengeTags).map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-full bg-[#fff7ed] px-3 py-1 text-sm font-bold text-[#9a3412]"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
                   </div>
                 </section>
 
