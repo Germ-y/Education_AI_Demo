@@ -28,6 +28,8 @@ cat > "$PLIST_PATH" <<PLIST
   <dict>
     <key>EDUYJ_ROOT</key>
     <string>$ROOT_DIR</string>
+    <key>EDUYJ_FRONTEND_MODE</key>
+    <string>production</string>
     <key>PATH</key>
     <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
   </dict>

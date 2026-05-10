@@ -7,6 +7,7 @@ CLOUDFLARED_BIN="${CLOUDFLARED_BIN:-/opt/homebrew/bin/cloudflared}"
 CLOUDFLARED_TOKEN_FILE="${CLOUDFLARED_TOKEN_FILE:-$HOME/.cloudflared/summit1123.token}"
 BACKEND_PORT="${EDUYJ_BACKEND_PORT:-4000}"
 FRONTEND_PORT="${EDUYJ_FRONTEND_PORT:-3000}"
+FRONTEND_MODE="${EDUYJ_FRONTEND_MODE:-production}"
 CHECK_INTERVAL_SEC="${EDUYJ_CHECK_INTERVAL_SEC:-30}"
 
 mkdir -p "$LOG_DIR"
@@ -47,11 +48,16 @@ start_frontend() {
     return
   fi
   screen -S eduyj-frontend -X quit >/dev/null 2>&1 || true
-  log "starting frontend on :$FRONTEND_PORT"
+  log "starting frontend on :$FRONTEND_PORT ($FRONTEND_MODE)"
+  if [ "$FRONTEND_MODE" = "development" ]; then
+    frontend_command="npm run dev -- --hostname 0.0.0.0 --port '$FRONTEND_PORT'"
+  else
+    frontend_command="npm run start -- --hostname 0.0.0.0 --port '$FRONTEND_PORT'"
+  fi
   screen -S eduyj-frontend -dm zsh -lc "
     cd '$ROOT_DIR/frontend' || exit 1
     while true; do
-      npm run dev -- --hostname 0.0.0.0 --port '$FRONTEND_PORT' 2>&1 | tee -a '$LOG_DIR/frontend.log'
+      $frontend_command 2>&1 | tee -a '$LOG_DIR/frontend.log'
       sleep 1
     done
   "
