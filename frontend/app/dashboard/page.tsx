@@ -218,6 +218,13 @@ type SavedFeedbackRecord = {
   savedAt: string;
 };
 
+type TeacherPreviewTarget = {
+  id: string;
+  title: string;
+  caseId: string;
+  contentId: string;
+};
+
 type GeneratedReportDraft = {
   draftId: string;
   bodyMarkdown: string;
@@ -942,6 +949,10 @@ export default function DashboardPage() {
   const [reviewPreviewRefreshKey, setReviewPreviewRefreshKey] = useState(0);
   const [reviewPreviewScale, setReviewPreviewScale] = useState(0.65);
   const reviewPreviewFrameRef = useRef<HTMLDivElement>(null);
+  const [teacherPreviewTarget, setTeacherPreviewTarget] = useState<TeacherPreviewTarget | null>(null);
+  const [teacherPreviewStep, setTeacherPreviewStep] = useState(1);
+  const [teacherPreviewScale, setTeacherPreviewScale] = useState(0.65);
+  const teacherPreviewFrameRef = useRef<HTMLDivElement>(null);
   const [reportPreviewScale, setReportPreviewScale] = useState(0.65);
   const reportPreviewFrameRef = useRef<HTMLDivElement>(null);
   const [reportPreviewStep, setReportPreviewStep] = useState(1);
@@ -2209,6 +2220,33 @@ export default function DashboardPage() {
   }, [openReportId]);
 
   useEffect(() => {
+    if (!teacherPreviewTarget) return;
+    setTeacherPreviewStep(1);
+  }, [teacherPreviewTarget]);
+
+  useEffect(() => {
+    if (!teacherPreviewTarget) return;
+    const frame = teacherPreviewFrameRef.current;
+    if (!frame) return;
+
+    const updateScale = () => {
+      const { width, height } = frame.getBoundingClientRect();
+      setTeacherPreviewScale(
+        Math.min(
+          1,
+          Math.max(0.1, (width - 24) / studentPreviewViewport.width),
+          Math.max(0.1, (height - 24) / studentPreviewViewport.height),
+        ),
+      );
+    };
+
+    updateScale();
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [teacherPreviewTarget, teacherPreviewStep]);
+
+  useEffect(() => {
     if (!openReport) return;
     const frame = reportPreviewFrameRef.current;
     if (!frame) return;
@@ -2744,7 +2782,6 @@ export default function DashboardPage() {
                       const materialRejected = isMaterialRejected(item);
                       const isActionRunning = reviewActionId === item.id;
                       const needsMediaGeneration = hasMissingGeneratedMedia(item.content);
-                      const teacherPreviewHref = `/student/stage?caseId=${encodeURIComponent(item.caseId)}&contentId=${encodeURIComponent(item.content.id)}&preview=1`;
 
                       return (
                         <div key={item.id} className="rounded-md border border-[#e5e9f0] bg-white p-4">
@@ -2790,13 +2827,21 @@ export default function DashboardPage() {
                             >
                               제안 검토하기
                             </button>
-                            <Link
-                              href={teacherPreviewHref}
-                              target="_blank"
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTeacherPreviewStep(1);
+                                setTeacherPreviewTarget({
+                                  id: item.id,
+                                  title: item.title,
+                                  caseId: item.caseId,
+                                  contentId: item.content.id,
+                                });
+                              }}
                               className="rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8]"
                             >
                               교사용 미리보기
-                            </Link>
+                            </button>
                             {needsMediaGeneration && (
                               <button
                                 onClick={() => handleRetryMaterialAssets(item)}
@@ -2861,13 +2906,21 @@ export default function DashboardPage() {
                               </span>
                             </div>
                             <div className="mt-3 flex flex-wrap gap-2">
-                              <Link
-                                href={`/student/stage?caseId=${encodeURIComponent(content.caseId)}&contentId=${encodeURIComponent(content.id)}&preview=1`}
-                                target="_blank"
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTeacherPreviewStep(1);
+                                  setTeacherPreviewTarget({
+                                    id: content.id,
+                                    title: content.title,
+                                    caseId: content.caseId,
+                                    contentId: content.id,
+                                  });
+                                }}
                                 className="rounded-md border border-[#bbf7d0] bg-white px-3 py-2 text-sm font-bold text-[#15803d]"
                               >
                                 교사용 미리보기
-                              </Link>
+                              </button>
                               <Link
                                 href={`/student/stage?caseId=${encodeURIComponent(content.caseId)}&contentId=${encodeURIComponent(content.id)}`}
                                 target="_blank"
@@ -3231,6 +3284,67 @@ export default function DashboardPage() {
                   {reportReuseError && <p className="mt-2 text-sm font-bold text-[#b42318]">{reportReuseError}</p>}
                 </div>
               </aside>
+            </div>
+          </section>
+        </div>
+      )}
+      {teacherPreviewTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/45 p-6">
+          <section className="flex h-[min(90vh,900px)] w-[min(94vw,1320px)] flex-col rounded-xl bg-white shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#e5e9f0] px-6 py-4">
+              <div>
+                <p className="text-sm font-bold text-[#64748b]">교사용 미리보기</p>
+                <h3 className="mt-1 text-2xl font-black">{teacherPreviewTarget.title}</h3>
+                <p className="mt-1 text-sm font-semibold text-[#64748b]">
+                  학생에게 보이는 화면을 검토용으로 확인합니다.
+                </p>
+              </div>
+              <button
+                onClick={() => setTeacherPreviewTarget(null)}
+                aria-label="닫기"
+                className="flex h-11 w-11 items-center justify-center rounded-md border border-[#cbd5e1] bg-white text-2xl font-bold leading-none text-[#334155]"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex min-h-0 flex-1 flex-col bg-[#f1f5f9] px-6 py-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black text-[#64748b]">학생 화면</p>
+                  <p className="mt-1 text-base font-black text-[#172033]">스테이지 {teacherPreviewStep}</p>
+                </div>
+                <div className="flex rounded-lg bg-white p-1 shadow-sm">
+                  {[1, 2, 3, 4].map((step) => (
+                    <button
+                      key={step}
+                      type="button"
+                      onClick={() => setTeacherPreviewStep(step)}
+                      className={`h-8 w-10 rounded-md text-sm font-black transition ${
+                        teacherPreviewStep === step ? "bg-[#1f3a5f] text-white" : "text-[#64748b] hover:bg-[#eef2f7]"
+                      }`}
+                    >
+                      {step}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div
+                ref={teacherPreviewFrameRef}
+                className="relative mx-auto min-h-[360px] w-full max-w-[1040px] flex-1 overflow-hidden rounded-md bg-[#e7edf4] shadow-inner"
+              >
+                <iframe
+                  key={`${teacherPreviewTarget.id}-${teacherPreviewStep}`}
+                  title={`교사용 미리보기 스테이지 ${teacherPreviewStep}`}
+                  src={`/student/stage?caseId=${encodeURIComponent(teacherPreviewTarget.caseId)}&contentId=${encodeURIComponent(teacherPreviewTarget.contentId)}&step=${teacherPreviewStep}&preview=1`}
+                  className="absolute left-1/2 top-1/2 origin-center border-0"
+                  style={{
+                    width: studentPreviewViewport.width,
+                    height: studentPreviewViewport.height,
+                    transform: `translate(-50%, -50%) scale(${teacherPreviewScale})`,
+                  }}
+                />
+              </div>
             </div>
           </section>
         </div>
