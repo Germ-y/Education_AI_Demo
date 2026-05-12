@@ -150,7 +150,13 @@
 `blank_fill`:
 
 - `question`, `sentence`, `tiles`, `acceptedAnswers`를 사용합니다.
-- 빈칸은 근거를 보고 채울 수 있어야 합니다.
+- `sentence`는 반드시 빈칸 표식 `__`, `[A]`, `[B]` 중 하나를 포함한 완성 문장입니다.
+- `question`은 학생에게 무엇을 채울지 묻는 지시문이고, 빈칸 표식은 `sentence`에 넣습니다.
+- `tiles`는 빈칸에 넣을 후보 문자열 배열입니다.
+- `acceptedAnswers`는 `{ "answer": "..." }` 객체 배열이며, 정답 문자열은 `tiles` 안의 값과 일치해야 합니다.
+- 나쁜 예: `"sentence": "알맞은 값을 골라 식을 완성하세요."`
+- 좋은 예: `"sentence": "처음 12개에서 5개를 나누어 주면 남은 수는 __개입니다."`
+- 빈칸은 원자료를 읽거나 개념 기준을 적용해야 채울 수 있어야 합니다.
 
 `wrong_explanation_fix`:
 

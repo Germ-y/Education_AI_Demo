@@ -600,9 +600,53 @@ def _stage_plans_from_orchestrator(orchestrator_plan: dict[str, Any]) -> list[di
                 "studentTitle": item.get("studentTitle"),
                 "purpose": item.get("purpose"),
                 "templateRationale": item.get("templateRationale") or item.get("reason"),
+                "templateJsonContract": _template_json_contract(item.get("templateType")),
             }
         )
     return plans
+
+
+def _template_json_contract(template_type: Any) -> dict[str, Any]:
+    common_fields = ["imageAssetId", "audioAssetId", "assetBundle", "sourceTextLines", "sceneTextLines"]
+    contracts: dict[str, dict[str, Any]] = {
+        "blank_fill": {
+            "requiredFields": [
+                *common_fields,
+                "question",
+                "sentence",
+                "tiles",
+                "acceptedAnswers",
+                "correctFeedback",
+                "wrongFeedback",
+            ],
+            "hardRules": [
+                "sentence must include exactly one blank marker: __, [A], or [B].",
+                "question asks what to fill; sentence is the complete sentence with the blank marker.",
+                "acceptedAnswers is an array of objects shaped {\"answer\":\"...\"}.",
+                "each accepted answer must match a value in tiles.",
+            ],
+            "minimalExample": {
+                "question": "빈칸에 들어갈 수를 골라 보세요.",
+                "sentence": "처음 12개에서 5개를 나누어 주면 남은 수는 __개입니다.",
+                "tiles": ["7", "12", "17"],
+                "acceptedAnswers": [{"answer": "7"}],
+            },
+        },
+        "card_match": {
+            "requiredFields": [*common_fields, "question", "leftCards", "rightCards", "matches", "correctFeedback", "wrongFeedback"],
+            "hardRules": [
+                "leftCards ids are left_1 and left_2.",
+                "rightCards ids are right_1 and right_2.",
+                "matches is shaped {\"left_1\":\"right_1\",\"left_2\":\"right_2\"}.",
+                "do not include choices, cards, or tiles.",
+            ],
+        },
+        "sequence_ordering": {
+            "requiredFields": [*common_fields, "question", "cards", "answerOrder", "correctFeedback", "wrongFeedback"],
+            "hardRules": ["answerOrder contains the card ids in the correct order."],
+        },
+    }
+    return contracts.get(str(template_type or ""), {"requiredFields": common_fields, "hardRules": []})
 
 
 def _visual_spec_drafts_from_orchestrator(orchestrator_plan: dict[str, Any]) -> list[dict[str, Any]]:

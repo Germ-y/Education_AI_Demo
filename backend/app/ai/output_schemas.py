@@ -143,7 +143,7 @@ _BLANK_FILL_TEMPLATE_SCHEMA = _object_schema(
         "audioAssetId": {"type": "string"},
         "assetBundle": _ASSET_BUNDLE_SCHEMA,
         "question": {"type": "string"},
-        "sentence": {"type": "string"},
+        "sentence": {"type": "string", "pattern": "(__|\\[A\\]|\\[B\\])"},
         "tiles": _string_array(),
         "acceptedAnswers": {
             "type": "array",
