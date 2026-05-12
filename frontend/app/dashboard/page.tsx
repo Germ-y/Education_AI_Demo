@@ -1064,28 +1064,30 @@ export default function DashboardPage() {
               !isAgentRunTimedOut(run) &&
               (run.agentType === "orchestrator" || run.agentType === "content"),
           ) ?? null;
+        const latestSucceededContentRun =
+          runs.find((run) => run.status === "succeeded" && run.agentType === "content") ?? null;
+        if (!restorableRun && latestSucceededContentRun) {
+          const contentId = getGeneratedContentId(latestSucceededContentRun);
+          if (contentId) {
+            const content = await getReviewableContent(contentId).catch(() => null);
+            if (isPendingGenerationContentUsable(content) && hasMissingGeneratedMedia(content)) {
+              restorableRun = latestSucceededContentRun;
+            }
+          }
+        }
         if (!restorableRun) {
           restorableRun =
             runs.find((run) => {
               if (run.status !== "succeeded" || run.agentType !== "orchestrator") return false;
+              if (latestSucceededContentRun && toTimestamp(latestSucceededContentRun.createdAt) > toTimestamp(run.createdAt)) {
+                return false;
+              }
               return !runs.some(
                 (candidate) =>
                   candidate.agentType === "content" &&
                   getSnapshotText(candidate, "orchestratorRunId") === run.id,
               );
             }) ?? null;
-        }
-        if (!restorableRun) {
-          for (const run of runs) {
-            if (run.status !== "succeeded" || run.agentType !== "content") continue;
-            const contentId = getGeneratedContentId(run);
-            if (!contentId) continue;
-            const content = await getReviewableContent(contentId).catch(() => null);
-            if (isPendingGenerationContentUsable(content) && hasMissingGeneratedMedia(content)) {
-              restorableRun = run;
-              break;
-            }
-          }
         }
         if (!restorableRun) return;
 
