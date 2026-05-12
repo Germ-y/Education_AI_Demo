@@ -2,24 +2,31 @@
 
 영주 공공데이터 공모전용 AI 교육 지원 데모입니다.
 
-## 기준 브랜치
+## 지금 팀 기준
 
-- `dev`: 프론트/백엔드 통합 검증 기준
-- `frontend`: 프론트 단독 작업 기준
-- `backend`: 백엔드 단독 작업 기준
+- 기준 브랜치: `main`
+- 작업 루트: `/Users/gimdonghyeon/Desktop/educationforyeongju-backend`
+- 프론트 배포 터널: <https://eduYj.summit1123.co.kr>
+- 백엔드 배포 터널: <https://eduYjapp.summit1123.co.kr>
+- 로컬 프론트: `http://localhost:3000`
+- 로컬 백엔드: `http://localhost:4000`
+- 현재 공유 DB는 SQLite입니다. PostgreSQL은 목표 환경이지만, 운영 migration은 아직 별도 작업입니다.
 
-팀원이 이어받을 때는 먼저 현재 브랜치와 변경사항을 확인합니다.
+프론트/백엔드 작업자는 `main`에서 새 브랜치를 따서 작업합니다.
 
 ```bash
-git status --short --branch
+git checkout main
+git pull origin main
+git checkout -b frontend/작업명
+# 또는
+git checkout -b backend/작업명
 ```
 
-## 핵심 문서
+## 먼저 읽을 문서
 
-- [AGENTS.md](AGENTS.md): 새 작업자가 먼저 읽는 실행 규칙
-- [GOAL.md](GOAL.md): 현재 데모 목표와 남은 일
-- [docs/GOAL_CONTEXT.md](docs/GOAL_CONTEXT.md): 현재 작동 흐름, 남은 이슈, API 계약, E2E 기준, `/goal` 프롬프트
-- [backend/data/README.md](backend/data/README.md): 데모 DB dump/seed 복원 방법
+- [AGENTS.md](AGENTS.md): 작업 규칙
+- [docs/GOAL_CONTEXT.md](docs/GOAL_CONTEXT.md): 현재 기능, DB 상태, 남은 작업, API 흐름
+- [backend/data/README.md](backend/data/README.md): DB/asset 복원과 공유 기준
 
 ## 실행
 
@@ -29,7 +36,7 @@ Backend:
 cd backend
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
-.venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 4000
+.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 4000
 ```
 
 Frontend:
@@ -40,24 +47,16 @@ npm install
 npm run dev
 ```
 
-- 프론트: `http://localhost:3000`
-- 백엔드: `http://localhost:4000`
+## 현재 공유 DB 복원
 
-## 데모 DB
+`backend/data/eduyj_demo.db`와 `backend/generated/assets/students/**`를 함께 추적합니다. 팀원이 `main`을 받으면 현재 배포 화면의 학생, 콘텐츠, 이미지, 음성 파일을 그대로 확인할 수 있어야 합니다.
 
-현재 MVP 확인 단계에서는 팀원이 같은 화면을 바로 볼 수 있도록 `backend/data/eduyj_demo.db`, `backend/data/eduyj_demo_dump.sql`, `backend/generated/assets/`를 추적합니다. 로컬에서 생성 테스트를 하면 DB와 asset이 달라지므로 공유 기준을 갱신할 때만 커밋합니다.
+DB가 꼬이면 dump로 복원합니다.
 
 ```bash
 cd backend
 rm -f data/eduyj_demo.db
 sqlite3 data/eduyj_demo.db < data/eduyj_demo_dump.sql
-```
-
-seed로 다시 만들 때:
-
-```bash
-cd backend
-DATABASE_URL=sqlite+pysqlite:///./data/eduyj_demo.db .venv/bin/python -m app.data.seed_demo
 ```
 
 ## 검증
@@ -76,10 +75,11 @@ Frontend:
 cd frontend
 npm run lint
 npx tsc --noEmit
+npm run build
 ```
 
-문서만 바꾼 경우:
+DB/asset:
 
 ```bash
-git diff --check
+sqlite3 backend/data/eduyj_demo.db "pragma integrity_check;"
 ```

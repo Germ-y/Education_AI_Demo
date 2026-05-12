@@ -2461,7 +2461,6 @@ def _abstract_context_pattern(value: str) -> str:
 
 def _build_teacher_report_draft_text(snapshot: dict[str, Any]) -> tuple[str, list[str], list[str]]:
     summary = snapshot["reviewSummary"]
-    student = snapshot["student"]
     content = snapshot["content"]
     realtime = snapshot.get("realtimeSession") or {}
     context_brief = snapshot.get("contextBrief") or {}
