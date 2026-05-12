@@ -66,6 +66,9 @@
 
 ## 시나리오 품질
 
+- 오케스트레이터의 `scenarioSpine`이 시나리오 source of truth입니다.
+- 콘텐츠 작성 단계에서 새 시나리오를 발명하지 않습니다.
+- 장면, 근거, 흔한 오해, 2단계 쉬운 성공, 3단계 전이, 4단계 재사용은 `scenarioSpine`을 실행하는 방식으로 씁니다.
 - 콘텐츠 전체는 하나의 감정적으로 연결된 작은 시나리오여야 합니다.
 - 학생이 “왜 이 문제를 지금 풀어야 하는지”를 장면 안에서 이해할 수 있어야 합니다.
 - 각 단계는 이전 단계의 근거를 다시 쓰거나 한 단계만 확장해야 합니다.
@@ -75,6 +78,9 @@
 
 ## RULE 1. 좋은 수업 콘텐츠 기준
 
+- `briefJson.scenarioSpine.anchorSituation`은 1단계 `storyText`에 살아 있어야 합니다.
+- `briefJson.scenarioSpine.keyEvidence`는 2~3단계 `sourceTextLines`, `sceneTextLines`, 문제 문장, 피드백 중 최소 두 곳에 연결되어야 합니다.
+- `briefJson.scenarioSpine.stage4Reuse`는 4단계 `realtimeSpec`의 `studentGoal` 또는 `openingPrompt`로 이어져야 합니다.
 - 1단계는 장면 소개가 아니라 이후 문제의 기준을 여는 단계입니다.
 - 2단계는 학생이 바로 성공할 수 있는 첫 확인입니다.
 - 3단계는 같은 기준을 다른 조건에 적용하는 전이입니다.
