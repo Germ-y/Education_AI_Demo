@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { getContextSeed, type SeedContext } from "@/lib/api";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const teacherRole = {
   href: "/dashboard",
   label: "교사용",
