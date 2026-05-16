@@ -477,7 +477,7 @@ function FloatingStageFeedback({
   if (!showSuccess && !showWrong) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+12px)] z-40 grid place-items-center">
+    <div className="pointer-events-none mb-2 grid place-items-center">
       <div
         className={`rounded-[18px] px-5 py-3 text-center text-sm font-bold leading-6 shadow-[0_18px_42px_rgba(31,41,55,0.18)] ${
           showSuccess ? "border border-[#f0dfb4] bg-[#fff7dd] text-[#6b4b12]" : "bg-[#fff0ed] text-[#b84232]"
@@ -634,11 +634,13 @@ function SequenceTemplate({
   const slots = Array.from({ length: items.length }, (_, index) => selected[index] ?? "");
   const selectedIds = slots.filter(Boolean);
   const availableItems = items.filter((item) => !selectedIds.includes(item.id));
+  const isSequenceComplete = items.length > 0 && selectedIds.length === items.length;
+  const sequenceColumnCount = Math.min(Math.max(items.length, 1), 3);
 
   return (
     <div
       data-template-kind="sequence-ordering"
-      className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-2 overflow-hidden rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-3 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]"
+      className="grid h-full min-h-0 grid-rows-[auto_auto_auto] gap-2 overflow-hidden rounded-[22px] border border-[#d9ebc9] bg-[#fbfff7] p-3 shadow-[inset_0_-10px_0_rgba(39,174,96,0.05)]"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -663,26 +665,23 @@ function SequenceTemplate({
           </p>
           <p className="text-[11px] font-bold text-[#8a5a00]">클릭해서 순서대로 놓기</p>
         </div>
-        <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}>
+        <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: `repeat(${sequenceColumnCount}, minmax(0, 1fr))` }}>
           {slots.map((id, index) => {
             const item = items.find((candidate) => candidate.id === id);
 
           return (
             <div
               key={index}
-              className={`flex h-[74px] flex-col items-center justify-center rounded-[16px] border-2 border-dashed px-2.5 py-2 text-center transition ${
+              className={`relative flex h-[64px] flex-col justify-center rounded-[16px] border px-3 py-2 text-center transition ${
                 item ? "border-solid bg-white shadow-[0_10px_24px_rgba(57,78,97,0.10)]" : "bg-white/55"
               }`}
               style={{ borderColor: item ? theme.accent : "#cfd8cf" }}
             >
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white" style={{ backgroundColor: theme.accent }}>
+              <span className="absolute left-1/2 top-[-9px] flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full text-[10px] font-black text-white" style={{ backgroundColor: theme.accent }}>
                 {index + 1}
               </span>
-              <span className={`mt-1 block text-[15px] font-black leading-6 break-keep ${item ? "text-[#1f211d]" : "text-[#9aa39b]"}`}>
+              <span className={`line-clamp-2 text-[13px] font-black leading-[18px] break-keep [overflow-wrap:anywhere] ${item ? "text-[#1f211d]" : "text-[#9aa39b]"}`}>
                 {item?.label ?? "여기에 놓기"}
-              </span>
-              <span className="line-clamp-1 min-h-4 text-[10px] font-bold leading-4 text-[#6d746c] break-keep">
-                {item?.caption ?? ""}
               </span>
             </div>
           );
@@ -690,29 +689,33 @@ function SequenceTemplate({
         </div>
       </div>
 
-      <div className="min-h-0 overflow-y-auto rounded-[18px] border border-[#f0dfb4] bg-[#fff9e8] p-2.5">
+      <div className="rounded-[18px] border border-[#f0dfb4] bg-[#fff9e8] p-2.5">
         <div className="flex items-center justify-between">
           <p className="text-xs font-black text-[#8a5a00]">카드 트레이</p>
-          {availableItems.length > 0 && <p className="text-[11px] font-bold text-[#8a5a00]">카드를 차례대로 눌러요</p>}
+          <p className="text-[11px] font-bold text-[#8a5a00]">
+            {isSequenceComplete ? "순서 고르기 완료" : "카드를 차례대로 눌러요"}
+          </p>
         </div>
-        <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(Math.max(items.length, 1), 3)}, minmax(0, 1fr))` }}>
-          {items.map((item) => {
-            const picked = selectedIds.includes(item.id);
-
-            return (
-            <button
-              key={item.id}
-              onClick={() => onPick(item.id)}
-              disabled={picked}
-              className="h-[48px] cursor-grab rounded-[16px] border bg-white px-3 py-1.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(57,78,97,0.12)] active:cursor-grabbing disabled:cursor-default disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
-              style={{ borderColor: picked ? theme.accent : "#dde6ee" }}
-            >
-              <p className="line-clamp-2 text-[13px] font-black leading-[18px] break-keep [overflow-wrap:anywhere]">{item.label}</p>
-              {item.caption && <p className="text-[10px] font-bold leading-4 text-[#6d746c] break-keep [overflow-wrap:anywhere]">{item.caption}</p>}
-            </button>
-            );
-          })}
-        </div>
+        {isSequenceComplete ? (
+          <div className="mt-2 flex h-[64px] flex-col justify-center rounded-[16px] border border-[#f0dfb4] bg-white/75 px-4 py-2 text-center">
+            <p className="text-sm font-black" style={{ color: theme.accentStrong }}>
+              {question.completionTitle}
+            </p>
+            <p className="mt-1 line-clamp-1 text-xs font-bold leading-5 text-[#6b5a24]">{question.completionMessage}</p>
+          </div>
+        ) : (
+          <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: `repeat(${sequenceColumnCount}, minmax(0, 1fr))` }}>
+            {availableItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => onPick(item.id)}
+                className="h-[64px] cursor-grab rounded-[16px] border border-[#dde6ee] bg-white px-3 py-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(57,78,97,0.12)] active:cursor-grabbing"
+              >
+                <p className="line-clamp-2 text-[13px] font-black leading-[18px] break-keep [overflow-wrap:anywhere]">{item.label}</p>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -734,7 +737,7 @@ function SequenceStageBoard({
   onReset: () => void;
 }) {
   return (
-    <div className="grid h-full min-h-0 grid-rows-[minmax(220px,1fr)_auto] gap-3">
+    <div className="grid h-full min-h-0 grid-rows-[minmax(170px,0.8fr)_auto] gap-3">
       <div className="min-h-0 overflow-hidden">
         <StageVisualBoard visual={visual} question={question} theme={theme} compact />
       </div>
@@ -764,9 +767,13 @@ function CardMatchingTemplate({
   const rightItems = [...items].reverse();
   const matchedCount = Object.keys(pairs).length;
   const compactPairSet = items.length <= 2;
-  const matchingRowHeight = compactPairSet ? 64 : 54;
-  const matchingGap = compactPairSet ? 12 : 8;
+  const matchingRowHeight = compactPairSet ? 72 : 62;
+  const matchingGap = compactPairSet ? 12 : 10;
   const matchingLaneHeight = items.length * matchingRowHeight + Math.max(0, items.length - 1) * matchingGap;
+  const matchingListStyle = {
+    gridTemplateRows: `repeat(${items.length}, ${matchingRowHeight}px)`,
+    gap: matchingGap,
+  };
   const laneConnections = items
     .map((item, index) => {
       const rightId = pairs[item.leftId];
@@ -809,7 +816,7 @@ function CardMatchingTemplate({
         className="grid grid-cols-[minmax(220px,1fr)_minmax(180px,0.42fr)_minmax(220px,1fr)] items-start gap-4 overflow-hidden"
         style={{ height: matchingLaneHeight }}
       >
-        <div className="grid min-h-0 content-start gap-1.5">
+        <div className="grid min-h-0" style={matchingListStyle}>
           {items.map((item) => {
             const picked = selectedLeft === item.leftId;
             const matched = Boolean(pairs[item.leftId]);
@@ -818,15 +825,14 @@ function CardMatchingTemplate({
                 key={item.leftId}
                 onClick={() => onLeft(item.leftId)}
                 disabled={matched}
-                className="relative z-10 flex items-center rounded-[16px] border bg-white px-4 text-left text-[0.9rem] font-black leading-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:hover:translate-y-0"
+                className="relative z-10 flex h-full items-center rounded-[16px] border bg-white px-4 text-left text-[0.9rem] font-black leading-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:hover:translate-y-0"
                 style={{
-                  minHeight: matchingRowHeight,
                   borderColor: picked || matched ? theme.accent : "#dde6ee",
                   backgroundColor: matched ? theme.accentSoft : picked ? "#f8fff9" : "#ffffff",
                   boxShadow: picked ? `0 0 0 6px ${theme.accentSoft}` : undefined,
                 }}
               >
-                <span className="min-w-0 flex-1 break-keep [overflow-wrap:anywhere]">{item.left}</span>
+                <span className="line-clamp-2 min-w-0 flex-1 break-keep [overflow-wrap:anywhere]">{item.left}</span>
                 {matched && (
                   <span className="ml-3 flex h-8 w-8 items-center justify-center rounded-full text-sm text-white" style={{ backgroundColor: theme.accent }}>
                     ✓
@@ -870,17 +876,17 @@ function CardMatchingTemplate({
                 </span>
               ))}
             </div>
-            <div className="mt-3 w-full rounded-[18px] bg-white/90 px-3 py-3 shadow-[0_12px_26px_rgba(57,78,97,0.10)]">
-              <p className="text-sm font-black leading-6 break-keep" style={{ color: theme.accentStrong }}>
-                {selectedLeft ? "오른쪽 카드를 골라요" : "왼쪽 카드를 골라요"}
+            <div className="mt-3 w-full rounded-[18px] bg-white/90 px-2.5 py-3 shadow-[0_12px_26px_rgba(57,78,97,0.10)]">
+              <p className="whitespace-nowrap text-sm font-black leading-6" style={{ color: theme.accentStrong }}>
+                {selectedLeft ? "오른쪽 선택" : "왼쪽 선택"}
               </p>
-              <p className="mt-1 text-[11px] font-bold leading-4 text-[#6d746c]">맞으면 바로 연결돼요</p>
+              <p className="mt-1 whitespace-nowrap text-[11px] font-bold leading-4 text-[#6d746c]">맞으면 연결돼요</p>
             </div>
             <div className="mt-3 text-[11px] font-black text-[#8a5a00]">연결 {matchedCount}/{items.length}</div>
           </div>
         </div>
 
-        <div className="grid min-h-0 content-start gap-2">
+        <div className="grid min-h-0" style={matchingListStyle}>
           {rightItems.map((item) => {
             const used = Object.values(pairs).includes(item.rightId);
             return (
@@ -888,10 +894,10 @@ function CardMatchingTemplate({
                 key={item.rightId}
                 onClick={() => onRight(item.rightId)}
                 disabled={!selectedLeft || used}
-                className="relative z-10 flex items-center rounded-[16px] border bg-white px-4 text-left text-[0.9rem] font-black leading-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
-                style={{ minHeight: matchingRowHeight, borderColor: used ? theme.accent : "#dde6ee", backgroundColor: used ? theme.accentSoft : "#ffffff" }}
+                className="relative z-10 flex h-full items-center rounded-[16px] border bg-white px-4 text-left text-[0.9rem] font-black leading-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
+                style={{ borderColor: used ? theme.accent : "#dde6ee", backgroundColor: used ? theme.accentSoft : "#ffffff" }}
               >
-                <span className="min-w-0 flex-1 break-keep [overflow-wrap:anywhere]">{item.right}</span>
+                <span className="line-clamp-2 min-w-0 flex-1 break-keep [overflow-wrap:anywhere]">{item.right}</span>
                 {used && (
                   <span className="ml-3 flex h-8 w-8 items-center justify-center rounded-full text-sm text-white" style={{ backgroundColor: theme.accent }}>
                     ✓
@@ -2554,7 +2560,7 @@ export function StudentStageExperience({
                 {usesFullStageBoard && !isRealtimeStage && (
                   <div className="relative mt-3">
                     <FloatingStageFeedback
-                      showSuccess={((answer && isCorrect) || isStageComplete) && !isFinished}
+                      showSuccess={activeQuestion.kind !== "sequence" && ((answer && isCorrect) || isStageComplete) && !isFinished}
                       showWrong={Boolean(wrongNotice) && !isStageComplete && !isFinished}
                       title={activeQuestion.completionTitle}
                       message={activeQuestion.completionMessage}

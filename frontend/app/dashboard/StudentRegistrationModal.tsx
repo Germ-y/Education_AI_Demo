@@ -258,6 +258,29 @@ const inputClass =
 const textareaClass =
   "mt-2 w-full resize-none rounded-md border border-[#cbd5e1] bg-white px-3 py-3 text-sm font-semibold leading-6 text-[#172033] outline-none transition placeholder:text-[#94a3b8] focus:border-[#1f3a5f]";
 
+function SectionHeading({
+  step,
+  title,
+  description,
+  badge,
+}: {
+  step: string;
+  title: string;
+  description: string;
+  badge?: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <p className="text-sm font-black text-[#1f3a5f]">{step}</p>
+        <h3 className="mt-1 text-xl font-black text-[#172033]">{title}</h3>
+        <p className="mt-1 text-sm font-semibold leading-6 text-[#64748b]">{description}</p>
+      </div>
+      {badge && <span className="rounded-full bg-[#f1f5f9] px-3 py-1 text-xs font-black text-[#64748b]">{badge}</span>}
+    </div>
+  );
+}
+
 function createDefaultRegistrationForm(): RegistrationFormState {
   return {
     displayName: "",
@@ -380,13 +403,16 @@ function ChecklistGroup({
   onToggle: (value: string) => void;
 }) {
   return (
-    <section className="rounded-lg border border-[#e5e9f0] bg-white p-4">
+    <section className="rounded-lg border border-[#d8dee8] bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 className="text-sm font-black text-[#172033]">{title}</h3>
           <p className="mt-1 text-xs font-bold leading-5 text-[#64748b]">{description}</p>
         </div>
-        {required && <span className="rounded-full bg-[#eef4fb] px-2 py-1 text-[11px] font-black text-[#1f3a5f]">필수</span>}
+        <div className="flex flex-wrap gap-1.5">
+          {required && <span className="rounded-full bg-[#eef4fb] px-2 py-1 text-[11px] font-black text-[#1f3a5f]">필수</span>}
+          <span className="rounded-full bg-[#f8fafc] px-2 py-1 text-[11px] font-black text-[#64748b]">{values.length}개 선택</span>
+        </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {options.map((option) => {
@@ -633,7 +659,15 @@ export function StudentRegistrationModal({
 
         <form onSubmit={handleSubmit} className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <div className="space-y-5">
-            <section className="grid gap-4 rounded-lg border border-[#e5e9f0] bg-[#fbfcfe] p-4 lg:grid-cols-[minmax(220px,1fr)_120px_minmax(180px,240px)_minmax(120px,1fr)]">
+            <section className="rounded-lg border border-[#d8dee8] bg-white p-5">
+              <SectionHeading
+                step="1 기본 정보"
+                title="학생과 학교 확인"
+                description="학생 기본 정보와 학교를 먼저 확인합니다. 학교를 선택하면 교육청 정보가 자동으로 반영됩니다."
+                badge="필수 정보"
+              />
+
+              <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(220px,1fr)_120px_minmax(180px,240px)_minmax(120px,1fr)]">
               <div>
                 <label className="block">
                   <span className="text-sm font-bold text-[#64748b]">이름</span>
@@ -682,32 +716,55 @@ export function StudentRegistrationModal({
                 </label>
               </div>
 
-              <section className="rounded-lg border border-[#e5e9f0] bg-white p-4 lg:col-span-2">
-                <label className="block">
-                  <span className="text-sm font-bold text-[#64748b]">학교검색</span>
-                  <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+              <section className="rounded-lg border border-[#e5e9f0] bg-[#fbfcfe] p-4 lg:col-span-4">
+                <div className="grid gap-3 lg:grid-cols-[170px_minmax(260px,420px)_88px_minmax(220px,1fr)] lg:items-end">
+                  <div className="lg:self-center">
+                    <p className="text-sm font-black text-[#172033]">학교 선택</p>
+                    <p className="mt-1 text-xs font-semibold leading-5 text-[#64748b]">
+                      학교명 일부로 검색한 뒤 선택합니다.
+                    </p>
+                  </div>
+
+                  <label className="block">
+                    <span className="text-sm font-bold text-[#64748b]">학교명</span>
                     <input
                       value={form.schoolQuery}
                       onChange={(event) => {
                         updateForm("schoolQuery", event.target.value);
                         setSelectedSchool(null);
                       }}
-                      className="w-full rounded-md border border-[#cbd5e1] bg-white px-3 py-3 text-sm font-bold text-[#172033] outline-none transition placeholder:text-[#94a3b8] focus:border-[#1f3a5f]"
+                      className="mt-2 w-full rounded-md border border-[#cbd5e1] bg-white px-3 py-3 text-sm font-bold text-[#172033] outline-none transition placeholder:text-[#94a3b8] focus:border-[#1f3a5f]"
                       placeholder="학교명을 입력하세요"
                     />
-                    <button
-                      type="button"
-                      onClick={() => void handleSearchSchools()}
-                      disabled={isSearchingSchools}
-                      className="shrink-0 rounded-md bg-[#1f3a5f] px-5 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
-                    >
-                      {isSearchingSchools ? "검색 중" : "검색"}
-                    </button>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleSearchSchools()}
+                    disabled={isSearchingSchools}
+                    className="h-[46px] rounded-md bg-[#1f3a5f] px-5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
+                  >
+                    {isSearchingSchools ? "검색 중" : "검색"}
+                  </button>
+
+                  <div className="min-h-[46px] rounded-md border border-[#d8dee8] bg-white px-3 py-2">
+                    {selectedSchool ? (
+                      <>
+                        <p className="text-xs font-black text-[#15803d]">선택된 학교</p>
+                        <p className="mt-0.5 truncate text-sm font-black text-[#172033]">
+                          {schoolDisplayName(selectedSchool)}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-sm font-semibold leading-6 text-[#94a3b8]">
+                        검색 후 등록할 학교를 선택하세요.
+                      </p>
+                    )}
                   </div>
-                </label>
+                </div>
                 {schoolSearchError && <p className="mt-3 text-sm font-bold text-[#b42318]">{schoolSearchError}</p>}
                 {schoolSearchMessage && <p className="mt-3 text-sm font-bold text-[#1d4ed8]">{schoolSearchMessage}</p>}
-                <div className="mt-3 max-h-52 space-y-2 overflow-y-auto">
+                <div className="mt-3 grid max-h-52 gap-2 overflow-y-auto md:grid-cols-2">
                   {schoolResults.map((school) => {
                     const selected = selectedSchool?.schoolCode === school.schoolCode;
 
@@ -737,24 +794,29 @@ export function StudentRegistrationModal({
                     );
                   })}
                 </div>
-                {selectedSchool && (
-                  <p className="mt-3 rounded-md border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm font-bold text-[#15803d]">
-                    {schoolDisplayName(selectedSchool)} 선택됨
-                  </p>
-                )}
               </section>
 
-              <fieldset className="lg:col-span-2">
-                <legend className="text-sm font-bold text-[#64748b]">학생 유형</legend>
-                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              <div className="flex items-center gap-3 pt-2 lg:col-span-4">
+                <p className="text-sm font-black text-[#1f3a5f]">2 지원 방향</p>
+                <div className="h-px flex-1 bg-[#edf2f7]" />
+              </div>
+
+              <fieldset className="rounded-lg border border-[#e5e9f0] bg-[#fbfcfe] p-4 lg:col-span-2 lg:row-span-2">
+                <legend className="px-1 text-sm font-bold text-[#64748b]">학생 유형</legend>
+                <p className="mt-1 text-xs font-semibold leading-5 text-[#64748b]">
+                  자료를 어떤 관점으로 만들지 먼저 정합니다.
+                </p>
+                <div className="mt-3 grid gap-2">
                   {studentTypeOptions.map((option) => {
                     const selected = form.studentType === option.value;
 
                     return (
                       <label
                         key={option.value}
-                        className={`block rounded-lg border p-4 transition ${
-                          selected ? "border-[#1f3a5f] bg-[#eef4fb]" : "border-[#e5e9f0] bg-white"
+                        className={`block cursor-pointer rounded-md border p-4 transition ${
+                          selected
+                            ? "border-[#1f3a5f] bg-[#eef4fb] shadow-[0_8px_18px_rgba(31,58,95,0.08)]"
+                            : "border-[#d8dee8] bg-white hover:border-[#94a3b8]"
                         }`}
                       >
                         <input
@@ -765,7 +827,14 @@ export function StudentRegistrationModal({
                           onChange={() => handleStudentTypeChange(option.value)}
                           className="sr-only"
                         />
-                        <span className="block text-base font-black text-[#172033]">{option.label}</span>
+                        <span className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-base font-black text-[#172033]">{option.label}</span>
+                          {selected && (
+                            <span className="rounded-full bg-[#1f3a5f] px-2.5 py-1 text-[11px] font-black text-white">
+                              선택됨
+                            </span>
+                          )}
+                        </span>
                         <span className="mt-1 block text-sm font-semibold leading-6 text-[#64748b]">
                           {option.description}
                         </span>
@@ -795,20 +864,17 @@ export function StudentRegistrationModal({
                   required
                 />
               </label>
+              </div>
             </section>
 
             <section className="space-y-4">
-              <section className="rounded-lg border border-[#d8dee8] bg-[#fbfcfe] p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-black text-[#1f3a5f]">지원 체크리스트</p>
-                    <h3 className="mt-1 text-xl font-black text-[#172033]">{checklistIntro.title}</h3>
-                  </div>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#64748b]">필수 3개 영역</span>
-                </div>
-                <p className="mt-2 text-sm font-semibold leading-6 text-[#64748b]">
-                  {checklistIntro.description}
-                </p>
+              <section className="rounded-lg border border-[#d8dee8] bg-[#fbfcfe] p-5">
+                <SectionHeading
+                  step="3 지원 체크리스트"
+                  title={checklistIntro.title}
+                  description={checklistIntro.description}
+                  badge="필수 3개 영역"
+                />
               </section>
 
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
