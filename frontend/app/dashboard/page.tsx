@@ -380,6 +380,18 @@ function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
 }
 
+function mergeStringLists(...groups: string[][]) {
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  groups.flat().forEach((item) => {
+    const normalized = item.trim();
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    merged.push(normalized);
+  });
+  return merged;
+}
+
 function toReadingLoadLabel(value: unknown) {
   if (value === "low") return "짧은 문장";
   if (value === "medium") return "보통 문장";
@@ -876,46 +888,109 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
 
 function SignalCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
-    <div className="rounded-lg border border-[#e2e8f0] bg-white p-4">
+    <div className="rounded-md border border-[#e2e8f0] bg-[#fbfcfe] p-4">
       <p className="text-xs font-black text-[#64748b]">{label}</p>
-      <p className="mt-2 text-base font-black leading-6 text-[#172033]">{value}</p>
-      {helper && <p className="mt-2 text-xs font-semibold leading-5 text-[#94a3b8]">{helper}</p>}
+      <p className="mt-2 text-[15px] font-black leading-7 text-[#172033]">{value}</p>
+      {helper && <p className="mt-2 border-t border-[#edf2f7] pt-2 text-xs font-semibold leading-5 text-[#7c8ba1]">{helper}</p>}
     </div>
   );
 }
 
-function ChipGroup({
+function SummaryStepCard({
+  step,
   title,
-  description,
   items,
   empty = "기록 확인 중",
   tone = "blue",
 }: {
+  step: string;
   title: string;
-  description?: string;
+  items: string[];
+  empty?: string;
+  tone?: "blue" | "green" | "orange";
+}) {
+  const shownItems = items.length > 0 ? items : [empty];
+  const toneStyle = {
+    blue: {
+      accent: "bg-[#1f3a5f]",
+      badge: "bg-[#eef4fb] text-[#1f3a5f]",
+      border: "border-[#c9d9ec]",
+    },
+    orange: {
+      accent: "bg-[#c2410c]",
+      badge: "bg-[#fff7ed] text-[#9a3412]",
+      border: "border-[#fed7aa]",
+    },
+    green: {
+      accent: "bg-[#15803d]",
+      badge: "bg-[#f0fdf4] text-[#166534]",
+      border: "border-[#bbebca]",
+    },
+  }[tone];
+
+  return (
+    <div className={`rounded-md border bg-white p-4 ${toneStyle.border}`}>
+      <div className="flex items-center gap-2">
+        <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-black text-white ${toneStyle.accent}`}>
+          {step}
+        </span>
+        <p className="text-sm font-black text-[#172033]">{title}</p>
+      </div>
+      <ul className="mt-3 space-y-2">
+        {shownItems.map((item, index) => (
+          <li key={`${item}-${index}`} className={`rounded-md px-3 py-2 text-xs font-bold leading-5 ${toneStyle.badge}`}>
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ProfileListRow({
+  title,
+  items,
+  empty = "지원 초안 생성 전",
+  tone = "blue",
+}: {
+  title: string;
   items: string[];
   empty?: string;
   tone?: "blue" | "green" | "orange" | "slate";
 }) {
   const shownItems = items.length > 0 ? items : [empty];
-  const toneClass = {
-    blue: "bg-[#eef4fb] text-[#1f3a5f]",
-    green: "bg-[#f0fdf4] text-[#15803d]",
-    orange: "bg-[#fff7ed] text-[#9a3412]",
-    slate: "bg-[#f8fafc] text-[#475569]",
+  const toneStyle = {
+    blue: {
+      dot: "bg-[#1f3a5f]",
+      item: "border-[#c9d9ec] bg-[#f7fbff] text-[#1f3a5f]",
+    },
+    green: {
+      dot: "bg-[#15803d]",
+      item: "border-[#bbebca] bg-[#f7fdf9] text-[#166534]",
+    },
+    orange: {
+      dot: "bg-[#c2410c]",
+      item: "border-[#fed7aa] bg-[#fffaf4] text-[#9a3412]",
+    },
+    slate: {
+      dot: "bg-[#64748b]",
+      item: "border-[#dbe3ee] bg-[#f8fafc] text-[#475569]",
+    },
   }[tone];
 
   return (
-    <div className="rounded-lg border border-[#e2e8f0] bg-white p-4">
-      <p className="text-sm font-black text-[#172033]">{title}</p>
-      {description && <p className="mt-1 text-xs font-semibold leading-5 text-[#94a3b8]">{description}</p>}
-      <div className="mt-3 flex flex-wrap gap-2">
-        {shownItems.map((item, index) => (
-          <span key={`${item}-${index}`} className={`rounded-full px-3 py-1 text-xs font-bold ${toneClass}`}>
-            {item}
-          </span>
-        ))}
+    <div className="grid gap-3 border-t border-[#e8eef5] px-4 py-3 first:border-t-0 lg:grid-cols-[160px_minmax(0,1fr)]">
+      <div className="flex items-start gap-2">
+        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${toneStyle.dot}`} />
+        <p className="text-sm font-black text-[#172033]">{title}</p>
       </div>
+      <ul className="grid gap-2 md:grid-cols-2">
+        {shownItems.map((item, index) => (
+          <li key={`${item}-${index}`} className={`rounded-md border px-3 py-2 text-xs font-bold leading-5 ${toneStyle.item}`}>
+            {item}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -1219,6 +1294,29 @@ export default function DashboardPage() {
       ? academicStrategyItems
       : recommendedScaffolds.slice(0, 4)
     : replacementSkills;
+  const supportFlowWorksWellItems = mergeStringLists(
+    responseWorksWell,
+    supportProfileStrengths,
+    activeContextBrief?.recentSuccessPatterns ?? [],
+    dashboardProfile?.strengths ?? [],
+    selectedStudent.strengths,
+  );
+  const supportFlowCautionItems = mergeStringLists(
+    responseCanBeHard,
+    supportProfileCautions,
+    activeContextBrief?.recentDifficultyPatterns ?? [],
+    dashboardProfile?.weaknesses ?? [],
+    selectedCase.challengeTags,
+  );
+  const supportFlowScaffoldItems = mergeStringLists(
+    recommendedScaffolds,
+    supportProfileLessonHints,
+    activeContextBrief?.recommendedScaffolds ?? [],
+    selectedCase.planTags,
+  );
+  const supportFlowWorksWellSummary = supportFlowWorksWellItems.slice(0, 2);
+  const supportFlowCautionSummary = supportFlowCautionItems.slice(0, 2);
+  const supportFlowScaffoldSummary = supportFlowScaffoldItems.slice(0, 3);
   const lessonDesignDirection =
     supportProfileLessonHints[0] ??
     dashboardProfile?.supportStrategyDetail ??
@@ -2393,13 +2491,16 @@ export default function DashboardPage() {
             <div className="min-h-[560px]">
             {activeTab === "info" && (
               <section className="space-y-6 p-6">
-                <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-                  <div className="rounded-lg border border-[#d8dee8] bg-white p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-black text-[#64748b]">학생 정보</p>
-                        <h3 className="mt-1 text-2xl font-black">지원 흐름 요약</h3>
-                      </div>
+                <section className="rounded-lg border border-[#d8dee8] bg-white p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-[#64748b]">오늘 먼저 볼 것</p>
+                      <h3 className="mt-1 text-2xl font-black">핵심 요약</h3>
+                      <p className="mt-2 text-sm font-semibold leading-6 text-[#64748b]">
+                        수업 시작 전 확인할 순서만 먼저 모았습니다. 아래 지원 흐름 상세에서 전체 항목을 이어서 확인합니다.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-black ${
                           activeContextBrief
@@ -2411,56 +2512,6 @@ export default function DashboardPage() {
                       >
                         {activeContextBrief ? (activeContextBrief.dirty ? "기억장치 갱신 필요" : "기억장치 갱신 완료") : "기억장치 생성 전"}
                       </span>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 md:grid-cols-3">
-                      <SignalCard
-                        label="수업 설계 방향"
-                        value={lessonDesignDirection}
-                        helper="확정 프로필이나 AI 참고 요약에서 가져온 실제 제시 방식입니다."
-                      />
-                      <SignalCard
-                        label="프로필 상태"
-                        value={supportProfileStatusLabel(supportProfileStatus)}
-                        helper="아래 강점, 주의 흐름, 제시 방식이 자료 생성에 반영됩니다."
-                      />
-                      <SignalCard
-                        label="처음 제시 기준"
-                        value={`${toReadingLoadLabel(firstReadingLoad)} · ${toChoiceCountLabel(firstChoiceCount)}`}
-                        helper="첫 문제에서 시작할 문장 길이와 보기 수입니다."
-                      />
-                    </div>
-
-                    <div className="mt-4 grid gap-3 lg:grid-cols-3">
-                      <ChipGroup
-                        title="잘 되는 시작점"
-                        description="수업 첫 화면에서 살릴 반응입니다."
-                        items={responseWorksWell.length ? responseWorksWell : supportProfileStrengths.length ? supportProfileStrengths : dashboardProfile?.strengths?.length ? dashboardProfile.strengths : selectedStudent.strengths}
-                      />
-                      <ChipGroup
-                        title="주의할 흐름"
-                        description="부담을 먼저 낮춰야 할 장면입니다."
-                        items={responseCanBeHard.length ? responseCanBeHard : supportProfileCautions.length ? supportProfileCautions : dashboardProfile?.weaknesses?.length ? dashboardProfile.weaknesses : selectedCase.challengeTags}
-                        tone="orange"
-                      />
-                      <ChipGroup
-                        title="제시 방식"
-                        description="문제 난이도가 아니라 안내 방식을 조정합니다."
-                        items={recommendedScaffolds.length ? recommendedScaffolds : supportProfileLessonHints.length ? supportProfileLessonHints : selectedCase.planTags}
-                        tone="green"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-[#d8dee8] bg-[#fbfcfe] p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-black text-[#64748b]">AI 참고 요약</p>
-                        <h3 className="mt-1 text-xl font-black">핵심만 보기</h3>
-                        <p className="mt-1 text-xs font-semibold leading-5 text-[#94a3b8]">
-                          긴 기억장치 원문은 AI가 내부에서 참고하고, 화면에는 생성에 영향을 주는 신호만 보여줍니다.
-                        </p>
-                      </div>
                       <button
                         type="button"
                         onClick={() => void handleRefreshContextBrief()}
@@ -2470,117 +2521,24 @@ export default function DashboardPage() {
                         {supportProfileAction === "refresh" ? "갱신 중" : "기억장치 갱신"}
                       </button>
                     </div>
-
-                    {activeContextBrief?.briefText ? (
-                      <>
-                        <div className="mt-4 space-y-3">
-                          <ChipGroup
-                            title="잘 먹히는 시작"
-                            items={activeContextBrief.recentSuccessPatterns.slice(0, 2)}
-                            tone="blue"
-                          />
-                          <ChipGroup
-                            title="먼저 줄일 부담"
-                            items={activeContextBrief.recentDifficultyPatterns.slice(0, 2)}
-                            tone="orange"
-                          />
-                          <ChipGroup
-                            title="적용할 지원"
-                            items={activeContextBrief.recommendedScaffolds.slice(0, 2)}
-                            tone="green"
-                          />
-                        </div>
-                        <details className="mt-3 rounded-md border border-[#e2e8f0] bg-white px-4 py-3">
-                          <summary className="cursor-pointer text-sm font-black text-[#1f3a5f]">AI용 원문 보기</summary>
-                          <p className="mt-3 text-sm font-semibold leading-7 text-[#334155]">{activeContextBrief.briefText}</p>
-                          <div className="mt-4 space-y-3">
-                            <ChipGroup title="성공 패턴 전체" items={activeContextBrief.recentSuccessPatterns} tone="blue" />
-                            <ChipGroup title="주의 흐름 전체" items={activeContextBrief.recentDifficultyPatterns} tone="orange" />
-                            <ChipGroup title="지원 방식 전체" items={activeContextBrief.recommendedScaffolds} tone="green" />
-                          </div>
-                        </details>
-                      </>
-                    ) : (
-                      <p className="mt-4 rounded-md bg-white px-4 py-3 text-sm font-semibold leading-6 text-[#64748b]">
-                        아직 생성된 기억장치가 없습니다. 지원 초안을 확정하거나 수업 기록을 저장하면 다음 자료 생성에 반영할 요약을 만들 수 있습니다.
-                      </p>
-                    )}
                   </div>
-                </section>
-
-                <section className="rounded-lg border border-[#d8dee8] bg-white p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-xl font-black">초기 지원 프로필</h3>
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-black ${
-                            supportProfileStatus === "confirmed"
-                              ? "bg-[#dcfce7] text-[#15803d]"
-                              : supportProfileStatus === "draft"
-                                ? "bg-[#eff6ff] text-[#1d4ed8]"
-                                : "bg-[#f1f5f9] text-[#64748b]"
-                          }`}
-                        >
-                          {supportProfileStatus === "confirmed" ? "선생님 확인 완료" : supportProfileStatus === "draft" ? "초안" : "작성 전"}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                        등록 원자료를 수업 방식 프로필로 정리합니다. 콘텐츠 주제는 생성 요청이 우선합니다.
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleCreateSupportProfileDraft()}
-                        disabled={!selectedCase.studentId || Boolean(supportProfileAction)}
-                        className="rounded-md border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-black text-[#334155] disabled:cursor-not-allowed disabled:text-[#94a3b8]"
-                      >
-                        {supportProfileAction === "draft" ? "생성 중" : "지원 초안 생성"}
-                      </button>
-                    </div>
-                  </div>
-
-                  {supportProfileDraft && (
-                    <div className="mt-4 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-black text-[#1d4ed8]">AI 수업 방식 초안</p>
-                          <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">
-                            {stringList(supportProfileDraft.profileDraft.lessonDesignHints)[0] ?? "초안 내용을 확인한 뒤 저장할 수 있습니다."}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => void handleConfirmSupportProfile()}
-                          disabled={Boolean(supportProfileAction)}
-                          className="rounded-md bg-[#1f3a5f] px-4 py-2 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
-                        >
-                          {supportProfileAction === "confirm" ? "저장 중" : "선생님 확인 완료"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <ChipGroup
-                      title="관찰된 강점"
-                      items={responseWorksWell.length ? responseWorksWell : supportProfileStrengths.length ? supportProfileStrengths : ["지원 초안 생성 전"]}
+                  <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                    <SummaryStepCard
+                      step="1"
+                      title="시작점 살리기"
+                      items={supportFlowWorksWellSummary}
                     />
-                    <ChipGroup
-                      title="지원이 필요한 상황"
-                      items={responseCanBeHard.length ? responseCanBeHard : supportProfileCautions.length ? supportProfileCautions : selectedCase.challengeTags}
+                    <SummaryStepCard
+                      step="2"
+                      title="부담 먼저 줄이기"
+                      items={supportFlowCautionSummary}
                       tone="orange"
                     />
-                    <ChipGroup
-                      title="수업 적용 힌트"
-                      items={recommendedScaffolds.length ? recommendedScaffolds : supportProfileLessonHints.length ? supportProfileLessonHints : selectedCase.planTags}
+                    <SummaryStepCard
+                      step="3"
+                      title="제시 방식 적용"
+                      items={supportFlowScaffoldSummary}
                       tone="green"
-                    />
-                    <ChipGroup
-                      title={isLearningFocusStudent ? "학습 전략" : "연습할 표현·기술"}
-                      items={supportSkillItems.length ? supportSkillItems : ["확정 프로필 저장 뒤 표시"]}
-                      tone="slate"
                     />
                   </div>
                 </section>
@@ -2590,7 +2548,7 @@ export default function DashboardPage() {
                     <div>
                       <h3 className="text-xl font-black">선생님 통합 메모</h3>
                       <p className="mt-1 text-sm font-semibold text-[#64748b]">
-                        특정 콘텐츠가 아니라 학생 전체에 대해 계속 참고할 관찰과 조정점을 남깁니다.
+                        핵심 요약을 보며 학생 전체에 대해 계속 참고할 관찰과 조정점을 남깁니다.
                       </p>
                     </div>
                     {savedMemo && (
@@ -2626,6 +2584,204 @@ export default function DashboardPage() {
                       {isSavingMemo ? "저장 중" : "메모리로 저장"}
                     </button>
                   </div>
+                </section>
+
+                <section className="grid gap-4">
+                  <div className="rounded-lg border border-[#d8dee8] bg-white p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-[#64748b]">학생 정보</p>
+                        <h3 className="mt-1 text-2xl font-black">지원 흐름 상세</h3>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold text-[#64748b]">
+                          <span>프로필 상태</span>
+                          <span
+                            className={`rounded-full px-2.5 py-1 font-black ${
+                              supportProfileStatus === "confirmed"
+                                ? "bg-[#dcfce7] text-[#15803d]"
+                                : supportProfileStatus === "draft"
+                                  ? "bg-[#eff6ff] text-[#1d4ed8]"
+                                  : "bg-[#f1f5f9] text-[#64748b]"
+                            }`}
+                          >
+                            {supportProfileStatusLabel(supportProfileStatus)}
+                          </span>
+                          <span>강점, 주의 흐름, 제시 방식이 자료 생성에 반영됩니다.</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex items-center gap-3">
+                      <p className="text-xs font-black text-[#64748b]">전체 항목</p>
+                      <div className="h-px flex-1 bg-[#edf2f7]" />
+                    </div>
+                    <div className="mt-3 overflow-hidden rounded-md border border-[#e2e8f0] bg-white">
+                      <ProfileListRow
+                        title="잘 되는 시작점"
+                        items={supportFlowWorksWellItems}
+                      />
+                      <ProfileListRow
+                        title="주의할 흐름"
+                        items={supportFlowCautionItems}
+                        tone="orange"
+                      />
+                      <ProfileListRow
+                        title="제시 방식"
+                        items={supportFlowScaffoldItems}
+                        tone="green"
+                      />
+                    </div>
+
+                    <div className="mt-5 flex items-center gap-3">
+                      <p className="text-xs font-black text-[#64748b]">수업 기준</p>
+                      <div className="h-px flex-1 bg-[#edf2f7]" />
+                    </div>
+                    <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]">
+                      <SignalCard
+                        label="수업 설계 방향"
+                        value={lessonDesignDirection}
+                        helper="확정 프로필이나 AI 참고 요약에서 가져온 실제 제시 방식입니다."
+                      />
+                      <SignalCard
+                        label="처음 제시 기준"
+                        value={`${toReadingLoadLabel(firstReadingLoad)} · ${toChoiceCountLabel(firstChoiceCount)}`}
+                        helper="첫 문제에서 시작할 문장 길이와 보기 수입니다."
+                      />
+                    </div>
+                  </div>
+
+                </section>
+
+                <section className="rounded-lg border border-[#e5e9f0] bg-[#fbfcfe] p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-lg font-black">초기 지원 프로필</h3>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-black ${
+                            supportProfileStatus === "confirmed"
+                              ? "bg-[#dcfce7] text-[#15803d]"
+                              : supportProfileStatus === "draft"
+                                ? "bg-[#eff6ff] text-[#1d4ed8]"
+                                : "bg-[#f1f5f9] text-[#64748b]"
+                          }`}
+                        >
+                          {supportProfileStatus === "confirmed" ? "선생님 확인 완료" : supportProfileStatus === "draft" ? "초안" : "작성 전"}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs font-semibold leading-5 text-[#64748b]">
+                        등록 원자료를 수업 방식 프로필로 정리합니다. 콘텐츠 주제는 생성 요청이 우선합니다.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleCreateSupportProfileDraft()}
+                        disabled={!selectedCase.studentId || Boolean(supportProfileAction)}
+                        className="rounded-md border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-black text-[#334155] disabled:cursor-not-allowed disabled:text-[#94a3b8]"
+                      >
+                        {supportProfileAction === "draft" ? "생성 중" : "지원 프로필 초안 생성"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {supportProfileDraft && (
+                    <div className="mt-4 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-black text-[#1d4ed8]">AI 수업 방식 초안</p>
+                          <p className="mt-2 text-sm font-semibold leading-6 text-[#334155]">
+                            {stringList(supportProfileDraft.profileDraft.lessonDesignHints)[0] ?? "초안 내용을 확인한 뒤 저장할 수 있습니다."}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void handleConfirmSupportProfile()}
+                          disabled={Boolean(supportProfileAction)}
+                          className="rounded-md bg-[#1f3a5f] px-4 py-2 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-[#94a3b8]"
+                        >
+                          {supportProfileAction === "confirm" ? "저장 중" : "선생님 확인 완료"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <details className="group mt-4 overflow-hidden rounded-md border border-[#d8dee8] bg-white">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:hidden hover:bg-[#f8fafc]">
+                      <div>
+                        <p className="text-sm font-black text-[#1f3a5f]">세부 프로필 보기</p>
+                        <p className="mt-1 text-xs font-bold leading-5 text-[#64748b]">
+                          {supportSkillItems[0] ?? recommendedScaffolds[0] ?? supportProfileLessonHints[0] ?? "강점, 상황, 힌트, 전략을 펼쳐서 확인합니다."}
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-[#cbd5e1] px-3 py-1 text-xs font-black text-[#64748b] group-open:hidden">
+                        펼치기
+                      </span>
+                      <span className="hidden rounded-full border border-[#cbd5e1] px-3 py-1 text-xs font-black text-[#64748b] group-open:inline">
+                        접기
+                      </span>
+                    </summary>
+                    <div className="border-t border-[#edf2f7]">
+                      <ProfileListRow
+                        title="관찰된 강점"
+                        items={responseWorksWell.length ? responseWorksWell : supportProfileStrengths.length ? supportProfileStrengths : ["지원 초안 생성 전"]}
+                      />
+                      <ProfileListRow
+                        title="지원이 필요한 상황"
+                        items={responseCanBeHard.length ? responseCanBeHard : supportProfileCautions.length ? supportProfileCautions : selectedCase.challengeTags}
+                        tone="orange"
+                      />
+                      <ProfileListRow
+                        title="수업 적용 힌트"
+                        items={recommendedScaffolds.length ? recommendedScaffolds : supportProfileLessonHints.length ? supportProfileLessonHints : selectedCase.planTags}
+                        tone="green"
+                      />
+                      <ProfileListRow
+                        title={isLearningFocusStudent ? "학습 전략" : "연습할 표현·기술"}
+                        items={supportSkillItems.length ? supportSkillItems : ["확정 프로필 저장 뒤 표시"]}
+                        tone="slate"
+                      />
+                    </div>
+                  </details>
+                </section>
+
+                <section className="rounded-lg border border-[#d8dee8] bg-[#fbfcfe] p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-[#64748b]">AI 참고 요약</p>
+                      <h3 className="mt-1 text-xl font-black">원문 확인</h3>
+                      <p className="mt-1 text-xs font-semibold leading-5 text-[#94a3b8]">
+                        긴 기억장치 원문은 AI가 내부에서 참고하고, 화면에는 생성에 영향을 주는 신호만 보여줍니다.
+                      </p>
+                    </div>
+                  </div>
+
+                  {activeContextBrief?.briefText ? (
+                    <details className="group mt-4 overflow-hidden rounded-md border border-[#d8dee8] bg-white">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:hidden hover:bg-[#f8fafc]">
+                        <div>
+                          <p className="text-sm font-black text-[#1f3a5f]">AI용 원문 보기</p>
+                          <p className="mt-1 text-xs font-bold leading-5 text-[#64748b]">
+                            요약에 쓰인 긴 원문 문단을 펼쳐서 확인합니다.
+                          </p>
+                        </div>
+                        <span className="rounded-full border border-[#cbd5e1] px-3 py-1 text-xs font-black text-[#64748b] group-open:hidden">
+                          펼치기
+                        </span>
+                        <span className="hidden rounded-full border border-[#cbd5e1] px-3 py-1 text-xs font-black text-[#64748b] group-open:inline">
+                          접기
+                        </span>
+                      </summary>
+                      <div className="border-t border-[#edf2f7] p-4">
+                        <p className="max-h-40 overflow-auto rounded-md bg-[#f8fafc] p-3 text-xs font-semibold leading-6 text-[#475569]">
+                          {activeContextBrief.briefText}
+                        </p>
+                      </div>
+                    </details>
+                  ) : (
+                    <p className="mt-4 rounded-md bg-white px-4 py-3 text-sm font-semibold leading-6 text-[#64748b]">
+                      아직 생성된 기억장치가 없습니다. 지원 초안을 확정하거나 수업 기록을 저장하면 다음 자료 생성에 반영할 요약을 만들 수 있습니다.
+                    </p>
+                  )}
                 </section>
               </section>
             )}
