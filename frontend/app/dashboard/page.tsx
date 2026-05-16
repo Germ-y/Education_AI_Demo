@@ -636,17 +636,7 @@ function findCompletedReviewContentForGenerationJob(job: PendingGenerationJob, c
   if (!caseFile) return null;
   const exactContent = findPendingGenerationContent(job, caseFile);
   if (isPendingGenerationContentComplete(exactContent)) return exactContent;
-
-  const matchesSelectedCase =
-    job.caseId === caseFile.openCase.id || Boolean(job.studentId && job.studentId === caseFile.profile.id);
-  if (!matchesSelectedCase) return null;
-
-  return (
-    caseFile.recentContents
-      .filter(isReviewQueueContent)
-      .filter(isPendingGenerationContentComplete)
-      .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left))[0] ?? null
-  );
+  return null;
 }
 
 function isPendingGenerationContentUsable(content: MissionContent | null): content is MissionContent {
