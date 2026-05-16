@@ -73,8 +73,9 @@
 1. 학년 수준에 맞는 학습 기능을 정합니다.
 2. 학생이 UI에서 볼 문제 데이터를 정합니다. 예: 식, 짧은 문장, 표 값, 카드 문구, 빈칸 문장, 비교 조건, 분류 기준.
 3. 이미지는 문제 데이터를 풀게 하는 정답지가 아니라, 같은 수업 맥락의 장소·활동·조작물을 보여주는 보조 장면으로 설계합니다.
-4. 2단계는 가장 쉬운 기본 문제, 3단계는 같은 개념을 한 단계 옮긴 문제로 설계합니다.
-5. 4단계는 학생이 풀이 기준이나 설명을 자기 말로 말하게 합니다.
+4. 2단계는 기본 문제입니다. 가장 쉬운 활동으로 낮추지 말고, 해당 학년의 개념을 확인하는 문제로 설계합니다.
+5. 3단계는 응용 예제입니다. 같은 개념을 더 복잡한 조건이나 다른 자료에 적용해 난이도를 한 단계 올립니다.
+6. 4단계는 학생이 풀이 기준이나 설명을 자기 말로 말하게 합니다.
 
 `life_support` 설계:
 
@@ -128,7 +129,7 @@
 `learning_focus`:
 
 - 1단계: `concept_intro` + `concept_intro`
-- 2단계: `basic_problem` + `card_match`, `sequence_ordering`, `blank_fill`, `scene_question`, `clue_question`, `partition_picker`
+- 2단계: `basic_problem` + `card_match`, `sequence_ordering`, `blank_fill`, `scene_question`, `clue_question`
 - 3단계: `applied_problem` + `card_match`, `sequence_ordering`, `blank_fill`, `applied_question`, `mini_simulation`, `explanation_choice`, `wrong_explanation_fix`
 - 4단계: `realtime_practice` + `realtime_teach_back`
 

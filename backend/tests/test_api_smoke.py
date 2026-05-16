@@ -1089,10 +1089,10 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
                     {
                         "step": 2,
                         "stageRole": "basic_problem",
-                        "templateType": "partition_picker",
+                        "templateType": "scene_question",
                         "studentTitle": "문제 1",
                         "purpose": "전체 조각 수를 먼저 세게 합니다.",
-                        "templateRationale": "partition_picker가 전체 조각을 손으로 확인하는 첫 성공에 맞습니다.",
+                        "templateRationale": "scene_question이 전체 조각 수를 선택형으로 확인하는 기본 문제에 맞습니다.",
                     },
                     {
                         "step": 3,
@@ -1619,10 +1619,10 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
                     {
                         "step": 2,
                         "stageRole": "basic_problem",
-                        "templateType": "partition_picker",
+                        "templateType": "scene_question",
                         "studentTitle": "문제 1",
                         "purpose": "전체 조각 수를 먼저 세게 합니다.",
-                        "templateRationale": "partition_picker가 전체 조각을 손으로 확인하는 첫 성공에 맞습니다.",
+                        "templateRationale": "scene_question이 전체 조각 수를 선택형으로 확인하는 기본 문제에 맞습니다.",
                     },
                     {
                         "step": 3,

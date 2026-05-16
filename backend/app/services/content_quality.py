@@ -25,7 +25,6 @@ FLOW_RULES: dict[str, dict[int, tuple[str, set[str]]]] = {
                 TemplateType.BLANK_FILL.value,
                 TemplateType.SCENE_QUESTION.value,
                 TemplateType.CLUE_QUESTION.value,
-                TemplateType.PARTITION_PICKER.value,
             },
         ),
         3: (

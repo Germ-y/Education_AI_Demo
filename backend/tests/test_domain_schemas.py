@@ -269,7 +269,7 @@ def test_content_generation_rejects_realtime_rubric_without_label() -> None:
         _mission_from_generation(content, student_id=base_content.student_id, case_id=base_content.case_id)
 
 
-def test_content_generation_preserves_extra_card_match_fields_for_schema_visibility() -> None:
+def test_content_generation_rejects_extra_card_match_fields() -> None:
     base_content = next(content for content in create_demo_database().mission_contents if content.student_id == "student_learning_fraction")
     content = base_content.model_dump(by_alias=True)
     content["id"] = "content_generated_card_match_cleanup"
@@ -292,21 +292,20 @@ def test_content_generation_preserves_extra_card_match_fields_for_schema_visibil
         "imageAssetId": "asset_content_fraction_001_stage_2",
         "audioAssetId": "asset_content_fraction_001_stage_2_audio",
         "question": "같은 양끼리 이어 보세요.",
-        "leftCards": [{"id": "half", "text": "1/2"}, {"id": "quarter", "text": "1/4"}],
-        "rightCards": [{"id": "zero_five", "text": "0.5"}, {"id": "zero_two_five", "text": "0.25"}],
+        "leftCards": [{"id": "left_1", "text": "1/2"}, {"id": "left_2", "text": "1/4"}],
+        "rightCards": [{"id": "right_1", "text": "0.5"}, {"id": "right_2", "text": "0.25"}],
         "cards": [
             {"id": "extra_1", "text": "추가 카드 1"},
             {"id": "extra_2", "text": "추가 카드 2"},
             {"id": "extra_3", "text": "추가 카드 3"},
         ],
-        "matches": {"half": "zero_five", "quarter": "zero_two_five"},
+        "matches": {"left_1": "right_1", "left_2": "right_2"},
         "correctFeedback": "좋아요. 같은 양을 잘 찾았어요.",
         "wrongFeedback": "그림과 값을 다시 비교해 볼까요?",
     }
 
-    mission = _mission_from_generation(content, student_id=base_content.student_id, case_id=base_content.case_id)
-
-    assert "cards" in mission.stages[1].template_json
+    with pytest.raises(ValueError, match="card_match"):
+        _mission_from_generation(content, student_id=base_content.student_id, case_id=base_content.case_id)
 
 
 def test_orchestrator_plan_quality_requires_track_matching_four_stage_flow() -> None:
@@ -390,9 +389,9 @@ def test_mission_quality_leaves_choice_limit_nuance_to_teacher_review() -> None:
         "audioAssetId": content["stages"][1]["templateJson"]["audioAssetId"],
         "assetBundle": content["stages"][1]["templateJson"]["assetBundle"],
         "question": "같은 양끼리 이어 보세요.",
-        "leftCards": [{"id": "a", "text": "1/2"}, {"id": "b", "text": "1/4"}, {"id": "c", "text": "3/4"}],
-        "rightCards": [{"id": "d", "text": "0.5"}, {"id": "e", "text": "0.25"}, {"id": "f", "text": "0.75"}],
-        "matches": {"a": "d", "b": "e", "c": "f"},
+        "leftCards": [{"id": "left_1", "text": "1/2"}, {"id": "left_2", "text": "1/4"}],
+        "rightCards": [{"id": "right_1", "text": "0.5"}, {"id": "right_2", "text": "0.25"}],
+        "matches": {"left_1": "right_1", "left_2": "right_2"},
         "correctFeedback": "좋아요. 같은 양을 잘 찾았어요.",
         "wrongFeedback": "분수와 소수를 다시 비교해 볼까요?",
     }
@@ -469,7 +468,7 @@ def test_mission_quality_allows_four_sequence_cards_after_schema_passes() -> Non
 def test_mission_quality_allows_three_blank_fill_tiles_with_two_choice_limit() -> None:
     content = _generated_fraction_content()
     content["stages"][1]["templateJson"]["choices"] = [{"id": "a", "text": "1議곌컖"}, {"id": "b", "text": "4議곌컖"}]
-    content["stages"][2]["templateJson"]["tiles"] = ["1", "2", "4"]
+    content["stages"][2]["templateJson"]["tiles"] = ["1/4", "1/2", "4/1"]
     mission = MissionContent.model_validate(content)
     case_file = _fraction_case_file()
     case_file["profile"]["profileJson"]["choiceCountLimit"] = 2
@@ -484,7 +483,7 @@ def test_mission_quality_allows_three_blank_fill_tiles_with_two_choice_limit() -
 def test_mission_quality_allows_four_blank_fill_tiles_after_schema_passes() -> None:
     content = _generated_fraction_content()
     content["stages"][1]["templateJson"]["choices"] = [{"id": "a", "text": "1議곌컖"}, {"id": "b", "text": "4議곌컖"}]
-    content["stages"][2]["templateJson"]["tiles"] = ["1", "2", "3", "4"]
+    content["stages"][2]["templateJson"]["tiles"] = ["1/4", "1/2", "3/4", "4/1"]
     mission = MissionContent.model_validate(content)
     case_file = _fraction_case_file()
     case_file["profile"]["profileJson"]["choiceCountLimit"] = 2
@@ -498,7 +497,7 @@ def test_mission_quality_allows_four_blank_fill_tiles_after_schema_passes() -> N
 
 def test_blank_fill_rejects_generic_image_fill_instruction() -> None:
     content = _generated_fraction_content()
-    content["stages"][2]["templateJson"]["question"] = "그림을 보고 알맞은 값을 골라 빈칸을 채워 보세요. __"
+    content["stages"][2]["templateJson"]["sentence"] = "그림을 보고 알맞은 값을 골라 빈칸을 채워 보세요. __"
 
     with pytest.raises(ValueError, match="blank_fill"):
         MissionContent.model_validate(content)
@@ -644,10 +643,10 @@ def _valid_learning_plan() -> dict:
             {
                 "step": 2,
                 "stageRole": "basic_problem",
-                "templateType": "partition_picker",
+                "templateType": "scene_question",
                 "studentTitle": "문제 1",
                 "purpose": "전체 조각 수를 먼저 세게 합니다.",
-                "templateRationale": "partition_picker가 전체 조각을 손으로 확인하는 첫 성공에 맞습니다.",
+                "templateRationale": "scene_question이 전체 조각 수를 선택형으로 확인하는 기본 문제에 맞습니다.",
             },
             {
                 "step": 3,
