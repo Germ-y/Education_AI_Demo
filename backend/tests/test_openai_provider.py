@@ -6,7 +6,7 @@ from app.ai.provider_errors import ProviderOutputError
 from app.core.config import Settings
 
 
-def test_post_retries_transient_openai_502(monkeypatch) -> None:
+def test_post_fails_fast_on_transient_openai_502(monkeypatch) -> None:
     import app.ai.openai_provider as openai_provider
 
     calls = {"count": 0}
@@ -32,19 +32,18 @@ def test_post_retries_transient_openai_502(monkeypatch) -> None:
 
         def post(self, *args, **kwargs):
             calls["count"] += 1
-            if calls["count"] == 1:
-                return FakeResponse(502, text="<html>Bad gateway</html>")
-            return FakeResponse(200, {"output_text": "{\"ok\": true}"})
+            return FakeResponse(502, text="<html>Bad gateway</html>")
 
     monkeypatch.setattr(openai_provider.httpx, "Client", FakeClient)
     monkeypatch.setattr(openai_provider, "_sleep_before_retry", lambda *args, **kwargs: None)
 
     provider = OpenAiProvider(Settings(openai_api_key="test-key"))
 
-    data = provider._post("/v1/responses", {"model": "gpt-5-nano"}, timeout_sec=10)
+    with pytest.raises(openai_provider.ProviderRequestError) as exc:
+        provider._post("/v1/responses", {"model": "gpt-5-nano"}, timeout_sec=10)
 
-    assert calls["count"] == 2
-    assert data == {"output_text": "{\"ok\": true}"}
+    assert calls["count"] == 1
+    assert exc.value.code == "OPENAI_HTTP_ERROR"
 
 
 def test_realtime_client_secret_uses_configured_voice(monkeypatch) -> None:

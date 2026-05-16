@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-import re
 from collections import Counter
 from typing import Any
 
 from app.domain.enums import AssetRole, AssetType, MissionStatus, StageRole, StudentType, TemplateType
 from app.domain.schemas import MissionContent
-
-HANGUL_RE = re.compile(r"[가-힣]")
-ASCII_WORD_RE = re.compile(r"[A-Za-z]{2,}")
 
 REQUIRED_ASSET_ROLES = [
     AssetRole.HERO,
@@ -24,7 +20,6 @@ FLOW_RULES: dict[str, dict[int, tuple[str, set[str]]]] = {
         2: (
             StageRole.BASIC_PROBLEM.value,
             {
-                TemplateType.IMAGE_QUIZ.value,
                 TemplateType.CARD_MATCH.value,
                 TemplateType.SEQUENCE_ORDERING.value,
                 TemplateType.BLANK_FILL.value,
@@ -36,7 +31,6 @@ FLOW_RULES: dict[str, dict[int, tuple[str, set[str]]]] = {
         3: (
             StageRole.APPLIED_PROBLEM.value,
             {
-                TemplateType.IMAGE_QUIZ.value,
                 TemplateType.CARD_MATCH.value,
                 TemplateType.SEQUENCE_ORDERING.value,
                 TemplateType.BLANK_FILL.value,
@@ -55,14 +49,12 @@ FLOW_RULES: dict[str, dict[int, tuple[str, set[str]]]] = {
             {
                 TemplateType.SCENE_OBSERVATION.value,
                 TemplateType.HIGHLIGHT_CLUE.value,
-                TemplateType.IMAGE_QUIZ.value,
                 TemplateType.CARD_MATCH.value,
             },
         ),
         3: (
             StageRole.ACTION_SELECTION.value,
             {
-                TemplateType.IMAGE_QUIZ.value,
                 TemplateType.CARD_MATCH.value,
                 TemplateType.SEQUENCE_ORDERING.value,
                 TemplateType.ACTION_CHOICE.value,
@@ -88,20 +80,6 @@ STAGE_TITLE_RULES: dict[str, dict[int, str]] = {
     },
 }
 
-VISIBLE_TEMPLATE_TEXT_KEYS = {
-    "question",
-    "storyText",
-    "missionText",
-    "instruction",
-    "correctFeedback",
-    "wrongFeedback",
-    "text",
-    "label",
-    "sentence",
-    "sourceTextLines",
-    "sceneTextLines",
-}
-
 RAW_ENGLISH_TERMS = (
     "teach-back",
     "teach_back",
@@ -125,101 +103,11 @@ STIGMATIZING_TERMS = (
     "실패한 학생",
 )
 
-PROPOSAL_PHRASES = (
-    "수업이 좋겠어요",
-    "콘텐츠가 좋겠어요",
-    "하면 좋겠어요",
-)
-
-TEXT_LIMITS = {
-    "very_low": {"instruction": 60, "question": 52, "choice": 24, "audio": 95, "audio_min": 24},
-    "low": {"instruction": 90, "question": 80, "choice": 32, "audio": 125, "audio_min": 32},
-    "default": {"instruction": 120, "question": 100, "choice": 42, "audio": 150, "audio_min": 36},
-}
-
 STRUCTURED_INTERACTION_TEMPLATES = {
     TemplateType.CARD_MATCH.value,
     TemplateType.SEQUENCE_ORDERING.value,
     TemplateType.BLANK_FILL.value,
 }
-
-SOURCE_MATERIAL_TERMS = (
-    "안내문",
-    "포스터",
-    "표지판",
-    "간판",
-    "시간표",
-    "메뉴",
-    "영수증",
-    "문구",
-)
-
-LIFE_SUPPORT_BACKGROUND_ONLY_TERMS = (
-    "천장",
-    "창문",
-    "하늘",
-    "벽",
-    "색깔",
-    "모양",
-    "장식",
-)
-
-LIFE_SUPPORT_DECISION_TERMS = (
-    "먼저",
-    "확인",
-    "보기",
-    "살피",
-    "멈추",
-    "말",
-    "요청",
-    "도움",
-    "기다리",
-    "조심",
-    "안전",
-    "알리",
-    "물어",
-    "천천히",
-    "피하",
-    "내려놓",
-    "지나가",
-    "미끄",
-)
-
-LIFE_SUPPORT_BACKGROUND_CONTEXT_TERMS = (
-    "안전",
-    "위험",
-    "닫",
-    "열",
-    "연기",
-    "사람",
-    "친구",
-    "지나가",
-    "표지",
-    "번호",
-    "시간",
-    "도움",
-    "요청",
-    "알림",
-)
-
-LEARNING_FOCUS_REASONING_TERMS = (
-    "개념",
-    "근거",
-    "이유",
-    "비교",
-    "구분",
-    "계산",
-    "설명",
-    "전체",
-    "부분",
-    "문장",
-    "자료",
-    "단서",
-    "규칙",
-    "값",
-    "수",
-    "뜻",
-)
 
 
 class ContentQualityError(ValueError):
@@ -288,6 +176,7 @@ def validate_mission_content_quality(
     # 문장 길이, 문제 뉘앙스, 이미지 프롬프트 표현 같은 내용 품질은
     # 프롬프트와 교사 검토에서 다루고, 여기서 콘텐츠 생성을 차단하지 않는다.
     _validate_mission_visual_brief_contract(mission, orchestrator_plan, issues)
+    _validate_problem_data_does_not_leak_to_visual_context(mission, issues)
 
     if issues:
         raise ContentQualityError(issues)
@@ -441,287 +330,6 @@ def _validate_stage_asset_links(mission: MissionContent, issues: list[str]) -> N
             issues.append(f"{stage.id}.realtimeSpec.imageAssetId가 stage_4_realtime 이미지와 다릅니다.")
 
 
-def _validate_visible_content_text(
-    mission: MissionContent,
-    reading_load: str,
-    choice_limit: int | None,
-    issues: list[str],
-) -> None:
-    limits = TEXT_LIMITS.get(reading_load, TEXT_LIMITS["default"])
-    _validate_korean_text(mission.title, "mission.title", issues)
-    _validate_korean_text(mission.session_goal, "mission.sessionGoal", issues)
-    if mission.teacher_review_summary:
-        _validate_korean_text(mission.teacher_review_summary, "mission.teacherReviewSummary", issues)
-
-    for stage in mission.stages:
-        _validate_korean_text(stage.student_title, f"{stage.id}.studentTitle", issues)
-        _validate_korean_text(stage.student_instruction, f"{stage.id}.studentInstruction", issues)
-        if len(stage.student_instruction) > limits["instruction"]:
-            issues.append(f"{stage.id}.studentInstruction이 학생 읽기 부담 기준보다 깁니다.")
-        for path, text in _iter_template_visible_text(stage.template_json, stage.id):
-            _validate_korean_text(text, path, issues)
-            if _has_student_proposal_phrase(text):
-                issues.append(f"{path} 학생 문구에 교사용 제안 말투가 섞였습니다.")
-            if path.endswith(".question") and len(text) > limits["question"]:
-                issues.append(f"{path}이 학생 읽기 부담 기준보다 깁니다.")
-            if path.endswith(".text") and len(text) > limits["choice"]:
-                issues.append(f"{path} 선택지 문구가 학생 읽기 부담 기준보다 깁니다.")
-        if choice_limit is not None:
-            _validate_choice_limit(stage.template_json, stage.template_type.value, choice_limit, f"{stage.id}.templateJson", issues)
-        if _has_student_proposal_phrase(stage.student_title) or _has_student_proposal_phrase(stage.student_instruction):
-            issues.append(f"{stage.id} 학생 문구에 교사용 제안 말투가 섞였습니다.")
-
-        if stage.realtime_spec:
-            spec = stage.realtime_spec
-            realtime_texts = {
-                "practiceTitle": spec.practice_title,
-                "situationText": spec.situation_text,
-                "aiRole": spec.ai_role,
-                "openingLine": spec.opening_line,
-                "studentGoal": spec.student_goal,
-                "allowedFeedback": spec.allowed_feedback,
-                "forbidden": spec.forbidden,
-                "postPracticeReflection": spec.post_practice_reflection,
-                "rubric": [item.label for item in spec.rubric],
-            }
-            for path, text in _iter_named_visible_text(realtime_texts, f"{stage.id}.realtimeSpec"):
-                _validate_korean_text(text, path, issues)
-            if not (2 <= len(spec.post_practice_reflection) <= 4):
-                issues.append(f"{stage.id}.realtimeSpec.postPracticeReflection은 2~4개 선택지여야 합니다.")
-
-    for asset in mission.assets:
-        if asset.asset_type != AssetType.AUDIO or not asset.source_text:
-            continue
-        _validate_korean_text(asset.source_text, f"{asset.id}.sourceText", issues)
-        if len(asset.source_text.strip()) < limits["audio_min"]:
-            issues.append(f"{asset.id}.sourceText가 장면과 과제를 연결하기에 너무 짧습니다.")
-        if len(asset.source_text) > limits["audio"]:
-            issues.append(f"{asset.id}.sourceText가 학생 듣기 부담 기준보다 깁니다.")
-
-
-def _validate_image_prompt_policy(mission: MissionContent, issues: list[str]) -> None:
-    allowed_scene_texts = {
-        text
-        for stage in mission.stages
-        for text in _iter_scene_source_text(stage.template_json)
-        if _meaningful_prompt_overlap_text(text)
-    }
-    visible_texts = [
-        text
-        for stage in mission.stages
-        for _, text in _iter_template_visible_text(stage.template_json, stage.id)
-        if _meaningful_prompt_overlap_text(text)
-    ]
-    for asset in mission.assets:
-        if asset.asset_type != AssetType.IMAGE:
-            continue
-        prompt_json = asset.prompt_json if isinstance(asset.prompt_json, dict) else {}
-        prompt = prompt_json.get("prompt")
-        if not isinstance(prompt, str):
-            continue
-        text_policy = str(prompt_json.get("textRenderingPolicy") or prompt_json.get("ocrPolicy") or "")
-        allows_scene_text = bool(prompt_json.get("ocrRequired")) and "short_scene_text_allowed" in text_policy
-        if allows_scene_text:
-            scene_text_lines = _iter_prompt_scene_text(prompt_json)
-            if not scene_text_lines:
-                issues.append(f"{asset.id}.promptJson은 짧은 장면 텍스트 허용 시 sceneTextLines를 함께 제공해야 합니다.")
-        for text in visible_texts:
-            if text and text in prompt and not (allows_scene_text and text in allowed_scene_texts):
-                issues.append(f"{asset.id}.promptJson.prompt에 UI 문구가 그대로 들어갔습니다: {text[:20]}")
-                break
-
-
-def _validate_source_material_evidence(mission: MissionContent, issues: list[str]) -> None:
-    for stage in mission.stages:
-        template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
-        scene_lines = _iter_scene_source_text(template_json)
-        visible_text = " ".join(
-            text
-            for _, text in _iter_template_visible_text(template_json, stage.id)
-        )
-        combined = f"{stage.student_instruction} {visible_text}"
-        if any(term in combined for term in SOURCE_MATERIAL_TERMS) and not scene_lines:
-            issues.append(
-                f"{stage.id}.templateJson.sourceTextLines 또는 sceneTextLines가 필요합니다. "
-                "안내문/포스터/표지판처럼 읽거나 확인할 자료를 쓰는 단계는 실제 근거 문구를 먼저 구조화해야 합니다."
-            )
-
-
-def _validate_track_specific_problem_quality(mission: MissionContent, content_type: str, issues: list[str]) -> None:
-    if content_type == StudentType.LIFE_SUPPORT.value:
-        _validate_life_support_problem_quality(mission, issues)
-    if content_type == StudentType.LEARNING_FOCUS.value:
-        _validate_learning_focus_problem_quality(mission, issues)
-
-
-def _validate_life_support_problem_quality(mission: MissionContent, issues: list[str]) -> None:
-    for stage in mission.stages:
-        if stage.step not in {2, 3}:
-            continue
-        template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
-        question = str(template_json.get("question") or "")
-        choice_texts = _choice_like_texts(template_json)
-        problem_text = " ".join([question, *choice_texts])
-
-        if stage.step == 2 and _looks_like_passive_background_question(question):
-            issues.append(f"{stage.id}.templateJson.question은 단순 배경 찾기가 아니라 행동 판단에 쓰이는 단서를 묻도록 작성해야 합니다.")
-
-        for text in choice_texts:
-            if _is_background_only_life_support_text(text):
-                issues.append(f"{stage.id}.templateJson 선택지가 행동 판단과 무관한 배경 단서입니다: {text}")
-
-        if stage.step == 3 and _as_value(stage.template_type) == TemplateType.SEQUENCE_ORDERING.value:
-            cards = [str(card.get("text") or "") for card in template_json.get("cards", []) if isinstance(card, dict)]
-            if _is_generic_life_support_sequence(cards, question):
-                issues.append(f"{stage.id}.templateJson.cards는 상황 단서가 빠진 일반 행동 순서입니다. 장면의 구체 단서나 도움 요청 말을 포함해야 합니다.")
-
-        if stage.step in {2, 3} and problem_text and not _contains_any(problem_text, LIFE_SUPPORT_DECISION_TERMS):
-            issues.append(f"{stage.id}.templateJson은 일상생활 지원형답게 확인, 말하기, 도움 요청, 안전 행동 중 하나와 연결되어야 합니다.")
-
-
-def _validate_learning_focus_problem_quality(mission: MissionContent, issues: list[str]) -> None:
-    for stage in mission.stages:
-        if stage.step not in {2, 3}:
-            continue
-        template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
-        visible_text = " ".join(text for _, text in _iter_template_visible_text(template_json, stage.id))
-        if not visible_text:
-            continue
-        if _contains_any(visible_text, ("도움 요청", "안전하게", "조심", "위험", "선생님께 말")) and not _contains_any(
-            visible_text,
-            LEARNING_FOCUS_REASONING_TERMS,
-        ):
-            issues.append(f"{stage.id}.templateJson은 학습지원형인데 일상생활 행동 문제처럼 보입니다. 목표 개념이나 근거 판단이 드러나야 합니다.")
-
-
-def _choice_like_texts(template_json: dict[str, Any]) -> list[str]:
-    texts: list[str] = []
-    for key in ("choices", "cards", "leftCards", "rightCards"):
-        value = template_json.get(key)
-        if not isinstance(value, list):
-            continue
-        for item in value:
-            if isinstance(item, dict) and isinstance(item.get("text"), str):
-                texts.append(item["text"])
-            elif isinstance(item, str):
-                texts.append(item)
-    return texts
-
-
-def _looks_like_passive_background_question(question: str) -> bool:
-    if not question:
-        return False
-    passive_patterns = ("무엇이 보", "어떤 것이 보", "무엇을 보", "어떤 그림", "어떤 물건")
-    return any(pattern in question for pattern in passive_patterns) and not _contains_any(question, LIFE_SUPPORT_DECISION_TERMS)
-
-
-def _is_background_only_life_support_text(text: str) -> bool:
-    if not text:
-        return False
-    return _contains_any(text, LIFE_SUPPORT_BACKGROUND_ONLY_TERMS) and not _contains_any(text, LIFE_SUPPORT_BACKGROUND_CONTEXT_TERMS)
-
-
-def _is_generic_life_support_sequence(cards: list[str], question: str) -> bool:
-    if len(cards) < 3:
-        return False
-    combined_cards = " ".join(cards)
-    generic_hits = sum(1 for term in ("멈추", "주변 확인", "도움 요청", "말하기") if term in combined_cards)
-    concrete_terms = ("국물", "바닥", "식판", "공", "버스", "정류장", "센터", "도서관", "안내문", "직원", "친구")
-    return generic_hits >= 3 and not _contains_any(combined_cards + " " + question, concrete_terms)
-
-
-def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
-    return any(term in text for term in terms)
-
-
-def _iter_template_visible_text(value: Any, prefix: str) -> list[tuple[str, str]]:
-    items: list[tuple[str, str]] = []
-
-    def walk(current: Any, path: str, key: str | None = None) -> None:
-        if isinstance(current, str):
-            if key in VISIBLE_TEMPLATE_TEXT_KEYS:
-                items.append((path, current))
-            return
-        if isinstance(current, list):
-            for index, item in enumerate(current):
-                walk(item, f"{path}[{index}]", key)
-            return
-        if isinstance(current, dict):
-            for child_key, child_value in current.items():
-                walk(child_value, f"{path}.{child_key}", child_key)
-
-    walk(value, f"{prefix}.templateJson")
-    return items
-
-
-def _iter_named_visible_text(value: Any, prefix: str) -> list[tuple[str, str]]:
-    items: list[tuple[str, str]] = []
-
-    def walk(current: Any, path: str) -> None:
-        if isinstance(current, str):
-            items.append((path, current))
-            return
-        if isinstance(current, list):
-            for index, item in enumerate(current):
-                walk(item, f"{path}[{index}]")
-            return
-        if isinstance(current, dict):
-            for key, child_value in current.items():
-                walk(child_value, f"{path}.{key}")
-
-    walk(value, prefix)
-    return items
-
-
-def _iter_scene_source_text(template_json: dict[str, Any]) -> list[str]:
-    lines: list[str] = []
-    for key in ("sourceTextLines", "sceneTextLines"):
-        value = template_json.get(key)
-        if isinstance(value, list):
-            lines.extend(item.strip() for item in value if isinstance(item, str) and item.strip())
-    return lines
-
-
-def _iter_prompt_scene_text(prompt_json: dict[str, Any]) -> list[str]:
-    lines: list[str] = []
-    value = prompt_json.get("sceneTextLines")
-    if isinstance(value, list):
-        lines.extend(item.strip() for item in value if isinstance(item, str) and item.strip())
-    return lines
-
-
-def _validate_choice_limit(template_json: dict[str, Any], template_type: str, limit: int, path: str, issues: list[str]) -> None:
-    if template_type == TemplateType.CARD_MATCH.value:
-        _validate_array_limit(template_json, "leftCards", limit, path, issues)
-        _validate_array_limit(template_json, "rightCards", limit, path, issues)
-        matches = template_json.get("matches")
-        if isinstance(matches, dict) and len(matches) > limit:
-            issues.append(f"{path}.matches는 학생 선택지 제한 {limit}개를 넘을 수 없습니다.")
-        return
-
-    if template_type == TemplateType.IMAGE_QUIZ.value:
-        _validate_array_limit(template_json, "choices", 3, path, issues)
-        return
-
-    if template_type == TemplateType.SEQUENCE_ORDERING.value:
-        _validate_array_limit(template_json, "cards", 3, path, issues)
-        return
-
-    if template_type == TemplateType.BLANK_FILL.value:
-        _validate_array_limit(template_json, "choices", 3, path, issues)
-        _validate_array_limit(template_json, "tiles", 3, path, issues)
-        return
-
-    for key in ("choices", "tiles"):
-        _validate_array_limit(template_json, key, max(limit, 3), path, issues)
-
-
-def _validate_array_limit(template_json: dict[str, Any], key: str, limit: int, path: str, issues: list[str]) -> None:
-    value = template_json.get(key)
-    if isinstance(value, list) and len(value) > limit:
-        issues.append(f"{path}.{key}는 학생 선택지 제한 {limit}개를 넘을 수 없습니다.")
-
-
 def _validate_intent_roles(value: Any, path: str, issues: list[str]) -> None:
     if not isinstance(value, list):
         issues.append(f"{path}는 asset role list여야 합니다.")
@@ -748,6 +356,10 @@ def _validate_stage_visual_specs(value: Any, path: str, issues: list[str]) -> No
         for key in ("mustShow", "allowedSceneText", "doNotRenderText"):
             if not isinstance(item.get(key), list):
                 issues.append(f"{path}[{index}].{key}는 list여야 합니다.")
+        if item.get("allowedSceneText") != []:
+            issues.append(f"{path}[{index}].allowedSceneText는 빈 배열이어야 합니다.")
+        if item.get("evidenceLocation") not in {"problem_ui_only", "templateJson.sourceTextLines"}:
+            issues.append(f"{path}[{index}].evidenceLocation은 problem_ui_only 또는 templateJson.sourceTextLines여야 합니다.")
 
 
 def _validate_scenario_spine(value: Any, path: str, issues: list[str]) -> None:
@@ -783,6 +395,235 @@ def _validate_mission_visual_brief_contract(
         issues.append("mission.briefJson.stageVisualSpecs는 5개 이미지 역할별 제작 지시서를 모두 포함해야 합니다.")
 
 
+NEGATIVE_VISUAL_KEYS = {
+    "allowedSceneText",
+    "doNotRenderText",
+    "mustNotShow",
+    "negativePromptRules",
+    "qaChecklist",
+    "textRenderingPolicy",
+}
+
+FORBIDDEN_POSITIVE_VISUAL_TERMS = (
+    "정답",
+    "선택지",
+    "보기",
+    "문제",
+    "힌트",
+    "체크",
+    "동그라미",
+    "화살표",
+    "밑줄",
+    "강조",
+    "읽고 고르기",
+    "그림을 보고",
+)
+
+
+def _validate_problem_data_does_not_leak_to_visual_context(mission: MissionContent, issues: list[str]) -> None:
+    brief_json = mission.brief_json if isinstance(mission.brief_json, dict) else {}
+    positive_brief_visuals = (
+        _collect_positive_visual_strings(brief_json.get("stageVisualSpecs"))
+        + _collect_positive_visual_strings(brief_json.get("imagePackageIntent"))
+    )
+    visual_text = _normalize_for_leak_check(
+        " ".join(
+            positive_brief_visuals
+            + _collect_template_scene_texts(mission)
+            + _collect_asset_prompt_strings(mission)
+        )
+    )
+    if not visual_text:
+        return
+
+    for text in _collect_problem_data_strings(mission):
+        normalized = _normalize_for_leak_check(text)
+        if len(normalized) < 2:
+            continue
+        if normalized in visual_text:
+            issues.append(f"이미지 맥락에 문제 UI 텍스트가 새었습니다: {text}")
+
+    positive_visual_text = _normalize_for_leak_check(
+        " ".join(positive_brief_visuals + _collect_template_scene_texts(mission))
+    )
+    for term in FORBIDDEN_POSITIVE_VISUAL_TERMS:
+        if _normalize_for_leak_check(term) in positive_visual_text:
+            issues.append(f"이미지 맥락 필드가 문제 풀이 화면처럼 작성되었습니다: {term}")
+
+    asset_prompt_text = _normalize_for_leak_check(" ".join(_collect_image_prompt_texts(mission)))
+    for term in FORBIDDEN_POSITIVE_VISUAL_TERMS:
+        if _normalize_for_leak_check(term) in asset_prompt_text:
+            issues.append(f"이미지 프롬프트가 문제 풀이 화면처럼 작성되었습니다: {term}")
+
+
+def _collect_positive_visual_strings(value: Any) -> list[str]:
+    return _collect_strings(value, skip_keys=NEGATIVE_VISUAL_KEYS | {"prompt", "sourceTextLines"})
+
+
+def _collect_template_scene_texts(mission: MissionContent) -> list[str]:
+    texts: list[str] = []
+    for stage in mission.stages:
+        template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
+        texts.extend(_string_list(template_json.get("sceneTextLines")))
+    return texts
+
+
+def _collect_asset_prompt_strings(mission: MissionContent) -> list[str]:
+    texts: list[str] = []
+    for asset in mission.assets:
+        if asset.asset_type != AssetType.IMAGE or not isinstance(asset.prompt_json, dict):
+            continue
+        prompt = asset.prompt_json.get("prompt")
+        if isinstance(prompt, str):
+            texts.append(prompt)
+        visual_context = asset.prompt_json.get("visualContext")
+        texts.extend(_collect_strings(visual_context, skip_keys=NEGATIVE_VISUAL_KEYS))
+    return texts
+
+
+def _collect_image_prompt_texts(mission: MissionContent) -> list[str]:
+    texts: list[str] = []
+    for asset in mission.assets:
+        if asset.asset_type != AssetType.IMAGE or not isinstance(asset.prompt_json, dict):
+            continue
+        prompt = asset.prompt_json.get("prompt")
+        if isinstance(prompt, str):
+            texts.append(prompt)
+    return texts
+
+
+def _collect_problem_data_strings(mission: MissionContent) -> list[str]:
+    texts: list[str] = []
+    for stage in mission.stages:
+        template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
+        for key in ("question", "sentence", "prompt", "title", "situation", "context"):
+            value = template_json.get(key)
+            if isinstance(value, str):
+                texts.append(value)
+        texts.extend(_string_list(template_json.get("sourceTextLines")))
+        texts.extend(_extract_choice_texts(template_json))
+        texts.extend(_extract_matching_texts(template_json))
+        texts.extend(_extract_sequence_texts(template_json))
+        texts.extend(_string_list(template_json.get("tiles")))
+        accepted = template_json.get("acceptedAnswers")
+        if isinstance(accepted, list):
+            for item in accepted:
+                if isinstance(item, dict):
+                    value = item.get("answer")
+                    if isinstance(value, str):
+                        texts.append(value)
+                elif isinstance(item, str):
+                    texts.append(item)
+        answer = template_json.get("answer")
+        if isinstance(answer, str):
+            texts.append(answer)
+            texts.extend(_choice_texts_for_answer(template_json, answer))
+    return _dedupe_strings(texts)
+
+
+def _choice_texts_for_answer(template_json: dict[str, Any], answer: str) -> list[str]:
+    choices = template_json.get("choices")
+    if not isinstance(choices, list):
+        return []
+    texts: list[str] = []
+    for choice in choices:
+        if not isinstance(choice, dict):
+            continue
+        if choice.get("id") == answer:
+            value = choice.get("text") or choice.get("label") or choice.get("value")
+            if isinstance(value, str):
+                texts.append(value)
+    return texts
+
+
+def _collect_strings(value: Any, *, skip_keys: set[str]) -> list[str]:
+    texts: list[str] = []
+    if isinstance(value, str):
+        if value.strip():
+            texts.append(value.strip())
+    elif isinstance(value, list):
+        for item in value:
+            texts.extend(_collect_strings(item, skip_keys=skip_keys))
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            if key in skip_keys:
+                continue
+            texts.extend(_collect_strings(item, skip_keys=skip_keys))
+    return texts
+
+
+def _normalize_for_leak_check(value: str) -> str:
+    return "".join(character for character in value.strip().lower() if not character.isspace())
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+
+
+def _extract_choice_texts(template_json: dict[str, Any]) -> list[str]:
+    choices = template_json.get("choices")
+    if not isinstance(choices, list):
+        return []
+    texts: list[str] = []
+    for choice in choices:
+        if isinstance(choice, str) and choice.strip():
+            texts.append(choice.strip())
+        elif isinstance(choice, dict):
+            for key in ("text", "label", "value"):
+                value = choice.get(key)
+                if isinstance(value, str) and value.strip():
+                    texts.append(value.strip())
+                    break
+    return texts
+
+
+def _extract_matching_texts(template_json: dict[str, Any]) -> list[str]:
+    texts: list[str] = []
+    for key in ("leftCards", "rightCards", "cards", "pairs", "matchingPairs"):
+        value = template_json.get(key)
+        if not isinstance(value, list):
+            continue
+        for item in value:
+            if isinstance(item, str) and item.strip():
+                texts.append(item.strip())
+            elif isinstance(item, dict):
+                for text_key in ("text", "label", "value", "left", "right"):
+                    text = item.get(text_key)
+                    if isinstance(text, str) and text.strip():
+                        texts.append(text.strip())
+    return texts
+
+
+def _extract_sequence_texts(template_json: dict[str, Any]) -> list[str]:
+    cards = template_json.get("cards")
+    if not isinstance(cards, list):
+        return []
+    texts: list[str] = []
+    for card in cards:
+        if isinstance(card, str) and card.strip():
+            texts.append(card.strip())
+        elif isinstance(card, dict):
+            for key in ("text", "label", "value"):
+                value = card.get(key)
+                if isinstance(value, str) and value.strip():
+                    texts.append(value.strip())
+                    break
+    return texts
+
+
+def _dedupe_strings(values: list[str]) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        stripped = value.strip()
+        if stripped and stripped not in result:
+            result.append(stripped)
+    return result
+
+
 def _validate_text_list(value: Any, path: str, issues: list[str]) -> None:
     if not isinstance(value, list) or not value:
         issues.append(f"{path}는 비어 있지 않은 list여야 합니다.")
@@ -796,7 +637,7 @@ def _validate_korean_text(value: Any, path: str, issues: list[str]) -> None:
         issues.append(f"{path}는 비어 있지 않은 한국어 문구여야 합니다.")
         return
     text = value.strip()
-    if _requires_hangul(text) and not HANGUL_RE.search(text):
+    if _requires_hangul(text) and not _contains_hangul(text):
         issues.append(f"{path}는 한국어 문구여야 합니다.")
     lowered = text.lower()
     for term in RAW_ENGLISH_TERMS:
@@ -813,20 +654,32 @@ def _requires_hangul(text: str) -> bool:
     compact = text.strip()
     if not compact:
         return True
-    if HANGUL_RE.search(compact):
+    if _contains_hangul(compact):
         return False
-    if re.fullmatch(r"[\d\s./%()+\-]+", compact):
+    if _is_numeric_symbol_text(compact):
         return False
-    return bool(ASCII_WORD_RE.search(compact)) or len(compact) > 4
+    return _contains_ascii_word(compact, min_length=2) or len(compact) > 4
 
 
-def _has_student_proposal_phrase(text: str) -> bool:
-    return any(phrase in text for phrase in PROPOSAL_PHRASES)
+def _contains_hangul(text: str) -> bool:
+    return any("가" <= character <= "힣" for character in text)
 
 
-def _meaningful_prompt_overlap_text(text: str) -> bool:
-    stripped = text.strip()
-    return len(stripped) >= 8 and bool(HANGUL_RE.search(stripped))
+def _contains_ascii_word(text: str, *, min_length: int) -> bool:
+    run_length = 0
+    for character in text:
+        if ("A" <= character <= "Z") or ("a" <= character <= "z"):
+            run_length += 1
+            if run_length >= min_length:
+                return True
+        else:
+            run_length = 0
+    return False
+
+
+def _is_numeric_symbol_text(text: str) -> bool:
+    allowed = set("0123456789 \t\r\n./%()+-")
+    return all(character in allowed for character in text)
 
 
 def _asset_role_for_step(step: int) -> AssetRole:

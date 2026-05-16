@@ -215,9 +215,6 @@ _IMAGE_PROMPT_JSON_SCHEMA = _object_schema(
     {
         "prompt": {"type": "string"},
         "textRenderingPolicy": {"type": "string"},
-        "ocrPolicy": {"type": "string"},
-        "ocrRequired": {"type": "boolean"},
-        "sceneTextLines": _string_array(),
     }
 )
 
@@ -280,7 +277,6 @@ _CONTENT_STAGE_SCHEMA = _object_schema(
                 "action_choice",
                 "sequence_ordering",
                 "decision_card",
-                "image_quiz",
                 "concept_intro",
                 "scene_question",
                 "clue_question",
@@ -408,10 +404,10 @@ _IMAGE_BRIEF_SCHEMA = _object_schema(
                     "stageId": {"type": ["string", "null"]},
                     "prompt": {"type": "string"},
                     "negativePromptRules": _string_array(),
-                    "learningEvidence": _object_schema(
+                    "visualContext": _object_schema(
                         {
                             "primaryObject": {"type": "string"},
-                            "mustBeReadableOrCountable": _string_array(),
+                            "visualAnchors": _string_array(),
                             "whyItMattersForThisStage": {"type": "string"},
                         }
                     ),
@@ -422,8 +418,6 @@ _IMAGE_BRIEF_SCHEMA = _object_schema(
                             "humanPresence": {"type": "string"},
                         }
                     ),
-                    "ocrRequired": {"type": "boolean"},
-                    "sceneTextLines": _string_array(),
                     "textRenderingPolicy": {"type": "string"},
                     "qaChecklist": _string_array(),
                 }

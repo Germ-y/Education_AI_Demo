@@ -77,11 +77,11 @@ def _pizza_stage_visual_specs() -> list[dict]:
             "visualPurpose": "전체와 부분을 배울 피자 조각 장면을 소개합니다.",
             "sceneSummary": "네 조각 피자가 놓인 책상 장면",
             "primaryEvidenceObject": "네 조각 피자",
-            "evidenceLocation": "책상 가운데 네 조각 피자 경계",
+            "evidenceLocation": "problem_ui_only",
             "mustShow": ["네 조각 피자"],
             "allowedSceneText": [],
             "doNotRenderText": ["문제", "선택지", "정답", "힌트"],
-            "composition": "피자 조각이 중심에 크게 보입니다.",
+            "composition": "피자 조각이 자연스럽게 놓여 있습니다.",
         },
         {
             "assetRole": "stage_1",
@@ -89,35 +89,35 @@ def _pizza_stage_visual_specs() -> list[dict]:
             "visualPurpose": "전체 피자가 몇 조각인지 확인하게 합니다.",
             "sceneSummary": "네 조각으로 나뉜 피자 전체",
             "primaryEvidenceObject": "전체 피자",
-            "evidenceLocation": "화면 중심의 전체 피자 조각 경계",
+            "evidenceLocation": "problem_ui_only",
             "mustShow": ["네 조각", "전체 피자"],
             "allowedSceneText": [],
             "doNotRenderText": ["문제", "선택지", "정답", "힌트"],
-            "composition": "전체 피자 윤곽이 한눈에 보입니다.",
+            "composition": "전체와 부분 관계를 떠올릴 수 있는 장면입니다.",
         },
         {
             "assetRole": "stage_2",
             "step": 2,
             "visualPurpose": "전체 조각 수를 세는 근거를 보여줍니다.",
-            "sceneSummary": "네 조각 피자 중 한 조각이 살짝 강조된 장면",
+            "sceneSummary": "네 조각 피자 중 한 조각이 옆에 따로 놓인 장면",
             "primaryEvidenceObject": "네 조각 피자",
-            "evidenceLocation": "강조된 한 조각 주변의 네 조각 경계",
-            "mustShow": ["네 조각", "한 조각 강조"],
+            "evidenceLocation": "problem_ui_only",
+            "mustShow": ["네 조각", "한 조각과 전체 조각"],
             "allowedSceneText": [],
             "doNotRenderText": ["전체는 몇 조각인가요?", "1개", "2개", "4개", "정답"],
-            "composition": "조각 경계가 분명하게 보입니다.",
+            "composition": "조작물이 자연스럽게 배치되어 있습니다.",
         },
         {
             "assetRole": "stage_3",
             "step": 3,
             "visualPurpose": "고른 조각과 전체 조각을 연결해 분수로 말하게 합니다.",
             "sceneSummary": "고른 한 조각과 전체 네 조각이 함께 보이는 장면",
-            "primaryEvidenceObject": "강조된 한 조각",
-            "evidenceLocation": "왼쪽의 한 조각과 오른쪽의 전체 네 조각 비교 위치",
+            "primaryEvidenceObject": "따로 놓인 한 조각",
+            "evidenceLocation": "problem_ui_only",
             "mustShow": ["한 조각", "네 조각 전체"],
             "allowedSceneText": [],
             "doNotRenderText": ["분수", "빈칸", "정답", "힌트"],
-            "composition": "한 조각과 전체가 동시에 비교됩니다.",
+            "composition": "한 조각과 전체가 같은 책상 위에 놓입니다.",
         },
         {
             "assetRole": "stage_4_realtime",
@@ -125,7 +125,7 @@ def _pizza_stage_visual_specs() -> list[dict]:
             "visualPurpose": "학생이 전체와 부분을 말로 설명하는 상황을 준비합니다.",
             "sceneSummary": "피자 조각을 보며 설명을 준비하는 책상 장면",
             "primaryEvidenceObject": "피자 조각 그림",
-            "evidenceLocation": "설명 카드 옆 피자 조각 그림",
+            "evidenceLocation": "problem_ui_only",
             "mustShow": ["피자 조각 그림"],
             "allowedSceneText": [],
             "doNotRenderText": ["말하기 정답", "힌트", "채점"],
@@ -159,7 +159,7 @@ def _generated_learning_focus_content_payload(student_id: str, case_id: str) -> 
             asset["promptJson"] = {
                 "prompt": (
                     f"{asset['assetRole']} 장면. 따뜻한 교실 책상 위 피자 조각과 전체-부분 근거만 보여줍니다. "
-                    "문제 문장, 선택지, 정답, 버튼, 말풍선, 학습지 UI 텍스트는 넣지 않습니다."
+                    "no app UI, no answer panels, no speech bubbles, no readable lesson text."
                 ),
                 "textRenderingPolicy": "scene_only_no_problem_text",
             }
@@ -304,7 +304,7 @@ def test_teacher_and_student_demo_flows() -> None:
     )
     assert public_sync.status_code == 424
     assert public_sync.json()["error"]["code"] == "NEIS_API_KEY_MISSING"
-    assert public_sync.json()["error"]["details"] == {"reviewRequired": True, "fallbackPolicy": "disabled"}
+    assert public_sync.json()["error"]["details"] == {"reviewRequired": True}
 
     history = client.get("/api/teacher/students/student_learning_fraction/history", headers={"authorization": f"Bearer {teacher_token}"})
     assert history.status_code == 200
@@ -382,14 +382,14 @@ def test_teacher_and_student_demo_flows() -> None:
     )
     assert package_generation.status_code == 424
     assert package_generation.json()["error"]["code"] == "OPENAI_API_KEY_MISSING"
-    assert package_generation.json()["error"]["details"] == {"reviewRequired": True, "fallbackPolicy": "disabled"}
+    assert package_generation.json()["error"]["details"] == {"reviewRequired": True}
     preview_realtime = client.post(
         "/api/contents/content_fraction_001/stages/stage_fraction_4/preview-realtime-session",
         headers={"authorization": f"Bearer {teacher_token}"},
     )
     assert preview_realtime.status_code == 424
     assert preview_realtime.json()["error"]["code"] == "OPENAI_API_KEY_MISSING"
-    assert preview_realtime.json()["error"]["details"] == {"reviewRequired": True, "fallbackPolicy": "disabled"}
+    assert preview_realtime.json()["error"]["details"] == {"reviewRequired": True}
     approve = client.post(
         "/api/contents/content_fraction_001/approve",
         headers={"authorization": f"Bearer {teacher_token}"},
@@ -399,36 +399,14 @@ def test_teacher_and_student_demo_flows() -> None:
             "reviewNote": "데모 검수 완료",
         },
     )
-    assert approve.status_code == 200
-    expected_approved_status = "published" if content_payload["status"] == "published" else "approved"
-    assert approve.json()["data"]["status"] == expected_approved_status
-    publish = client.post("/api/contents/content_fraction_001/publish", headers={"authorization": f"Bearer {teacher_token}"})
-    assert publish.status_code == 200
-    assert publish.json()["data"]["status"] == "published"
-    reapprove = client.post(
-        "/api/contents/content_fraction_001/approve",
-        headers={"authorization": f"Bearer {teacher_token}"},
-        json={
-            "approvedStageIds": [stage["id"] for stage in content_payload["stages"]],
-            "approvedAssetIds": [asset["id"] for asset in content_payload["assets"]],
-            "reviewNote": "배포 후 재검수",
-        },
-    )
-    assert reapprove.status_code == 200
-    assert reapprove.json()["data"]["status"] == "published"
-    assert reapprove.json()["data"]["publishedAt"] is not None
+    assert approve.status_code == 400
+    assert approve.json()["error"]["code"] == "CONTENT_APPROVAL_FAILED"
     students_after_publish = client.get("/api/teacher/students", headers={"authorization": f"Bearer {teacher_token}"})
     assert students_after_publish.status_code == 200
     fraction_student_after_publish = next(
         item for item in students_after_publish.json()["data"] if item["studentId"] == "student_learning_fraction"
     )
-    assert fraction_student_after_publish["dashboardStage"] == "learning"
-    content_audit = client.get(
-        "/api/audit-logs?studentId=student_learning_fraction",
-        headers={"authorization": f"Bearer {teacher_token}"},
-    )
-    assert content_audit.status_code == 200
-    assert {"approve_content", "publish_content"}.issubset({log["action"] for log in content_audit.json()["data"]})
+    assert fraction_student_after_publish["dashboardStage"] == "material_review"
 
     note = client.post(
         "/api/teacher/students/student_learning_fraction/notes",
@@ -496,7 +474,7 @@ def test_teacher_and_student_demo_flows() -> None:
     )
     assert realtime.status_code == 424
     assert realtime.json()["error"]["code"] == "OPENAI_API_KEY_MISSING"
-    assert realtime.json()["error"]["details"] == {"reviewRequired": True, "fallbackPolicy": "disabled"}
+    assert realtime.json()["error"]["details"] == {"reviewRequired": True}
 
     reflection = client.post(
         "/api/student/missions/content_fraction_001/post-practice-reflection",
@@ -768,6 +746,7 @@ def test_asset_generation_job_persists_partial_failure_and_retries(monkeypatch, 
     store = get_store_instance()
     mission = store.get_mission_for_teacher(content_id)
     assert mission is not None
+    mission.brief_json = {**mission.brief_json, "stageVisualSpecs": _pizza_stage_visual_specs()}
     for asset in mission.assets:
         asset.storage_url = ""
         asset.preview_url = None
@@ -932,6 +911,65 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
     assert context_bundle.status_code == 200
     assert context_bundle.json()["data"]["student"]["displayName"] == "최하늘"
 
+    def fake_profile_memory_json_response(
+        self,
+        *,
+        model,
+        instructions,
+        input_snapshot,
+        output_schema_name=None,
+        output_json_schema=None,
+        timeout_sec=90,
+        max_output_tokens=None,
+    ):
+        assert output_schema_name
+        assert output_json_schema
+        if output_schema_name == "SupportProfileDraftV1":
+            return (
+                {
+                    "profileVersion": "support_profile_v1",
+                    "draftLabel": "수업 설계 초안",
+                    "lessonDesignHints": [
+                        "짧은 지시를 이해함에서 시작하고 지시를 짧게 나누기 전략을 적용합니다.",
+                        "콘텐츠 주제는 생성 요청을 우선합니다.",
+                    ],
+                    "learningResponsePattern": {
+                        "worksWell": ["짧은 지시를 이해함"],
+                        "canBeHard": ["긴 지시 이해"],
+                        "choiceCountLimit": 2,
+                        "readingLoad": "low",
+                        "explanationStyle": "짧은 단계로 확인",
+                    },
+                    "behaviorSupportProfile": {
+                        "priorityBehaviors": [],
+                        "functionHypotheses": [],
+                        "replacementSkills": ["순서 확인 질문"],
+                        "recommendedScaffolds": ["지시를 짧게 나누기", "예시를 먼저 보여주기"],
+                    },
+                    "strengths": ["짧은 지시를 이해함"],
+                    "supportCautions": ["긴 지시 이해"],
+                    "source": {"intakeSourceId": None, "generatedBy": "test_ai", "rawRecordPreserved": True},
+                },
+                {"input_tokens": 4, "output_tokens": 4},
+            )
+        if output_schema_name == "StudentMemoryBriefV1":
+            return (
+                {
+                    "briefText": "짧은 지시를 이해함에서 시작이 안정적입니다. 기억장치는 새 수업 주제를 정하는 값이 아니라 제시 방식 조정에만 사용합니다.",
+                    "readingLoad": "low",
+                    "choiceCount": 2,
+                    "recentSuccessPatterns": ["짧은 지시를 이해함"],
+                    "recentDifficultyPatterns": ["긴 지시 이해"],
+                    "recommendedScaffolds": ["지시를 짧게 나누기"],
+                    "avoidTopicRegression": ["피자 조각"],
+                    "sourceWatermark": "ai_memory_test",
+                },
+                {"input_tokens": 4, "output_tokens": 4},
+            )
+        raise AssertionError(output_schema_name)
+
+    monkeypatch.setattr(OpenAiProvider, "create_json_response", fake_profile_memory_json_response)
+
     support_draft = client.post(f"/api/teacher/students/{student_id}/support-profile-drafts", headers=teacher_headers)
     assert support_draft.status_code == 200, support_draft.json()
     support_draft_payload = support_draft.json()["data"]
@@ -1011,13 +1049,23 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
             content_generation_calls["count"] += 1
             assert input_snapshot["studentId"] == student_id
             assert input_snapshot["caseId"] == case_id
+            assert input_snapshot["studentProfile"]["displayName"] == "최하늘"
+            assert input_snapshot["studentProfile"]["gradeLabel"] == "초4"
+            assert input_snapshot["studentProfile"]["studentTypeLabel"] == "학습지원형"
             assert input_snapshot["generationPlan"]["unitVersion"] == "content_generation_units_v1"
             assert len(input_snapshot["generationPlan"]["stagePlans"]) == 4
             assert len(input_snapshot["generationPlan"]["visualSpecDrafts"]) == 5
-            assert input_snapshot["caseFile"]["contextBrief"]["dirty"] is False
+            assert "caseFile" not in input_snapshot
+            assert "studentContextBrief" not in input_snapshot
+            assert input_snapshot["generationMode"]["memoryUsed"] is False
             return copy.deepcopy(generated_content), {"input_tokens": 12, "output_tokens": 24}
-        assert input_snapshot["studentContextBrief"]["dirty"] is False
-        assert "기억장치는 새 수업 주제를 정하는 값이 아니라" in input_snapshot["studentContextBrief"]["briefText"]
+        assert input_snapshot["studentProfile"]["displayName"] == "최하늘"
+        assert input_snapshot["studentProfile"]["gradeLabel"] == "초4"
+        assert input_snapshot["studentProfile"]["studentTypeLabel"] == "학습지원형"
+        assert "caseFile" not in input_snapshot
+        assert "studentContextBrief" not in input_snapshot
+        assert "generationContext" not in input_snapshot
+        assert input_snapshot["generationMode"]["memoryUsed"] is False
         return (
             {
                 "planVersion": "orchestrator_plan_v1",
@@ -1067,7 +1115,7 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
                     {"assetRole": "hero", "scenePurpose": "시작 장면", "mustShow": ["피자 조각"], "mustNotShow": ["문제 문장"]},
                     {"assetRole": "stage_1", "scenePurpose": "전체 확인", "mustShow": ["전체 피자"], "mustNotShow": ["문제 문장"]},
                     {"assetRole": "stage_2", "scenePurpose": "조각 세기", "mustShow": ["네 조각"], "mustNotShow": ["문제 문장"]},
-                    {"assetRole": "stage_3", "scenePurpose": "분수 연결", "mustShow": ["한 조각 강조"], "mustNotShow": ["문제 문장"]},
+                    {"assetRole": "stage_3", "scenePurpose": "분수 연결", "mustShow": ["한 조각과 전체 조각"], "mustNotShow": ["문제 문장"]},
                     {"assetRole": "stage_4_realtime", "scenePurpose": "설명 상황", "mustShow": ["피자 그림"], "mustNotShow": ["문제 문장"]},
                 ],
                 "stageVisualSpecs": stage_visual_specs,
@@ -1099,7 +1147,7 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
         return {"value": "test-realtime-client-secret", "expiresAt": 1893456000, "raw": {}}
 
     def fake_stream_text_response(self, *, model, instructions, input_snapshot, timeout_sec=90):
-        assert "특수교육 수업 후" in instructions
+        assert "수업 리포트 코치" in instructions
         assert input_snapshot["performance"]["completionRate"] == 1
         yield "## 수업 반응\n\n"
         yield "> 4단계 활동을 끝까지 수행하고 긍정적인 회고를 남겼습니다.\n\n"
@@ -1426,11 +1474,11 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
             "visualPurpose": "전체와 부분을 배울 피자 조각 장면을 소개합니다.",
             "sceneSummary": "네 조각 피자가 놓인 책상 장면",
             "primaryEvidenceObject": "네 조각 피자",
-            "evidenceLocation": "책상 가운데 네 조각 피자 경계",
+            "evidenceLocation": "problem_ui_only",
             "mustShow": ["네 조각 피자"],
             "allowedSceneText": [],
             "doNotRenderText": ["문제", "선택지", "정답", "힌트"],
-            "composition": "피자 조각이 중심에 크게 보입니다.",
+            "composition": "피자 조각이 자연스럽게 놓여 있습니다.",
         },
         {
             "assetRole": "stage_1",
@@ -1438,35 +1486,35 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
             "visualPurpose": "전체 피자가 몇 조각인지 확인하게 합니다.",
             "sceneSummary": "네 조각으로 나뉜 피자 전체",
             "primaryEvidenceObject": "전체 피자",
-            "evidenceLocation": "화면 중심의 전체 피자 조각 경계",
+            "evidenceLocation": "problem_ui_only",
             "mustShow": ["네 조각", "전체 피자"],
             "allowedSceneText": [],
             "doNotRenderText": ["문제", "선택지", "정답", "힌트"],
-            "composition": "전체 피자 윤곽이 한눈에 보입니다.",
+            "composition": "전체와 부분 관계를 떠올릴 수 있는 장면입니다.",
         },
         {
             "assetRole": "stage_2",
             "step": 2,
             "visualPurpose": "전체 조각 수를 세는 근거를 보여줍니다.",
-            "sceneSummary": "네 조각 피자 중 한 조각이 살짝 강조된 장면",
+            "sceneSummary": "네 조각 피자 중 한 조각이 옆에 따로 놓인 장면",
             "primaryEvidenceObject": "네 조각 피자",
-            "evidenceLocation": "강조된 한 조각 주변의 네 조각 경계",
-            "mustShow": ["네 조각", "한 조각 강조"],
+            "evidenceLocation": "problem_ui_only",
+            "mustShow": ["네 조각", "한 조각과 전체 조각"],
             "allowedSceneText": [],
             "doNotRenderText": ["전체는 몇 조각인가요?", "1개", "2개", "4개", "정답"],
-            "composition": "조각 경계가 분명하게 보입니다.",
+            "composition": "조작물이 자연스럽게 배치되어 있습니다.",
         },
         {
             "assetRole": "stage_3",
             "step": 3,
             "visualPurpose": "고른 조각과 전체 조각을 연결해 분수로 말하게 합니다.",
             "sceneSummary": "고른 한 조각과 전체 네 조각이 함께 보이는 장면",
-            "primaryEvidenceObject": "강조된 한 조각",
-            "evidenceLocation": "왼쪽의 한 조각과 오른쪽의 전체 네 조각 비교 위치",
+            "primaryEvidenceObject": "따로 놓인 한 조각",
+            "evidenceLocation": "problem_ui_only",
             "mustShow": ["한 조각", "네 조각 전체"],
             "allowedSceneText": [],
             "doNotRenderText": ["분수", "빈칸", "정답", "힌트"],
-            "composition": "한 조각과 전체가 동시에 비교됩니다.",
+            "composition": "한 조각과 전체가 같은 책상 위에 놓입니다.",
         },
         {
             "assetRole": "stage_4_realtime",
@@ -1474,7 +1522,7 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
             "visualPurpose": "학생이 전체와 부분을 말로 설명하는 상황을 준비합니다.",
             "sceneSummary": "피자 조각을 보며 설명을 준비하는 책상 장면",
             "primaryEvidenceObject": "피자 조각 그림",
-            "evidenceLocation": "설명 카드 옆 피자 조각 그림",
+            "evidenceLocation": "problem_ui_only",
             "mustShow": ["피자 조각 그림"],
             "allowedSceneText": [],
             "doNotRenderText": ["말하기 정답", "힌트", "채점"],
@@ -1506,7 +1554,7 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
         asset["promptJson"] = asset.get("promptJson") or {}
         if asset["assetType"] == "image":
             asset["promptJson"] = {
-                "prompt": f"{asset['assetRole']} 장면. 따뜻한 교실 느낌의 피자 조각 장면만 보여주고 문제 문장, 선택지, 정답, 힌트 텍스트는 넣지 않습니다.",
+                "prompt": f"{asset['assetRole']} 장면. 따뜻한 교실 느낌의 피자 조각 장면만 보여주고 no app UI, no answer panels, no readable lesson text.",
                 "textRenderingPolicy": "scene_only_no_problem_text",
             }
         asset["storageUrl"] = ""
@@ -1597,7 +1645,7 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
                     {"assetRole": "hero", "scenePurpose": "시작 장면", "mustShow": ["피자 조각"], "mustNotShow": ["problem text"]},
                     {"assetRole": "stage_1", "scenePurpose": "전체 확인", "mustShow": ["전체 피자"], "mustNotShow": ["problem text"]},
                     {"assetRole": "stage_2", "scenePurpose": "조각 세기", "mustShow": ["네 조각"], "mustNotShow": ["problem text"]},
-                    {"assetRole": "stage_3", "scenePurpose": "분수 연결", "mustShow": ["한 조각 강조"], "mustNotShow": ["problem text"]},
+                    {"assetRole": "stage_3", "scenePurpose": "분수 연결", "mustShow": ["한 조각과 전체 조각"], "mustNotShow": ["problem text"]},
                     {"assetRole": "stage_4_realtime", "scenePurpose": "설명 상황", "mustShow": ["마스코트"], "mustNotShow": ["problem text"]},
                 ],
                 "stageVisualSpecs": stage_visual_specs,
@@ -1707,12 +1755,12 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     assert all(asset["storageUrl"].startswith(expected_asset_prefix) for asset in package_data["assets"])
     assert all(asset["qaStatus"] == "passed" for asset in package_data["assets"])
     assert all(
-        asset["promptJson"].get("promptVersion") == "image_brief_v1"
+        asset["promptJson"].get("promptVersion") == "image_brief_v2"
         for asset in package_data["assets"]
         if asset["assetType"] == "image"
     )
     assert all(
-        asset["promptJson"].get("compositionPlan", {}).get("subjectPriority") == "learning_object_first"
+            asset["promptJson"].get("compositionPlan", {}).get("subjectPriority") == "context_first"
         for asset in package_data["assets"]
         if asset["assetType"] == "image"
     )

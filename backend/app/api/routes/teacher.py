@@ -150,26 +150,26 @@ def refresh_student_context_brief(
     demo_store: DemoStore = Depends(get_store),
 ) -> dict:
     settings = get_settings()
-    memory_override: dict | None = None
-    generation_mode = "local_fallback"
-    if settings.openai_api_key:
-        try:
-            memory_override = _generate_memory_brief_with_ai(student_id, principal.id, demo_store)
-            generation_mode = settings.openai_memory_model
-        except AiProviderError as exc:
-            demo_store.record_audit(
-                actor_user_id=principal.id,
-                student_id=student_id,
-                action="refresh_context_brief_ai_failed",
-                resource_type="student_context_brief",
-                resource_id=student_id,
-                payload_json={"code": exc.code, "message": exc.message},
-            )
+    try:
+        memory_override = _generate_memory_brief_with_ai(student_id, principal.id, demo_store)
+    except AiProviderError as exc:
+        demo_store.record_audit(
+            actor_user_id=principal.id,
+            student_id=student_id,
+            action="refresh_context_brief_ai_failed",
+            resource_type="student_context_brief",
+            resource_id=student_id,
+            payload_json={"code": exc.code, "message": exc.message},
+        )
+        raise HTTPException(
+            status_code=424,
+            detail={"code": exc.code, "message": exc.message, "details": {"reviewRequired": True}},
+        ) from exc
     brief = demo_store.refresh_student_context_brief(
         student_id,
         teacher_id=principal.id if principal.role == "teacher" else None,
         brief_override=memory_override,
-        model=generation_mode,
+        model=settings.openai_memory_model,
     )
     if brief is None:
         raise HTTPException(status_code=404, detail={"code": "CONTEXT_BRIEF_NOT_FOUND", "message": "학생 ContextBrief를 갱신할 수 없습니다."})
@@ -179,9 +179,9 @@ def refresh_student_context_brief(
         action="refresh_context_brief",
         resource_type="student_context_brief",
         resource_id=brief.id,
-        payload_json={"dirty": brief.dirty, "generationMode": generation_mode},
+        payload_json={"dirty": brief.dirty, "generationMode": settings.openai_memory_model},
     )
-    return ok({**brief.model_dump(by_alias=True), "generationMode": generation_mode})
+    return ok({**brief.model_dump(by_alias=True), "generationMode": settings.openai_memory_model})
 
 
 @router.post("/students/{student_id}/support-profile-drafts")
@@ -194,34 +194,34 @@ def create_support_profile_draft(
     if principal.role != "teacher":
         raise HTTPException(status_code=403, detail={"code": "FORBIDDEN", "message": "교사만 지원 프로필 초안을 만들 수 있습니다."})
     settings = get_settings()
-    profile_override: dict | None = None
-    generation_mode = "local_fallback"
-    if settings.openai_api_key:
-        try:
-            profile_override = _generate_support_profile_draft_with_ai(
-                student_id,
-                principal.id,
-                demo_store,
-                support_intake=payload.support_intake if payload else None,
-                teacher_note=payload.teacher_note if payload else None,
-            )
-            generation_mode = settings.openai_support_profile_model
-        except AiProviderError as exc:
-            demo_store.record_audit(
-                actor_user_id=principal.id,
-                student_id=student_id,
-                action="create_support_profile_draft_ai_failed",
-                resource_type="student_support_profile",
-                resource_id=student_id,
-                payload_json={"code": exc.code, "message": exc.message},
-            )
+    try:
+        profile_override = _generate_support_profile_draft_with_ai(
+            student_id,
+            principal.id,
+            demo_store,
+            support_intake=payload.support_intake if payload else None,
+            teacher_note=payload.teacher_note if payload else None,
+        )
+    except AiProviderError as exc:
+        demo_store.record_audit(
+            actor_user_id=principal.id,
+            student_id=student_id,
+            action="create_support_profile_draft_ai_failed",
+            resource_type="student_support_profile",
+            resource_id=student_id,
+            payload_json={"code": exc.code, "message": exc.message},
+        )
+        raise HTTPException(
+            status_code=424,
+            detail={"code": exc.code, "message": exc.message, "details": {"reviewRequired": True}},
+        ) from exc
     draft = demo_store.create_support_profile_draft(
         student_id,
         teacher_id=principal.id,
         support_intake=payload.support_intake if payload else None,
         teacher_note=payload.teacher_note if payload else None,
         profile_json_override=profile_override,
-        generated_by=generation_mode,
+        generated_by=settings.openai_support_profile_model,
     )
     if draft is None:
         raise HTTPException(status_code=404, detail={"code": "STUDENT_NOT_FOUND", "message": "지원 프로필 초안을 만들 학생을 찾을 수 없습니다."})
@@ -231,14 +231,18 @@ def create_support_profile_draft(
         action="create_support_profile_draft",
         resource_type="student_support_profile",
         resource_id=draft.id,
-        payload_json={"generatedBy": draft.generated_by, "sourceIntakeId": draft.source_intake_id, "generationMode": generation_mode},
+        payload_json={
+            "generatedBy": draft.generated_by,
+            "sourceIntakeId": draft.source_intake_id,
+            "generationMode": settings.openai_support_profile_model,
+        },
     )
     return ok(
         {
             "draftId": draft.id,
             "studentId": draft.student_id,
             "status": "completed",
-            "generationMode": generation_mode,
+            "generationMode": settings.openai_support_profile_model,
             "profileDraft": draft.profile_json,
             "supportProfile": draft.model_dump(by_alias=True),
         }
@@ -415,7 +419,7 @@ def _resolve_registration_school(payload: StudentRegistrationRequest, demo_store
             detail={
                 "code": "NEIS_API_KEY_MISSING",
                 "message": "학생 등록 학교 확인을 위해 NEIS_API_KEY가 필요합니다.",
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+                "details": {"reviewRequired": True},
             },
         )
     try:
@@ -430,7 +434,7 @@ def _resolve_registration_school(payload: StudentRegistrationRequest, demo_store
             detail={
                 "code": exc.code,
                 "message": exc.message,
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+                "details": {"reviewRequired": True},
             },
         ) from exc
     if not schools:
