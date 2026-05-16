@@ -1339,6 +1339,7 @@ export default function DashboardPage() {
   const selectedReviewItems = (activeCaseFile?.recentContents ?? [])
     .filter((content) => !completedContentIds.has(content.id))
     .filter(isReviewQueueContent)
+    .filter((content) => !hasMissingGeneratedMedia(content))
     .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left))
     .map((content) => mapContentToReviewItem(content));
   const selectedPublishedContents = (activeCaseFile?.recentContents ?? [])
