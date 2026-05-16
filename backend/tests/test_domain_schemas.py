@@ -517,30 +517,28 @@ def test_mission_quality_requires_fixed_student_stage_titles() -> None:
         )
 
 
-def test_mission_quality_rejects_ui_text_inside_image_prompt() -> None:
+def test_mission_quality_does_not_block_image_prompt_text_with_string_matching() -> None:
     content = _generated_fraction_content()
     content["assets"][1]["promptJson"]["prompt"] += " 전체는 몇 조각인가요?"
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="문제 UI 텍스트"):
-        validate_mission_content_quality(
-            mission,
-            case_file=_fraction_case_file(),
-            orchestrator_plan=_valid_learning_plan(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=_fraction_case_file(),
+        orchestrator_plan=_valid_learning_plan(),
+    )
 
 
-def test_mission_quality_rejects_ui_like_image_prompt_wording() -> None:
+def test_mission_quality_does_not_block_ui_like_image_prompt_wording() -> None:
     content = _generated_fraction_content()
     content["assets"][1]["promptJson"]["prompt"] += " 빈 카드와 말풍선, 선택지 영역을 함께 배치합니다."
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="이미지 프롬프트"):
-        validate_mission_content_quality(
-            mission,
-            case_file=_fraction_case_file(),
-            orchestrator_plan=_valid_learning_plan(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=_fraction_case_file(),
+        orchestrator_plan=_valid_learning_plan(),
+    )
 
 
 def test_mission_quality_allows_real_object_button_word_in_image_prompt() -> None:
