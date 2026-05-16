@@ -356,8 +356,8 @@ def _validate_stage_visual_specs(value: Any, path: str, issues: list[str]) -> No
                 issues.append(f"{path}[{index}].{key}는 list여야 합니다.")
         if item.get("allowedSceneText") != []:
             issues.append(f"{path}[{index}].allowedSceneText는 빈 배열이어야 합니다.")
-        if item.get("evidenceLocation") not in {"problem_ui_only", "templateJson.sourceTextLines"}:
-            issues.append(f"{path}[{index}].evidenceLocation은 problem_ui_only 또는 templateJson.sourceTextLines여야 합니다.")
+        if item.get("evidenceLocation") != "problem_ui_only":
+            issues.append(f"{path}[{index}].evidenceLocation은 problem_ui_only여야 합니다.")
 
 
 def _validate_scenario_spine(value: Any, path: str, issues: list[str]) -> None:

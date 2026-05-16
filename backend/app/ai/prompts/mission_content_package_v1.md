@@ -34,14 +34,13 @@
 학생이 정답을 판단하는 근거는 `templateJson` 안에만 있습니다.
 이미지는 정답 근거를 제공하지 않습니다.
 
-- 문제를 푸는 데 필요한 식, 문장, 표 값, 카드 문구, 선택지, 빈칸, 정답 후보는 `templateJson`에 넣습니다.
+- 문제를 푸는 데 필요한 식, 문장, 카드 문구, 선택지, 빈칸, 정답 후보는 `templateJson`에 넣습니다.
 - 이미지는 정답을 품은 자료가 아니라, 학생이 활동 상황을 이해하도록 돕는 장면/조작물/맥락입니다.
 - 이미지 안에 문제 문장, 선택지, 정답, 피드백, 풀이 힌트, 채점 표시를 넣지 않습니다.
-- 학습지원형에서 수학식이나 문장제가 필요하면 `question`, `sentence`, `choices`, `cards`, `leftCards`, `rightCards`, `sourceTextLines` 같은 UI 필드에 넣습니다.
+- 학습지원형에서 수학식이나 문장제가 필요하면 `question`, `sentence`, `choices`, `cards`, `leftCards`, `rightCards` 같은 UI 필드에 넣습니다.
 - 일상생활 지원형에서 상황 이해가 필요하면 이미지는 장소, 사람, 물체, 행동 흐름을 보여주고, 선택해야 할 행동이나 말은 `templateJson`에 넣습니다.
-- `sourceTextLines`에는 학생 화면의 자료 영역에서 보여줄 정확한 문장, 숫자, 표 값, 관찰 기록을 넣습니다. 필요 없으면 빈 배열을 넣습니다.
-- `sourceTextLines`가 필요한 문제에서는 학생이 `sourceTextLines`를 읽고 답을 고릅니다.
-- 이미지는 `sourceTextLines`의 내용을 다시 쓰거나 시각적으로 정답을 암시하지 않습니다.
+- `sourceTextLines`는 schema 호환 필드입니다. 선생님 요청에 그대로 사용할 원문이 없으면 빈 배열 `[]`로 둡니다.
+- 새 원문이나 별도 자료를 임의로 만들어 `sourceTextLines`에 넣지 않습니다.
 - `sceneTextLines`는 이미지 안에 들어갈 글자가 아닙니다. 장면 배경 설명입니다. 필요 없으면 빈 배열을 넣습니다.
 - `sceneTextLines`에 정답 단서, 선택지 문구, 핵심 숫자, 문제 문장을 넣지 않습니다.
 - 모든 문제 텍스트, 선택지, 정답, 피드백은 `templateJson`에만 넣습니다.
@@ -96,7 +95,7 @@
 공통:
 
 - 모든 `templateJson`에는 `imageAssetId`, `audioAssetId`, `assetBundle`, `sourceTextLines`, `sceneTextLines`를 넣습니다.
-- `sourceTextLines`: 학생 화면에 별도 자료로 보여줄 문장·표 값·관찰 기록이 있을 때만 채웁니다. 없으면 `[]`입니다.
+- `sourceTextLines`: schema 호환 필드입니다. 선생님 요청에 그대로 사용할 원문이 없으면 `[]`입니다.
 - `sceneTextLines`: 이미지 제작자가 이해할 장면 메모입니다. 없으면 `[]`입니다.
 - 선택지는 학생이 실제로 헷갈릴 만해야 합니다.
 - 피드백은 정답 여부만 말하지 말고, 왜 그런지 한 문장으로 설명합니다.
@@ -110,7 +109,7 @@
 
 - `choices`는 `{ "id": "a", "text": "..." }` 형식입니다.
 - `answer`는 선택지 id입니다.
-- 이 템플릿 이름에 `scene`이 있어도, 정답은 이미지 속 힌트가 아니라 `question`, `choices`, `sourceTextLines`의 의미 관계로 판단하게 만듭니다.
+- 이 템플릿 이름에 `scene`이 있어도, 정답은 이미지 속 힌트가 아니라 `question`, `choices`의 의미 관계로 판단하게 만듭니다.
 
 `card_match`:
 
@@ -166,7 +165,7 @@
 - `briefJson.scenarioSpine`은 오케스트레이터의 `scenarioSpine`을 그대로 보존합니다.
 - `briefJson.stageVisualSpecs`는 오케스트레이터의 `stageVisualSpecs`를 그대로 보존합니다.
 - 이 두 필드는 문제 정답 계약이 아니라, 콘텐츠 흐름과 이미지 장면을 이어 주는 설계 메모입니다.
-- `briefJson.scenarioSpine.keyEvidence`는 2~3단계의 `sourceTextLines`, 문제 문장, 선택지, 피드백 중 최소 두 곳에 연결될 수 있습니다.
+- `briefJson.scenarioSpine.keyEvidence`는 2~3단계의 문제 문장, 선택지, 피드백 중 최소 두 곳에 연결될 수 있습니다.
 - `sceneTextLines`와 이미지 프롬프트는 `keyEvidence`를 정답 단서로 반복하지 않습니다.
 
 ## 출력 모양

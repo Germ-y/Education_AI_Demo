@@ -26,7 +26,7 @@ def test_prompts_keep_image_text_and_ui_text_separate() -> None:
     content_prompt = load_prompt("mission_content_package")
     image_prompt = load_prompt("image_brief")
 
-    assert "문제를 푸는 데 필요한 식, 문장, 표 값, 카드 문구, 선택지, 빈칸, 정답 후보는 `templateJson`에 넣습니다." in content_prompt
+    assert "문제를 푸는 데 필요한 식, 문장, 카드 문구, 선택지, 빈칸, 정답 후보는 `templateJson`에 넣습니다." in content_prompt
     assert '"assets"' in content_prompt
     assert "assetPlaceholders" not in content_prompt
     assert '"contentId"' not in content_prompt
