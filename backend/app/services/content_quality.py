@@ -169,6 +169,7 @@ def validate_mission_content_quality(
 
     _validate_mission_stage_flow(mission, expected_content_type, issues)
     _validate_mission_template_variety(mission, issues, reading_load=reading_load, choice_limit=choice_limit)
+    _validate_mission_template_interactions(mission, expected_content_type, issues)
     _validate_asset_package(mission, issues)
     _validate_stage_asset_links(mission, issues)
     # 생성 실패를 막는 품질검수는 렌더링/저장 계약 위주로 제한한다.
@@ -276,6 +277,19 @@ def _validate_mission_template_variety(mission: MissionContent, issues: list[str
 
     if not any(template in STRUCTURED_INTERACTION_TEMPLATES for template in stage_2_3_templates):
         issues.append("mission.stages 2~3단계 중 최소 1개는 card_match, sequence_ordering, blank_fill 중 하나여야 합니다.")
+
+
+def _validate_mission_template_interactions(mission: MissionContent, content_type: str, issues: list[str]) -> None:
+    for stage in mission.stages:
+        template_type = _as_value(stage.template_type)
+        template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
+        if content_type == StudentType.LIFE_SUPPORT.value and stage.step == 3 and template_type == TemplateType.SEQUENCE_ORDERING.value:
+            cards = template_json.get("cards")
+            answer_order = template_json.get("answerOrder")
+            card_count = len(cards) if isinstance(cards, list) else 0
+            answer_count = len(answer_order) if isinstance(answer_order, list) else 0
+            if card_count != 3 or answer_count != 3:
+                issues.append(f"{stage.id}.templateJson은 life_support 3단계 sequence_ordering에서 cards와 answerOrder를 각각 3개로 구성해야 합니다.")
 
 
 def _validate_asset_package(mission: MissionContent, issues: list[str]) -> None:

@@ -597,11 +597,17 @@ def _template_json_contract(template_type: Any) -> dict[str, Any]:
                 "rightCards ids are right_1 and right_2.",
                 "matches is shaped {\"left_1\":\"right_1\",\"left_2\":\"right_2\"}.",
                 "do not include choices, cards, or tiles.",
+                "If a card refers to a visible person, use an observable descriptor such as clothing, position, gender presentation, or current action.",
+                "Do not use hidden personal names like 민수 or 영희 unless the story text explicitly introduced the names.",
             ],
         },
         "sequence_ordering": {
             "requiredFields": [*common_fields, "question", "cards", "answerOrder", "correctFeedback", "wrongFeedback"],
-            "hardRules": ["answerOrder contains the card ids in the correct order."],
+            "hardRules": [
+                "answerOrder contains the card ids in the correct order.",
+                "Generated student missions should use exactly 3 cards unless the teacher explicitly requested a longer procedure.",
+                "For life_support step 3 action_selection, cards and answerOrder must contain exactly 3 items.",
+            ],
         },
         "scene_question": choice_contract,
         "clue_question": choice_contract,

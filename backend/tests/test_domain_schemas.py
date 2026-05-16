@@ -609,6 +609,64 @@ def test_mission_quality_accepts_life_support_plausible_decision_fork() -> None:
     )
 
 
+def test_mission_quality_accepts_three_card_life_support_action_sequence() -> None:
+    content = _generated_life_support_content()
+    stage = content["stages"][2]
+    stage["templateType"] = "sequence_ordering"
+    stage["templateJson"] = {
+        "imageAssetId": stage["templateJson"]["imageAssetId"],
+        "audioAssetId": stage["templateJson"]["audioAssetId"],
+        "assetBundle": stage["templateJson"]["assetBundle"],
+        "sourceTextLines": [],
+        "sceneTextLines": [],
+        "question": "친구들과 공놀이를 할 때 차례를 지키는 순서로 놓아 보세요.",
+        "cards": [
+            {"id": "look", "text": "공을 받을 친구를 바라본다."},
+            {"id": "ask", "text": "준비됐는지 짧게 물어본다."},
+            {"id": "pass", "text": "친구가 준비되면 천천히 공을 준다."},
+        ],
+        "answerOrder": ["look", "ask", "pass"],
+        "correctFeedback": "좋아요. 먼저 보고, 물어보고, 천천히 주는 순서예요.",
+        "wrongFeedback": "공을 주기 전에 친구가 준비됐는지 확인하는 순서를 다시 볼까요?",
+    }
+    mission = MissionContent.model_validate(content)
+
+    validate_mission_content_quality(
+        mission,
+        case_file=_life_support_case_file(),
+    )
+
+
+def test_mission_quality_rejects_four_card_life_support_action_sequence() -> None:
+    content = _generated_life_support_content()
+    stage = content["stages"][2]
+    stage["templateType"] = "sequence_ordering"
+    stage["templateJson"] = {
+        "imageAssetId": stage["templateJson"]["imageAssetId"],
+        "audioAssetId": stage["templateJson"]["audioAssetId"],
+        "assetBundle": stage["templateJson"]["assetBundle"],
+        "sourceTextLines": [],
+        "sceneTextLines": [],
+        "question": "친구들과 공놀이를 할 때 차례를 지키는 순서로 놓아 보세요.",
+        "cards": [
+            {"id": "look", "text": "공을 받을 친구를 바라본다."},
+            {"id": "ask", "text": "준비됐는지 짧게 물어본다."},
+            {"id": "wait", "text": "친구가 대답할 때까지 기다린다."},
+            {"id": "pass", "text": "친구가 준비되면 천천히 공을 준다."},
+        ],
+        "answerOrder": ["look", "ask", "wait", "pass"],
+        "correctFeedback": "좋아요. 먼저 보고, 물어보고, 기다린 뒤 천천히 주는 순서예요.",
+        "wrongFeedback": "공을 주기 전에 친구가 준비됐는지 확인하는 순서를 다시 볼까요?",
+    }
+    mission = MissionContent.model_validate(content)
+
+    with pytest.raises(ContentQualityError, match="3개"):
+        validate_mission_content_quality(
+            mission,
+            case_file=_life_support_case_file(),
+        )
+
+
 def _valid_learning_plan() -> dict:
     return {
         "planVersion": "orchestrator_plan_v1",
@@ -845,6 +903,24 @@ def _generated_life_support_content() -> dict:
                 {"id": "a", "text": "센터로 가는 버스 번호 확인하기"},
                 {"id": "b", "text": "버스가 오면 바로 타기"},
             ]
+        if stage["step"] == 3:
+            stage["templateType"] = "sequence_ordering"
+            stage["templateJson"] = {
+                "imageAssetId": stage["templateJson"]["imageAssetId"],
+                "audioAssetId": stage["templateJson"]["audioAssetId"],
+                "assetBundle": stage["templateJson"]["assetBundle"],
+                "sourceTextLines": [],
+                "sceneTextLines": [],
+                "question": "버스를 타기 전에 안전하게 확인하는 순서로 놓아 보세요.",
+                "cards": [
+                    {"id": "look", "text": "버스 번호를 먼저 본다."},
+                    {"id": "ask", "text": "헷갈리면 짧게 물어본다."},
+                    {"id": "ride", "text": "맞는 버스이면 천천히 탄다."},
+                ],
+                "answerOrder": ["look", "ask", "ride"],
+                "correctFeedback": "좋아요. 번호를 보고, 물어보고, 맞을 때 타는 순서예요.",
+                "wrongFeedback": "버스를 타기 전에 번호를 먼저 확인하는 순서를 다시 볼까요?",
+            }
         if stage.get("realtimeSpec"):
             stage["realtimeSpec"]["id"] = "rt_spec_generated_life_quality_001"
             stage["realtimeSpec"]["stageId"] = stage["id"]

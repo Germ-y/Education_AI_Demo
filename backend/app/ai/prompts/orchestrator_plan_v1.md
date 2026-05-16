@@ -127,6 +127,8 @@
 - 2단계: `clue_identification` + `scene_observation`, `highlight_clue`, `card_match`
 - 3단계: `action_selection` + `card_match`, `sequence_ordering`, `action_choice`, `decision_card`
 - 4단계: `realtime_practice` + `realtime_roleplay`
+- 3단계에서 `sequence_ordering`을 고르면 학생이 실제로 따라 할 수 있는 순서 카드 3개로 설계합니다.
+- 인물이 여러 명 나오는 장면은 이름보다 성별, 옷, 위치, 행동으로 구분되게 설계합니다. 이름을 쓰려면 이야기 안에서 먼저 소개합니다.
 
 `learning_focus`:
 
