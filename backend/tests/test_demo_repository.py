@@ -1,10 +1,17 @@
 from sqlalchemy.orm import sessionmaker
 
+from app.core.config import BACKEND_DIR
 from app.data.demo_data import create_demo_database
-from app.db.session import create_database_engine, create_schema
+from app.db.session import create_database_engine, create_schema, normalize_database_url
 from app.domain.models import ActivityEvent, ContentAttempt, ReviewSummary
 from app.repositories.demo_repository import DemoRepository
 from app.services.store import DemoStore
+
+
+def test_relative_sqlite_database_url_resolves_from_backend_dir() -> None:
+    expected_path = (BACKEND_DIR / "data" / "eduyj_demo.db").resolve().as_posix()
+
+    assert normalize_database_url("sqlite:///./data/eduyj_demo.db") == f"sqlite:///{expected_path}"
 
 
 def test_repository_round_trips_seed_database() -> None:

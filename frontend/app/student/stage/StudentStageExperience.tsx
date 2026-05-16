@@ -477,7 +477,7 @@ function FloatingStageFeedback({
   if (!showSuccess && !showWrong) return null;
 
   return (
-    <div className="pointer-events-none mb-2 grid place-items-center">
+    <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+12px)] z-40 grid place-items-center">
       <div
         className={`rounded-[18px] px-5 py-3 text-center text-sm font-bold leading-6 shadow-[0_18px_42px_rgba(31,41,55,0.18)] ${
           showSuccess ? "border border-[#f0dfb4] bg-[#fff7dd] text-[#6b4b12]" : "bg-[#fff0ed] text-[#b84232]"
@@ -633,8 +633,6 @@ function SequenceTemplate({
   const items = question.sequenceItems ?? [];
   const slots = Array.from({ length: items.length }, (_, index) => selected[index] ?? "");
   const selectedIds = slots.filter(Boolean);
-  const availableItems = items.filter((item) => !selectedIds.includes(item.id));
-  const isSequenceComplete = items.length > 0 && selectedIds.length === items.length;
   const sequenceColumnCount = Math.min(Math.max(items.length, 1), 3);
 
   return (
@@ -647,15 +645,14 @@ function SequenceTemplate({
           <p className="text-base font-black leading-5">{question.prompt}</p>
           <p className="mt-1 text-[11px] font-bold leading-4 text-[#596157]">{question.body ?? "카드를 끌어 올바른 순서대로 놓아보세요."}</p>
         </div>
-        {selectedIds.length > 0 && (
-          <button
-            onClick={onReset}
-            className="shrink-0 rounded-full border bg-white px-3 py-1.5 text-xs font-black shadow-sm"
-            style={{ borderColor: theme.border, color: theme.accentStrong }}
-          >
-            다시 놓기
-          </button>
-        )}
+        <button
+          onClick={onReset}
+          disabled={selectedIds.length === 0}
+          className="shrink-0 rounded-full border bg-white px-3 py-1.5 text-xs font-black shadow-sm transition disabled:cursor-default disabled:opacity-40"
+          style={{ borderColor: theme.border, color: theme.accentStrong }}
+        >
+          다시 놓기
+        </button>
       </div>
 
       <div className="rounded-[18px] border border-dashed border-[#cfd8cf] bg-white/70 p-2.5">
@@ -692,20 +689,20 @@ function SequenceTemplate({
       <div className="rounded-[18px] border border-[#f0dfb4] bg-[#fff9e8] p-2.5">
         <div className="flex items-center justify-between">
           <p className="text-xs font-black text-[#8a5a00]">카드 트레이</p>
-          <p className="text-[11px] font-bold text-[#8a5a00]">
-            {isSequenceComplete ? "순서 고르기 완료" : "카드를 차례대로 눌러요"}
-          </p>
+          <p className="text-[11px] font-bold text-[#8a5a00]">카드를 차례대로 눌러요</p>
         </div>
-        {isSequenceComplete ? (
-          <div className="mt-2 flex h-[64px] flex-col justify-center rounded-[16px] border border-[#f0dfb4] bg-white/75 px-4 py-2 text-center">
-            <p className="text-sm font-black" style={{ color: theme.accentStrong }}>
-              {question.completionTitle}
-            </p>
-            <p className="mt-1 line-clamp-1 text-xs font-bold leading-5 text-[#6b5a24]">{question.completionMessage}</p>
-          </div>
-        ) : (
-          <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: `repeat(${sequenceColumnCount}, minmax(0, 1fr))` }}>
-            {availableItems.map((item) => (
+        <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: `repeat(${sequenceColumnCount}, minmax(0, 1fr))` }}>
+          {items.map((item) => {
+            const picked = selectedIds.includes(item.id);
+
+            return picked ? (
+              <div
+                key={item.id}
+                className="flex h-[64px] items-center justify-center rounded-[16px] border border-dashed border-[#e4d8b6] bg-white/45 px-3 py-2 text-center"
+              >
+                <p className="text-xs font-black text-[#b39b5f]">순서 칸으로 이동</p>
+              </div>
+            ) : (
               <button
                 key={item.id}
                 onClick={() => onPick(item.id)}
@@ -713,9 +710,9 @@ function SequenceTemplate({
               >
                 <p className="line-clamp-2 text-[13px] font-black leading-[18px] break-keep [overflow-wrap:anywhere]">{item.label}</p>
               </button>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -1957,7 +1954,7 @@ export function StudentStageExperience({
     const resizeStageFrame = () => {
       const availableWidth = Math.max(320, window.innerWidth - 32);
       const availableHeight = Math.max(320, window.innerHeight - 32);
-      setStageFrameScale(Math.min(availableWidth / STAGE_FRAME_WIDTH, availableHeight / STAGE_FRAME_HEIGHT));
+      setStageFrameScale(Math.min(1, availableWidth / STAGE_FRAME_WIDTH, availableHeight / STAGE_FRAME_HEIGHT));
       setIsStageFrameReady(true);
     };
 
@@ -2557,7 +2554,7 @@ export function StudentStageExperience({
                 {usesFullStageBoard && !isRealtimeStage && (
                   <div className="relative mt-3">
                     <FloatingStageFeedback
-                      showSuccess={activeQuestion.kind !== "sequence" && ((answer && isCorrect) || isStageComplete) && !isFinished}
+                      showSuccess={((answer && isCorrect) || isStageComplete) && !isFinished}
                       showWrong={Boolean(wrongNotice) && !isStageComplete && !isFinished}
                       title={activeQuestion.completionTitle}
                       message={activeQuestion.completionMessage}
