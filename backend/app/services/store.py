@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -205,6 +206,9 @@ class DemoStore:
             students.append(
                 {
                     "studentId": student.id,
+                    "caseId": open_case_by_student_id[student.id].id,
+                    "openCaseId": open_case_by_student_id[student.id].id,
+                    "caseStatus": open_case_by_student_id[student.id].case_status,
                     "displayName": student.display_name,
                     "grade": student.grade,
                     "gradeLabel": dashboard.get("gradeLabel") or _grade_label(student.grade),
@@ -2461,7 +2465,6 @@ def _abstract_context_pattern(value: str) -> str:
 
 def _build_teacher_report_draft_text(snapshot: dict[str, Any]) -> tuple[str, list[str], list[str]]:
     summary = snapshot["reviewSummary"]
-    student = snapshot["student"]
     content = snapshot["content"]
     realtime = snapshot.get("realtimeSession") or {}
     context_brief = snapshot.get("contextBrief") or {}
@@ -2561,11 +2564,11 @@ def _list_value(value: Any) -> list[str]:
     return [_teacher_facing_text(str(item).strip()) for item in value if str(item).strip()]
 
 
-def _safe_int(value: Any, fallback: int) -> int:
+def _safe_int(value: Any, default: int) -> int:
     try:
         return int(value)
     except (TypeError, ValueError):
-        return fallback
+        return default
 
 
 def _list_dict_value(value: Any) -> list[dict[str, Any]]:
@@ -3025,7 +3028,18 @@ def _merge_choice_texts(existing_choices: Any, choice_texts: list[str]) -> list[
 
 
 def _is_asset_ready_for_teacher_approval(asset: ContentAsset) -> bool:
-    return bool(asset.storage_url or asset.preview_url) and asset.qa_status == "passed"
+    if asset.qa_status != "passed":
+        return False
+    return _asset_url_ready_for_review(asset.storage_url) or _asset_url_ready_for_review(asset.preview_url)
+
+
+def _asset_url_ready_for_review(url: str | None) -> bool:
+    if not url:
+        return False
+    if url.startswith("/generated/"):
+        relative_path = url.removeprefix("/generated/").lstrip("/")
+        return relative_path.startswith("assets/") and (Path(get_settings().generated_assets_dir) / relative_path).is_file()
+    return True
 
 
 def _is_asset_ready_for_student_publish(asset: ContentAsset) -> bool:

@@ -100,7 +100,7 @@ def create_realtime_session(
             detail={
                 "code": exc.code,
                 "message": exc.message,
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+                "details": {"reviewRequired": True},
             },
         ) from exc
 

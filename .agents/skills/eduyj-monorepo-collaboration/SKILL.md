@@ -16,7 +16,7 @@ description: EduYJ 레포에서 프론트엔드와 백엔드가 함께 바뀌는
 - 프론트 작업: `frontend/`
 - 백엔드 작업: `backend/`
 - API 계약: `docs/GOAL_CONTEXT.md`, `backend/app/domain/schemas.py`, `frontend/lib/api/contracts.ts`
-- DB/seed 인수인계: `backend/data/README.md`, `backend/data/eduyj_demo_dump.sql`
+- DB/seed/asset 인수인계: `backend/data/README.md`, `backend/data/eduyj_demo.db`, `backend/data/eduyj_demo_dump.sql`, `backend/generated/assets/students/**`
 - 진행상황/예정사항/병목: `docs/GOAL_CONTEXT.md`
 - 작업 규칙: `AGENTS.md`, `GOAL.md`, `.agents/skills/`
 
@@ -24,8 +24,8 @@ description: EduYJ 레포에서 프론트엔드와 백엔드가 함께 바뀌는
 
 ## 지켜야 할 것
 
-- 통합 검증은 `dev` 브랜치에서 한다.
-- 프론트 단독 작업은 `frontend`, 백엔드 단독 작업은 `backend`에서 진행한다.
+- 통합 기준은 `main` 브랜치다.
+- 프론트/백엔드 작업은 `main`에서 `frontend/작업명`, `backend/작업명` 브랜치를 따서 진행한다.
 - 작업 중에는 작은 커밋을 쌓고, 검증 후 push한다.
 - API field, enum, MissionContent 구조가 바뀌면 `docs/GOAL_CONTEXT.md`를 갱신한다.
 - provider key는 `frontend/`에 노출하지 않는다.
@@ -35,6 +35,8 @@ description: EduYJ 레포에서 프론트엔드와 백엔드가 함께 바뀌는
 - 영상 파이프라인을 추가하지 않는다.
 - 이미지 생성 실패를 seed asset으로 대체하지 않는다.
 - `.env`, `.venv`, `node_modules`, cache는 커밋하지 않는다.
+- 현재 공유 DB는 SQLite다. PostgreSQL migration은 별도 백엔드 작업으로 검증한다.
+- DB가 참조하는 generated asset은 DB/dump와 같은 커밋에 포함한다.
 
 ## 검증
 

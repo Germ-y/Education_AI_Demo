@@ -64,7 +64,7 @@ export function getAssetUrl(asset: ContentAsset | null) {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
   if (url.startsWith("/generated/")) return `${apiBaseUrl}${url}`;
 
-  // Legacy demo paths are intentionally not rendered as fallback assets.
+  // Legacy demo paths are intentionally hidden from newly generated mission views.
   if (url.startsWith("/examples/generated/") || url.startsWith("/assets/demo/")) return null;
 
   return url;
@@ -77,15 +77,10 @@ export function getStageAssetRole(step: ContentStage["step"]): AssetRole {
 export function resolveStageAssets(mission: MissionContent, stage: ContentStage): ResolvedStageAssets {
   const imageAssetId = typeof stage.templateJson.imageAssetId === "string" ? stage.templateJson.imageAssetId : null;
   const audioAssetId = typeof stage.templateJson.audioAssetId === "string" ? stage.templateJson.audioAssetId : null;
-  const fallbackRole = getStageAssetRole(stage.step);
 
   return {
-    image:
-      mission.assets.find((asset) => asset.id === imageAssetId && asset.assetType === "image") ??
-      getAssetByRole(mission, fallbackRole, "image"),
-    audio:
-      mission.assets.find((asset) => asset.id === audioAssetId && asset.assetType === "audio") ??
-      getAssetByRole(mission, fallbackRole, "audio"),
+    image: imageAssetId ? mission.assets.find((asset) => asset.id === imageAssetId && asset.assetType === "image") ?? null : null,
+    audio: audioAssetId ? mission.assets.find((asset) => asset.id === audioAssetId && asset.assetType === "audio") ?? null : null,
   };
 }
 

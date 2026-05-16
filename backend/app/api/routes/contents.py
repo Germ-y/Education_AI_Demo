@@ -24,38 +24,9 @@ logger = logging.getLogger(__name__)
 IMAGE_PACKAGE_PARALLELISM = 5
 ASSET_GENERATION_JOBS_KEY = "assetGenerationJobs"
 ASSET_GENERATION_JOB_HISTORY_LIMIT = 8
+IMAGE_BRIEF_PROMPT_VERSION = "image_brief_v2"
 _asset_package_locks: dict[str, Lock] = {}
 _asset_package_locks_guard = Lock()
-
-PROBLEM_ANSWER_IMAGE_PROMPT_TERMS = (
-    "문제 문장",
-    "문제 텍스트",
-    "문항",
-    "선택지",
-    "정답",
-    "답안",
-    "풀이",
-    "힌트",
-    "채점",
-    "오답",
-)
-ANSWER_CUE_IMAGE_TEXTS = (
-    "위험",
-    "안전",
-    "정답",
-    "오답",
-    "먼저",
-    "이쪽",
-    "맞음",
-    "틀림",
-    "체크",
-    "화살표",
-    "→",
-    "←",
-    "↑",
-    "↓",
-)
-
 
 @router.get("/{content_id}")
 def get_content(
@@ -339,7 +310,18 @@ def _is_required_asset_package_ready(content) -> bool:
 
 
 def _is_asset_ready(asset) -> bool:
-    return bool(asset.storage_url or asset.preview_url) and asset.qa_status == "passed"
+    if asset.qa_status != "passed":
+        return False
+    return _asset_url_ready(asset.storage_url) or _asset_url_ready(asset.preview_url)
+
+
+def _asset_url_ready(url: str | None) -> bool:
+    if not url:
+        return False
+    if url.startswith("/generated/"):
+        relative_path = url.removeprefix("/generated/").lstrip("/")
+        return _is_generated_file_ready(_generated_file_path(relative_path))
+    return True
 
 
 def _ensure_asset_generation_allowed(content) -> None:
@@ -737,7 +719,7 @@ def create_preview_realtime_session(
             detail={
                 "code": exc.code,
                 "message": exc.message,
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+                "details": {"reviewRequired": True},
             },
         ) from exc
 
@@ -960,7 +942,7 @@ def _generate_asset_or_raise(content, asset, *, force: bool = False) -> None:
             detail={
                 "code": exc.code,
                 "message": exc.message,
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "assetId": asset.id},
+                "details": {"reviewRequired": True, "assetId": asset.id},
             },
         ) from exc
 
@@ -978,14 +960,14 @@ def _refresh_image_prompts_or_raise(content) -> None:
 
 
 def _uses_image_brief_prompt(prompt_json: dict | None) -> bool:
-    return isinstance(prompt_json, dict) and prompt_json.get("promptVersion") == "image_brief_v1"
+    return isinstance(prompt_json, dict) and prompt_json.get("promptVersion") == IMAGE_BRIEF_PROMPT_VERSION
 
 
 def _build_image_brief_output(content, image_assets: list) -> dict[str, Any]:
     stages = sorted(content.stages, key=lambda item: item.step)
     stage_visual_specs = _stage_visual_specs_by_role(content)
     return {
-        "promptVersion": "image_brief_v1",
+        "promptVersion": IMAGE_BRIEF_PROMPT_VERSION,
         "contentId": content.id,
         "imageBriefs": [
             _build_image_brief_for_asset(content, asset, stages, stage_visual_specs)
@@ -997,67 +979,52 @@ def _build_image_brief_output(content, image_assets: list) -> dict[str, Any]:
 def _build_image_brief_for_asset(content, asset, stages: list, stage_visual_specs: dict[str, dict[str, Any]]) -> dict[str, Any]:
     spec = _stage_visual_spec_for_asset(content, asset, stages, stage_visual_specs)
     stage = next((candidate for candidate in stages if candidate.id == asset.stage_id), None)
-    visual_source = _stage_visual_source(stage) if stage else {"visualAnchors": _brief_visual_anchors_from_stages(stages)}
-    allowed_scene_text = _allowed_scene_text_for_asset(content, asset, stages, stage_visual_specs)
+    source_text_lines = _allowed_scene_text_for_asset(content, asset, stages, stage_visual_specs)
     blocked_texts = _do_not_render_text_for_asset(content, asset, stages, stage_visual_specs)
-    candidate_anchors = _dedupe_strings(
-        _string_list(spec.get("mustShow"))
-        + _string_list(visual_source.get("visualAnchors"))
-        + [_as_text(spec.get("primaryEvidenceObject"))]
-    )
+    hidden_texts = _dedupe_strings(source_text_lines + blocked_texts)
+    raw_context_object = _hide_prompt_text(_as_text(spec.get("primaryEvidenceObject")), hidden_texts)
+    primary_object = _safe_image_primary_object(content, asset, stage, raw_context_object, blocked_texts=hidden_texts)
+    candidate_anchors = _dedupe_strings([primary_object, _safe_image_anchor(content.title)])
     must_show = _dedupe_strings(
-        _sanitize_image_prompt_meta(value)
-        for value in _filter_prompt_anchors(candidate_anchors, blocked_texts=blocked_texts, allowed_scene_text=allowed_scene_text)
+        _hide_prompt_text(value, hidden_texts)
+        for value in _filter_prompt_anchors(candidate_anchors, blocked_texts=blocked_texts, source_text_lines=source_text_lines)
     )[:7]
-    spec_primary_object = _as_text(spec.get("primaryEvidenceObject"))
-    primary_object = (
-        spec_primary_object
-        if spec_primary_object and not _is_blocked_prompt_anchor(spec_primary_object, blocked_texts=blocked_texts, allowed_scene_text=allowed_scene_text)
-        else (must_show[0] if must_show else content.title)
-    )
-    primary_object = _sanitize_image_prompt_meta(primary_object) or content.title
-    scene_summary = _sanitize_image_prompt_meta(_as_text(spec.get("sceneSummary"))) or content.title
-    visual_purpose = _sanitize_image_prompt_meta(_as_text(spec.get("visualPurpose"))) or "학생이 확인할 장면 근거를 보여줍니다."
-    composition = _sanitize_image_prompt_meta(_as_text(spec.get("composition"))) or "학습 근거가 화면 중심에 보이도록 가까운 구도로 구성합니다."
-    composition = _normalize_source_text_composition(composition, has_readable_source=bool(allowed_scene_text))
+    primary_object = primary_object or (must_show[0] if must_show else _generic_learning_scene_object(content, asset, stage))
+    scene_summary = _asset_scene_summary(content, asset, stage, primary_object)
+    visual_purpose = _asset_visual_purpose(content, asset, stage)
+    instructional_design = _instructional_design_for_asset(content, asset, stage)
+    composition = _composition_for_asset(asset.asset_role)
     camera = _camera_for_asset(asset.asset_role)
     human_presence = _human_presence_for_asset(content, asset, stage)
-    ocr_required = bool(allowed_scene_text)
-    text_policy = "short_scene_text_allowed_no_problem_ui" if ocr_required else "scene_only_no_problem_text"
+    text_policy = "scene_context_only_no_lesson_text"
 
     prompt_parts = [
         "Premium Korean edtech illustration, warm but not childish, clean realistic classroom or daily-life detail.",
         f"Asset role: {asset.asset_role}.",
         f"Scene summary: {scene_summary}.",
-        f"Learning purpose: {visual_purpose}.",
-        f"Primary learning evidence object: {primary_object}.",
+        f"Student activity context: {visual_purpose}.",
+        f"Visual direction: {instructional_design}.",
+        f"Main visual focus: {primary_object}.",
     ]
     if must_show:
-        prompt_parts.append(f"Must show these inspectable scene anchors: {', '.join(must_show)}.")
+        prompt_parts.append(f"Include these natural scene elements: {', '.join(must_show)}.")
     prompt_parts.extend(
         [
             f"Composition: {composition}",
-            f"Camera: {camera}; subject priority is learning_object_first; human presence: {human_presence}.",
-            "Make the evidence object large, clear, and easy to inspect. People, if present, stay secondary and never become portrait-first.",
+            f"Camera: {camera}; subject priority is context_first; human presence: {human_presence}.",
+            "Show the situation, manipulatives, materials, and activity mood that support the lesson. "
+            "The image is not the problem, worksheet, source sheet, answer key, or UI screen. "
+            "All exact lesson data, equations, table values, source sentences, questions, choices, answers, and feedback are rendered by the app UI outside the image. "
+            "People, if present, stay secondary unless the stage is a life-support role practice.",
         ]
     )
-    if allowed_scene_text:
-        prompt_parts.append(
-            "Readable real-world scene text is required only on the natural object in the scene. "
-            "The source text is the learning evidence, so render it sharp, legible, and not blurred. "
-            "Do not highlight the answer or add guide marks; the student must inspect the source naturally. "
-            f"Render exactly these source material lines: {' / '.join(allowed_scene_text)}."
-        )
-    else:
-        prompt_parts.append(
-            "Do not render any readable text inside the image. "
-            "Do not add Korean labels, speech bubbles, signs, captions, badges, arrows, colored guide marks, "
-            "check marks, X marks, or red/green answer cues."
-        )
+    prompt_parts.append(
+        "Keep the scene natural and do not add readable labels, tables, worksheets, speech bubbles, captions, badges, arrows, check marks, X marks, answer cues, copied lesson sentences, or invented numbers."
+    )
     prompt_parts.append(
         "Avoid app UI, worksheet layout, answer panels, scoring marks, feedback bubbles, "
-        "category labels, long labels, watermarks, logos, decorative generic scenes, split-screen comparison diagrams, "
-        "warning/safety signs, and any visual overlay that tells the answer. The image must look like a natural scene, not an instructional diagram."
+        "watermarks, logos, decorative generic scenes, split-screen comparison diagrams, "
+            "and any visual overlay that tells the answer. The image must look like a natural scene or classroom material setup, not an instructional diagram or source document."
     )
 
     return {
@@ -1072,24 +1039,23 @@ def _build_image_brief_for_asset(content, asset, stages: list, stage_visual_spec
             "no category labels",
             "no watermark",
         ],
-        "learningEvidence": {
+        "visualContext": {
             "primaryObject": primary_object,
-            "mustBeReadableOrCountable": allowed_scene_text or must_show,
+            "visualAnchors": must_show,
             "whyItMattersForThisStage": visual_purpose,
         },
         "compositionPlan": {
             "camera": camera,
-            "subjectPriority": "learning_object_first",
+            "subjectPriority": "context_first",
             "humanPresence": human_presence,
             "negativeComposition": ["portrait-first framing", "generic decorative scene", "worksheet-like composition"],
         },
-        "ocrRequired": ocr_required,
-        "sceneTextLines": allowed_scene_text,
         "textRenderingPolicy": text_policy,
         "qaChecklist": [
             "scene matches stage purpose",
-            "learning evidence is visually dominant",
+            "situation is visually clear",
             "no problem UI embedded",
+            "image does not contain the answer",
             "student-safe tone",
         ],
     }
@@ -1099,71 +1065,144 @@ def _as_text(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
-def _sanitize_image_prompt_meta(value: str) -> str:
-    sanitized = value.strip()
-    replacements = {
-        "문제 문장": "학습 화면 문구",
-        "문제 텍스트": "학습 화면 문구",
-        "문항": "학습 활동",
-        "선택지": "보기",
-        "정답 후보": "목표 단서 후보",
-        "정답 표기": "맞는 내용 표시",
-        "정답": "맞는 내용",
-        "답안": "학생 응답",
-        "풀이": "생각 과정",
-        "힌트": "도움 단서",
-        "채점": "확인 표시",
-        "오답": "다른 응답",
-        "위험한": "사람이 많은",
-        "위험": "사람이 많은 쪽",
-        "안전한": "비어 있는",
-        "안전": "빈 공간",
-        "어느 방향이 더 비어 있는지 생각하게 한다": "주변 사람 수와 빈 공간을 살펴보게 한다",
-        "어느 방향이 더": "주변 단서가 어떻게",
-        "두 방향": "두 공간",
-        "방향": "공간",
-        "화살표": "방향 표시 없는 장면 단서",
-        "빨간": "색으로 답을 암시하지 않는",
-        "초록": "색으로 답을 암시하지 않는",
-    }
-    for term, replacement in replacements.items():
-        sanitized = sanitized.replace(term, replacement)
-    return sanitized.strip()
+def _safe_image_primary_object(content, asset, stage, raw_value: str, *, blocked_texts: list[str]) -> str:
+    candidate = _safe_image_anchor(raw_value)
+    if candidate and not _is_blocked_prompt_anchor(candidate, blocked_texts=blocked_texts, source_text_lines=[]):
+        return candidate
+    return _generic_learning_scene_object(content, asset, stage)
 
 
-def _normalize_source_text_composition(value: str, *, has_readable_source: bool) -> str:
-    if not value or not has_readable_source:
-        return value
-    replacements = {
-        "글 내용은 흐릿하거나 의미 없이 표현하고": "원자료 문장은 선명하게 읽히도록 표현하고",
-        "실제 문장 내용은 판독 불가한 수준으로 표현한다": "실제 원자료 문장은 읽을 수 있게 표현한다",
-        "실제 문장 내용은 판독 불가한 수준으로 표현하고": "실제 원자료 문장은 읽을 수 있게 표현하고",
-        "본문은 흐릿하게": "본문은 선명하게",
-        "흐릿하거나 의미 없이": "선명하고 의미 있게",
-        "판독 불가": "판독 가능",
-        "흐릿하게": "선명하게",
-    }
-    normalized = value
-    for before, after in replacements.items():
-        normalized = normalized.replace(before, after)
-    return normalized
+def _safe_image_anchor(value: str) -> str:
+    cleaned = value.strip() if isinstance(value, str) else ""
+    if not cleaned:
+        return ""
+    if any(character.isdigit() for character in cleaned):
+        return ""
+    if len(cleaned) > 42:
+        return ""
+    blocked_words = ("문제", "정답", "보기", "선택지", "피드백", "힌트", "cm", "월", "일")
+    if any(word in cleaned for word in blocked_words):
+        return ""
+    return cleaned
 
 
-def _filter_prompt_anchors(values: list[str], *, blocked_texts: list[str], allowed_scene_text: list[str]) -> list[str]:
+def _generic_learning_scene_object(content, asset, stage) -> str:
+    title = content.title
+    template_type = _as_asset_role_value(stage.template_type) if stage else ""
+    if any(word in title for word in ("텃밭", "식물", "나무", "키 변화")):
+        return "학교 텃밭의 식물, 자, 관찰 공책"
+    if any(word in title for word in ("날씨", "온도")):
+        return "날씨 관찰 도구와 기록 공책"
+    if any(word in title for word in ("간식", "나누기", "묶음")):
+        return "간식을 나누어 놓은 책상 장면"
+    if any(word in title for word in ("안내", "표지", "장소")):
+        return "학교 공간과 안내판이 보이는 장면"
+    if template_type == "card_match":
+        return "책상 위 학습 카드와 조작물"
+    if template_type == "sequence_ordering":
+        return "순서를 떠올릴 수 있는 활동 준비 장면"
+    if template_type == "blank_fill":
+        return "빈칸 문제를 풀기 전 사용할 조작물과 공책"
+    return "학생이 문제를 풀기 전 살펴보는 학습 조작물과 교실 장면"
+
+
+def _hide_prompt_text(value: str, hidden_texts: list[str]) -> str:
+    result = value.strip()
+    for text in hidden_texts:
+        cleaned = text.strip()
+        if cleaned:
+            result = result.replace(cleaned, "").strip()
+    return " ".join(result.split())
+
+
+def _composition_for_asset(asset_role: str) -> str:
+    if asset_role == AssetRole.HERO:
+        return "medium-wide establishing scene with the learning context visible, no worksheet close-up."
+    if asset_role in {AssetRole.STAGE_2, AssetRole.STAGE_3}:
+        return "contextual classroom or daily-life scene; show the place, objects, and student action together instead of filling the frame with text."
+    if asset_role == AssetRole.STAGE_4_REALTIME:
+        return "role-practice scene with two participants or a clear conversation setting, leaving space for the app UI to guide the activity."
+    return "introductory scene that shows the context and main object without turning it into a problem sheet."
+
+
+def _stage_context_object(stage) -> str:
+    if stage is None:
+        return ""
+    template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
+    for key in ("context", "situation", "storyText", "missionText"):
+        value = template_json.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return stage.student_title
+
+
+def _asset_scene_summary(content, asset, stage, primary_object: str) -> str:
+    if asset.asset_role == AssetRole.HERO:
+        return f"{content.title} 활동이 시작되는 교실이나 실제 생활 장면"
+    if asset.asset_role == AssetRole.STAGE_4_REALTIME:
+        return f"{content.title} 내용을 말이나 행동으로 연습하는 실제 대화 장면"
+    stage_label = _visual_stage_label(asset.asset_role)
+    return f"{content.title} 중 {stage_label}에 어울리는 실제 상황 장면, {primary_object}은 장면 속 자연스러운 사물로 배치"
+
+
+def _asset_visual_purpose(content, asset, stage) -> str:
+    if asset.asset_role == AssetRole.HERO:
+        return "수업의 전체 상황과 분위기를 먼저 이해하게 합니다."
+    if asset.asset_role == AssetRole.STAGE_4_REALTIME:
+        return "학생이 앞 단계에서 다룬 내용을 실제 대화나 행동으로 옮겨 볼 장면을 제공합니다."
+    stage_label = _visual_stage_label(asset.asset_role)
+    return f"{stage_label}에 들어가기 전 상황과 활동 맥락을 이해하게 합니다."
+
+
+def _visual_stage_label(asset_role: str) -> str:
+    if asset_role == AssetRole.STAGE_1:
+        return "첫 활동"
+    if asset_role == AssetRole.STAGE_2:
+        return "두 번째 활동"
+    if asset_role == AssetRole.STAGE_3:
+        return "세 번째 활동"
+    return "학습 활동"
+
+
+def _instructional_design_for_asset(content, asset, stage) -> str:
+    content_type = _as_asset_role_value(content.content_type)
+    if asset.asset_role == AssetRole.HERO:
+        return "present the mission world and the main learning material with enough specificity for a teacher to recognize the lesson goal"
+    if asset.asset_role == AssetRole.STAGE_4_REALTIME:
+        if content_type == "life_support":
+            return "show a realistic practice setup where the student can rehearse a short action or expression with another person"
+        return "show a teach-back setup where the student can explain the learned idea using nearby materials"
+    template_type = _as_asset_role_value(stage.template_type) if stage else ""
+    if content_type == "life_support":
+        if template_type in {"sequence_ordering", "decision_card"}:
+            return "show the order of events and the decision point that changes the next action"
+        if template_type in {"clue_question", "scene_question", "scene_observation"}:
+            return "show the meaningful clue before the action, with place, person, and object relationships clear"
+        return "show the real-life decision context that leads to a safer or more appropriate next action"
+    if template_type in {"card_match", "partition_picker"}:
+        return "show comparable materials arranged so relationships can be noticed without turning the image into answer cards"
+    if template_type in {"sequence_ordering", "blank_fill"}:
+        return "show the activity setup and materials around the concept without turning them into the problem source"
+    if template_type in {"explanation_choice", "wrong_explanation_fix", "applied_question"}:
+        return "show the concept in a transfer situation where the student must justify or correct an explanation"
+    return "show the learning material in context so the student can observe, compare, and explain rather than guess from decoration"
+
+
+def _filter_prompt_anchors(values: list[str], *, blocked_texts: list[str], source_text_lines: list[str]) -> list[str]:
     return [
         value
         for value in _dedupe_strings(values)
-        if not _is_blocked_prompt_anchor(value, blocked_texts=blocked_texts, allowed_scene_text=allowed_scene_text)
+        if not _is_blocked_prompt_anchor(value, blocked_texts=blocked_texts, source_text_lines=source_text_lines)
     ]
 
 
-def _is_blocked_prompt_anchor(value: str, *, blocked_texts: list[str], allowed_scene_text: list[str]) -> bool:
+def _is_blocked_prompt_anchor(value: str, *, blocked_texts: list[str], source_text_lines: list[str]) -> bool:
     cleaned = value.strip()
-    if not cleaned or cleaned in allowed_scene_text:
-        return False
-    for blocked in blocked_texts:
+    if not cleaned:
+        return True
+    for blocked in blocked_texts + source_text_lines:
         blocked_cleaned = blocked.strip() if isinstance(blocked, str) else ""
-        if not blocked_cleaned or blocked_cleaned in allowed_scene_text:
+        if not blocked_cleaned:
             continue
         if cleaned == blocked_cleaned or cleaned in blocked_cleaned or blocked_cleaned in cleaned:
             return True
@@ -1174,10 +1213,10 @@ def _camera_for_asset(asset_role: str) -> str:
     if asset_role == AssetRole.HERO:
         return "medium-close establishing shot"
     if asset_role in {AssetRole.STAGE_2, AssetRole.STAGE_3}:
-        return "close-up or tabletop evidence shot"
+        return "contextual medium-close situation shot"
     if asset_role == AssetRole.STAGE_4_REALTIME:
         return "medium-close role-practice shot"
-    return "medium-close evidence introduction shot"
+    return "contextual medium-close introduction shot"
 
 
 def _human_presence_for_asset(content, asset, stage) -> str:
@@ -1206,124 +1245,53 @@ def _stage_visual_specs_by_role(content) -> dict[str, dict[str, Any]]:
     return specs
 
 
-def _stage_visual_source(stage) -> dict[str, Any]:
-    template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
-    return {
-        "sourceTextLines": _string_list(template_json.get("sourceTextLines")),
-        "sceneTextLines": _string_list(template_json.get("sceneTextLines")),
-        "visualAnchors": _extract_visual_anchors(template_json),
-        "assetRole": _asset_role_for_step(stage.step).value,
-    }
-
-
 def _stage_visual_spec_for_stage(stage, stage_visual_specs: dict[str, dict[str, Any]]) -> dict[str, Any]:
     role = _asset_role_for_step(stage.step).value
-    return stage_visual_specs.get(role) or _fallback_stage_visual_spec(stage)
+    spec = stage_visual_specs.get(role)
+    if not isinstance(spec, dict):
+        raise HTTPException(
+            status_code=424,
+            detail={
+                "code": "STAGE_VISUAL_SPEC_MISSING",
+                "message": f"{role} 이미지 제작 지시서가 없습니다. 콘텐츠 구조를 다시 생성해야 합니다.",
+                "details": {"reviewRequired": True, "assetRole": role},
+            },
+        )
+    return spec
 
 
 def _stage_visual_spec_for_asset(content, asset, stages: list, stage_visual_specs: dict[str, dict[str, Any]]) -> dict[str, Any]:
     role = _as_asset_role_value(asset.asset_role)
-    if role in stage_visual_specs:
-        return stage_visual_specs[role]
-    if asset.asset_role == AssetRole.HERO:
-        return _fallback_hero_visual_spec(content, stages)
-    stage = next((candidate for candidate in stages if candidate.id == asset.stage_id), None)
-    return _fallback_stage_visual_spec(stage) if stage else {}
-
-
-def _fallback_hero_visual_spec(content, stages: list) -> dict[str, Any]:
-    anchors = _brief_visual_anchors_from_stages(stages)
-    return {
-        "assetRole": AssetRole.HERO.value,
-        "step": 0,
-        "visualPurpose": "미션 전체의 상황과 핵심 학습 근거를 한눈에 보여줍니다.",
-        "sceneSummary": content.title,
-        "primaryEvidenceObject": anchors[0] if anchors else content.title,
-        "mustShow": anchors[:5],
-        "allowedSceneText": _allowed_scene_text_from_stages(stages),
-        "doNotRenderText": _do_not_render_text_from_stages(stages),
-        "composition": "학습 근거가 화면 중심에 보이고 사람은 보조 맥락으로만 배치합니다.",
-    }
-
-
-def _fallback_stage_visual_spec(stage) -> dict[str, Any]:
-    if stage is None:
-        return {}
-    template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
-    allowed_scene_text = _allowed_scene_text_from_stage(stage)
-    anchors = _extract_visual_anchors(template_json)
-    role = _asset_role_for_step(stage.step).value
-    return {
-        "assetRole": role,
-        "step": stage.step,
-        "visualPurpose": f"{stage.student_title} 단계에서 학생이 볼 실제 장면 근거를 보여줍니다.",
-        "sceneSummary": _first_text_value(template_json, ("storyText", "missionText", "context", "situation")) or stage.student_title,
-        "primaryEvidenceObject": anchors[0] if anchors else (allowed_scene_text[0] if allowed_scene_text else stage.student_title),
-        "mustShow": anchors[:5],
-        "allowedSceneText": allowed_scene_text,
-        "doNotRenderText": _stage_do_not_render_text(stage),
-        "composition": "장면 근거를 크게 보여주고 문제 UI, 선택지, 정답 범주는 이미지 밖에 남깁니다.",
-    }
+    spec = stage_visual_specs.get(role)
+    if not isinstance(spec, dict):
+        raise HTTPException(
+            status_code=424,
+            detail={
+                "code": "STAGE_VISUAL_SPEC_MISSING",
+                "message": f"{role} 이미지 제작 지시서가 없습니다. 콘텐츠 구조를 다시 생성해야 합니다.",
+                "details": {"reviewRequired": True, "contentId": content.id, "assetId": asset.id, "assetRole": role},
+            },
+        )
+    return spec
 
 
 def _allowed_scene_text_for_asset(content, asset, stages: list, stage_visual_specs: dict[str, dict[str, Any]]) -> list[str]:
-    spec = _stage_visual_spec_for_asset(content, asset, stages, stage_visual_specs)
-    spec_lines = _string_list(spec.get("allowedSceneText")) if isinstance(spec, dict) else []
-    if asset.asset_role == AssetRole.HERO:
-        source_lines = _allowed_scene_text_from_stages(stages)
-        blocked_texts = _do_not_render_text_from_stages(stages)
-        return _filter_allowed_scene_text(spec_lines + source_lines, blocked_texts=blocked_texts, source_lines=source_lines)
-    stage = next((candidate for candidate in stages if candidate.id == asset.stage_id), None)
-    source_lines = _allowed_scene_text_from_stage(stage) if stage else []
-    blocked_texts = _stage_do_not_render_text(stage) if stage else []
-    return _filter_allowed_scene_text(spec_lines + source_lines, blocked_texts=blocked_texts, source_lines=source_lines)
+    return []
 
 
 def _do_not_render_text_for_asset(content, asset, stages: list, stage_visual_specs: dict[str, dict[str, Any]]) -> list[str]:
-    spec = _stage_visual_spec_for_asset(content, asset, stages, stage_visual_specs)
-    spec_lines = _string_list(spec.get("doNotRenderText")) if isinstance(spec, dict) else []
-    spec_lines.extend(ANSWER_CUE_IMAGE_TEXTS)
     if asset.asset_role == AssetRole.HERO:
-        return _dedupe_strings(spec_lines + _do_not_render_text_from_stages(stages))
+        return _do_not_render_text_from_stages(stages)
     stage = next((candidate for candidate in stages if candidate.id == asset.stage_id), None)
-    return _dedupe_strings(spec_lines + (_stage_do_not_render_text(stage) if stage else []))
-
-
-def _filter_allowed_scene_text(
-    lines: list[str],
-    *,
-    blocked_texts: list[str] | None = None,
-    source_lines: list[str] | None = None,
-) -> list[str]:
-    blocked = {text.strip() for text in (blocked_texts or []) if isinstance(text, str) and text.strip()}
-    source = {text.strip() for text in (source_lines or []) if isinstance(text, str) and text.strip()}
-    return _dedupe_strings(
-        line
-        for line in lines
-        if not _is_answer_cue_image_text(line)
-        and not (line.strip() in blocked and line.strip() not in source)
-    )
-
-
-def _is_answer_cue_image_text(value: str) -> bool:
-    cleaned = value.strip()
-    if not cleaned:
-        return False
-    return any(term in cleaned for term in ANSWER_CUE_IMAGE_TEXTS)
+    return _stage_do_not_render_text(stage) if stage else []
 
 
 def _allowed_scene_text_from_stages(stages: list) -> list[str]:
-    lines: list[str] = []
-    for stage in stages:
-        lines.extend(_allowed_scene_text_from_stage(stage))
-    return _dedupe_strings(lines)
+    return []
 
 
 def _allowed_scene_text_from_stage(stage) -> list[str]:
-    if stage is None:
-        return []
-    template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
-    return _dedupe_strings(_string_list(template_json.get("sourceTextLines")) + _string_list(template_json.get("sceneTextLines")))
+    return []
 
 
 def _do_not_render_text_from_stages(stages: list) -> list[str]:
@@ -1338,18 +1306,19 @@ def _stage_do_not_render_text(stage) -> list[str]:
         return []
     template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
     blocked = [stage.student_instruction]
-    evidence = _stage_learning_evidence(stage)
+    blocked.extend(_string_list(template_json.get("sourceTextLines")))
+    blocked.extend(_string_list(template_json.get("sceneTextLines")))
+    problem_data = _stage_problem_data(stage)
     for key in ("taskPrompt", "taskBody"):
-        value = evidence.get(key)
+        value = problem_data.get(key)
         if isinstance(value, str):
             blocked.append(value)
     for key in ("choiceTexts", "matchingTexts", "sequenceTexts"):
-        value = evidence.get(key)
+        value = problem_data.get(key)
         if isinstance(value, list):
             blocked.extend(item for item in value if isinstance(item, str))
     blocked.extend(_template_feedback_texts(template_json))
-    allowed = set(_allowed_scene_text_from_stage(stage))
-    return _dedupe_strings(text for text in blocked if text and text not in allowed)
+    return _dedupe_strings(text for text in blocked if text)
 
 
 def _template_feedback_texts(template_json: dict[str, Any]) -> list[str]:
@@ -1393,7 +1362,7 @@ def _apply_image_brief_output(content, output_json: dict) -> None:
             detail={
                 "code": "IMAGE_BRIEF_OUTPUT_INVALID",
                 "message": "이미지 프롬프트 빌더 응답에 imageBriefs가 없습니다.",
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "contentId": content.id},
+                "details": {"reviewRequired": True, "contentId": content.id},
             },
         )
 
@@ -1409,202 +1378,25 @@ def _apply_image_brief_output(content, output_json: dict) -> None:
                 detail={
                     "code": "IMAGE_BRIEF_PROMPT_INVALID",
                     "message": f"{asset.asset_role} 이미지 프롬프트가 충분하지 않습니다.",
-                    "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "assetId": asset.id},
-                },
-            )
-        for term in PROBLEM_ANSWER_IMAGE_PROMPT_TERMS:
-            if _requests_problem_answer_image_text(prompt, term):
-                raise HTTPException(
-                    status_code=424,
-                    detail={
-                        "code": "IMAGE_BRIEF_PROBLEM_ANSWER_TEXT",
-                        "message": f"{asset.asset_role} 이미지 프롬프트가 문제/정답/선택지 텍스트를 이미지에 넣도록 요청합니다: {term}",
-                        "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "assetId": asset.id},
-                    },
-                )
-        blocked_text = _blocked_visible_text_in_image_prompt(
-            content,
-            asset,
-            prompt,
-            extra_allowed_scene_texts=_string_list(brief.get("sceneTextLines")) if isinstance(brief, dict) else [],
-        )
-        if blocked_text:
-            raise HTTPException(
-                status_code=424,
-                detail={
-                    "code": "IMAGE_BRIEF_UI_TEXT",
-                    "message": f"{asset.asset_role} 이미지 프롬프트에 sourceTextLines가 아닌 UI/보기 문구가 들어갔습니다: {blocked_text}",
-                    "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "assetId": asset.id},
+                    "details": {"reviewRequired": True, "assetId": asset.id},
                 },
             )
         existing = asset.prompt_json if isinstance(asset.prompt_json, dict) else {}
-        ocr_required = bool(brief.get("ocrRequired", False))
-        text_rendering_policy = "short_scene_text_allowed_no_problem_ui" if ocr_required else "scene_only_no_problem_text"
         asset.prompt_json = {
             **existing,
-            "promptVersion": "image_brief_v1",
+            "promptVersion": IMAGE_BRIEF_PROMPT_VERSION,
             "prompt": prompt.strip(),
             "negativePromptRules": brief.get("negativePromptRules", []),
-            "learningEvidence": brief.get("learningEvidence", {}),
+            "visualContext": brief.get("visualContext", {}),
             "compositionPlan": brief.get("compositionPlan", {}),
-            "ocrRequired": ocr_required,
-            "sceneTextLines": brief.get("sceneTextLines", []),
             "qaChecklist": brief.get("qaChecklist", []),
-            "textRenderingPolicy": text_rendering_policy,
+            "textRenderingPolicy": "scene_only_no_problem_text",
         }
 
 
-def _requests_problem_answer_image_text(prompt: str, term: str) -> bool:
-    index = prompt.find(term)
-    while index != -1:
-        window = prompt[max(0, index - 80) : index + len(term) + 120]
-        if not _is_negated_image_prompt_term(window):
-            return True
-        index = prompt.find(term, index + len(term))
-    return False
-
-
-def _blocked_visible_text_in_image_prompt(
-    content,
-    asset,
-    prompt: str,
-    *,
-    extra_allowed_scene_texts: list[str] | None = None,
-) -> str | None:
-    allowed_scene_texts = set()
-    blocked_texts = []
-    stages = list(content.stages)
-    stage_visual_specs = _stage_visual_specs_by_role(content)
-    for stage in stages:
-        template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
-        allowed_scene_texts.update(_string_list(template_json.get("sourceTextLines")))
-        allowed_scene_texts.update(_string_list(template_json.get("sceneTextLines")))
-    allowed_scene_texts.update(_allowed_scene_text_for_asset(content, asset, stages, stage_visual_specs))
-    allowed_scene_texts.update(extra_allowed_scene_texts or [])
-
-    if asset.asset_role == AssetRole.HERO:
-        target_stages = stages
-    else:
-        target_stages = [stage for stage in stages if stage.id == asset.stage_id]
-
-    for stage in target_stages:
-        evidence = _stage_learning_evidence(stage)
-        for key in ("taskPrompt", "taskBody"):
-            value = evidence.get(key)
-            if isinstance(value, str):
-                blocked_texts.append(value)
-        for key in ("choiceTexts", "matchingTexts", "sequenceTexts"):
-            value = evidence.get(key)
-            if isinstance(value, list):
-                blocked_texts.extend(item for item in value if isinstance(item, str))
-    blocked_texts.extend(_do_not_render_text_for_asset(content, asset, stages, stage_visual_specs))
-
-    for text in blocked_texts:
-        cleaned = text.strip()
-        if not _is_meaningful_image_ui_text(cleaned):
-            continue
-        if _is_allowed_scene_text(cleaned, allowed_scene_texts):
-            continue
-        if _contains_non_negated_prompt_text(prompt, cleaned):
-            return cleaned
-    return None
-
-
-def _is_allowed_scene_text(text: str, allowed_scene_texts: set[str]) -> bool:
-    normalized = _normalize_scene_text(text)
-    if not normalized:
-        return False
-    for allowed in allowed_scene_texts:
-        allowed_normalized = _normalize_scene_text(allowed)
-        if not allowed_normalized:
-            continue
-        if normalized == allowed_normalized or normalized in allowed_normalized or allowed_normalized in normalized:
-            return True
-    return False
-
-
-def _normalize_scene_text(text: str) -> str:
-    return "".join(character for character in text.strip() if not character.isspace() and character not in ".,!?\"'“”‘’")
-
-
-def _contains_non_negated_prompt_text(prompt: str, text: str) -> bool:
-    index = prompt.find(text)
-    while index != -1:
-        window = prompt[max(0, index - 80) : index + len(text) + 120]
-        if not _is_negated_image_prompt_term(window):
-            return True
-        index = prompt.find(text, index + len(text))
-    return False
-
-
-def _is_meaningful_image_ui_text(text: str) -> bool:
-    return len(text) >= 5 and any("\uac00" <= character <= "\ud7a3" for character in text)
-
-
-def _is_negated_image_prompt_term(text: str) -> bool:
-    negation_markers = (
-        "넣지 마세요",
-        "넣지 않는다",
-        "넣지 않",
-        "넣지 않습니다",
-        "포함하지 마세요",
-        "포함하지 않",
-        "포함하지 않는",
-        "포함하지 않습니다",
-        "표시하지 않",
-        "표시하지 않습니다",
-        "보이지 않",
-        "보이지 않는",
-        "보이지 않습니다",
-        "노출하지",
-        "노출되지",
-        "노출하지 않습니다",
-        "노출되지 않습니다",
-        "드러나지",
-        "렌더링하지",
-        "렌더링하지 않습니다",
-        "쓰지",
-        "쓰지 않습니다",
-        "사용하지",
-        "사용하지 않습니다",
-        "요청하지",
-        "요청하지 않습니다",
-        "피하고",
-        "피합니다",
-        "제외",
-        "제외합니다",
-        "금지",
-        "없이",
-        "없는",
-        "없습니다",
-        "없게",
-        "아닌",
-        "no ",
-        "do not",
-        "not include",
-        "avoid",
-        "without",
-    )
-    lowered = text.lower()
-    return any(marker in lowered for marker in negation_markers)
-
-
-def _asset_stage_evidence(asset, stages: list) -> dict[str, Any] | None:
-    if asset.asset_role == AssetRole.HERO:
-        return {
-            "purpose": "대표 장면",
-            "contentTitle": "mission overview",
-            "sharedAnchors": _brief_visual_anchors_from_stages(stages),
-        }
-    stage = next((candidate for candidate in stages if candidate.id == asset.stage_id), None)
-    if stage is None:
-        return None
-    return _stage_learning_evidence(stage)
-
-
-def _stage_learning_evidence(stage) -> dict[str, Any]:
+def _stage_problem_data(stage) -> dict[str, Any]:
     template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
-    evidence: dict[str, Any] = {
+    problem_data: dict[str, Any] = {
         "step": stage.step,
         "studentTitle": stage.student_title,
         "stageRole": stage.stage_role,
@@ -1620,19 +1412,19 @@ def _stage_learning_evidence(stage) -> dict[str, Any]:
     }
     if stage.realtime_spec:
         spec = stage.realtime_spec.model_dump(by_alias=True)
-        evidence["realtime"] = {
+        problem_data["realtime"] = {
             "scenario": spec.get("scenario"),
             "openingLine": spec.get("openingLine"),
             "targetBehavior": spec.get("targetBehavior"),
             "rubric": spec.get("rubric"),
         }
-    return evidence
+    return problem_data
 
 
 def _brief_visual_anchors_from_stages(stages: list) -> list[str]:
     anchors: list[str] = []
     for stage in stages:
-        for value in _stage_learning_evidence(stage).get("visualAnchors", []):
+        for value in _stage_problem_data(stage).get("visualAnchors", []):
             if value not in anchors:
                 anchors.append(value)
     return anchors[:8]
@@ -1731,9 +1523,9 @@ def _extract_sequence_texts(template_json: dict[str, Any]) -> list[str]:
 
 def _extract_visual_anchors(template_json: dict[str, Any]) -> list[str]:
     anchors: list[str] = []
-    for key in ("visualAnchors", "objects", "materials", "sourceTextLines", "sceneTextLines"):
+    for key in ("visualAnchors", "objects", "materials"):
         anchors.extend(_string_list(template_json.get(key)))
-    for key in ("situation", "context", "body", "prompt", "question"):
+    for key in ("situation", "context"):
         value = template_json.get(key)
         if isinstance(value, str) and value.strip():
             anchors.append(value.strip())
@@ -1790,7 +1582,7 @@ def _preflight_provider_keys(content) -> None:
             detail={
                 "code": "OPENAI_API_KEY_MISSING",
                 "message": "OPENAI_API_KEY가 없어 이미지 패키지 생성을 실행할 수 없습니다.",
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+                "details": {"reviewRequired": True},
             },
         )
     if has_audio and not settings.elevenlabs_api_key:
@@ -1799,7 +1591,7 @@ def _preflight_provider_keys(content) -> None:
             detail={
                 "code": "ELEVENLABS_API_KEY_MISSING",
                 "message": "ELEVENLABS_API_KEY가 없어 오디오 패키지 생성을 실행할 수 없습니다.",
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+                "details": {"reviewRequired": True},
             },
         )
     if has_audio and not settings.elevenlabs_voice_id:
@@ -1808,7 +1600,7 @@ def _preflight_provider_keys(content) -> None:
             detail={
                 "code": "ELEVENLABS_VOICE_ID_MISSING",
                 "message": "ELEVENLABS_VOICE_ID가 없어 오디오 패키지 생성을 실행할 수 없습니다.",
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+                "details": {"reviewRequired": True},
             },
         )
 

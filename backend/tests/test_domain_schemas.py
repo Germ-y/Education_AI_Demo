@@ -2,10 +2,8 @@ import pytest
 
 from app.api.routes.ai import _mission_from_generation
 from app.api.routes.contents import (
-    _blocked_visible_text_in_image_prompt,
     _build_image_brief_output,
     _pairs_from_left_right_cards,
-    _requests_problem_answer_image_text,
 )
 from app.data.demo_data import create_demo_database
 from app.domain.schemas import ContentAsset, ContentStage, MissionContent
@@ -19,17 +17,6 @@ def test_accepts_demo_4_stage_missions() -> None:
         MissionContent.model_validate(content.model_dump(by_alias=True))
         assert content.total_steps == 4
         assert sorted(stage.step for stage in content.stages) == [1, 2, 3, 4]
-
-
-def test_image_prompt_checker_only_blocks_requested_problem_answer_text() -> None:
-    assert not _requests_problem_answer_image_text("문제 문장이나 선택지는 넣지 마세요.", "문제 문장")
-    assert not _requests_problem_answer_image_text("정답 UI가 없는 실제 게시판 장면으로 구성합니다.", "정답")
-    assert not _requests_problem_answer_image_text("선택지와 정답은 포함하지 않는 포스터 장면입니다.", "정답")
-    assert not _requests_problem_answer_image_text(
-        "Real notice board with short source text. Do not include problem instructions, choices, hints, correct answers, or 정답 category labels.",
-        "정답",
-    )
-    assert _requests_problem_answer_image_text("이미지 중앙에 정답을 크게 보여주세요.", "정답")
 
 
 def test_image_brief_evidence_reads_card_match_dict_matches() -> None:
@@ -53,61 +40,7 @@ def test_image_brief_evidence_reads_card_match_dict_matches() -> None:
     ]
 
 
-def test_image_brief_blocks_choice_text_from_visible_prompt() -> None:
-    mission = MissionContent.model_validate(_generated_life_support_content())
-    asset = next(asset for asset in mission.assets if asset.asset_type == "image" and asset.asset_role == "stage_2")
-
-    blocked = _blocked_visible_text_in_image_prompt(
-        mission,
-        asset,
-        "버스 정류장 장면 안에 '센터로 가는 버스 번호 확인하기' 선택 카드가 크게 보입니다.",
-    )
-
-    assert blocked == "센터로 가는 버스 번호 확인하기"
-
-
-def test_image_brief_allows_stage_visual_scene_text_from_visible_prompt() -> None:
-    mission = MissionContent.model_validate(_generated_life_support_content())
-    mission.brief_json = {
-        "stageVisualSpecs": [
-            {
-                "assetRole": "stage_2",
-                "allowedSceneText": ["오늘 시간표"],
-                "doNotRenderText": [],
-            }
-        ]
-    }
-    asset = next(asset for asset in mission.assets if asset.asset_type == "image" and asset.asset_role == "stage_2")
-
-    blocked = _blocked_visible_text_in_image_prompt(
-        mission,
-        asset,
-        "교실 칠판에 실제 장면 단서로 '오늘 시간표'가 작게 보입니다.",
-    )
-
-    assert blocked is None
-
-
-def test_image_brief_allows_source_text_substrings_from_visible_prompt() -> None:
-    mission = MissionContent.model_validate(_generated_life_support_content())
-    stage = next(stage for stage in mission.stages if stage.step == 2)
-    stage.template_json = {
-        **stage.template_json,
-        "sourceTextLines": ["복도에서 줄을 서서 이동해요.", "뛰지 말고 천천히 걸어요."],
-    }
-    asset = next(asset for asset in mission.assets if asset.asset_type == "image" and asset.asset_role == "stage_2")
-
-    blocked = _blocked_visible_text_in_image_prompt(
-        mission,
-        asset,
-        "학교 복도 안내문에 '줄을 서서 이동해요'라는 원자료 문구가 자연스럽게 보입니다.",
-        extra_allowed_scene_texts=["복도에서는 천천히 걸어요"],
-    )
-
-    assert blocked is None
-
-
-def test_image_brief_keeps_source_text_but_filters_ui_question_from_prompt() -> None:
+def test_image_brief_keeps_image_prompt_situational_and_filters_ui_question() -> None:
     mission = MissionContent.model_validate(_generated_life_support_content())
     stage = next(stage for stage in mission.stages if stage.step == 2)
     stage.template_json = {
@@ -125,11 +58,11 @@ def test_image_brief_keeps_source_text_but_filters_ui_question_from_prompt() -> 
                 "assetRole": "stage_2",
                 "visualPurpose": "알림장 원자료에서 준비물을 찾는 근거를 보여줍니다.",
                 "sceneSummary": "학교 알림장 본문을 가까이 보여주는 장면",
-                "primaryEvidenceObject": "학교 알림장",
+                "primaryEvidenceObject": "체육 활동 준비 장면",
                 "mustShow": ["학교 알림장", "준비물 줄"],
-                "allowedSceneText": ["무엇을 준비해 오나요?", "체육 행사 안내", "준비물: 운동화, 물통"],
+                "allowedSceneText": [],
                 "doNotRenderText": [],
-                "composition": "실제 문장 내용은 판독 불가한 수준으로 표현한다.",
+                "composition": "책상과 알림장, 준비물 그림이 함께 보이는 교실 장면",
             }
         ]
     }
@@ -137,14 +70,19 @@ def test_image_brief_keeps_source_text_but_filters_ui_question_from_prompt() -> 
 
     output = _build_image_brief_output(mission, [asset])
     prompt = output["imageBriefs"][0]["prompt"]
-    scene_text_lines = output["imageBriefs"][0]["sceneTextLines"]
 
     assert "무엇을 준비해 오나요?" not in prompt
-    assert "준비물: 운동화, 물통" in prompt
-    assert "준비물: 운동화, 물통" in scene_text_lines
-    assert "무엇을 준비해 오나요?" not in scene_text_lines
-    assert "판독 불가" not in prompt
-    assert "sharp, legible, and not blurred" in prompt
+    assert "준비물: 운동화, 물통" not in prompt
+    assert "색연필과 가위" not in prompt
+    assert "체육 행사 안내" not in prompt
+    assert "장소: 운동장" not in prompt
+    assert "worksheet" in prompt
+    assert "natural scene or classroom material setup" in prompt
+    assert "not an instructional diagram or source document" in prompt
+    assert "sceneTextLines" not in output["imageBriefs"][0]
+    assert "learningEvidence" not in output["imageBriefs"][0]
+    assert "visualContext" in output["imageBriefs"][0]
+    assert output["imageBriefs"][0]["textRenderingPolicy"] == "scene_context_only_no_lesson_text"
 
 
 def test_rejects_fifth_stage() -> None:
@@ -277,7 +215,7 @@ def test_content_generation_output_accepts_direct_mission_content_schema() -> No
     assert len([asset for asset in mission.assets if asset.asset_type == "audio"]) == 5
 
 
-def test_content_generation_normalizes_realtime_reflection_object() -> None:
+def test_content_generation_rejects_realtime_reflection_object() -> None:
     base_content = next(content for content in create_demo_database().mission_contents if content.student_id == "student_learning_fraction")
     content = base_content.model_dump(by_alias=True)
     content["id"] = "content_generated_realtime_reflection_check"
@@ -300,13 +238,11 @@ def test_content_generation_normalizes_realtime_reflection_object() -> None:
         "choices": ["잘 말했어요.", "조금 더 연습하고 싶어요."],
     }
 
-    mission = _mission_from_generation(content, student_id=base_content.student_id, case_id=base_content.case_id)
-
-    assert mission.stages[3].realtime_spec is not None
-    assert mission.stages[3].realtime_spec.post_practice_reflection == ["오늘 연습에서 내가 말한 도움 요청 문장을 떠올려볼까요?"]
+    with pytest.raises(ValueError, match="postPracticeReflection"):
+        _mission_from_generation(content, student_id=base_content.student_id, case_id=base_content.case_id)
 
 
-def test_content_generation_normalizes_realtime_rubric_description() -> None:
+def test_content_generation_rejects_realtime_rubric_without_label() -> None:
     base_content = next(content for content in create_demo_database().mission_contents if content.student_id == "student_learning_fraction")
     content = base_content.model_dump(by_alias=True)
     content["id"] = "content_generated_realtime_rubric_check"
@@ -329,14 +265,11 @@ def test_content_generation_normalizes_realtime_rubric_description() -> None:
         {"id": "r2", "description": "부분의 수를 한 문장으로 설명한다.", "required": False},
     ]
 
-    mission = _mission_from_generation(content, student_id=base_content.student_id, case_id=base_content.case_id)
-
-    assert mission.stages[3].realtime_spec is not None
-    assert mission.stages[3].realtime_spec.rubric[0].label == "전체를 먼저 확인한다고 말한다."
-    assert mission.stages[3].realtime_spec.rubric[1].label == "부분의 수를 한 문장으로 설명한다."
+    with pytest.raises(ValueError, match="rubric"):
+        _mission_from_generation(content, student_id=base_content.student_id, case_id=base_content.case_id)
 
 
-def test_content_generation_strips_unsupported_card_match_cards() -> None:
+def test_content_generation_preserves_extra_card_match_fields_for_schema_visibility() -> None:
     base_content = next(content for content in create_demo_database().mission_contents if content.student_id == "student_learning_fraction")
     content = base_content.model_dump(by_alias=True)
     content["id"] = "content_generated_card_match_cleanup"
@@ -373,7 +306,7 @@ def test_content_generation_strips_unsupported_card_match_cards() -> None:
 
     mission = _mission_from_generation(content, student_id=base_content.student_id, case_id=base_content.case_id)
 
-    assert "cards" not in mission.stages[1].template_json
+    assert "cards" in mission.stages[1].template_json
 
 
 def test_orchestrator_plan_quality_requires_track_matching_four_stage_flow() -> None:
@@ -400,7 +333,6 @@ def test_orchestrator_plan_quality_leaves_prompt_level_design_criteria_to_genera
     plan = _valid_learning_plan()
     del plan["scenarioSpine"]["stage2FirstSuccess"]
     del plan["stagePlan"][1]["templateRationale"]
-    del plan["stageVisualSpecs"][1]["evidenceLocation"]
 
     validate_orchestrator_plan_quality(
         plan,
@@ -585,28 +517,30 @@ def test_mission_quality_requires_fixed_student_stage_titles() -> None:
         )
 
 
-def test_mission_quality_leaves_ui_text_inside_image_prompt_to_asset_review() -> None:
+def test_mission_quality_rejects_ui_text_inside_image_prompt() -> None:
     content = _generated_fraction_content()
     content["assets"][1]["promptJson"]["prompt"] += " 전체는 몇 조각인가요?"
     mission = MissionContent.model_validate(content)
 
-    validate_mission_content_quality(
-        mission,
-        case_file=_fraction_case_file(),
-        orchestrator_plan=_valid_learning_plan(),
-    )
+    with pytest.raises(ContentQualityError, match="문제 UI 텍스트"):
+        validate_mission_content_quality(
+            mission,
+            case_file=_fraction_case_file(),
+            orchestrator_plan=_valid_learning_plan(),
+        )
 
 
-def test_mission_quality_leaves_ui_like_image_prompt_wording_to_pre_asset_review() -> None:
+def test_mission_quality_rejects_ui_like_image_prompt_wording() -> None:
     content = _generated_fraction_content()
     content["assets"][1]["promptJson"]["prompt"] += " 빈 카드와 말풍선, 선택지 영역을 함께 배치합니다."
     mission = MissionContent.model_validate(content)
 
-    validate_mission_content_quality(
-        mission,
-        case_file=_fraction_case_file(),
-        orchestrator_plan=_valid_learning_plan(),
-    )
+    with pytest.raises(ContentQualityError, match="이미지 프롬프트"):
+        validate_mission_content_quality(
+            mission,
+            case_file=_fraction_case_file(),
+            orchestrator_plan=_valid_learning_plan(),
+        )
 
 
 def test_mission_quality_allows_real_object_button_word_in_image_prompt() -> None:
@@ -738,7 +672,7 @@ def _valid_learning_plan() -> dict:
             {"assetRole": "hero", "scenePurpose": "시작 장면", "mustShow": ["피자 조각"], "mustNotShow": ["problem text"]},
             {"assetRole": "stage_1", "scenePurpose": "전체 확인", "mustShow": ["전체 피자"], "mustNotShow": ["problem text"]},
             {"assetRole": "stage_2", "scenePurpose": "조각 세기", "mustShow": ["네 조각"], "mustNotShow": ["problem text"]},
-            {"assetRole": "stage_3", "scenePurpose": "분수 연결", "mustShow": ["한 조각 강조"], "mustNotShow": ["problem text"]},
+            {"assetRole": "stage_3", "scenePurpose": "분수 연결", "mustShow": ["한 조각과 전체 조각"], "mustNotShow": ["problem text"]},
             {"assetRole": "stage_4_realtime", "scenePurpose": "설명 상황", "mustShow": ["마스코트"], "mustNotShow": ["problem text"]},
         ],
         "stageVisualSpecs": _fraction_stage_visual_specs(),
@@ -788,11 +722,11 @@ def _fraction_stage_visual_specs() -> list[dict]:
             "visualPurpose": "전체와 부분을 배울 피자 조각 장면을 소개합니다.",
             "sceneSummary": "네 조각 피자가 놓인 책상 장면",
             "primaryEvidenceObject": "네 조각 피자",
-            "evidenceLocation": "책상 가운데 네 조각 피자 경계",
+            "evidenceLocation": "problem_ui_only",
             "mustShow": ["네 조각 피자"],
             "allowedSceneText": [],
             "doNotRenderText": ["문제", "선택지", "정답", "힌트"],
-            "composition": "피자 조각이 중심에 크게 보입니다.",
+            "composition": "피자 조각이 자연스럽게 놓여 있습니다.",
         },
         {
             "assetRole": "stage_1",
@@ -800,35 +734,35 @@ def _fraction_stage_visual_specs() -> list[dict]:
             "visualPurpose": "전체 피자가 몇 조각인지 확인하게 합니다.",
             "sceneSummary": "네 조각으로 나뉜 피자 전체",
             "primaryEvidenceObject": "전체 피자",
-            "evidenceLocation": "화면 중심의 전체 피자 조각 경계",
+            "evidenceLocation": "problem_ui_only",
             "mustShow": ["네 조각", "전체 피자"],
             "allowedSceneText": [],
             "doNotRenderText": ["문제", "선택지", "정답", "힌트"],
-            "composition": "전체 피자 윤곽이 한눈에 보입니다.",
+            "composition": "전체와 부분 관계를 떠올릴 수 있는 장면입니다.",
         },
         {
             "assetRole": "stage_2",
             "step": 2,
             "visualPurpose": "전체 조각 수를 세는 근거를 보여줍니다.",
-            "sceneSummary": "네 조각 피자 중 한 조각이 살짝 강조된 장면",
+            "sceneSummary": "네 조각 피자 중 한 조각이 옆에 따로 놓인 장면",
             "primaryEvidenceObject": "네 조각 피자",
-            "evidenceLocation": "강조된 한 조각 주변의 네 조각 경계",
-            "mustShow": ["네 조각", "한 조각 강조"],
+            "evidenceLocation": "problem_ui_only",
+            "mustShow": ["네 조각", "한 조각과 전체 조각"],
             "allowedSceneText": [],
             "doNotRenderText": ["전체는 몇 조각인가요?", "1개", "2개", "4개", "정답"],
-            "composition": "조각 경계가 분명하게 보입니다.",
+            "composition": "조작물이 자연스럽게 배치되어 있습니다.",
         },
         {
             "assetRole": "stage_3",
             "step": 3,
             "visualPurpose": "고른 조각과 전체 조각을 연결해 분수로 말하게 합니다.",
             "sceneSummary": "고른 한 조각과 전체 네 조각이 함께 보이는 장면",
-            "primaryEvidenceObject": "강조된 한 조각",
-            "evidenceLocation": "왼쪽의 한 조각과 오른쪽의 전체 네 조각 비교 위치",
+            "primaryEvidenceObject": "따로 놓인 한 조각",
+            "evidenceLocation": "problem_ui_only",
             "mustShow": ["한 조각", "네 조각 전체"],
             "allowedSceneText": [],
             "doNotRenderText": ["분수", "빈칸", "정답", "힌트"],
-            "composition": "한 조각과 전체가 동시에 비교됩니다.",
+            "composition": "한 조각과 전체가 같은 책상 위에 놓입니다.",
         },
         {
             "assetRole": "stage_4_realtime",
@@ -836,7 +770,7 @@ def _fraction_stage_visual_specs() -> list[dict]:
             "visualPurpose": "학생이 전체와 부분을 말로 설명하는 상황을 준비합니다.",
             "sceneSummary": "피자 조각을 보며 설명을 준비하는 책상 장면",
             "primaryEvidenceObject": "피자 조각 그림",
-            "evidenceLocation": "설명 카드 옆 피자 조각 그림",
+            "evidenceLocation": "problem_ui_only",
             "mustShow": ["피자 조각 그림"],
             "allowedSceneText": [],
             "doNotRenderText": ["말하기 정답", "힌트", "채점"],
@@ -879,7 +813,7 @@ def _generated_fraction_content() -> dict:
         asset["id"] = f"asset_{content['id']}_{asset['assetRole']}{'_audio' if asset['assetType'] == 'audio' else ''}"
         if asset["assetType"] == "image":
             asset["promptJson"] = {
-                "prompt": f"{asset['assetRole']} 장면. 따뜻한 교실 느낌의 피자 조각 장면만 보여주고 문제 문장, 선택지, 정답, 힌트 텍스트는 넣지 않습니다.",
+                "prompt": f"{asset['assetRole']} 장면. 따뜻한 교실 느낌의 피자 조각 장면만 보여주고 no app UI, no answer panels, no readable lesson text.",
                 "textRenderingPolicy": "scene_only_no_problem_text",
             }
         asset["storageUrl"] = ""
@@ -927,7 +861,7 @@ def _generated_life_support_content() -> dict:
             asset["promptJson"] = {
                 "prompt": (
                     f"{asset['assetRole']} 장면. 버스 정류장에서 센터행 버스 번호를 확인하는 실제 생활 장면을 보여주고 "
-                    "문제 문장, 선택지, 정답, 힌트 텍스트는 넣지 않습니다."
+                    "no app UI, no answer panels, no readable lesson text."
                 ),
                 "textRenderingPolicy": "scene_only_no_problem_text",
             }

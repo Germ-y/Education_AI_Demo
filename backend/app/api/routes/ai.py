@@ -36,7 +36,6 @@ ORCHESTRATOR_STAGE_CONTRACTS: dict[str, dict[int, dict[str, Any]]] = {
             "studentTitle": "문제 1",
             "defaultTemplate": "scene_question",
             "allowedTemplates": {
-                "image_quiz",
                 "card_match",
                 "sequence_ordering",
                 "blank_fill",
@@ -50,7 +49,6 @@ ORCHESTRATOR_STAGE_CONTRACTS: dict[str, dict[int, dict[str, Any]]] = {
             "studentTitle": "문제 2",
             "defaultTemplate": "applied_question",
             "allowedTemplates": {
-                "image_quiz",
                 "card_match",
                 "sequence_ordering",
                 "blank_fill",
@@ -85,14 +83,14 @@ ORCHESTRATOR_STAGE_CONTRACTS: dict[str, dict[int, dict[str, Any]]] = {
             "stageRole": "clue_identification",
             "studentTitle": "단서 찾기",
             "defaultTemplate": "highlight_clue",
-            "allowedTemplates": {"scene_observation", "highlight_clue", "image_quiz", "card_match"},
+            "allowedTemplates": {"scene_observation", "highlight_clue", "card_match"},
             "templateAliases": {"scene_question": "highlight_clue", "clue_question": "highlight_clue"},
         },
         3: {
             "stageRole": "action_selection",
             "studentTitle": "행동 고르기",
             "defaultTemplate": "action_choice",
-            "allowedTemplates": {"image_quiz", "card_match", "sequence_ordering", "action_choice", "decision_card"},
+            "allowedTemplates": {"card_match", "sequence_ordering", "action_choice", "decision_card"},
             "templateAliases": {
                 "scene_question": "action_choice",
                 "clue_question": "action_choice",
@@ -126,38 +124,22 @@ def create_orchestrator_run(
 
     settings = get_settings()
     spec = PROMPT_SPECS["orchestrator_plan"]
-    context_brief = demo_store.get_student_context_brief(payload.student_id)
-    if context_brief is None or context_brief.dirty:
-        context_brief = (
-            demo_store.refresh_student_context_brief(
-                payload.student_id,
-                teacher_id=principal.id if principal.role == "teacher" else None,
-            )
-            or context_brief
-        )
-        case_file = demo_store.get_student_case_file(payload.student_id) or case_file
     content_type = str(payload.content_type or case_file["profile"]["studentType"])
-    template_randomization = _build_template_randomization(content_type, case_file=case_file)
+    template_randomization = _build_template_randomization(content_type)
     input_snapshot = {
         "teacherId": principal.id,
         "studentId": payload.student_id,
         "caseId": payload.case_id,
         "requestedGoal": payload.requested_goal,
-        "contentType": payload.content_type,
+        "contentType": content_type,
+        "studentProfile": _minimal_student_profile(case_file),
         "templateRandomization": template_randomization,
-        "studentContextBrief": context_brief.model_dump(by_alias=True) if context_brief else None,
-        "generationContext": {
-            "teacherRequestedGoal": payload.requested_goal,
-            "contextBriefPriority": "use_context_brief_for_scaffolding_not_topic_override",
-            "contextBriefDirty": context_brief.dirty if context_brief else True,
-            "templateSelectionPolicy": "use_backend_randomized_stage_templates_exactly",
-            "topicPolicy": (
-                "requestedGoal is the source of truth for subject/topic. "
-                "caseFile.openCase.currentGoal and contextBrief examples are support-pattern history only; "
-                "do not reuse their concrete scenario unless requestedGoal explicitly asks for it."
-            ),
+        "generationMode": {
+            "contextPolicy": "minimal_student_profile_only",
+            "memoryUsed": False,
+            "caseFileUsedForAi": False,
+            "teacherRequestedGoalIsTopicSource": True,
         },
-        "caseFile": case_file,
     }
     agent_run = agent_runs.create_running(
         agent_type="orchestrator",
@@ -223,9 +205,14 @@ def create_content_generation(
         "studentId": payload.student_id,
         "caseId": payload.case_id,
         "orchestratorRunId": payload.orchestrator_run_id,
+        "studentProfile": _minimal_student_profile(case_file),
         "orchestratorPlan": orchestrator_run.output_json,
         "generationPlan": generation_plan,
-        "caseFile": case_file,
+        "generationMode": {
+            "contextPolicy": "minimal_student_profile_only",
+            "memoryUsed": False,
+            "caseFileUsedForAi": False,
+        },
     }
     agent_run = agent_runs.create_running(
         agent_type="content",
@@ -328,7 +315,7 @@ def _run_orchestrator_agent(
             student_id=student_id,
             case_id=case_id,
             content_type=content_type,
-            case_file=input_snapshot.get("caseFile") if isinstance(input_snapshot.get("caseFile"), dict) else None,
+            case_file=None,
         )
     except AiProviderError as exc:
         logger.warning(
@@ -432,77 +419,43 @@ def _normalize_orchestrator_plan_candidate(
     return normalized
 
 
-def _build_template_randomization(content_type: str, *, case_file: dict[str, Any]) -> dict[str, Any]:
+def _minimal_student_profile(case_file: dict[str, Any]) -> dict[str, Any]:
+    profile = case_file.get("profile") if isinstance(case_file.get("profile"), dict) else {}
+    return {
+        "id": profile.get("id"),
+        "displayName": profile.get("displayName") or profile.get("name"),
+        "grade": profile.get("grade"),
+        "gradeLabel": profile.get("gradeLabel"),
+        "studentType": profile.get("studentType"),
+        "studentTypeLabel": profile.get("studentTypeLabel"),
+    }
+
+
+def _build_template_randomization(content_type: str) -> dict[str, Any]:
     contracts = ORCHESTRATOR_STAGE_CONTRACTS.get(content_type, {})
-    recent_templates = _recent_template_types_by_step(case_file)
     forced_stage_templates: list[dict[str, Any]] = []
     candidate_templates: dict[str, list[str]] = {}
-    avoided_recent_templates: dict[str, list[str]] = {}
     for step in (2, 3):
         contract = contracts.get(step)
         if not contract:
             continue
         all_candidates = sorted(str(template) for template in contract["allowedTemplates"])
-        candidates = _template_candidates_for_case(
-            all_candidates,
-            step=step,
-            case_file=case_file,
-            recent_templates=recent_templates,
-        )
+        candidates = list(all_candidates)
         candidate_templates[str(step)] = candidates
-        avoided = [template for template in recent_templates.get(step, []) if template in all_candidates and template not in candidates]
-        if avoided:
-            avoided_recent_templates[str(step)] = avoided
         if candidates:
             forced_stage_templates.append({"step": step, "templateType": _template_random.choice(candidates)})
 
-    _ensure_randomized_template_quality(content_type, forced_stage_templates, case_file=case_file)
+    _ensure_randomized_template_quality(content_type, forced_stage_templates)
     return {
         "mode": "random_per_generation",
         "randomId": uuid4().hex,
         "policy": "2~3단계 템플릿은 매 생성마다 후보 중 랜덤으로 정하고 오케스트레이터가 그대로 사용합니다.",
         "candidateTemplates": candidate_templates,
-        "recentTemplates": {str(step): templates for step, templates in recent_templates.items()},
-        "avoidedRecentTemplates": avoided_recent_templates,
         "forcedStageTemplates": forced_stage_templates,
     }
 
 
-def _template_candidates_for_case(
-    candidates: list[str],
-    *,
-    step: int,
-    case_file: dict[str, Any],
-    recent_templates: dict[int, list[str]],
-) -> list[str]:
-    filtered = list(candidates)
-    choice_count = _choice_count_limit_from_case_file(case_file)
-    if choice_count is not None and choice_count < 3:
-        filtered = [template for template in filtered if template != "image_quiz"] or filtered
-
-    recent = recent_templates.get(step, [])[:2]
-    without_recent = [template for template in filtered if template not in recent]
-    return without_recent or filtered
-
-
-def _recent_template_types_by_step(case_file: dict[str, Any]) -> dict[int, list[str]]:
-    contents = case_file.get("recentContents") if isinstance(case_file.get("recentContents"), list) else []
-    result: dict[int, list[str]] = {2: [], 3: []}
-    for content in reversed(contents[-6:]):
-        stages = content.get("stages") if isinstance(content, dict) and isinstance(content.get("stages"), list) else []
-        for stage in stages:
-            if not isinstance(stage, dict):
-                continue
-            step = stage.get("step")
-            template_type = stage.get("templateType") or stage.get("template_type")
-            if step in result and isinstance(template_type, str) and template_type not in result[step]:
-                result[step].append(template_type)
-    return result
-
-
-def _ensure_randomized_template_quality(content_type: str, forced_stage_templates: list[dict[str, Any]], *, case_file: dict[str, Any]) -> None:
-    if _allows_choice_first_case_file(case_file):
-        return
+def _ensure_randomized_template_quality(content_type: str, forced_stage_templates: list[dict[str, Any]]) -> None:
     structured_templates = {"card_match", "sequence_ordering", "blank_fill"}
     if any(item.get("templateType") in structured_templates for item in forced_stage_templates):
         return
@@ -515,24 +468,6 @@ def _ensure_randomized_template_quality(content_type: str, forced_stage_template
     structured_allowed = sorted(template for template in allowed if template in structured_templates)
     if structured_allowed:
         target["templateType"] = _template_random.choice(structured_allowed)
-
-
-def _allows_choice_first_case_file(case_file: dict[str, Any]) -> bool:
-    choice_count = _choice_count_limit_from_case_file(case_file)
-    profile = case_file.get("profile") if isinstance(case_file.get("profile"), dict) else {}
-    profile_json = profile.get("profileJson") if isinstance(profile.get("profileJson"), dict) else {}
-    reading_load = str(profile_json.get("readingLoad") or "")
-    return reading_load == "very_low" or (choice_count is not None and choice_count <= 2)
-
-
-def _choice_count_limit_from_case_file(case_file: dict[str, Any]) -> int | None:
-    profile = case_file.get("profile") if isinstance(case_file.get("profile"), dict) else {}
-    profile_json = profile.get("profileJson") if isinstance(profile.get("profileJson"), dict) else {}
-    choice_count_value = profile_json.get("choiceCountLimit")
-    try:
-        return int(choice_count_value)
-    except (TypeError, ValueError):
-        return None
 
 
 def _forced_templates_from_randomization(template_randomization: Any) -> dict[int, str]:
@@ -600,9 +535,53 @@ def _stage_plans_from_orchestrator(orchestrator_plan: dict[str, Any]) -> list[di
                 "studentTitle": item.get("studentTitle"),
                 "purpose": item.get("purpose"),
                 "templateRationale": item.get("templateRationale") or item.get("reason"),
+                "templateJsonContract": _template_json_contract(item.get("templateType")),
             }
         )
     return plans
+
+
+def _template_json_contract(template_type: Any) -> dict[str, Any]:
+    common_fields = ["imageAssetId", "audioAssetId", "assetBundle", "sourceTextLines", "sceneTextLines"]
+    contracts: dict[str, dict[str, Any]] = {
+        "blank_fill": {
+            "requiredFields": [
+                *common_fields,
+                "question",
+                "sentence",
+                "tiles",
+                "acceptedAnswers",
+                "correctFeedback",
+                "wrongFeedback",
+            ],
+            "hardRules": [
+                "sentence must include exactly one blank marker: __, [A], or [B].",
+                "question asks what to fill; sentence is the complete sentence with the blank marker.",
+                "acceptedAnswers is an array of objects shaped {\"answer\":\"...\"}.",
+                "each accepted answer must match a value in tiles.",
+            ],
+            "minimalExample": {
+                "question": "빈칸에 들어갈 수를 골라 보세요.",
+                "sentence": "처음 12개에서 5개를 나누어 주면 남은 수는 __개입니다.",
+                "tiles": ["7", "12", "17"],
+                "acceptedAnswers": [{"answer": "7"}],
+            },
+        },
+        "card_match": {
+            "requiredFields": [*common_fields, "question", "leftCards", "rightCards", "matches", "correctFeedback", "wrongFeedback"],
+            "hardRules": [
+                "leftCards ids are left_1 and left_2.",
+                "rightCards ids are right_1 and right_2.",
+                "matches is shaped {\"left_1\":\"right_1\",\"left_2\":\"right_2\"}.",
+                "do not include choices, cards, or tiles.",
+            ],
+        },
+        "sequence_ordering": {
+            "requiredFields": [*common_fields, "question", "cards", "answerOrder", "correctFeedback", "wrongFeedback"],
+            "hardRules": ["answerOrder contains the card ids in the correct order."],
+        },
+    }
+    return contracts.get(str(template_type or ""), {"requiredFields": common_fields, "hardRules": []})
 
 
 def _visual_spec_drafts_from_orchestrator(orchestrator_plan: dict[str, Any]) -> list[dict[str, Any]]:
@@ -715,7 +694,7 @@ def _normalize_generated_mission_candidate(candidate: Any) -> Any:
     if not isinstance(stages, list):
         return normalized
 
-    normalized["stages"] = [_normalize_generated_stage(stage) for stage in stages]
+    normalized["stages"] = stages
     return normalized
 
 
@@ -804,122 +783,6 @@ def _stage_id_for_generated_asset_role(role: str, stage_id_by_step: dict[int, st
 
 def _safe_generated_id_segment(value: str) -> str:
     return "".join(character if character.isalnum() or character in {"_", "-"} else "_" for character in value)[:48]
-
-
-def _normalize_generated_stage(stage: Any) -> Any:
-    if not isinstance(stage, dict):
-        return stage
-
-    normalized = dict(stage)
-    template_type = normalized.get("templateType")
-    template_json = normalized.get("templateJson")
-    if template_type == "card_match" and isinstance(template_json, dict):
-        normalized_template_json = dict(template_json)
-        for unsupported_key in ("cards", "choices", "tiles"):
-            normalized_template_json.pop(unsupported_key, None)
-        normalized["templateJson"] = normalized_template_json
-    realtime_spec = normalized.get("realtimeSpec")
-    if isinstance(realtime_spec, dict):
-        normalized["realtimeSpec"] = _normalize_generated_realtime_spec(realtime_spec, stage=normalized)
-    return normalized
-
-
-def _normalize_generated_realtime_spec(realtime_spec: dict[str, Any], *, stage: dict[str, Any] | None = None) -> dict[str, Any]:
-    normalized = dict(realtime_spec)
-    stage = stage or {}
-    stage_template_type = stage.get("templateType")
-    template_type = normalized.get("templateType") or stage_template_type
-    if template_type not in {"realtime_roleplay", "realtime_teach_back"}:
-        template_type = "realtime_roleplay"
-    normalized["templateType"] = template_type
-
-    _set_string_default(normalized, "practiceTitle", stage.get("studentTitle") or "한 번 해보기")
-    _set_string_default(
-        normalized,
-        "situationText",
-        normalized.get("situation") or normalized.get("scenario") or stage.get("studentInstruction") or "지금 상황에서 한 번 말해봅니다.",
-    )
-    _set_string_default(normalized, "aiRole", normalized.get("role") or "연습 상대")
-    _set_string_default(normalized, "openingLine", normalized.get("intro") or "준비되면 한 문장으로 말해볼까요?")
-    _set_string_default(
-        normalized,
-        "studentGoal",
-        normalized.get("goal") or stage.get("studentInstruction") or "상황에 맞는 말을 짧게 시도합니다.",
-    )
-
-    allowed_feedback = normalized.get("allowedFeedback") or normalized.get("feedback")
-    if not isinstance(allowed_feedback, list) or not allowed_feedback:
-        normalized["allowedFeedback"] = ["학생의 시도를 먼저 인정하고, 다음에 말할 쉬운 한 문장을 제안합니다."]
-
-    forbidden = normalized.get("forbidden")
-    if not isinstance(forbidden, list) or not forbidden:
-        normalized["forbidden"] = ["정답을 대신 말하지 않기", "학생을 재촉하지 않기", "틀렸다고 단정하지 않기"]
-
-    max_turns = normalized.get("maxTurns") or normalized.get("turnLimit")
-    normalized["maxTurns"] = _coerce_bounded_int(max_turns, default=6, minimum=1, maximum=12)
-    max_duration_sec = normalized.get("maxDurationSec") or normalized.get("timeLimitSec") or normalized.get("durationSec")
-    normalized["maxDurationSec"] = _coerce_bounded_int(max_duration_sec, default=180, minimum=1, maximum=300)
-
-    rubric = normalized.get("rubric")
-    if isinstance(rubric, list):
-        normalized["rubric"] = [_normalize_generated_rubric_item(item, index) for index, item in enumerate(rubric, start=1)]
-    else:
-        normalized["rubric"] = [
-            {"id": "r1", "label": "핵심 말을 한 번 시도한다", "required": True},
-            {"id": "r2", "label": "상황에 맞게 차분히 대답한다", "required": False},
-        ]
-    reflection = normalized.get("postPracticeReflection")
-    if isinstance(reflection, dict):
-        candidates: list[str] = []
-        question = reflection.get("question")
-        if isinstance(question, str) and question.strip():
-            candidates.append(question.strip())
-        prompts = reflection.get("questions") or reflection.get("prompts")
-        if isinstance(prompts, list):
-            candidates.extend(str(item).strip() for item in prompts if str(item).strip())
-        if candidates:
-            normalized["postPracticeReflection"] = candidates
-        else:
-            normalized["postPracticeReflection"] = ["오늘 연습에서 잘 된 점을 한 문장으로 말해볼까요?"]
-    elif isinstance(reflection, str):
-        normalized["postPracticeReflection"] = [reflection.strip()] if reflection.strip() else []
-    if not isinstance(normalized.get("postPracticeReflection"), list) or not normalized["postPracticeReflection"]:
-        normalized["postPracticeReflection"] = ["오늘 연습에서 잘 된 점을 한 문장으로 말해볼까요?"]
-    return normalized
-
-
-def _set_string_default(target: dict[str, Any], key: str, default: Any) -> None:
-    value = target.get(key)
-    if isinstance(value, str) and value.strip():
-        target[key] = value.strip()
-        return
-    target[key] = str(default).strip() if str(default).strip() else "한 번 해보기"
-
-
-def _coerce_bounded_int(value: Any, *, default: int, minimum: int, maximum: int) -> int:
-    try:
-        number = int(value)
-    except (TypeError, ValueError):
-        return default
-    return max(minimum, min(maximum, number))
-
-
-def _normalize_generated_rubric_item(item: Any, index: int) -> Any:
-    if not isinstance(item, dict):
-        return item
-    normalized = dict(item)
-    label = normalized.get("label")
-    if not isinstance(label, str) or not label.strip():
-        for fallback_key in ("description", "criterion", "text", "name"):
-            fallback = normalized.get(fallback_key)
-            if isinstance(fallback, str) and fallback.strip():
-                normalized["label"] = fallback.strip()
-                break
-    if not isinstance(normalized.get("id"), str) or not normalized["id"].strip():
-        normalized["id"] = f"r{index}"
-    if "required" not in normalized:
-        normalized["required"] = index == 1
-    return normalized
 
 
 def _attach_generation_units(mission: MissionContent, *, orchestrator_plan: dict[str, Any]) -> MissionContent:
@@ -1115,7 +978,7 @@ def _critique_mission_content_quality(
         model=settings.openai_critique_model,
         instructions=load_prompt("content_quality_critique"),
         input_snapshot={
-            "caseFile": case_file,
+            "studentProfile": _minimal_student_profile(case_file),
             "orchestratorPlan": orchestrator_plan,
             "missionContent": mission.model_dump(by_alias=True),
         },

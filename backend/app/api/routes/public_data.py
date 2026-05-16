@@ -48,7 +48,7 @@ def search_schools(
             detail={
                 "code": "NEIS_API_KEY_MISSING",
                 "message": "학교 검색을 위해 NEIS_API_KEY가 필요합니다.",
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+                "details": {"reviewRequired": True},
             },
         )
 
@@ -60,7 +60,7 @@ def search_schools(
             detail={
                 "code": exc.code,
                 "message": exc.message,
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+                "details": {"reviewRequired": True},
             },
         ) from exc
     counts = demo_store.upsert_public_school_context(schools=schools, calendar=[], timetable=[])
@@ -138,7 +138,7 @@ def get_school_timetable(
             detail={
                 "code": "NEIS_API_KEY_MISSING",
                 "message": "저장된 시간표가 없고 NEIS_API_KEY가 없어 시간표를 조회할 수 없습니다.",
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "cacheStatus": "empty"},
+                "details": {"reviewRequired": True, "cacheStatus": "empty"},
             },
         )
     if not timetable_date or not grade or not class_name:
@@ -165,7 +165,7 @@ def get_school_timetable(
             detail={
                 "code": exc.code,
                 "message": exc.message,
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+                "details": {"reviewRequired": True},
             },
         ) from exc
 
@@ -217,7 +217,7 @@ def get_school_weekly_timetable(
                 detail={
                     "code": "NEIS_API_KEY_MISSING",
                     "message": "저장된 주간 시간표가 없고 NEIS_API_KEY가 없어 시간표를 조회할 수 없습니다.",
-                    "details": {"reviewRequired": True, "fallbackPolicy": "disabled", "cacheStatus": "empty"},
+                    "details": {"reviewRequired": True, "cacheStatus": "empty"},
                 },
             )
         client = NeisClient(settings)
@@ -246,7 +246,7 @@ def get_school_weekly_timetable(
                     detail={
                         "code": exc.code,
                         "message": exc.message,
-                        "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+                        "details": {"reviewRequired": True},
                     },
                 ) from exc
             counts = demo_store.upsert_public_school_context(schools=[school.model_dump(by_alias=True)], calendar=[], timetable=timetable)
@@ -301,7 +301,7 @@ def sync_public_data_source(
             detail={
                 "code": exc.code,
                 "message": exc.message,
-                "details": {"reviewRequired": True, "fallbackPolicy": "disabled"},
+                "details": {"reviewRequired": True},
             },
         ) from exc
 

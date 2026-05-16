@@ -14,7 +14,7 @@ from app.core.config import Settings
 
 logger = logging.getLogger(__name__)
 TRANSIENT_OPENAI_STATUS_CODES = {408, 409, 429, 500, 502, 503, 504}
-OPENAI_POST_MAX_ATTEMPTS = 3
+OPENAI_POST_MAX_ATTEMPTS = 1
 OPENAI_POST_BASE_BACKOFF_SEC = 0.8
 
 

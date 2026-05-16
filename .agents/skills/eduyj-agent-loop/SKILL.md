@@ -14,14 +14,15 @@ description: EduYJ 레포에서 장기 작업을 이어갈 때 사용한다. 현
 
 ## 기본 규칙
 
-- 통합 검증은 `dev` 브랜치를 기준으로 한다.
-- 프론트 단독 작업은 `frontend`, 백엔드 단독 작업은 `backend`에서 진행한다.
+- 통합 기준은 `main` 브랜치다.
+- 프론트/백엔드 작업은 `main`에서 `frontend/작업명`, `backend/작업명` 브랜치를 따서 진행한다.
 - 커밋은 작게 나눈다.
 - 커밋 메시지는 `docs : 내용`, `feat : 내용`, `fix : 내용`, `chore : 내용`처럼 한국어로 쓴다.
 - 학생 콘텐츠는 4단계다.
 - 4단계가 realtime이다.
 - 영상 생성 범위를 다시 넣지 않는다.
 - API, DB, 진행상황, 남은 이슈가 바뀌면 `docs/GOAL_CONTEXT.md`와 필요한 경우 `backend/data/README.md`만 갱신한다.
+- 현재 공유 DB는 SQLite이며, DB 공유 기준을 갱신할 때는 dump와 generated asset을 함께 커밋한다.
 
 ## 반복 순서
 

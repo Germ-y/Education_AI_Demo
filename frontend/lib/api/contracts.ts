@@ -230,6 +230,8 @@ export type SchoolWeeklyTimetable = {
 
 export type StudentListItem = {
   studentId: string;
+  caseId?: string;
+  openCaseId?: string;
   displayName: string;
   grade: string;
   gradeLabel?: string;
