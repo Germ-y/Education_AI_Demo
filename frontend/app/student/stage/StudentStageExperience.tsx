@@ -764,9 +764,13 @@ function CardMatchingTemplate({
   const rightItems = [...items].reverse();
   const matchedCount = Object.keys(pairs).length;
   const compactPairSet = items.length <= 2;
-  const matchingRowHeight = compactPairSet ? 64 : 54;
-  const matchingGap = compactPairSet ? 12 : 8;
+  const matchingRowHeight = compactPairSet ? 72 : 62;
+  const matchingGap = compactPairSet ? 12 : 10;
   const matchingLaneHeight = items.length * matchingRowHeight + Math.max(0, items.length - 1) * matchingGap;
+  const matchingListStyle = {
+    gridTemplateRows: `repeat(${items.length}, ${matchingRowHeight}px)`,
+    gap: matchingGap,
+  };
   const laneConnections = items
     .map((item, index) => {
       const rightId = pairs[item.leftId];
@@ -809,7 +813,7 @@ function CardMatchingTemplate({
         className="grid grid-cols-[minmax(220px,1fr)_minmax(180px,0.42fr)_minmax(220px,1fr)] items-start gap-4 overflow-hidden"
         style={{ height: matchingLaneHeight }}
       >
-        <div className="grid min-h-0 content-start gap-1.5">
+        <div className="grid min-h-0" style={matchingListStyle}>
           {items.map((item) => {
             const picked = selectedLeft === item.leftId;
             const matched = Boolean(pairs[item.leftId]);
@@ -818,15 +822,14 @@ function CardMatchingTemplate({
                 key={item.leftId}
                 onClick={() => onLeft(item.leftId)}
                 disabled={matched}
-                className="relative z-10 flex items-center rounded-[16px] border bg-white px-4 text-left text-[0.9rem] font-black leading-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:hover:translate-y-0"
+                className="relative z-10 flex h-full items-center rounded-[16px] border bg-white px-4 text-left text-[0.9rem] font-black leading-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:hover:translate-y-0"
                 style={{
-                  minHeight: matchingRowHeight,
                   borderColor: picked || matched ? theme.accent : "#dde6ee",
                   backgroundColor: matched ? theme.accentSoft : picked ? "#f8fff9" : "#ffffff",
                   boxShadow: picked ? `0 0 0 6px ${theme.accentSoft}` : undefined,
                 }}
               >
-                <span className="min-w-0 flex-1 break-keep [overflow-wrap:anywhere]">{item.left}</span>
+                <span className="line-clamp-2 min-w-0 flex-1 break-keep [overflow-wrap:anywhere]">{item.left}</span>
                 {matched && (
                   <span className="ml-3 flex h-8 w-8 items-center justify-center rounded-full text-sm text-white" style={{ backgroundColor: theme.accent }}>
                     ✓
@@ -870,17 +873,17 @@ function CardMatchingTemplate({
                 </span>
               ))}
             </div>
-            <div className="mt-3 w-full rounded-[18px] bg-white/90 px-3 py-3 shadow-[0_12px_26px_rgba(57,78,97,0.10)]">
-              <p className="text-sm font-black leading-6 break-keep" style={{ color: theme.accentStrong }}>
-                {selectedLeft ? "오른쪽 카드를 골라요" : "왼쪽 카드를 골라요"}
+            <div className="mt-3 w-full rounded-[18px] bg-white/90 px-2.5 py-3 shadow-[0_12px_26px_rgba(57,78,97,0.10)]">
+              <p className="whitespace-nowrap text-sm font-black leading-6" style={{ color: theme.accentStrong }}>
+                {selectedLeft ? "오른쪽 선택" : "왼쪽 선택"}
               </p>
-              <p className="mt-1 text-[11px] font-bold leading-4 text-[#6d746c]">맞으면 바로 연결돼요</p>
+              <p className="mt-1 whitespace-nowrap text-[11px] font-bold leading-4 text-[#6d746c]">맞으면 연결돼요</p>
             </div>
             <div className="mt-3 text-[11px] font-black text-[#8a5a00]">연결 {matchedCount}/{items.length}</div>
           </div>
         </div>
 
-        <div className="grid min-h-0 content-start gap-2">
+        <div className="grid min-h-0" style={matchingListStyle}>
           {rightItems.map((item) => {
             const used = Object.values(pairs).includes(item.rightId);
             return (
@@ -888,10 +891,10 @@ function CardMatchingTemplate({
                 key={item.rightId}
                 onClick={() => onRight(item.rightId)}
                 disabled={!selectedLeft || used}
-                className="relative z-10 flex items-center rounded-[16px] border bg-white px-4 text-left text-[0.9rem] font-black leading-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
-                style={{ minHeight: matchingRowHeight, borderColor: used ? theme.accent : "#dde6ee", backgroundColor: used ? theme.accentSoft : "#ffffff" }}
+                className="relative z-10 flex h-full items-center rounded-[16px] border bg-white px-4 text-left text-[0.9rem] font-black leading-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 disabled:opacity-45 disabled:hover:translate-y-0"
+                style={{ borderColor: used ? theme.accent : "#dde6ee", backgroundColor: used ? theme.accentSoft : "#ffffff" }}
               >
-                <span className="min-w-0 flex-1 break-keep [overflow-wrap:anywhere]">{item.right}</span>
+                <span className="line-clamp-2 min-w-0 flex-1 break-keep [overflow-wrap:anywhere]">{item.right}</span>
                 {used && (
                   <span className="ml-3 flex h-8 w-8 items-center justify-center rounded-full text-sm text-white" style={{ backgroundColor: theme.accent }}>
                     ✓
