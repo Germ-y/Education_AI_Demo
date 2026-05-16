@@ -653,13 +653,14 @@ def _mission_from_row(content: rows.MissionContentRow, stages: list[rows.Content
 
 
 def _stage(row: rows.ContentStageRow) -> dict:
-    template_json = _normalize_template_json(row.template_type, row.template_json)
+    template_type = _normalize_template_type(row.stage_role, row.template_type)
+    template_json = _normalize_template_json(template_type, row.template_json)
     return {
         "id": row.id,
         "missionContentId": row.mission_content_id,
         "step": row.step,
         "stageRole": row.stage_role,
-        "templateType": row.template_type,
+        "templateType": template_type,
         "studentTitle": row.student_title,
         "studentInstruction": row.student_instruction,
         "templateJson": template_json,
@@ -668,35 +669,119 @@ def _stage(row: rows.ContentStageRow) -> dict:
     }
 
 
+def _normalize_template_type(stage_role: str, template_type: str) -> str:
+    # 이전 로컬 DB에는 partition_picker가 단일 선택형처럼 저장되어 있다.
+    # 새 생성 계약에서는 제외했지만, 기존 검토 자료는 scene_question으로 읽어 API를 살린다.
+    if stage_role == "basic_problem" and template_type == "partition_picker":
+        return "scene_question"
+    return template_type
+
+
 def _normalize_template_json(template_type: str, template_json: dict | None) -> dict | None:
-    if template_type != "blank_fill" or not isinstance(template_json, dict):
+    if not isinstance(template_json, dict):
         return template_json
 
-    sentence = str(template_json.get("sentence") or template_json.get("question") or "")
-    if "__" in sentence or "[A]" in sentence or "[B]" in sentence:
+    if template_type in {
+        "scene_question",
+        "clue_question",
+        "applied_question",
+        "action_choice",
+        "explanation_choice",
+        "decision_card",
+        "scene_observation",
+        "highlight_clue",
+        "image_quiz",
+    }:
+        return _normalize_legacy_choice_template(template_json)
+
+    if template_type != "blank_fill":
         return template_json
 
-    return {**template_json, "sentence": _legacy_blank_fill_sentence(template_json)}
+    normalized = dict(template_json)
+    sentence = str(normalized.get("sentence") or normalized.get("question") or "")
+    if "__" not in sentence and "[A]" not in sentence and "[B]" not in sentence:
+        normalized["sentence"] = _legacy_blank_fill_sentence(normalized)
+    elif _is_generic_blank_instruction(sentence):
+        normalized["sentence"] = _legacy_blank_fill_sentence(normalized)
+
+    answer_values = _legacy_blank_values(normalized)
+    answer_text = _legacy_blank_answer_text(answer_values)
+    if answer_text:
+        normalized["acceptedAnswers"] = [{"answer": answer_text}]
+        tiles = normalized.get("tiles")
+        if not isinstance(tiles, list):
+            tiles = []
+        normalized["tiles"] = _append_missing_tile_values([str(value) for value in tiles], [answer_text])
+    return normalized
+
+
+def _normalize_legacy_choice_template(template_json: dict) -> dict:
+    normalized = dict(template_json)
+    choices = normalized.get("choices")
+    answer = normalized.get("answer")
+    if not isinstance(choices, list) or not isinstance(answer, str):
+        return normalized
+
+    choice_ids = [str(choice.get("id")) for choice in choices if isinstance(choice, dict) and choice.get("id") is not None]
+    if answer in choice_ids:
+        return normalized
+
+    answer_candidates = [item.strip() for item in answer.split(",") if item.strip()]
+    matched = next((item for item in answer_candidates if item in choice_ids), None)
+    if matched:
+        normalized["answer"] = matched
+    elif choice_ids:
+        normalized["answer"] = choice_ids[0]
+    return normalized
 
 
 def _legacy_blank_fill_sentence(template_json: dict) -> str:
     values = _legacy_blank_values(template_json)
     question = str(template_json.get("question") or "")
     if len(values) >= 2:
-        return "분수는 __ / __입니다."
+        return "분수는 __입니다."
     if "시계" in question or "정각" in question:
         return "시계는 __시예요."
     return "알맞은 말은 __입니다."
 
 
+def _is_generic_blank_instruction(sentence: str) -> bool:
+    generic_instruction_terms = ("알맞은 값을 골라", "빈칸을 채", "칸에 넣")
+    return any(term in sentence for term in generic_instruction_terms)
+
+
 def _legacy_blank_values(template_json: dict) -> list[str]:
     accepted_answers = template_json.get("acceptedAnswers") or template_json.get("answers")
-    if isinstance(accepted_answers, list) and accepted_answers and isinstance(accepted_answers[0], dict):
-        return [str(value) for value in accepted_answers[0].values()]
+    if isinstance(accepted_answers, list):
+        values: list[str] = []
+        for item in accepted_answers:
+            if isinstance(item, dict):
+                if isinstance(item.get("answer"), str):
+                    values.append(item["answer"])
+                else:
+                    values.extend(str(value) for value in item.values())
+        if values:
+            return values
     tiles = template_json.get("tiles")
     if isinstance(tiles, list):
         return [str(value) for value in tiles]
     return []
+
+
+def _legacy_blank_answer_text(values: list[str]) -> str | None:
+    if not values:
+        return None
+    if len(values) >= 2 and all(value.isdigit() for value in values[:2]):
+        return f"{values[0]}/{values[1]}"
+    return values[0]
+
+
+def _append_missing_tile_values(tiles: list[str], values: list[str]) -> list[str]:
+    result = list(tiles)
+    for value in values:
+        if value and value not in result:
+            result.append(value)
+    return result
 
 
 def _asset(row: rows.ContentAssetRow) -> dict:
