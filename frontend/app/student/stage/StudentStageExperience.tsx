@@ -1957,7 +1957,7 @@ export function StudentStageExperience({
     const resizeStageFrame = () => {
       const availableWidth = Math.max(320, window.innerWidth - 32);
       const availableHeight = Math.max(320, window.innerHeight - 32);
-      setStageFrameScale(Math.min(availableWidth / STAGE_FRAME_WIDTH, availableHeight / STAGE_FRAME_HEIGHT));
+      setStageFrameScale(Math.min(1, availableWidth / STAGE_FRAME_WIDTH, availableHeight / STAGE_FRAME_HEIGHT));
       setIsStageFrameReady(true);
     };
 
