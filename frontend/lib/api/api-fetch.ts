@@ -18,13 +18,18 @@ export type ApiFetchOptions = Omit<RequestInit, "body"> & {
   baseUrl?: string;
   token?: string;
   body?: unknown;
+  retry?: number;
 };
 
 const DEFAULT_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+const DEFAULT_SAFE_REQUEST_RETRY_COUNT = 2;
+const RETRY_DELAY_MS = 350;
 
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
-  const { baseUrl = DEFAULT_API_BASE_URL, token, headers, body, ...init } = options;
-  const response = await fetch(`${baseUrl}${path}`, {
+  const { baseUrl = DEFAULT_API_BASE_URL, token, headers, body, retry, ...init } = options;
+  const method = init.method?.toUpperCase() ?? "GET";
+  const retryCount = retry ?? (method === "GET" || method === "HEAD" ? DEFAULT_SAFE_REQUEST_RETRY_COUNT : 0);
+  const response = await fetchWithRetry(`${baseUrl}${path}`, {
     ...init,
     headers: {
       Accept: "application/json",
@@ -33,7 +38,7 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
       ...headers,
     },
     body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  }, retryCount);
   const envelope = (await parseJson(response)) as ApiEnvelope<T>;
 
   if ("error" in envelope) {
@@ -45,6 +50,30 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   }
 
   return envelope.data;
+}
+
+async function fetchWithRetry(input: RequestInfo | URL, init: RequestInit, retryCount: number): Promise<Response> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+    try {
+      return await fetch(input, init);
+    } catch (error) {
+      lastError = error;
+      if (attempt === retryCount || isAbortError(error)) break;
+      await wait(RETRY_DELAY_MS * (attempt + 1));
+    }
+  }
+
+  throw lastError;
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function parseJson(response: Response): Promise<unknown> {

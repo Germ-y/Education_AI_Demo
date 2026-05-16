@@ -1019,12 +1019,14 @@ def _build_image_brief_for_asset(content, asset, stages: list, stage_visual_spec
         ]
     )
     prompt_parts.append(
-        "Keep the scene natural and do not add readable labels, tables, worksheets, speech bubbles, captions, badges, arrows, check marks, X marks, answer cues, copied lesson sentences, or invented numbers."
+        "Keep the scene natural and do not add readable labels, tables, worksheets, speech bubbles, captions, badges, "
+        "arrows, check marks, X marks, answer cues, copied lesson sentences, or invented numbers."
     )
     prompt_parts.append(
         "Avoid app UI, worksheet layout, answer panels, scoring marks, feedback bubbles, "
         "watermarks, logos, decorative generic scenes, split-screen comparison diagrams, "
-            "and any visual overlay that tells the answer. The image must look like a natural scene or classroom material setup, not an instructional diagram or source document."
+        "and any visual overlay that tells the answer. The image must look like a natural scene or classroom material setup, "
+        "not an instructional diagram or source document."
     )
 
     return {

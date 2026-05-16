@@ -1,15 +1,31 @@
 from collections.abc import Iterator
 from functools import lru_cache
+from pathlib import Path
 
 from sqlalchemy import Engine, create_engine, inspect, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.config import get_settings
+from app.core.config import BACKEND_DIR, get_settings
 from app.domain.db_models import Base
 
 
+def normalize_database_url(database_url: str) -> str:
+    url = make_url(database_url)
+    if not url.drivername.startswith("sqlite") or not url.database or url.database == ":memory:":
+        return database_url
+
+    database_path = Path(url.database)
+    if database_path.is_absolute():
+        return database_url
+
+    resolved_path = (BACKEND_DIR / database_path).resolve()
+    return url.set(database=resolved_path.as_posix()).render_as_string(hide_password=False)
+
+
 def create_database_engine(database_url: str) -> Engine:
+    database_url = normalize_database_url(database_url)
     connect_args = {}
     engine_kwargs = {}
     if database_url.startswith("sqlite"):

@@ -67,6 +67,13 @@ type MaterialReviewItem = {
 type GenerationStatus = {
   state: "running" | "succeeded" | "failed";
   message: string;
+  title?: string;
+  persistent?: boolean;
+};
+
+type GenerationFeedbackCard = GenerationStatus & {
+  id: string;
+  caseId: string;
 };
 
 type PendingGenerationJob = {
@@ -751,6 +758,10 @@ function isReviewQueueContent(content: MissionContent) {
   return hasGeneratedAt(content) && (content.status === "teacher_review" || content.status === "approved");
 }
 
+function isReviewCardReadyContent(content: MissionContent) {
+  return isReviewQueueContent(content) && !hasMissingGeneratedMedia(content);
+}
+
 function formatContentGeneratedAt(content: MissionContent) {
   const generatedAt = content.briefJson.generatedAt;
   if (typeof generatedAt !== "string") return null;
@@ -1352,10 +1363,14 @@ export default function DashboardPage() {
     return Array.from(byRecordId.values());
   }, [savedFeedbackRecords, serverSavedFeedbackRecords]);
   const completedContentIds = new Set((activeReport?.reports ?? []).map((record) => record.contentId));
-  const selectedReviewItems = (activeCaseFile?.recentContents ?? [])
+  const selectedPreparingContents = (activeCaseFile?.recentContents ?? [])
     .filter((content) => !completedContentIds.has(content.id))
     .filter(isReviewQueueContent)
-    .filter((content) => !hasMissingGeneratedMedia(content))
+    .filter(hasMissingGeneratedMedia)
+    .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left));
+  const selectedReviewItems = (activeCaseFile?.recentContents ?? [])
+    .filter((content) => !completedContentIds.has(content.id))
+    .filter(isReviewCardReadyContent)
     .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left))
     .map((content) => mapContentToReviewItem(content));
   const selectedPublishedContents = (activeCaseFile?.recentContents ?? [])
@@ -1505,9 +1520,12 @@ export default function DashboardPage() {
   const generationFeedbackState = isGeneratingContent ? "running" : generationStatus?.state;
   const generationStatusMessage =
     generationStatus?.message ?? "검토할 수업 자료를 만들고 있습니다. 잠시만 기다려 주세요.";
-  const generationFeedbackCards =
-    selectedPendingGenerationJobs.length > 0
-      ? selectedPendingGenerationJobs.map((job, index) => {
+  const visiblePendingGenerationJobs = selectedPendingGenerationJobs.filter(
+    (job) => !isPendingGenerationJobTimedOut(job) || findPendingGenerationContent(job, activeCaseFile) === null,
+  );
+  const pendingGenerationFeedbackCards: GenerationFeedbackCard[] =
+    visiblePendingGenerationJobs.length > 0
+      ? visiblePendingGenerationJobs.map((job, index) => {
           const pendingContent = findPendingGenerationContent(job, activeCaseFile);
           const completedContent = findCompletedReviewContentForGenerationJob(job, activeCaseFile);
           const isComplete = isPendingGenerationContentComplete(pendingContent) || isPendingGenerationContentComplete(completedContent);
@@ -1536,16 +1554,29 @@ export default function DashboardPage() {
             message,
           };
         })
-      : generationFeedbackState
-        ? [
-            {
-              id: selectedCase.id || "generation-feedback",
-              caseId: selectedCase.id,
-              state: generationFeedbackState,
-              message: generationStatusMessage,
-            },
-          ]
+      : [];
+  const shouldShowPreparingContents = visiblePendingGenerationJobs.length === 0 && generationFeedbackState === "running";
+  const preparingContentFeedbackCards: GenerationFeedbackCard[] = shouldShowPreparingContents
+    ? selectedPreparingContents.map((content) => ({
+        id: `preparing-${content.id}`,
+        caseId: content.caseId,
+        state: "running" as const,
+        title: "이미지/음성 생성 중",
+        message: "수업 구조는 만들어졌고 이미지와 음성이 준비되는 중입니다. 모두 준비되면 검토 목록에 표시됩니다.",
+      }))
+    : [];
+  const transientGenerationFeedbackCards: GenerationFeedbackCard[] =
+    visiblePendingGenerationJobs.length === 0 &&
+    preparingContentFeedbackCards.length === 0 &&
+    generationFeedbackState &&
+    (generationFeedbackState === "running" || generationStatus?.persistent)
+      ? [{ id: selectedCase.id || "generation-feedback", caseId: selectedCase.id, state: generationFeedbackState, message: generationStatusMessage }]
         : [];
+  const generationFeedbackCards = [
+    ...pendingGenerationFeedbackCards,
+    ...preparingContentFeedbackCards,
+    ...transientGenerationFeedbackCards,
+  ];
 
   const updateReviewStageDraft = (
     reviewId: string,
@@ -1682,15 +1713,21 @@ export default function DashboardPage() {
         setSelectedReport(refreshedReport);
       }
 
-      setReviewPreviewStep(1);
-      setOpenReviewId(generatedContent.id);
+      const isGeneratedContentComplete = isPendingGenerationContentComplete(generatedContent);
+      if (isGeneratedContentComplete) {
+        setReviewPreviewStep(1);
+        setOpenReviewId(generatedContent.id);
+      }
       setGenerationStatuses((current) => ({
         ...current,
         [assetJob.caseId]: {
-          state: assetGenerationErrorMessage ? "failed" : "succeeded",
+          state: isGeneratedContentComplete ? "succeeded" : assetGenerationErrorMessage ? "failed" : "running",
           message: assetGenerationErrorMessage
             ? `수업 구조는 만들어졌지만 이미지/음성 생성에 실패했습니다. ${assetGenerationErrorMessage}`
-            : "이미지와 음성까지 포함한 검토용 수업 자료가 만들어졌습니다.",
+            : isGeneratedContentComplete
+              ? "이미지와 음성까지 포함한 검토용 수업 자료가 만들어졌습니다."
+              : "이미지와 음성이 준비되는 중입니다. 모두 준비되면 검토 목록에 표시됩니다.",
+          persistent: Boolean(assetGenerationErrorMessage),
         },
       }));
       updatePendingGenerationJobs((current) => {
@@ -1860,15 +1897,21 @@ export default function DashboardPage() {
         setSelectedReport(refreshedReport);
       }
 
-      setReviewPreviewStep(1);
-      setOpenReviewId(generatedContent.id);
+      const isGeneratedContentComplete = isPendingGenerationContentComplete(generatedContent);
+      if (isGeneratedContentComplete) {
+        setReviewPreviewStep(1);
+        setOpenReviewId(generatedContent.id);
+      }
       setGenerationStatuses((current) => ({
         ...current,
         [job.caseId]: {
-          state: assetGenerationErrorMessage ? "failed" : "succeeded",
+          state: isGeneratedContentComplete ? "succeeded" : assetGenerationErrorMessage ? "failed" : "running",
           message: assetGenerationErrorMessage
             ? `수업 구조는 만들어졌지만 이미지/음성 생성에 실패했습니다. ${assetGenerationErrorMessage}`
-            : "이미지와 음성까지 포함한 검토용 수업 자료가 만들어졌습니다.",
+            : isGeneratedContentComplete
+              ? "이미지와 음성까지 포함한 검토용 수업 자료가 만들어졌습니다."
+              : "이미지와 음성이 준비되는 중입니다. 모두 준비되면 검토 목록에 표시됩니다.",
+          persistent: Boolean(assetGenerationErrorMessage),
         },
       }));
       updatePendingGenerationJobs((current) => {
@@ -2940,11 +2983,11 @@ export default function DashboardPage() {
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-base font-black">
-                                {card.state === "failed"
+                                {card.title ?? (card.state === "failed"
                                   ? "생성 확인 필요"
                                   : card.state === "succeeded"
                                     ? "새 제안이 준비됨"
-                                    : "검토 자료 생성 중"}
+                                    : "검토 자료 생성 중")}
                               </p>
                               <span className="rounded-full bg-white/80 px-2 py-1 text-[11px] font-black">
                                 {card.state === "failed" ? "확인 필요" : card.state === "succeeded" ? "생성 완료" : "생성 중"}
@@ -2978,7 +3021,6 @@ export default function DashboardPage() {
                       const materialRejected = isMaterialRejected(item);
                       const isActionRunning = reviewActionId === item.id;
                       const needsMediaGeneration = hasMissingGeneratedMedia(item.content);
-                      const teacherPreviewHref = `/student/stage?caseId=${encodeURIComponent(item.caseId)}&contentId=${encodeURIComponent(item.content.id)}&preview=1`;
 
                       return (
                         <div key={item.id} className="rounded-md border border-[#e5e9f0] bg-white p-4">
@@ -3024,13 +3066,6 @@ export default function DashboardPage() {
                             >
                               제안 검토하기
                             </button>
-                            <Link
-                              href={teacherPreviewHref}
-                              target="_blank"
-                              className="rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8]"
-                            >
-                              교사용 미리보기
-                            </Link>
                             {needsMediaGeneration && (
                               <button
                                 onClick={() => handleRetryMaterialAssets(item)}
@@ -3095,13 +3130,6 @@ export default function DashboardPage() {
                               </span>
                             </div>
                             <div className="mt-3 flex flex-wrap gap-2">
-                              <Link
-                                href={`/student/stage?caseId=${encodeURIComponent(content.caseId)}&contentId=${encodeURIComponent(content.id)}&preview=1`}
-                                target="_blank"
-                                className="rounded-md border border-[#bbf7d0] bg-white px-3 py-2 text-sm font-bold text-[#15803d]"
-                              >
-                                교사용 미리보기
-                              </Link>
                               <Link
                                 href={`/student/stage?caseId=${encodeURIComponent(content.caseId)}&contentId=${encodeURIComponent(content.id)}`}
                                 target="_blank"
