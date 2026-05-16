@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from app.ai.elevenlabs_provider import ElevenLabsProvider
 from app.ai.openai_provider import OpenAiProvider
 from app.api.deps import get_store_instance
-from app.api.routes.ai import _normalize_orchestrator_plan_candidate
+from app.api.routes.ai import _normalize_orchestrator_plan_candidate, _template_json_contract
 from app.core.config import get_settings
 from app.data.demo_data import create_demo_database
 from app.data.neis_client import NeisClient
@@ -619,6 +619,17 @@ def test_orchestrator_plan_normalizer_uses_randomized_template_contract() -> Non
 
     assert normalized["stagePlan"][1]["templateType"] == "card_match"
     assert normalized["stagePlan"][2]["templateType"] == "sequence_ordering"
+
+
+def test_realtime_template_json_contract_is_explicit() -> None:
+    teach_back_contract = _template_json_contract("realtime_teach_back")
+    roleplay_contract = _template_json_contract("realtime_roleplay")
+
+    assert "stage.realtimeSpec is required." in teach_back_contract["hardRules"]
+    assert "stage.templateType must be exactly realtime_teach_back." in teach_back_contract["hardRules"]
+    assert "stage.realtimeSpec.templateType must be exactly realtime_teach_back." in teach_back_contract["hardRules"]
+    assert "stage.templateType must be exactly realtime_roleplay." in roleplay_contract["hardRules"]
+    assert "stage.realtimeSpec.templateType must be exactly realtime_roleplay." in roleplay_contract["hardRules"]
 
 
 def test_teacher_can_persist_content_review_edits() -> None:

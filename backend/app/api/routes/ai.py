@@ -542,12 +542,28 @@ def _stage_plans_from_orchestrator(orchestrator_plan: dict[str, Any]) -> list[di
 
 def _template_json_contract(template_type: Any) -> dict[str, Any]:
     common_fields = ["imageAssetId", "audioAssetId", "assetBundle", "sourceTextLines", "sceneTextLines"]
+    template_type_value = str(template_type or "")
+    if template_type_value in {"realtime_roleplay", "realtime_teach_back"}:
+        return {
+            "requiredFields": common_fields,
+            "hardRules": [
+                f"stage.templateType must be exactly {template_type_value}.",
+                "stage.stageRole must be realtime_practice.",
+                "stage.step must be 4.",
+                "stage.realtimeSpec is required.",
+                "stage.realtimeSpec.stageId must equal stage.id.",
+                f"stage.realtimeSpec.templateType must be exactly {template_type_value}.",
+                "stage.realtimeSpec.rubric is an array of objects shaped {\"id\":\"r1\",\"label\":\"...\",\"required\":true}.",
+                "stage.realtimeSpec.postPracticeReflection is an array of strings.",
+                "stage.templateJson must include only the common asset fields plus empty sourceTextLines and sceneTextLines.",
+            ],
+        }
     choice_contract = {
         "requiredFields": [*common_fields, "question", "choices", "answer", "correctFeedback", "wrongFeedback"],
         "hardRules": [
             "choices is an array of objects shaped {\"id\":\"a\",\"text\":\"...\"}.",
             "answer is exactly one choice id from choices.",
-            "the correct answer must be determined from question, choices, and sourceTextLines, not from the image.",
+            "the correct answer must be determined from question and choices, not from the image.",
         ],
     }
     contracts: dict[str, dict[str, Any]] = {

@@ -2032,7 +2032,7 @@ def _build_support_profile_draft_json(
     ]
 
     if not observed_strengths:
-        observed_strengths = ["짧은 첫 과제에서 반응 확인 필요"]
+        observed_strengths = ["짧은 첫 활동에서 반응 확인 필요"]
     if not effective_supports:
         effective_supports = ["지시를 짧게 나눔"]
     if not recommended_scaffolds:
@@ -2259,7 +2259,7 @@ def _build_context_brief(
     difficulty_patterns = [pattern for pattern in difficulty_patterns if pattern not in success_patterns]
     avoid_topics = _build_avoid_topic_regression(memory_card, current_goal=open_case.current_goal)
     reading_load_label = _reading_load_label(reading_load)
-    strength_text = _join_context_items(success_patterns[:2]) or "짧은 첫 과제"
+    strength_text = _join_context_items(success_patterns[:2]) or "짧은 첫 활동"
     stable_basis_text = _join_context_items(success_patterns[:2]) or "짧은 단서"
     caution_text = _join_context_items(difficulty_patterns[:2]) or "긴 설명 뒤 첫 행동 시작"
     scaffold_text = _join_support_phrases(scaffolds[:2]) or "예시 먼저 보기"
@@ -2325,9 +2325,7 @@ def _is_support_pattern_only(value: str) -> bool:
         "소재",
         "단원",
         "시계",
-        "버스",
         "간식",
-        "안내판",
         "포스터",
         "피자",
         "분수",
@@ -2380,7 +2378,7 @@ def _is_presentation_scaffold(value: str) -> bool:
         "미리 보기",
         "짧은 음성",
         "한 단계씩",
-        "과제 순서",
+        "해야 할 순서",
     )
     return any(marker in text for marker in scaffold_markers)
 
@@ -2421,37 +2419,23 @@ def _abstract_context_pattern(value: str) -> str:
                 supports.append(keyword)
         if supports:
             return f"{', '.join(supports[:3])} 조건에서 다음 시도에 연결하기"
-    if "안내판" in text and "질문" in text:
+    if "질문" in text and ("시각" in text or "단서" in text):
         return "시각 단서를 먼저 확인한 뒤 짧은 질문으로 연결하기"
     if "정답률 100" in text and "첫 단서" in text:
         return "짧은 첫 단서를 제시하면 다음 시도에 연결하기"
     if "짧은 시각 단서" in text and "끝까지 수행" in text:
         return "짧은 시각 단서와 2개 선택 구조에서 끝까지 수행하기"
-    if "과제" in text and "유치" in text:
-        return "과제가 너무 쉬우면 참여감이 낮아져 현실감과 판단 난이도 조정이 필요함"
+    if "유치" in text:
+        return "활동이 너무 단순하면 참여감이 낮아져 현실감과 판단 난이도 조정이 필요함"
     if "먼저 물어보기" in text and "실시간 발화" in text:
         return "실시간 발화에서는 먼저 물어보기 표현을 구체적으로 연습하기"
     replacements = {
-        (
-            "운동장에서 친구가 찬 공이 내 쪽으로 왔을 때 바로 차기 전에 "
-            "친구에게 물어보고 안전하게 돌려주기"
-        ): "낯선 상황에서 행동 전에 멈추고 상대에게 먼저 확인하기",
-        (
-            "공을 바로 차기 전에 멈추고 친구에게 먼저 묻는 표현을 사용할 수 있음"
-        ): "행동 전에 멈추고 상대에게 먼저 묻기",
-        "행동 전에 멈추고 상대에게 먼저 묻는 표현을 사용할 수 있음": "행동 전에 멈추고 상대에게 먼저 묻기",
+        "구체 소재": "상황",
+        "특정 장소": "낯선 장소",
+        "특정 물건": "상황 단서",
+        "바로 행동하기 전에": "행동하기 전에",
+        "상대에게 먼저 묻는 표현을 사용할 수 있음": "상대에게 먼저 묻기",
         "낯선 상황은 짧은 예시 문장과 2개 선택지로 시작하면 안정적임": "낯선 상황은 짧은 예시 문장과 2개 선택지로 시작하기",
-        "낯선 운동장 상황": "낯선 상황",
-        "공을 바로 차기 전에": "행동하기 전에",
-        "공을": "상황 단서를",
-        "공이": "상황 단서가",
-        "축구공": "상황 단서",
-        "운동장 상황": "낯선 상황",
-        "운동장": "낯선 장소",
-        "차기": "행동하기",
-        "차서": "반응해서",
-        "돌려주기": "알맞게 반응하기",
-        "돌려주는": "알맞게 반응하는",
     }
     for source, target in replacements.items():
         text = text.replace(source, target)
@@ -2522,13 +2506,13 @@ def _reflection_note_for_report(reflection: str | None) -> str:
     if not reflection:
         return "학생 회고가 없어 수업 직후 반응을 교사가 한 번 더 확인하면 좋습니다."
     if any(term in reflection for term in ("유치", "쉬워", "시시", "재미없")):
-        return "학생이 과제 수준을 낮게 느낀 반응이 있어, 다음 자료는 같은 지원 방식은 유지하되 상황의 현실감과 난이도를 높이는 편이 좋습니다."
+        return "학생이 활동 수준을 낮게 느낀 반응이 있어, 다음 자료는 같은 지원 방식은 유지하되 상황의 현실감과 난이도를 높이는 편이 좋습니다."
     return "학생 회고가 남아 있어 다음 수업의 소재와 난이도 조정에 참고할 수 있습니다."
 
 
 def _next_teacher_report_suggestion(content: dict[str, Any], reflection: str | None, scaffold_text: str) -> str:
     if reflection and any(term in reflection for term in ("유치", "쉬워", "시시", "재미없")):
-        return f"다음 수업은 {scaffold_text} 같은 지원 방식은 유지하되, 학생 나이에 맞는 더 현실적인 상황과 한 단계 높은 판단 과제로 조정합니다."
+        return f"다음 수업은 {scaffold_text} 같은 지원 방식은 유지하되, 학생 나이에 맞는 더 현실적인 상황과 한 단계 높은 판단 활동으로 조정합니다."
     return f"다음 수업은 {scaffold_text} 같은 지원 방식을 유지하면서, 이번 수업의 목표를 다른 상황으로 옮겨 적용해 봅니다."
 
 
@@ -2686,7 +2670,7 @@ def _registration_support_focus(payload: StudentRegistrationRequest) -> str:
 
     if [*hard_situations, *instruction_burdens]:
         return "핵심 단서를 먼저 확인하고, 짧은 단계로 개념을 설명합니다."
-    return "짧은 예시와 핵심 단서로 학습 과제를 시작합니다."
+    return "짧은 예시와 핵심 단서로 학습을 시작합니다."
 
 
 def _registration_support_strategy(payload: StudentRegistrationRequest) -> str:
@@ -2708,7 +2692,7 @@ def _registration_support_strategy(payload: StudentRegistrationRequest) -> str:
         return f"관찰상 효과가 확인된 지원은 {', '.join(supports[:3])}입니다. 수업에서는 {', '.join(support_hints[:2])}을 적용합니다.{burden_text}"
     if payload.student_type == "life_support":
         return "생활 장면에서 어려워지는 조건을 먼저 확인하고, 도움 요청과 순서 확인을 수업 적용 힌트로 사용합니다."
-    return "학습 과제에서 어려워지는 조건을 먼저 확인하고, 지시를 나누어 개념 확인 순서를 안정화합니다."
+    return "학습에서 어려워지는 조건을 먼저 확인하고, 지시를 나누어 개념 확인 순서를 안정화합니다."
 
 
 def _registration_response_pattern(payload: StudentRegistrationRequest) -> str:
@@ -2725,7 +2709,7 @@ def _registration_response_pattern(payload: StudentRegistrationRequest) -> str:
         return f"관찰된 강점은 {', '.join(strengths[:2])}입니다. 효과가 확인된 지원은 {', '.join(supports[:2])}입니다."
     if strengths:
         return f"관찰된 강점은 {', '.join(strengths[:2])}입니다."
-    return "등록 직후에는 쉬운 첫 과제로 반응을 확인하고 지원 조건을 보완합니다."
+    return "등록 직후에는 짧은 첫 활동으로 반응을 확인하고 지원 조건을 보완합니다."
 
 
 def _registration_ai_context_summary(payload: StudentRegistrationRequest, track_label: str, primary_need: str) -> str:
@@ -2739,7 +2723,7 @@ def _registration_strengths(payload: StudentRegistrationRequest) -> list[str]:
     supports = _registration_preferred_supports(payload)
     if supports:
         return [f"{support}이 제공되면 수업 참여가 안정됩니다." for support in supports[:3]]
-    return ["짧고 쉬운 첫 과제에서 반응을 확인해 강점을 구체화합니다."]
+    return ["짧은 첫 활동에서 반응을 확인해 강점을 구체화합니다."]
 
 
 def _registration_weaknesses(payload: StudentRegistrationRequest) -> list[str]:
@@ -2817,7 +2801,7 @@ def _registration_support_hints(
         elif "선택지" in item:
             mapped.append("선택지 수 줄이기")
         elif "순서" in item:
-            mapped.append("풀이 순서 먼저 확인하기" if student_type == "learning_focus" else "과제 순서 먼저 확인하기")
+            mapped.append("풀이 순서 먼저 확인하기" if student_type == "learning_focus" else "해야 할 순서 먼저 확인하기")
         elif "기다" in item:
             mapped.append("대답 전 기다릴 시간 주기")
         elif student_type == "learning_focus" and any(keyword in item for keyword in ["단서", "조건", "빈칸", "그림", "표"]):

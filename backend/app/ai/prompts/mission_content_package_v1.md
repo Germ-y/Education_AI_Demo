@@ -68,6 +68,7 @@
 - 3단계 `행동 고르기`: 상황을 바탕으로 다음 행동이나 말을 고릅니다.
 - 4단계 `한 번 해보기`: 실제처럼 말하거나 행동을 연습합니다.
 - 답은 실제 다음 행동, 물어볼 말, 도움 요청, 순서 확인, 선택 전 확인으로 이어져야 합니다.
+- 추천 생성에서는 단순 절차 확인으로 좁히지 말고, 학생 학년에 맞는 일상 생활 판단과 의사표현으로 만듭니다.
 - 단순 물건 이름, 색, 위치 맞히기로 끝내지 않습니다.
 
 ## 학년과 학생 프로필 사용
@@ -82,6 +83,7 @@
 
 - 오케스트레이터의 `scenarioSpine`이 시나리오 source of truth입니다.
 - 콘텐츠 작성 단계에서 전혀 다른 시나리오를 발명하지 않습니다.
+- 각 stage의 `stageRole`, `templateType`, `studentTitle`은 `orchestratorPlan.stagePlan`과 정확히 같아야 합니다.
 - 1단계는 장면 소개에서 끝나지 않고 2~3단계 문제에 필요한 기준을 엽니다.
 - 2단계는 기본 문제입니다. 학생이 배워야 할 개념의 핵심 기준을 직접 확인하게 합니다.
 - 3단계는 응용 예제입니다. 2단계 기준을 새 조건이나 한 단계 어려운 자료에 적용하게 합니다.
@@ -141,7 +143,12 @@
 
 4단계에는 `realtimeSpec`을 넣습니다.
 
-- `templateType`은 `realtime_roleplay` 또는 `realtime_teach_back`입니다.
+- 4단계 `stageRole`, `templateType`, `studentTitle`은 `orchestratorPlan.stagePlan[step=4]`의 값을 그대로 씁니다.
+- `life_support`의 4단계 `templateType`은 반드시 `realtime_roleplay`입니다.
+- `learning_focus`의 4단계 `templateType`은 반드시 `realtime_teach_back`입니다.
+- `realtimeSpec`은 반드시 존재해야 합니다.
+- `realtimeSpec.stageId`는 해당 4단계 stage의 `id`와 같아야 합니다.
+- `realtimeSpec.templateType`은 해당 4단계 stage의 `templateType`과 같아야 합니다.
 - `postPracticeReflection`은 문자열 배열입니다.
 - `rubric` 항목은 `{ "id": "r1", "label": "관찰할 행동", "required": true }` 형식입니다.
 - `maxTurns`는 8 이하, `maxDurationSec`는 180 이하를 권장합니다.

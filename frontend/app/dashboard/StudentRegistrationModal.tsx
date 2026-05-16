@@ -184,7 +184,7 @@ const supportChecklistGroupsByType: Record<ContentType, ChecklistGroupDefinition
     title: "현재 잘 되는 수행",
     description: "관찰된 강점과 독립적으로 가능한 행동",
     required: true,
-    options: ["짧은 지시를 이해함", "익숙한 과제를 시작함", "한 문항씩 끝까지 수행함", "오류 뒤 다시 시도함", "선생님 질문에 짧게 답함", "또래 활동을 관찰함"],
+    options: ["짧은 지시를 이해함", "익숙한 활동을 시작함", "한 활동을 끝까지 해봄", "오류 뒤 다시 시도함", "선생님 질문에 짧게 답함", "또래 활동을 관찰함"],
   },
   {
     key: "weaknessesText",
@@ -195,8 +195,8 @@ const supportChecklistGroupsByType: Record<ContentType, ChecklistGroupDefinition
       "긴 지시 이해",
       "여러 조건을 한 번에 처리",
       "긴 글을 읽고 시작",
-      "과제 시작",
-      "과제 지속",
+      "활동 시작",
+      "활동 지속",
       "오류 후 재시도",
       "활동 전환",
       "기다림",
@@ -209,7 +209,7 @@ const supportChecklistGroupsByType: Record<ContentType, ChecklistGroupDefinition
     title: "효과가 확인된 지원",
     description: "관찰 또는 이전 지원에서 효과가 있었던 조건",
     required: true,
-    options: ["지시를 짧게 나눔", "예시를 먼저 보여줌", "선택지를 줄임", "과제 순서를 확인함", "기다릴 시간을 줌", "도움 요청 문장을 연습함", "안전 규칙을 먼저 확인함"],
+    options: ["지시를 짧게 나눔", "예시를 먼저 보여줌", "선택지를 줄임", "해야 할 순서를 확인함", "기다릴 시간을 줌", "도움 요청 문장을 연습함", "안전 규칙을 먼저 확인함"],
   },
   {
     key: "communicationNeedText",
@@ -244,8 +244,8 @@ const checklistIntroByType: Record<ContentType, { title: string; description: st
 };
 
 const currentGoalPlaceholderByType: Record<ContentType, string> = {
-  learning_focus: "예: 짧은 영어 안내문에서 장소와 해야 할 행동을 구분해 읽기",
-  life_support: "예: 친구에게 먼저 물어보고 공을 안전하게 돌려주기",
+  learning_focus: "예: 오늘 다룰 개념이나 자료 이해 목표를 적어주세요",
+  life_support: "예: 생활 상황에서 필요한 말이나 행동을 짧게 연습하기",
 };
 
 const observationPlaceholderByType: Record<ContentType, string> = {

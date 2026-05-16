@@ -1026,21 +1026,18 @@ function getRealtimePracticeCopy(scene: StudentContext["scene"], question: Stage
   const isClockPractice = /시계|시침|분침|짧은 바늘|긴 바늘|약속 시간/.test(
     `${scene.title} ${scene.missionDescription} ${question.prompt}`,
   );
-  const isTransitPractice = /버스|정류장|센터|도움|안내 직원/.test(`${scene.title} ${scene.missionDescription} ${question.prompt}`);
   const firstPrompt = question.realtimePracticeSpec?.firstPrompt ?? question.prompt;
 
   return {
     label: isLearningFocus ? "친구에게 설명하기" : "생활에 적용하기",
     title: isLearningFocus ? "내 말로 쉽게 설명해요" : "오늘 바로 쓸 말을 연습해요",
-    partner: isLearningFocus ? "친구" : isTransitPractice ? "안내 직원" : "나",
+    partner: isLearningFocus ? "친구" : "상대",
     partnerLine: firstPrompt,
     studentLine: isLearningFocus
       ? isClockPractice
         ? "짧은 바늘을 먼저 보고, 그다음 긴 바늘을 보면 돼."
         : "먼저 중요한 단서를 보고, 내가 이해한 순서를 짧게 말해볼게."
-      : isTransitPractice
-        ? "센터에 가야 해요. 버스 알려 주세요."
-        : "필요한 말을 짧게 말해볼게.",
+      : "필요한 말을 짧게 말해볼게.",
     sceneLine: firstPrompt,
     actionLabel: isLearningFocus ? "설명 연습 시작" : "생활 적용 연습 시작",
   };
