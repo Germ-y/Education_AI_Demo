@@ -2954,6 +2954,7 @@ export default function DashboardPage() {
                       const materialRejected = isMaterialRejected(item);
                       const isActionRunning = reviewActionId === item.id;
                       const needsMediaGeneration = hasMissingGeneratedMedia(item.content);
+                      const teacherPreviewHref = `/student/stage?caseId=${encodeURIComponent(item.caseId)}&contentId=${encodeURIComponent(item.content.id)}&preview=1`;
 
                       return (
                         <div key={item.id} className="rounded-md border border-[#e5e9f0] bg-white p-4">
@@ -2999,6 +3000,13 @@ export default function DashboardPage() {
                             >
                               제안 검토하기
                             </button>
+                            <Link
+                              href={teacherPreviewHref}
+                              target="_blank"
+                              className="rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8]"
+                            >
+                              교사용 미리보기
+                            </Link>
                             {needsMediaGeneration && (
                               <button
                                 onClick={() => handleRetryMaterialAssets(item)}
@@ -3063,6 +3071,13 @@ export default function DashboardPage() {
                               </span>
                             </div>
                             <div className="mt-3 flex flex-wrap gap-2">
+                              <Link
+                                href={`/student/stage?caseId=${encodeURIComponent(content.caseId)}&contentId=${encodeURIComponent(content.id)}&preview=1`}
+                                target="_blank"
+                                className="rounded-md border border-[#bbf7d0] bg-white px-3 py-2 text-sm font-bold text-[#15803d]"
+                              >
+                                교사용 미리보기
+                              </Link>
                               <Link
                                 href={`/student/stage?caseId=${encodeURIComponent(content.caseId)}&contentId=${encodeURIComponent(content.id)}`}
                                 target="_blank"
