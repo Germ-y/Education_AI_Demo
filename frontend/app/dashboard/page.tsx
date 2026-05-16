@@ -1451,9 +1451,10 @@ export default function DashboardPage() {
     activeContextBrief?.recommendedScaffolds,
     selectedCase.primaryNeed,
   ]);
-  const selectedPendingGenerationJob = Object.values(pendingGenerationJobs).find(
+  const selectedPendingGenerationJobs = Object.values(pendingGenerationJobs).filter(
     (job) => job.caseId === selectedCase.id || (selectedCase.studentId && job.studentId === selectedCase.studentId),
   );
+  const selectedPendingGenerationJob = selectedPendingGenerationJobs[0];
   const selectedPendingGenerationContent = selectedPendingGenerationJob
     ? findPendingGenerationContent(selectedPendingGenerationJob, activeCaseFile)
     : null;
@@ -1494,6 +1495,42 @@ export default function DashboardPage() {
         !isSelectedPendingGenerationComplete &&
         !isPendingGenerationJobTimedOut(selectedPendingGenerationJob),
     );
+  const generationFeedbackState = isGeneratingContent ? "running" : generationStatus?.state;
+  const generationStatusMessage =
+    generationStatus?.message ?? "검토할 수업 자료를 만들고 있습니다. 잠시만 기다려 주세요.";
+  const generationFeedbackCards =
+    selectedPendingGenerationJobs.length > 0
+      ? selectedPendingGenerationJobs.map((job, index) => {
+          const pendingContent = findPendingGenerationContent(job, activeCaseFile);
+          const completedContent = findCompletedReviewContentForGenerationJob(job, activeCaseFile);
+          const isComplete = isPendingGenerationContentComplete(pendingContent) || isPendingGenerationContentComplete(completedContent);
+          const jobStatus = generationStatuses[job.caseId];
+          const state: GenerationStatus["state"] = isComplete
+            ? "succeeded"
+            : isPendingGenerationJobTimedOut(job)
+              ? "failed"
+              : jobStatus?.state ?? "running";
+          const message =
+            jobStatus?.message ??
+            (state === "succeeded"
+              ? "이미지와 음성까지 준비된 검토 자료가 만들어졌습니다."
+              : state === "failed"
+                ? "생성 작업이 오래 응답하지 않아 멈춘 것으로 표시했습니다. 다시 제안받기를 눌러 주세요."
+                : job.phase === "orchestrator"
+                  ? "학생 기록을 바탕으로 수업 방향을 정리하는 중입니다."
+                  : job.phase === "content"
+                    ? "검토할 수업 콘텐츠 구조를 만드는 중입니다."
+                    : "이미지와 음성 asset을 연결하는 중입니다.");
+
+          return {
+            id: `${job.caseId}-${job.contentId ?? job.contentRunId ?? job.orchestratorRunId ?? index}`,
+            state,
+            message,
+          };
+        })
+      : generationFeedbackState
+        ? [{ id: selectedCase.id || "generation-feedback", state: generationFeedbackState, message: generationStatusMessage }]
+        : [];
 
   const updateReviewStageDraft = (
     reviewId: string,
@@ -2829,26 +2866,29 @@ export default function DashboardPage() {
                         <button
                           disabled={!selectedCase.id || isGeneratingContent}
                           onClick={() => void handleGenerateContent("teacher_request")}
-                          className={`rounded-md px-4 py-3 text-sm font-bold text-white ${
+                          className={`flex items-center justify-center gap-2 rounded-md px-4 py-3 text-sm font-bold text-white ${
                             !selectedCase.id || isGeneratingContent
-                              ? "cursor-not-allowed bg-[#94a3b8]"
+                              ? "cursor-not-allowed bg-[#1f3a5f]/80"
                               : "bg-[#1f3a5f] hover:bg-[#172b47]"
                           }`}
                         >
+                          {isGeneratingContent && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/50 border-t-white" />}
                           {isGeneratingContent ? "자료를 제안하는 중" : "입력 내용으로 생성"}
                         </button>
                         <button
                           disabled={!selectedCase.id || isGeneratingContent}
                           onClick={() => void handleGenerateContent("ai_recommendation")}
-                          className={`rounded-md border px-4 py-3 text-sm font-bold ${
+                          className={`flex items-center justify-center gap-2 rounded-md border px-4 py-3 text-sm font-bold ${
                             !selectedCase.id || isGeneratingContent
-                              ? "cursor-not-allowed border-[#cbd5e1] bg-[#f1f5f9] text-[#94a3b8]"
+                              ? "cursor-not-allowed border-[#bfdbfe] bg-[#eff6ff] text-[#1f3a5f]"
                               : "border-[#bfdbfe] bg-[#eff6ff] text-[#1f3a5f] hover:bg-[#dbeafe]"
                           }`}
                         >
+                          {isGeneratingContent && <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#bfdbfe] border-t-[#1f3a5f]" />}
                           {isGeneratingContent ? "추천 준비 중" : "AI 추천 생성"}
                         </button>
                       </div>
+
                     </div>
                   </div>
                 </section>
@@ -2861,40 +2901,54 @@ export default function DashboardPage() {
                         제안된 자료를 확인하고 선생님 판단으로 적용합니다.
                       </p>
                     </div>
-                    {generationStatus && generationStatus.state !== "succeeded" && (
+                    {generationFeedbackCards.map((card) => (
                       <div
+                        key={card.id}
                         className={`rounded-md border p-4 ${
-                          generationStatus.state === "failed"
+                          card.state === "failed"
                             ? "border-[#fed7aa] bg-[#fff7ed] text-[#9a3412]"
-                            : "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
+                            : card.state === "succeeded"
+                              ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
+                              : "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
                         }`}
+                        role="status"
+                        aria-live="polite"
                       >
                         <div className="flex items-start gap-3">
-                          {generationStatus.state === "failed" ? (
-                            <div className="mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full border border-[#fed7aa] bg-white text-xs font-black">
-                              !
-                            </div>
-                          ) : (
+                          {card.state === "running" ? (
                             <div className="mt-1 h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-[#93c5fd] border-t-[#1d4ed8]" />
+                          ) : (
+                            <div className="mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full border border-current bg-white text-xs font-black">
+                              {card.state === "succeeded" ? "✓" : "!"}
+                            </div>
                           )}
-                          <div>
-                            <p className="text-base font-black">
-                              {generationStatus.state === "failed" ? "생성 확인 필요" : "검토 자료 생성 중"}
-                            </p>
-                            <p className="mt-1 text-sm font-bold leading-6">{generationStatus.message}</p>
-                            {generationStatus.state === "running" && (
-                              <p className="mt-2 text-xs font-bold text-[#3b82f6]">새로고침해도 여기에서 이어서 확인합니다.</p>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-base font-black">
+                                {card.state === "failed"
+                                  ? "생성 확인 필요"
+                                  : card.state === "succeeded"
+                                    ? "새 제안이 준비됨"
+                                    : "검토 자료 생성 중"}
+                              </p>
+                              <span className="rounded-full bg-white/80 px-2 py-1 text-[11px] font-black">
+                                {card.state === "failed" ? "확인 필요" : card.state === "succeeded" ? "생성 완료" : "생성 중"}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-sm font-bold leading-6">{card.message}</p>
+                            {card.state === "running" && (
+                              <p className="mt-2 text-xs font-bold text-[#3b82f6]">완료되면 이 목록에 검토 카드가 추가됩니다.</p>
                             )}
                           </div>
                         </div>
                       </div>
-                    )}
-                    {selectedReviewItems.length === 0 && !isGeneratingContent && (
+                    ))}
+                    {selectedReviewItems.length === 0 && generationFeedbackCards.length === 0 && (
                       <div className="rounded-md border border-[#e5e9f0] bg-white p-4 text-sm font-bold leading-6 text-[#64748b]">
                         검토할 수업 자료 제안이 없습니다. 학생이 완료한 자료는 학습 기록에서 확인할 수 있어요.
                       </div>
                     )}
-                    {!isGeneratingContent && selectedReviewItems.map((item) => {
+                    {selectedReviewItems.map((item) => {
                       const materialApplied = isMaterialApplied(item);
                       const materialApproved = isMaterialApproved(item);
                       const materialRejected = isMaterialRejected(item);
