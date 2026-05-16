@@ -41,7 +41,6 @@ ORCHESTRATOR_STAGE_CONTRACTS: dict[str, dict[int, dict[str, Any]]] = {
                 "blank_fill",
                 "scene_question",
                 "clue_question",
-                "partition_picker",
             },
         },
         3: {
@@ -543,6 +542,14 @@ def _stage_plans_from_orchestrator(orchestrator_plan: dict[str, Any]) -> list[di
 
 def _template_json_contract(template_type: Any) -> dict[str, Any]:
     common_fields = ["imageAssetId", "audioAssetId", "assetBundle", "sourceTextLines", "sceneTextLines"]
+    choice_contract = {
+        "requiredFields": [*common_fields, "question", "choices", "answer", "correctFeedback", "wrongFeedback"],
+        "hardRules": [
+            "choices is an array of objects shaped {\"id\":\"a\",\"text\":\"...\"}.",
+            "answer is exactly one choice id from choices.",
+            "the correct answer must be determined from question, choices, and sourceTextLines, not from the image.",
+        ],
+    }
     contracts: dict[str, dict[str, Any]] = {
         "blank_fill": {
             "requiredFields": [
@@ -579,6 +586,31 @@ def _template_json_contract(template_type: Any) -> dict[str, Any]:
         "sequence_ordering": {
             "requiredFields": [*common_fields, "question", "cards", "answerOrder", "correctFeedback", "wrongFeedback"],
             "hardRules": ["answerOrder contains the card ids in the correct order."],
+        },
+        "scene_question": choice_contract,
+        "clue_question": choice_contract,
+        "applied_question": choice_contract,
+        "action_choice": choice_contract,
+        "explanation_choice": choice_contract,
+        "decision_card": choice_contract,
+        "scene_observation": choice_contract,
+        "highlight_clue": choice_contract,
+        "wrong_explanation_fix": {
+            "requiredFields": [
+                *common_fields,
+                "question",
+                "wrongLine",
+                "choices",
+                "answer",
+                "fixedLine",
+                "correctFeedback",
+                "wrongFeedback",
+            ],
+            "hardRules": [
+                "choices is an array of objects shaped {\"id\":\"a\",\"text\":\"...\"}.",
+                "answer is exactly one choice id from choices.",
+                "wrongLine is a plausible misconception and fixedLine explains the corrected idea.",
+            ],
         },
     }
     return contracts.get(str(template_type or ""), {"requiredFields": common_fields, "hardRules": []})

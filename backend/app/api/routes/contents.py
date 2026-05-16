@@ -1013,8 +1013,8 @@ def _build_image_brief_for_asset(content, asset, stages: list, stage_visual_spec
             f"Composition: {composition}",
             f"Camera: {camera}; subject priority is context_first; human presence: {human_presence}.",
             "Show the situation, manipulatives, materials, and activity mood that support the lesson. "
-            "The image is not the problem, worksheet, source sheet, answer key, or UI screen. "
-            "All exact lesson data, equations, table values, source sentences, questions, choices, answers, and feedback are rendered by the app UI outside the image. "
+            "The image is not the problem, worksheet, answer key, or UI screen. "
+            "All exact lesson data, equations, questions, choices, answers, and feedback are rendered by the app UI outside the image. "
             "People, if present, stay secondary unless the stage is a life-support role practice.",
         ]
     )
@@ -1180,7 +1180,7 @@ def _instructional_design_for_asset(content, asset, stage) -> str:
             return "show the meaningful clue before the action, with place, person, and object relationships clear"
         return "show the real-life decision context that leads to a safer or more appropriate next action"
     if template_type in {"card_match", "partition_picker"}:
-        return "show comparable materials arranged so relationships can be noticed without turning the image into answer cards"
+        return "show the lesson setting and hands-on materials as context without arranging them into a solvable answer board"
     if template_type in {"sequence_ordering", "blank_fill"}:
         return "show the activity setup and materials around the concept without turning them into the problem source"
     if template_type in {"explanation_choice", "wrong_explanation_fix", "applied_question"}:
@@ -1404,7 +1404,7 @@ def _stage_problem_data(stage) -> dict[str, Any]:
         "studentInstruction": stage.student_instruction,
         "taskPrompt": _first_text_value(template_json, ("prompt", "question", "title", "situation")),
         "taskBody": _first_text_value(template_json, ("body", "description", "context", "sentence")),
-        "sourceTextLines": _string_list(template_json.get("sourceTextLines")) + _string_list(template_json.get("sceneTextLines")),
+        "sourceTextLines": [],
         "choiceTexts": _extract_choice_texts(template_json),
         "matchingTexts": _extract_matching_texts(template_json),
         "sequenceTexts": _extract_sequence_texts(template_json),

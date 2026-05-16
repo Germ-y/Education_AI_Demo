@@ -171,22 +171,6 @@ _WRONG_EXPLANATION_FIX_TEMPLATE_SCHEMA = _object_schema(
     }
 )
 
-_PARTITION_PICKER_TEMPLATE_SCHEMA = _object_schema(
-    {
-        "imageAssetId": {"type": "string"},
-        "audioAssetId": {"type": "string"},
-        "assetBundle": _ASSET_BUNDLE_SCHEMA,
-        "question": {"type": "string"},
-        "wholeLabel": {"type": "string"},
-        "partLabel": {"type": "string"},
-        "choices": {"type": "array", "items": _CHOICE_ITEM_SCHEMA},
-        "answer": {"type": "string"},
-        "correctFeedback": {"type": "string"},
-        "wrongFeedback": {"type": "string"},
-        **_scene_text_fields(),
-    }
-)
-
 _REALTIME_TEMPLATE_SCHEMA = _object_schema(
     {
         "imageAssetId": {"type": "string"},
@@ -206,7 +190,6 @@ _TEMPLATE_JSON_SCHEMA = {
         _SEQUENCE_ORDERING_TEMPLATE_SCHEMA,
         _BLANK_FILL_TEMPLATE_SCHEMA,
         _WRONG_EXPLANATION_FIX_TEMPLATE_SCHEMA,
-        _PARTITION_PICKER_TEMPLATE_SCHEMA,
         _REALTIME_TEMPLATE_SCHEMA,
     ],
 }
@@ -281,7 +264,6 @@ _CONTENT_STAGE_SCHEMA = _object_schema(
                 "scene_question",
                 "clue_question",
                 "blank_fill",
-                "partition_picker",
                 "applied_question",
                 "mini_simulation",
                 "explanation_choice",

@@ -33,7 +33,7 @@
 
 - 목표는 학년 수준의 학습 콘텐츠입니다.
 - 수학, 국어, 영어, 사회, 과학, 자료 해석, 문장 이해, 수량 관계, 조건 비교, 설명하기처럼 **학습 판단**을 다룹니다.
-- 정답은 이미지 안에 있지 않습니다. 정답은 문제 UI의 식, 문장, 표, 보기, 카드, 빈칸, 조건에서 판단합니다.
+- 정답은 이미지 안에 있지 않습니다. 정답은 문제 UI의 식, 문장, 보기, 카드, 빈칸, 조건에서 판단합니다.
 - 이미지는 학습 문제의 상황, 조작물, 교실 맥락, 활동 분위기를 보여주는 보조 장면입니다.
 - 생활 장면을 쓰더라도 답은 예절이나 안전 행동이 아니라 학습 판단이어야 합니다.
 
@@ -71,10 +71,11 @@
 `learning_focus` 설계:
 
 1. 학년 수준에 맞는 학습 기능을 정합니다.
-2. 학생이 UI에서 볼 문제 데이터를 정합니다. 예: 식, 짧은 문장, 표 값, 카드 문구, 빈칸 문장, 비교 조건, 분류 기준.
+2. 학생이 UI에서 풀 문제 구조를 정합니다. 예: 식, 짧은 문장, 카드 문구, 빈칸 문장, 비교 조건, 분류 기준.
 3. 이미지는 문제 데이터를 풀게 하는 정답지가 아니라, 같은 수업 맥락의 장소·활동·조작물을 보여주는 보조 장면으로 설계합니다.
-4. 2단계는 가장 쉬운 기본 문제, 3단계는 같은 개념을 한 단계 옮긴 문제로 설계합니다.
-5. 4단계는 학생이 풀이 기준이나 설명을 자기 말로 말하게 합니다.
+4. 2단계는 기본 문제입니다. 가장 쉬운 활동으로 낮추지 말고, 해당 학년의 개념을 확인하는 문제로 설계합니다.
+5. 3단계는 응용 예제입니다. 같은 개념을 더 복잡한 조건이나 다른 자료에 적용해 난이도를 한 단계 올립니다.
+6. 4단계는 학생이 풀이 기준이나 설명을 자기 말로 말하게 합니다.
 
 `life_support` 설계:
 
@@ -89,16 +90,16 @@
 학생이 정답을 판단하는 근거는 문제 UI와 `templateJson` 안에만 존재합니다.
 이미지는 정답을 찾는 자료가 아니라, 학생이 수업 상황을 편안하게 이해하도록 돕는 맥락 장면입니다.
 
-- 학생이 읽어야 하는 정확한 문장, 숫자, 표 값, 선택지, 정답 단서는 이미지에 넣지 않습니다.
-- 정답 판단에 필요한 정보는 `sourceTextLines`, `question`, `choices`, `cards`, `tiles`, `acceptedAnswers`, `realtimeSpec` 같은 문제 데이터에만 넣습니다.
+- 학생이 읽어야 하는 정확한 문장, 숫자, 선택지, 정답 단서는 이미지에 넣지 않습니다.
+- 정답 판단에 필요한 정보는 `question`, `choices`, `cards`, `tiles`, `acceptedAnswers`, `realtimeSpec` 같은 문제 데이터에만 넣습니다.
 - `stageVisualSpecs`는 기존 schema 호환을 위해 유지하지만, 더 이상 증거 계약이 아닙니다.
 - `stageVisualSpecs`는 이미지가 보여줄 분위기, 장소, 사람의 위치, 활동 상황을 정하는 **장면 맥락 계약**입니다.
 - `primaryEvidenceObject` 필드는 schema 호환용입니다. 정답 근거가 아니라 장면의 대표 사물이나 활동 대상을 씁니다. 예: 책상 위 학습지, 마트 계산대, 버스 정류장, 실험 도구, 친구와 마주 앉은 자리.
 - `primaryEvidenceObject`에 정답 선택지, 문제 핵심 단어, 정답 행동을 넣지 않습니다. 이 값만 보고 학생이 정답을 알 수 있으면 실패입니다.
-- `evidenceLocation` 필드는 schema 호환용입니다. 항상 `problem_ui_only` 또는 `templateJson.sourceTextLines`처럼 이미지 밖 위치를 씁니다.
+- `evidenceLocation` 필드는 schema 호환용입니다. 항상 `problem_ui_only`를 씁니다.
 - `evidenceLocation`에 `이미지 안`, `칠판`, `표지판`, `종이 위 글자`처럼 이미지 내부를 정답 근거 위치로 쓰지 않습니다.
 - `allowedSceneText`는 항상 빈 배열 `[]`로 둡니다.
-- `mustShow`에는 장소, 사람, 사물, 행동 분위기만 넣습니다. 문제 보기, 정답 후보, 핵심 숫자, 표 값, 날짜, 문장 단서는 넣지 않습니다.
+- `mustShow`에는 장소, 사람, 사물, 행동 분위기만 넣습니다. 문제 보기, 정답 후보, 핵심 숫자, 날짜, 문장 단서는 넣지 않습니다.
 - `doNotRenderText`: 반드시 `problem`, `choices`, `answer`, `feedback`을 포함합니다.
 - `sceneSummary`, `visualPurpose`, `composition`은 이미지 속 글자가 아니라 장면 설명입니다.
 
@@ -113,7 +114,7 @@
 
 - 정답 사물만 크게 보여줍니다.
 - 선택지 중 하나만 눈에 띄게 그립니다.
-- 표, 안내문, 시간표, 날짜, 숫자, 문장을 이미지에 넣어 문제를 풀게 합니다.
+- 안내문, 날짜, 숫자, 문장을 이미지에 넣어 문제를 풀게 합니다.
 - 화살표, 체크, 동그라미, 색 강조로 정답 방향을 암시합니다.
 
 ## 허용 흐름
@@ -128,7 +129,7 @@
 `learning_focus`:
 
 - 1단계: `concept_intro` + `concept_intro`
-- 2단계: `basic_problem` + `card_match`, `sequence_ordering`, `blank_fill`, `scene_question`, `clue_question`, `partition_picker`
+- 2단계: `basic_problem` + `card_match`, `sequence_ordering`, `blank_fill`, `scene_question`, `clue_question`
 - 3단계: `applied_problem` + `card_match`, `sequence_ordering`, `blank_fill`, `applied_question`, `mini_simulation`, `explanation_choice`, `wrong_explanation_fix`
 - 4단계: `realtime_practice` + `realtime_teach_back`
 
@@ -175,7 +176,7 @@
       "visualPurpose": "string",
       "sceneSummary": "string",
       "primaryEvidenceObject": "string",
-      "evidenceLocation": "problem_ui_only | templateJson.sourceTextLines",
+      "evidenceLocation": "problem_ui_only",
       "mustShow": ["string"],
       "allowedSceneText": [],
       "doNotRenderText": ["problem", "choices", "answer", "feedback"],

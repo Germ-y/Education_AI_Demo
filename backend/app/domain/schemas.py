@@ -39,7 +39,6 @@ STATIC_STAGE_TEMPLATE_TYPES = {
         TemplateType.CARD_MATCH,
         TemplateType.SEQUENCE_ORDERING,
         TemplateType.BLANK_FILL,
-        TemplateType.PARTITION_PICKER,
     },
     StageRole.ACTION_SELECTION: {
         TemplateType.ACTION_CHOICE,
@@ -164,16 +163,19 @@ def _validate_template_json(template_type: TemplateType, template_json: dict[str
             raise ValueError("image_quiz.answer는 choices의 id 중 하나여야 합니다.")
     if template_type == TemplateType.CARD_MATCH:
         _require_keys(template_json, ["leftCards", "rightCards", "matches", "correctFeedback", "wrongFeedback"], "card_match")
+        _validate_card_match(template_json)
     if template_type == TemplateType.SEQUENCE_ORDERING:
         _require_keys(template_json, ["cards", "answerOrder", "correctFeedback", "wrongFeedback"], "sequence_ordering")
+        _validate_sequence_ordering(template_json)
     if template_type == TemplateType.BLANK_FILL:
         if "acceptedAnswers" not in template_json and "answers" not in template_json:
             raise ValueError("blank_fill은 acceptedAnswers 또는 answers를 가져야 합니다.")
-        _require_any_key(template_json, ["question", "sentence"], "blank_fill")
-        blank_sentence = str(template_json.get("sentence") or template_json.get("question") or "")
+        _require_keys(template_json, ["question", "sentence", "tiles", "acceptedAnswers", "correctFeedback", "wrongFeedback"], "blank_fill")
+        blank_sentence = str(template_json.get("sentence") or "")
         if "__" not in blank_sentence and "[A]" not in blank_sentence and "[B]" not in blank_sentence:
-            raise ValueError("blank_fill은 question 또는 sentence 안에 __, [A], [B] 중 하나의 빈칸 표시를 가져야 합니다.")
+            raise ValueError("blank_fill.sentence는 __, [A], [B] 중 하나의 빈칸 표시를 가져야 합니다.")
         _validate_blank_fill_sentence(blank_sentence)
+        _validate_blank_fill_answers(template_json)
     if template_type in CHOICE_TEMPLATE_TYPES:
         _require_keys(template_json, ["question", "choices", "answer", "correctFeedback", "wrongFeedback"], template_type.value)
         _validate_choice_answer(template_json, template_type.value)
@@ -206,6 +208,54 @@ def _validate_choice_answer(template_json: dict[str, Any], template_type: str) -
     choice_ids = [choice.get("id") for choice in choices if isinstance(choice, dict)]
     if len(choice_ids) != len(choices) or template_json["answer"] not in choice_ids:
         raise ValueError(f"{template_type}.answer는 choices의 id 중 하나여야 합니다.")
+
+
+def _validate_card_match(template_json: dict[str, Any]) -> None:
+    for blocked in ("choices", "cards", "tiles"):
+        if blocked in template_json:
+            raise ValueError(f"card_match에는 {blocked}를 넣지 않습니다.")
+    left_cards = template_json.get("leftCards")
+    right_cards = template_json.get("rightCards")
+    matches = template_json.get("matches")
+    if not isinstance(left_cards, list) or not isinstance(right_cards, list) or not isinstance(matches, dict):
+        raise ValueError("card_match는 leftCards, rightCards, matches object가 필요합니다.")
+    left_ids = [card.get("id") for card in left_cards if isinstance(card, dict)]
+    right_ids = [card.get("id") for card in right_cards if isinstance(card, dict)]
+    if left_ids != ["left_1", "left_2"]:
+        raise ValueError("card_match.leftCards id는 left_1, left_2여야 합니다.")
+    if right_ids != ["right_1", "right_2"]:
+        raise ValueError("card_match.rightCards id는 right_1, right_2여야 합니다.")
+    if set(matches.keys()) != {"left_1", "left_2"}:
+        raise ValueError("card_match.matches는 left_1, left_2를 모두 가져야 합니다.")
+    if any(value not in {"right_1", "right_2"} for value in matches.values()):
+        raise ValueError("card_match.matches 값은 right_1 또는 right_2여야 합니다.")
+
+
+def _validate_sequence_ordering(template_json: dict[str, Any]) -> None:
+    cards = template_json.get("cards")
+    answer_order = template_json.get("answerOrder")
+    if not isinstance(cards, list) or not isinstance(answer_order, list):
+        raise ValueError("sequence_ordering은 cards와 answerOrder 배열이 필요합니다.")
+    card_ids = [card.get("id") for card in cards if isinstance(card, dict)]
+    if len(card_ids) != len(cards) or len(set(card_ids)) != len(card_ids):
+        raise ValueError("sequence_ordering.cards는 중복 없는 id를 가져야 합니다.")
+    if sorted(answer_order) != sorted(card_ids):
+        raise ValueError("sequence_ordering.answerOrder는 cards id 전체를 한 번씩 포함해야 합니다.")
+
+
+def _validate_blank_fill_answers(template_json: dict[str, Any]) -> None:
+    tiles = template_json.get("tiles")
+    accepted_answers = template_json.get("acceptedAnswers")
+    if not isinstance(tiles, list) or not all(isinstance(tile, str) for tile in tiles):
+        raise ValueError("blank_fill.tiles는 문자열 배열이어야 합니다.")
+    if not isinstance(accepted_answers, list) or not accepted_answers:
+        raise ValueError("blank_fill.acceptedAnswers는 하나 이상의 {answer: ...} 객체 배열이어야 합니다.")
+    tile_values = set(tiles)
+    for answer in accepted_answers:
+        if not isinstance(answer, dict) or not isinstance(answer.get("answer"), str):
+            raise ValueError("blank_fill.acceptedAnswers 항목은 {answer: 문자열}이어야 합니다.")
+        if answer["answer"] not in tile_values:
+            raise ValueError("blank_fill.acceptedAnswers.answer는 tiles 안의 값과 일치해야 합니다.")
 
 
 class MissionContent(BaseModel):

@@ -1035,6 +1035,22 @@ export default function DashboardPage() {
     });
   }, []);
 
+  const clearGenerationFeedback = useCallback(
+    (caseId: string) => {
+      setGenerationStatuses((current) => {
+        const next = { ...current };
+        delete next[caseId];
+        return next;
+      });
+      updatePendingGenerationJobs((current) => {
+        const next = { ...current };
+        delete next[caseId];
+        return next;
+      });
+    },
+    [updatePendingGenerationJobs],
+  );
+
   useEffect(() => {
     writePendingGenerationJobs(pendingGenerationJobs);
   }, [pendingGenerationJobs]);
@@ -1339,6 +1355,7 @@ export default function DashboardPage() {
   const selectedReviewItems = (activeCaseFile?.recentContents ?? [])
     .filter((content) => !completedContentIds.has(content.id))
     .filter(isReviewQueueContent)
+    .filter((content) => !hasMissingGeneratedMedia(content))
     .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left))
     .map((content) => mapContentToReviewItem(content));
   const selectedPublishedContents = (activeCaseFile?.recentContents ?? [])
@@ -1514,12 +1531,20 @@ export default function DashboardPage() {
 
           return {
             id: `${job.caseId}-${job.contentId ?? job.contentRunId ?? job.orchestratorRunId ?? index}`,
+            caseId: job.caseId,
             state,
             message,
           };
         })
       : generationFeedbackState
-        ? [{ id: selectedCase.id || "generation-feedback", state: generationFeedbackState, message: generationStatusMessage }]
+        ? [
+            {
+              id: selectedCase.id || "generation-feedback",
+              caseId: selectedCase.id,
+              state: generationFeedbackState,
+              message: generationStatusMessage,
+            },
+          ]
         : [];
 
   const updateReviewStageDraft = (
@@ -2928,6 +2953,15 @@ export default function DashboardPage() {
                             <p className="mt-1 text-sm font-bold leading-6">{card.message}</p>
                             {card.state === "running" && (
                               <p className="mt-2 text-xs font-bold text-[#3b82f6]">완료되면 이 목록에 검토 카드가 추가됩니다.</p>
+                            )}
+                            {card.state === "failed" && (
+                              <button
+                                type="button"
+                                onClick={() => clearGenerationFeedback(card.caseId)}
+                                className="mt-3 rounded-md border border-[#fed7aa] bg-white px-3 py-2 text-xs font-black text-[#9a3412]"
+                              >
+                                확인하고 숨기기
+                              </button>
                             )}
                           </div>
                         </div>

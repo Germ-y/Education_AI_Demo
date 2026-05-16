@@ -26,7 +26,7 @@ def test_prompts_keep_image_text_and_ui_text_separate() -> None:
     content_prompt = load_prompt("mission_content_package")
     image_prompt = load_prompt("image_brief")
 
-    assert "문제를 푸는 데 필요한 식, 문장, 표 값, 카드 문구, 선택지, 빈칸, 정답 후보는 `templateJson`에 넣습니다." in content_prompt
+    assert "문제를 푸는 데 필요한 식, 문장, 카드 문구, 선택지, 빈칸, 정답 후보는 `templateJson`에 넣습니다." in content_prompt
     assert '"assets"' in content_prompt
     assert "assetPlaceholders" not in content_prompt
     assert '"contentId"' not in content_prompt
@@ -70,8 +70,8 @@ def test_generation_prompts_require_concrete_playable_micro_scenarios() -> None:
     assert "학년에 맞는 자료 길이, 어휘, 추론 수준, 보기 수" in orchestrator_prompt
     assert "초등 고학년과 중학생은 문장을 짧게 하더라도 소재와 표현을 유치하게 낮추지 않습니다." in content_prompt
     assert "학년 존중감을 지킵니다." in critique_prompt
-    assert "2단계는 바로 성공할 수 있는 첫 문제입니다." in content_prompt
-    assert "3단계는 같은 사고를 한 단계 옮긴 문제입니다." in content_prompt
+    assert "2단계는 기본 문제입니다." in content_prompt
+    assert "3단계는 응용 예제입니다." in content_prompt
     assert "초등 저학년은 문장과 선택지를 줄이되 사고 자체를 지나치게 낮추지 않습니다." in content_prompt
     assert "색/물건 이름만 묻는 단순 회상" in critique_prompt
 

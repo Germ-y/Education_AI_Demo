@@ -99,14 +99,14 @@ def build_fraction_content() -> MissionContent:
                     "missionContentId": content_id,
                     "step": 2,
                     "stageRole": "basic_problem",
-                    "templateType": "partition_picker",
+                    "templateType": "scene_question",
                     "studentTitle": "문제 1",
                     "studentInstruction": "전체 조각 수와 고른 조각 수를 차례대로 세어보세요.",
                     "sortOrder": 2,
                     "templateJson": {
                         "imageAssetId": "asset_content_fraction_001_stage_2",
                         "audioAssetId": "asset_content_fraction_001_stage_2_audio",
-                        "question": "전체는 몇 조각인가요?",
+                        "question": "피자 한 판 전체는 모두 몇 조각인가요?",
                         "choices": [
                             {"id": "a", "text": "1조각"},
                             {"id": "b", "text": "4조각"},
@@ -129,8 +129,10 @@ def build_fraction_content() -> MissionContent:
                     "templateJson": {
                         "imageAssetId": "asset_content_fraction_001_stage_3",
                         "audioAssetId": "asset_content_fraction_001_stage_3_audio",
-                        "question": "전체 4개 중 1개는 __ / __ 이에요.",
-                        "acceptedAnswers": [{"numerator": "1", "denominator": "4"}],
+                        "question": "빈칸에 알맞은 분수를 골라 보세요.",
+                        "sentence": "전체 4조각 중 1조각은 __이에요.",
+                        "tiles": ["1/4", "1/2", "4/1"],
+                        "acceptedAnswers": [{"answer": "1/4"}],
                         "correctFeedback": "좋아요. 위에는 고른 것 1, 아래에는 전체 4가 와요.",
                         "wrongFeedback": "위에는 고른 조각 수, 아래에는 전체 조각 수를 넣어요.",
                     },
@@ -1163,7 +1165,7 @@ def create_demo_database(*, include_students: bool = True, include_mission_conte
                     "studentId": "student_learning_fraction",
                     "stageId": "stage_fraction_3",
                     "eventType": "answer_submitted",
-                    "payloadJson": {"answer": {"numerator": "1", "denominator": "4"}, "isCorrect": True, "hintUsed": False},
+                    "payloadJson": {"answer": {"answer": "1/4"}, "isCorrect": True, "hintUsed": False},
                     "occurredAt": "2026-05-02T09:18:35.000Z",
                 },
                 {
