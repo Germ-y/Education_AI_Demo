@@ -189,6 +189,8 @@ type ReviewStageDraft = {
   description: string;
   question: string;
   choices: string[];
+  answerItems: ReviewAnswerItem[];
+  correctChoiceValues: string[];
   imagePrompt: string;
   realtimePracticeTitle?: string;
   realtimeSituationText?: string;
@@ -197,6 +199,11 @@ type ReviewStageDraft = {
   realtimeRubric?: string[];
   realtimeAllowedFeedback?: string[];
   realtimeMaxDurationSec?: number;
+};
+
+type ReviewAnswerItem = {
+  label: string;
+  value: string;
 };
 
 type SessionLog = {
@@ -813,6 +820,119 @@ function choicesFromTemplate(templateJson: Record<string, unknown>): string[] {
   return [];
 }
 
+function reviewTextFromTemplateValue(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (value && typeof value === "object") {
+    if ("text" in value && typeof value.text === "string") return value.text;
+    if ("label" in value && typeof value.label === "string") return value.label;
+    if ("title" in value && typeof value.title === "string") return value.title;
+  }
+  return null;
+}
+
+function reviewItemsFromTemplateValue(value: unknown): Array<{ id: string; text: string }> {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item, index) => {
+      const text = reviewTextFromTemplateValue(item);
+      if (!text) return null;
+      const id = item && typeof item === "object" && "id" in item ? String(item.id) : text || String(index + 1);
+      return { id, text };
+    })
+    .filter((item): item is { id: string; text: string } => Boolean(item));
+}
+
+function findReviewItemText(items: Array<{ id: string; text: string }>, id: string) {
+  return items.find((item) => item.id === id)?.text ?? null;
+}
+
+function answerValuesFromBlankTemplate(templateJson: Record<string, unknown>) {
+  const acceptedAnswers = templateJson.acceptedAnswers;
+  const answers = Array.isArray(acceptedAnswers) && acceptedAnswers.length > 0 ? acceptedAnswers : templateJson.answers;
+  const firstAnswer = Array.isArray(answers) ? answers[0] : answers;
+
+  if (typeof firstAnswer === "string" || typeof firstAnswer === "number") return [String(firstAnswer)];
+  if (!firstAnswer || typeof firstAnswer !== "object") return [];
+
+  return Object.values(firstAnswer)
+    .map((value) => reviewTextFromTemplateValue(value))
+    .filter((value): value is string => Boolean(value));
+}
+
+function matchingAnswerItemsFromTemplate(templateJson: Record<string, unknown>): ReviewAnswerItem[] {
+  const pairItems = templateJson.pairs;
+  if (Array.isArray(pairItems)) {
+    return pairItems
+      .map((pair, index) => {
+        if (!pair || typeof pair !== "object") return null;
+        const left = "left" in pair ? reviewTextFromTemplateValue(pair.left) : null;
+        const right = "right" in pair ? reviewTextFromTemplateValue(pair.right) : null;
+        if (!left || !right) return null;
+        return { label: `짝 ${index + 1}`, value: `${left} → ${right}` };
+      })
+      .filter((item): item is ReviewAnswerItem => Boolean(item));
+  }
+
+  const leftCards = reviewItemsFromTemplateValue(templateJson.leftCards);
+  const rightCards = reviewItemsFromTemplateValue(templateJson.rightCards);
+  const matches = templateJson.matches;
+  const matchEntries = Array.isArray(matches)
+    ? matches
+        .map((match) => {
+          if (!match || typeof match !== "object" || !("leftId" in match) || !("rightId" in match)) return null;
+          return { leftId: String(match.leftId), rightId: String(match.rightId) };
+        })
+        .filter((item): item is { leftId: string; rightId: string } => Boolean(item))
+    : matches && typeof matches === "object"
+      ? Object.entries(matches).map(([leftId, rightId]) => ({ leftId, rightId: String(rightId) }))
+      : [];
+
+  return matchEntries
+    .map((match, index) => {
+      const left = findReviewItemText(leftCards, match.leftId);
+      const right = findReviewItemText(rightCards, match.rightId);
+      if (!left || !right) return null;
+      return { label: `짝 ${index + 1}`, value: `${left} → ${right}` };
+    })
+    .filter((item): item is ReviewAnswerItem => Boolean(item));
+}
+
+function answerInfoFromTemplate(templateType: string, templateJson: Record<string, unknown>) {
+  if (templateType === "card_match") {
+    return { answerItems: matchingAnswerItemsFromTemplate(templateJson), correctChoiceValues: [] };
+  }
+
+  if (Array.isArray(templateJson.answerOrder)) {
+    const cards = reviewItemsFromTemplateValue(templateJson.cards);
+    const answerItems = templateJson.answerOrder.map((answerId, index) => {
+      const id = String(answerId);
+      return { label: `${index + 1}번째`, value: findReviewItemText(cards, id) ?? id };
+    });
+    return { answerItems, correctChoiceValues: [] };
+  }
+
+  if (templateType === "blank_fill") {
+    const values = answerValuesFromBlankTemplate(templateJson);
+    return {
+      answerItems: values.map((value, index) => ({ label: values.length > 1 ? `빈칸 ${index + 1}` : "정답", value })),
+      correctChoiceValues: values,
+    };
+  }
+
+  if (typeof templateJson.answer === "string") {
+    const choices = reviewItemsFromTemplateValue(templateJson.choices);
+    const answerText = findReviewItemText(choices, templateJson.answer) ?? templateJson.answer;
+    return {
+      answerItems: [{ label: "정답 선택지", value: answerText }],
+      correctChoiceValues: [answerText],
+    };
+  }
+
+  return { answerItems: [], correctChoiceValues: [] };
+}
+
 function mapContentToReviewStages(content: MissionContent): ReviewStageDraft[] {
   return [...content.stages]
     .sort((left, right) => left.step - right.step)
@@ -830,6 +950,7 @@ function mapContentToReviewStages(content: MissionContent): ReviewStageDraft[] {
           : typeof stage.templateJson.missionText === "string"
             ? stage.templateJson.missionText
             : stage.studentInstruction;
+      const answerInfo = answerInfoFromTemplate(stage.templateType, stage.templateJson);
 
       return {
         step: stage.step,
@@ -841,6 +962,8 @@ function mapContentToReviewStages(content: MissionContent): ReviewStageDraft[] {
         description: stage.studentInstruction,
         question: stage.realtimeSpec?.studentGoal ?? question,
         choices: stage.step === 4 || stage.stageRole === "realtime_practice" ? [] : choicesFromTemplate(stage.templateJson),
+        answerItems: stage.step === 4 || stage.stageRole === "realtime_practice" ? [] : answerInfo.answerItems,
+        correctChoiceValues: stage.step === 4 || stage.stageRole === "realtime_practice" ? [] : answerInfo.correctChoiceValues,
         imagePrompt,
         realtimePracticeTitle: stage.realtimeSpec?.practiceTitle,
         realtimeSituationText: stage.realtimeSpec?.situationText,
@@ -3567,7 +3690,7 @@ export default function DashboardPage() {
                           </span>
                           <h4 className="text-lg font-black text-[#172033]">{stage.title}</h4>
                         </div>
-                        {!stage.isRealtimeStage && (
+                        {!stage.isRealtimeStage && stage.answerItems.length > 0 && (
                           <span className="rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-1 text-xs font-bold text-[#15803d]">
                             정답 포함
                           </span>
@@ -3677,9 +3800,26 @@ export default function DashboardPage() {
                             </div>
                           )}
 
+                          {!stage.isRealtimeStage && stage.answerItems.length > 0 && (
+                            <div className="rounded-md border border-[#bbf7d0] bg-[#f0fdf4] p-4">
+                              <p className="text-xs font-black text-[#15803d]">정답 기준</p>
+                              <div className="mt-2 space-y-2">
+                                {stage.answerItems.map((answer, answerIndex) => (
+                                  <div
+                                    key={`${stage.step}-${answer.label}-${answerIndex}`}
+                                    className="grid gap-1 rounded-md bg-white px-3 py-2 text-sm sm:grid-cols-[88px_1fr]"
+                                  >
+                                    <span className="font-black text-[#15803d]">{answer.label}</span>
+                                    <span className="font-bold leading-6 text-[#172033]">{answer.value}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
                           {!stage.isRealtimeStage && (stage.choices.length > 0 || isReviewEditing) && (
                           <div className="rounded-md bg-white p-4">
-                            <p className="text-xs font-black text-[#64748b]">선택지</p>
+                            <p className="text-xs font-black text-[#64748b]">보기</p>
                             <div className="mt-2 space-y-2">
                               {(stage.choices.length > 0 ? stage.choices : [""]).map((choice, choiceIndex) =>
                                 isReviewEditing ? (
@@ -3700,7 +3840,7 @@ export default function DashboardPage() {
                                   <div
                                     key={`${stage.step}-${choiceIndex}`}
                                     className={`rounded-md border px-3 py-2 text-sm font-black ${
-                                      choiceIndex === 0
+                                      stage.correctChoiceValues.includes(choice)
                                         ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]"
                                         : "border-[#e5e9f0] bg-[#f8fafc] text-[#334155]"
                                     }`}
