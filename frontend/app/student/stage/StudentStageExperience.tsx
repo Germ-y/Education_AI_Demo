@@ -445,7 +445,7 @@ function StageInlineNotice({
   return (
     <div
       key={showSuccess ? `success-${title}` : wrongNotice ?? "wrong"}
-      className={`pointer-events-none absolute left-5 right-5 top-[68px] z-20 origin-top animate-[stageNoticeIn_420ms_cubic-bezier(0.16,1,0.3,1)_both] rounded-[16px] px-4 py-3 text-sm font-bold leading-6 shadow-[0_16px_34px_rgba(31,41,55,0.12)] will-change-transform ${
+      className={`pointer-events-none absolute bottom-5 left-5 right-5 z-20 origin-bottom animate-[stageNoticeIn_420ms_cubic-bezier(0.16,1,0.3,1)_both] rounded-[16px] px-4 py-3 text-sm font-bold leading-6 shadow-[0_16px_34px_rgba(31,41,55,0.12)] will-change-transform ${
         showSuccess ? "border border-[#f0dfb4] bg-[#fff7dd] text-[#6b4b12]" : "bg-[#fff0ed] text-[#b84232]"
       }`}
     >
@@ -477,7 +477,7 @@ function FloatingStageFeedback({
   if (!showSuccess && !showWrong) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+12px)] z-40 grid place-items-center">
+    <div className="pointer-events-none absolute inset-x-4 bottom-4 z-40 grid place-items-center">
       <div
         className={`rounded-[18px] px-5 py-3 text-center text-sm font-bold leading-6 shadow-[0_18px_42px_rgba(31,41,55,0.18)] ${
           showSuccess ? "border border-[#f0dfb4] bg-[#fff7dd] text-[#6b4b12]" : "bg-[#fff0ed] text-[#b84232]"
@@ -2533,6 +2533,16 @@ export function StudentStageExperience({
                       <StageVisualBoard visual={activeVisual} question={activeQuestion} theme={theme} />
                     )
                   )}
+                  {usesFullStageBoard && !isRealtimeStage && (
+                    <FloatingStageFeedback
+                      showSuccess={((answer && isCorrect) || isStageComplete) && !isFinished}
+                      showWrong={Boolean(wrongNotice) && !isStageComplete && !isFinished}
+                      title={activeQuestion.completionTitle}
+                      message={activeQuestion.completionMessage}
+                      wrongMessage={activeQuestion.wrongFeedback}
+                      theme={theme}
+                    />
+                  )}
                 </div>
 
                 {activeQuestion.kind !== "sequence" && activeQuestion.kind !== "cardMatching" && !isRealtimeStage && (
@@ -2553,14 +2563,6 @@ export function StudentStageExperience({
 
                 {usesFullStageBoard && !isRealtimeStage && (
                   <div className="relative mt-3">
-                    <FloatingStageFeedback
-                      showSuccess={((answer && isCorrect) || isStageComplete) && !isFinished}
-                      showWrong={Boolean(wrongNotice) && !isStageComplete && !isFinished}
-                      title={activeQuestion.completionTitle}
-                      message={activeQuestion.completionMessage}
-                      wrongMessage={activeQuestion.wrongFeedback}
-                      theme={theme}
-                    />
                     <button
                       onClick={goToNextStage}
                       disabled={(!isCorrect && !isStageComplete) || isTransitioning}
@@ -2584,7 +2586,8 @@ export function StudentStageExperience({
                   isTransitioning ? "opacity-70 blur-[1px]" : "opacity-100 blur-0"
                 }`}
               >
-                <div className="relative min-h-0 self-center overflow-y-auto rounded-[24px] border border-[#dce5ec] bg-white p-5 shadow-[0_18px_48px_rgba(57,78,97,0.10)]">
+                <div className="relative flex max-h-full min-h-0 self-center flex-col overflow-hidden rounded-[24px] border border-[#dce5ec] bg-white shadow-[0_18px_48px_rgba(57,78,97,0.10)]">
+                  <div className="min-h-0 overflow-y-auto p-5">
                   <h3 className="text-[1.2rem] font-black leading-snug break-keep">
                     {isFinished
                       ? `${scene.missionTitle}, 모두 완료했어요`
@@ -2592,18 +2595,6 @@ export function StudentStageExperience({
                         ? realtimePracticeCopy?.title
                         : activeQuestion.prompt}
                   </h3>
-
-                  <StageInlineNotice
-                    answer={answer}
-                    isCorrect={isCorrect}
-                    isStageComplete={isStageComplete}
-                    isFinished={isFinished}
-                    title={activeQuestion.completionTitle}
-                    message={activeQuestion.completionMessage}
-                    feedback={feedback}
-                    theme={theme}
-                    wrongNotice={wrongNotice}
-                  />
 
                   <div
                     key={`${activeQuestion.step}-${activeQuestion.kind}-${isOxReady ? "check" : "intro"}`}
@@ -2741,7 +2732,19 @@ export function StudentStageExperience({
                     </div>
                   )}
                   </div>
+                  </div>
 
+                  <StageInlineNotice
+                    answer={answer}
+                    isCorrect={isCorrect}
+                    isStageComplete={isStageComplete}
+                    isFinished={isFinished}
+                    title={activeQuestion.completionTitle}
+                    message={activeQuestion.completionMessage}
+                    feedback={feedback}
+                    theme={theme}
+                    wrongNotice={wrongNotice}
+                  />
                 </div>
 
                 {isFinished ? null : isRealtimeStage && !isStageComplete ? (
