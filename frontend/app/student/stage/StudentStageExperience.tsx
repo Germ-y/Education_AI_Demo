@@ -18,6 +18,7 @@ import {
   submitStudentMissionStage,
 } from "@/lib/api";
 import type { SceneTheme, SceneVisual, StageQuestion, StudentContext } from "@/lib/student-scene-types";
+import { StudentDeviceFrame } from "../StudentDeviceFrame";
 
 function MiniStar() {
   return (
@@ -423,9 +424,10 @@ function StageInlineNotice({
   isFinished,
   title,
   message,
-  feedback,
+  wrongMessage,
   theme,
   wrongNotice,
+  className = "",
 }: {
   answer: string | null;
   isCorrect: boolean;
@@ -433,9 +435,10 @@ function StageInlineNotice({
   isFinished: boolean;
   title: string;
   message: string;
-  feedback: string;
+  wrongMessage: string;
   theme: SceneTheme;
   wrongNotice: string | null;
+  className?: string;
 }) {
   const showSuccess = ((answer && isCorrect) || isStageComplete) && !isFinished;
   const showWrong = Boolean(wrongNotice) && !isStageComplete && !isFinished;
@@ -445,52 +448,18 @@ function StageInlineNotice({
   return (
     <div
       key={showSuccess ? `success-${title}` : wrongNotice ?? "wrong"}
-      className={`pointer-events-none absolute bottom-5 left-5 right-5 z-20 origin-bottom animate-[stageNoticeIn_420ms_cubic-bezier(0.16,1,0.3,1)_both] rounded-[16px] px-4 py-3 text-sm font-bold leading-6 shadow-[0_16px_34px_rgba(31,41,55,0.12)] will-change-transform ${
+      role="status"
+      aria-live="polite"
+      className={`pointer-events-none z-20 w-full shrink-0 origin-bottom animate-[stageNoticeIn_420ms_cubic-bezier(0.16,1,0.3,1)_both] rounded-[16px] px-4 py-3 text-sm font-bold leading-6 shadow-[0_16px_34px_rgba(31,41,55,0.12)] will-change-transform ${
         showSuccess ? "border border-[#f0dfb4] bg-[#fff7dd] text-[#6b4b12]" : "bg-[#fff0ed] text-[#b84232]"
-      }`}
+      } ${className}`}
     >
       {showSuccess && (
         <p className="font-black" style={{ color: theme.accentStrong }}>
           {title}
         </p>
       )}
-      <p className={showSuccess ? "mt-1" : ""}>{showSuccess ? message : feedback}</p>
-    </div>
-  );
-}
-
-function FloatingStageFeedback({
-  showSuccess,
-  showWrong,
-  title,
-  message,
-  wrongMessage,
-  theme,
-}: {
-  showSuccess: boolean;
-  showWrong: boolean;
-  title: string;
-  message: string;
-  wrongMessage: string;
-  theme: SceneTheme;
-}) {
-  if (!showSuccess && !showWrong) return null;
-
-  return (
-    <div className="pointer-events-none absolute inset-x-4 bottom-4 z-40 grid place-items-center">
-      <div
-        className={`rounded-[18px] px-5 py-3 text-center text-sm font-bold leading-6 shadow-[0_18px_42px_rgba(31,41,55,0.18)] ${
-          showSuccess ? "border border-[#f0dfb4] bg-[#fff7dd] text-[#6b4b12]" : "bg-[#fff0ed] text-[#b84232]"
-        }`}
-        style={{ width: "min(560px, 72%)" }}
-      >
-        {showSuccess && (
-          <p className="font-black" style={{ color: theme.accentStrong }}>
-            {title}
-          </p>
-        )}
-        <p className={showSuccess ? "mt-1" : ""}>{showSuccess ? message : wrongMessage}</p>
-      </div>
+      <p className={showSuccess ? "mt-1" : ""}>{showSuccess ? message : wrongMessage}</p>
     </div>
   );
 }
@@ -1853,9 +1822,6 @@ function QuestionStar() {
   );
 }
 
-const STAGE_FRAME_WIDTH = 1093;
-const STAGE_FRAME_HEIGHT = 820;
-
 export function StudentStageExperience({
   context,
   initialStep = context.scene.currentStep,
@@ -1908,8 +1874,6 @@ export function StudentStageExperience({
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [isCompletingMission, setIsCompletingMission] = useState(false);
-  const [stageFrameScale, setStageFrameScale] = useState(1);
-  const [isStageFrameReady, setIsStageFrameReady] = useState(false);
   const noticeCounter = useRef(0);
   const runtimeStartedRef = useRef(false);
   const pendingAnswerSubmissionsRef = useRef<PendingAnswerSubmission[]>([]);
@@ -1949,19 +1913,6 @@ export function StudentStageExperience({
       activeQuestion.kind === "cardMatching" ||
       activeQuestion.kind === "fillBlank" ||
       isRealtimeStage);
-
-  useEffect(() => {
-    const resizeStageFrame = () => {
-      const availableWidth = Math.max(320, window.innerWidth - 32);
-      const availableHeight = Math.max(320, window.innerHeight - 32);
-      setStageFrameScale(Math.min(1, availableWidth / STAGE_FRAME_WIDTH, availableHeight / STAGE_FRAME_HEIGHT));
-      setIsStageFrameReady(true);
-    };
-
-    resizeStageFrame();
-    window.addEventListener("resize", resizeStageFrame);
-    return () => window.removeEventListener("resize", resizeStageFrame);
-  }, []);
 
   useEffect(() => {
     if (
@@ -2030,13 +1981,6 @@ export function StudentStageExperience({
     helperLabel: activeStage.title,
     activeIndex: activeQuestion.visualActiveIndex ?? scene.visual.activeIndex,
   };
-
-  const feedback = useMemo(() => {
-    if (isFinished) return "오늘의 모든 스테이지를 끝냈어요. 학습 길에서 결과를 확인할 수 있어요.";
-    if (!answer) return activeQuestion.hint;
-    if (isCorrect) return activeQuestion.correctFeedback;
-    return activeQuestion.wrongFeedback;
-  }, [activeQuestion, answer, isCorrect, isFinished]);
 
   const canPersistRuntime = !previewMode && scene.status === "published" && Boolean(scene.contentId && attemptId && studentAccessToken);
 
@@ -2350,23 +2294,7 @@ export function StudentStageExperience({
         홈으로
       </Link>
       )}
-      <div
-        style={{
-          width: isStageFrameReady ? STAGE_FRAME_WIDTH * stageFrameScale : STAGE_FRAME_WIDTH,
-          height: isStageFrameReady ? STAGE_FRAME_HEIGHT * stageFrameScale : STAGE_FRAME_HEIGHT,
-        }}
-      >
-        <div
-          className="relative origin-top-left rounded-[44px] bg-[#202939] p-4 shadow-[0_30px_90px_rgba(15,23,42,0.28)]"
-          style={{
-            width: STAGE_FRAME_WIDTH,
-            height: STAGE_FRAME_HEIGHT,
-            transform: isStageFrameReady ? `scale(${stageFrameScale})` : "scale(1)",
-          }}
-        >
-          <div className="absolute bottom-5 left-1/2 h-1.5 w-24 -translate-x-1/2 rounded-full bg-white/22" />
-
-          <div className="h-full overflow-hidden rounded-[30px] bg-[#fbfaf4]">
+      <StudentDeviceFrame>
             <header className="flex h-[92px] items-center justify-between gap-5 border-b border-[#efe7d7] bg-[#fbfaf4]/95 px-10">
               <div className="flex min-w-0 items-center gap-4">
                 {isFinished ? (
@@ -2541,16 +2469,6 @@ export function StudentStageExperience({
                       <StageVisualBoard visual={activeVisual} question={activeQuestion} theme={theme} />
                     )
                   )}
-                  {usesFullStageBoard && !isRealtimeStage && (
-                    <FloatingStageFeedback
-                      showSuccess={((answer && isCorrect) || isStageComplete) && !isFinished}
-                      showWrong={Boolean(wrongNotice) && !isStageComplete && !isFinished}
-                      title={activeQuestion.completionTitle}
-                      message={activeQuestion.completionMessage}
-                      wrongMessage={activeQuestion.wrongFeedback}
-                      theme={theme}
-                    />
-                  )}
                 </div>
 
                 {activeQuestion.kind !== "sequence" && activeQuestion.kind !== "cardMatching" && !isRealtimeStage && (
@@ -2570,7 +2488,18 @@ export function StudentStageExperience({
                 )}
 
                 {usesFullStageBoard && !isRealtimeStage && (
-                  <div className="relative mt-3">
+                  <div className="mt-3 space-y-3">
+                    <StageInlineNotice
+                      answer={answer}
+                      isCorrect={isCorrect}
+                      isStageComplete={isStageComplete}
+                      isFinished={isFinished}
+                      title={activeQuestion.completionTitle}
+                      message={activeQuestion.completionMessage}
+                      wrongMessage={activeQuestion.wrongFeedback}
+                      theme={theme}
+                      wrongNotice={wrongNotice}
+                    />
                     <button
                       onClick={goToNextStage}
                       disabled={(!isCorrect && !isStageComplete) || isTransitioning}
@@ -2742,6 +2671,9 @@ export function StudentStageExperience({
                   </div>
                   </div>
 
+                </div>
+
+                <div className="space-y-3">
                   <StageInlineNotice
                     answer={answer}
                     isCorrect={isCorrect}
@@ -2749,65 +2681,63 @@ export function StudentStageExperience({
                     isFinished={isFinished}
                     title={activeQuestion.completionTitle}
                     message={activeQuestion.completionMessage}
-                    feedback={feedback}
+                    wrongMessage={activeQuestion.wrongFeedback}
                     theme={theme}
                     wrongNotice={wrongNotice}
                   />
-                </div>
 
-                {isFinished ? null : isRealtimeStage && !isStageComplete ? (
-                  <button
-                    onClick={completeRealtimePractice}
-                    disabled={isTransitioning}
-                    className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.28)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.32)] disabled:opacity-70 disabled:hover:translate-y-0"
-                    style={{ backgroundColor: theme.accent }}
-                  >
-                    {activeQuestion.actionLabel ?? "실시간 연습 시작하기"}
-                  </button>
-                ) : isCorrect || isStageComplete ? (
-                  <button
-                    onClick={goToNextStage}
-                    disabled={isTransitioning}
-                    className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.28)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.32)] disabled:opacity-70 disabled:hover:translate-y-0"
-                    style={{ backgroundColor: theme.accent }}
-                  >
-                    {isLastStage ? "오늘 학습 완료하기 →" : "다음 스테이지 →"}
-                  </button>
-                ) : activeQuestion.kind === "ox" && !isOxReady ? (
-                  <button
-                    onClick={showOxCheck}
-                    className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.18)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.26)]"
-                    style={{ backgroundColor: theme.accent }}
-                  >
-                    개념 확인하기
-                  </button>
-                ) : !isChoiceStage && !isStructuredStage ? (
-                  <button
-                    onClick={completeOpenStage}
-                    className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.18)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.26)]"
-                    style={{ backgroundColor: theme.accent }}
-                  >
-                    {activeQuestion.actionLabel ?? "확인했어요"}
-                  </button>
-                ) : (
-                  <button
-                    className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.18)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.26)]"
-                    style={{ backgroundColor: `${theme.accent}99` }}
-                  >
-                    {activeQuestion.kind === "fillBlank"
-                      ? "숫자를 골라 빈칸에 넣어볼까요"
-                      : isStructuredStage
-                        ? "카드를 눌러 완성해볼까요"
-                        : answer
-                          ? "다시 골라볼까요"
-                          : "정답을 찾아볼까요"}
-                  </button>
-                )}
+                  {isFinished ? null : isRealtimeStage && !isStageComplete ? (
+                    <button
+                      onClick={completeRealtimePractice}
+                      disabled={isTransitioning}
+                      className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.28)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.32)] disabled:opacity-70 disabled:hover:translate-y-0"
+                      style={{ backgroundColor: theme.accent }}
+                    >
+                      {activeQuestion.actionLabel ?? "실시간 연습 시작하기"}
+                    </button>
+                  ) : isCorrect || isStageComplete ? (
+                    <button
+                      onClick={goToNextStage}
+                      disabled={isTransitioning}
+                      className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.28)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.32)] disabled:opacity-70 disabled:hover:translate-y-0"
+                      style={{ backgroundColor: theme.accent }}
+                    >
+                      {isLastStage ? "오늘 학습 완료하기 →" : "다음 스테이지 →"}
+                    </button>
+                  ) : activeQuestion.kind === "ox" && !isOxReady ? (
+                    <button
+                      onClick={showOxCheck}
+                      className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.18)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.26)]"
+                      style={{ backgroundColor: theme.accent }}
+                    >
+                      개념 확인하기
+                    </button>
+                  ) : !isChoiceStage && !isStructuredStage ? (
+                    <button
+                      onClick={completeOpenStage}
+                      className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.18)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.26)]"
+                      style={{ backgroundColor: theme.accent }}
+                    >
+                      {activeQuestion.actionLabel ?? "확인했어요"}
+                    </button>
+                  ) : (
+                    <button
+                      className="w-full rounded-[18px] px-5 py-3 text-base font-black text-white shadow-[0_14px_30px_rgba(39,174,96,0.18)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_34px_rgba(39,174,96,0.26)]"
+                      style={{ backgroundColor: `${theme.accent}99` }}
+                    >
+                      {activeQuestion.kind === "fillBlank"
+                        ? "숫자를 골라 빈칸에 넣어볼까요"
+                        : isStructuredStage
+                          ? "카드를 눌러 완성해볼까요"
+                          : answer
+                            ? "다시 골라볼까요"
+                            : "정답을 찾아볼까요"}
+                    </button>
+                  )}
+                </div>
               </aside>
             </section>
-          </div>
-        </div>
-      </div>
+      </StudentDeviceFrame>
     </main>
   );
 }

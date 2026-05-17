@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { SceneTheme } from "@/lib/student-scene-types";
 import { getStudentContextForRoute, isStudentRuntimePreviewOnlyError } from "@/lib/student-context-source";
+import { StudentDeviceFrame } from "../StudentDeviceFrame";
 import { StudentPreviewOnlyNotice } from "../StudentPreviewOnlyNotice";
 
 function StarMascot() {
@@ -109,11 +110,7 @@ export default async function StudentHomePage({
       >
         홈으로
       </Link>
-      <div className="m-auto w-full max-w-[1093px]">
-        <div className="relative aspect-[4/3] h-[min(calc(100vh-32px),820px)] w-full rounded-[44px] bg-[#202939] p-4 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
-          <div className="absolute bottom-5 left-1/2 h-1.5 w-24 -translate-x-1/2 rounded-full bg-white/22" />
-
-          <div className="h-full overflow-hidden rounded-[30px] bg-[#fbfaf4]">
+      <StudentDeviceFrame>
             <header className="flex h-[92px] items-center justify-between gap-5 border-b border-[#efe7d7] bg-[#fbfaf4]/95 px-10">
               <div className="flex min-w-0 items-center gap-4">
                 <Link
@@ -258,9 +255,7 @@ export default async function StudentHomePage({
                 })}
               </section>
             </section>
-          </div>
-        </div>
-      </div>
+      </StudentDeviceFrame>
     </main>
   );
 }
