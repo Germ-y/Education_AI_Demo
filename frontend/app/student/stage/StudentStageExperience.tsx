@@ -2001,8 +2001,16 @@ export function StudentStageExperience({
 
   useEffect(() => {
     if (!previewMode) return;
-    window.parent.postMessage({ type: "student-preview-stage", step: activeStage.step }, window.location.origin);
-  }, [activeStage.step, previewMode]);
+    window.parent.postMessage(
+      {
+        type: "student-preview-stage",
+        step: activeStage.step,
+        contentId: scene.contentId,
+        caseId: scene.caseId,
+      },
+      window.location.origin,
+    );
+  }, [activeStage.step, previewMode, scene.caseId, scene.contentId]);
 
   useEffect(() => {
     if (initialMode === "complete" || isFinished) return;

@@ -206,6 +206,13 @@ type ReviewAnswerItem = {
   value: string;
 };
 
+type StudentPreviewStageMessage = {
+  type: "student-preview-stage";
+  step: number;
+  contentId?: string;
+  caseId?: string;
+};
+
 type SessionLog = {
   id: string;
   caseId: string;
@@ -931,6 +938,11 @@ function answerInfoFromTemplate(templateType: string, templateJson: Record<strin
   }
 
   return { answerItems: [], correctChoiceValues: [] };
+}
+
+function isStudentPreviewStageMessage(data: unknown): data is StudentPreviewStageMessage {
+  if (!data || typeof data !== "object") return false;
+  return "type" in data && data.type === "student-preview-stage" && "step" in data && typeof data.step === "number";
 }
 
 function mapContentToReviewStages(content: MissionContent): ReviewStageDraft[] {
@@ -2523,6 +2535,26 @@ export default function DashboardPage() {
     if (!openReportId) return;
     setReportPreviewStep(1);
   }, [openReportId]);
+
+  useEffect(() => {
+    const handlePreviewStageMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || !isStudentPreviewStageMessage(event.data)) return;
+      const nextStep = event.data.step;
+      if (!Number.isInteger(nextStep) || nextStep < 1 || nextStep > 4) return;
+
+      if (openReview && (!event.data.contentId || event.data.contentId === openReview.contentId)) {
+        setReviewPreviewStep(nextStep);
+        return;
+      }
+
+      if (openReport && (!event.data.contentId || event.data.contentId === openReport.contentId)) {
+        setReportPreviewStep(nextStep);
+      }
+    };
+
+    window.addEventListener("message", handlePreviewStageMessage);
+    return () => window.removeEventListener("message", handlePreviewStageMessage);
+  }, [openReport, openReview]);
 
   useEffect(() => {
     if (!openReport) return;
