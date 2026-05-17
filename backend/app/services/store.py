@@ -769,10 +769,12 @@ class DemoStore:
     def publish_mission_content(self, content_id: str, teacher_id: str) -> MissionContent | None:
         self.refresh()
         mission = self.get_mission_for_teacher(content_id, teacher_id)
-        if mission is None or mission.status not in {MissionStatus.APPROVED, MissionStatus.PUBLISHED}:
+        if mission is None or mission.status not in {MissionStatus.APPROVED, MissionStatus.PUBLISHED, MissionStatus.ARCHIVED}:
             return None
         if any(not _is_asset_ready_for_student_publish(asset) for asset in mission.assets):
             return None
+        published_at = _now()
+        superseded_content_ids = []
         for content in self.db.mission_contents:
             if (
                 content.id != mission.id
@@ -780,10 +782,28 @@ class DemoStore:
                 and content.case_id == mission.case_id
                 and content.status == MissionStatus.PUBLISHED
             ):
-                content.status = MissionStatus.APPROVED
-                content.published_at = None
+                superseded_content_ids.append(content.id)
+                content.status = MissionStatus.ARCHIVED
+                content.brief_json = _append_content_deployment_history(
+                    content.brief_json,
+                    {
+                        "event": "superseded",
+                        "supersededAt": published_at,
+                        "replacedByContentId": mission.id,
+                        "teacherId": teacher_id,
+                    },
+                )
         mission.status = MissionStatus.PUBLISHED
-        mission.published_at = _now()
+        mission.published_at = published_at
+        mission.brief_json = _append_content_deployment_history(
+            mission.brief_json,
+            {
+                "event": "published",
+                "publishedAt": published_at,
+                "teacherId": teacher_id,
+                "replacedContentIds": superseded_content_ids,
+            },
+        )
         support_case = next((case for case in self.db.support_cases if case.id == mission.case_id), None)
         if support_case is not None:
             support_case.dashboard_stage = "learning"
@@ -1385,7 +1405,14 @@ class DemoStore:
 
     def list_published_missions_for_student(self, student_id: str) -> list[MissionContent]:
         self.refresh()
-        return [content for content in self.db.mission_contents if content.student_id == student_id and content.status == "published"]
+        latest_by_case: dict[str, MissionContent] = {}
+        for content in self.db.mission_contents:
+            if content.student_id != student_id or content.status != MissionStatus.PUBLISHED:
+                continue
+            current = latest_by_case.get(content.case_id)
+            if current is None or _mission_mapping_sort_key(content) > _mission_mapping_sort_key(current):
+                latest_by_case[content.case_id] = content
+        return sorted(latest_by_case.values(), key=_mission_mapping_sort_key, reverse=True)
 
     def save_generated_mission_content(self, mission: MissionContent) -> MissionContent:
         self.refresh()
@@ -1405,7 +1432,7 @@ class DemoStore:
             (
                 content
                 for content in self.db.mission_contents
-                if content.id == content_id and content.student_id == student_id and content.status == "published"
+                if content.id == content_id and content.student_id == student_id and _is_deployed_for_student(content)
             ),
             None,
         )
@@ -2908,6 +2935,21 @@ def _mission_updated_at(content: MissionContent) -> str | None:
 
 def _mission_mapping_sort_key(content: MissionContent) -> tuple[str, str]:
     return (_mission_updated_at(content) or "", content.id)
+
+
+def _is_deployed_for_student(content: MissionContent) -> bool:
+    return content.status == MissionStatus.PUBLISHED or (content.status == MissionStatus.ARCHIVED and bool(content.published_at))
+
+
+def _append_content_deployment_history(brief_json: dict[str, Any], event: dict[str, Any]) -> dict[str, Any]:
+    history = brief_json.get("deploymentHistory") if isinstance(brief_json, dict) else None
+    return {
+        **brief_json,
+        "deploymentHistory": [
+            *(history if isinstance(history, list) else []),
+            event,
+        ],
+    }
 
 
 def _mission_progress_mapping(content: MissionContent, attempts: list[ContentAttempt]) -> dict[str, Any]:

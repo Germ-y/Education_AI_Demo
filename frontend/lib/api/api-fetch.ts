@@ -31,6 +31,7 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   const retryCount = retry ?? (method === "GET" || method === "HEAD" ? DEFAULT_SAFE_REQUEST_RETRY_COUNT : 0);
   const response = await fetchWithRetry(`${baseUrl}${path}`, {
     ...init,
+    cache: init.cache ?? "no-store",
     headers: {
       Accept: "application/json",
       ...(body === undefined ? {} : { "Content-Type": "application/json" }),

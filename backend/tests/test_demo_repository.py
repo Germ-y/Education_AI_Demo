@@ -3,7 +3,9 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import BACKEND_DIR
 from app.data.demo_data import create_demo_database
 from app.db.session import create_database_engine, create_schema, normalize_database_url
+from app.domain.enums import MissionStatus
 from app.domain.models import ActivityEvent, ContentAttempt, ReviewSummary
+from app.domain.schemas import MissionContent
 from app.repositories.demo_repository import DemoRepository
 from app.services.store import DemoStore
 
@@ -111,3 +113,49 @@ def test_student_report_hides_in_progress_attempt_summaries() -> None:
 
     assert report is not None
     assert all(item["id"] != "review_in_progress_should_hide" for item in report["reports"])
+
+
+def test_publish_archives_previous_student_deployment_with_history() -> None:
+    db = create_demo_database()
+    original = next(item for item in db.mission_contents if item.id == "content_fraction_001")
+    replacement_payload = original.model_dump(by_alias=True)
+    replacement_payload.update(
+        {
+            "id": "content_fraction_replacement",
+            "title": "Replacement fraction lesson",
+            "status": "approved",
+            "approvedByUserId": "user_teacher_demo",
+            "approvedAt": "2026-05-17T00:00:00+00:00",
+            "publishedAt": None,
+        }
+    )
+    for stage in replacement_payload["stages"]:
+        stage["id"] = f"{stage['id']}_replacement"
+        stage["missionContentId"] = replacement_payload["id"]
+    for asset in replacement_payload["assets"]:
+        asset["id"] = f"{asset['id']}_replacement"
+        asset["missionContentId"] = replacement_payload["id"]
+        asset["storageUrl"] = f"https://assets.example.test/{asset['id']}"
+        asset["previewUrl"] = asset["storageUrl"]
+
+    replacement = MissionContent.model_validate(replacement_payload)
+    db.mission_contents.append(replacement)
+    store = DemoStore(seed=db)
+
+    published = store.publish_mission_content(replacement.id, "user_teacher_demo")
+
+    assert published is not None
+    assert published.status == MissionStatus.PUBLISHED
+    assert published.published_at is not None
+    assert published.brief_json["deploymentHistory"][-1]["event"] == "published"
+    assert published.brief_json["deploymentHistory"][-1]["replacedContentIds"] == [original.id]
+
+    archived = next(item for item in store.db.mission_contents if item.id == original.id)
+    assert archived.status == MissionStatus.ARCHIVED
+    assert archived.published_at is not None
+    assert archived.brief_json["deploymentHistory"][-1]["event"] == "superseded"
+    assert archived.brief_json["deploymentHistory"][-1]["replacedByContentId"] == replacement.id
+
+    active_missions = store.list_published_missions_for_student(original.student_id)
+    assert [mission.id for mission in active_missions if mission.case_id == original.case_id] == [replacement.id]
+    assert store.get_published_mission_for_student(original.student_id, original.id) is not None

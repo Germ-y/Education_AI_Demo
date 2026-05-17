@@ -789,6 +789,18 @@ function formatContentGeneratedAt(content: MissionContent) {
   }).format(date);
 }
 
+function formatContentPublishedAt(content: MissionContent) {
+  if (typeof content.publishedAt !== "string") return null;
+  const date = new Date(content.publishedAt);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 function getActivePublishedContentIds(contents: MissionContent[] = []) {
   const latestByCase = new Map<string, MissionContent>();
   contents
@@ -1510,6 +1522,9 @@ export default function DashboardPage() {
     .map((content) => mapContentToReviewItem(content));
   const selectedPublishedContents = (activeCaseFile?.recentContents ?? [])
     .filter((content) => content.status === "published")
+    .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left));
+  const selectedArchivedDeploymentContents = (activeCaseFile?.recentContents ?? [])
+    .filter((content) => content.status === "archived" && Boolean(content.publishedAt))
     .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left));
   const selectedRecords: SessionLog[] = (activeReport?.reports ?? []).map((record) => {
     const durationMinutes = Math.max(1, Math.round((record.durationSec ?? 0) / 60));
@@ -3270,12 +3285,16 @@ export default function DashboardPage() {
                       selectedPublishedContents.map((content) => {
                         const contentCompleted = completedContentIds.has(content.id);
                         const generatedAtLabel = formatContentGeneratedAt(content);
+                        const publishedAtLabel = formatContentPublishedAt(content);
                         return (
                           <div key={content.id} className="rounded-md border border-[#bbf7d0] bg-[#f0fdf4] p-4">
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <p className="truncate text-base font-black text-[#172033]">{content.title}</p>
                                 <p className="mt-1 truncate text-sm font-semibold text-[#15803d]">{describeContentType(content)}</p>
+                                {publishedAtLabel && (
+                                  <p className="mt-1 text-xs font-black text-[#15803d]">배포 {publishedAtLabel}</p>
+                                )}
                                 {generatedAtLabel && (
                                   <p className="mt-1 text-xs font-black text-[#64748b]">생성 {generatedAtLabel}</p>
                                 )}
@@ -3296,6 +3315,33 @@ export default function DashboardPage() {
                           </div>
                         );
                       })
+                    )}
+                    {selectedArchivedDeploymentContents.length > 0 && (
+                      <div className="rounded-md border border-[#e5e9f0] bg-white p-4">
+                        <h4 className="text-sm font-black text-[#172033]">이전 배포 기록</h4>
+                        <div className="mt-3 space-y-2">
+                          {selectedArchivedDeploymentContents.map((content) => {
+                            const publishedAtLabel = formatContentPublishedAt(content);
+                            return (
+                              <div key={content.id} className="flex items-center justify-between gap-3 rounded-md bg-[#f8fafc] px-3 py-2">
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-black text-[#334155]">{content.title}</p>
+                                  {publishedAtLabel && (
+                                    <p className="mt-0.5 text-xs font-bold text-[#64748b]">배포 {publishedAtLabel}</p>
+                                  )}
+                                </div>
+                                <Link
+                                  href={`/student/stage?caseId=${encodeURIComponent(content.caseId)}&contentId=${encodeURIComponent(content.id)}&preview=1`}
+                                  target="_blank"
+                                  className="shrink-0 rounded-md border border-[#cbd5e1] px-3 py-1.5 text-xs font-black text-[#475569]"
+                                >
+                                  기록 보기
+                                </Link>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     )}
                   </section>
                 </div>
