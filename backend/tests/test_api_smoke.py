@@ -821,6 +821,76 @@ def test_asset_generation_job_persists_partial_failure_and_retries(monkeypatch, 
     assert all(asset["qaStatus"] == "passed" for asset in reviewable_after_retry.json()["data"]["assets"])
 
 
+def test_asset_generation_job_refreshes_stale_running_job_from_ready_assets() -> None:
+    client = TestClient(create_app())
+    content_id = "content_fraction_001"
+    store = get_store_instance()
+    mission = store.get_mission_for_teacher(content_id)
+    assert mission is not None
+
+    now = "2026-05-17T00:00:00+00:00"
+    job_assets = []
+    for asset in mission.assets:
+        ready_url = f"/examples/generated/{asset.id}"
+        asset.storage_url = ready_url
+        asset.preview_url = ready_url
+        asset.qa_status = "passed"
+        asset.approval_status = "pending"
+        is_audio = asset.asset_type.value == "audio"
+        job_assets.append(
+            {
+                "assetId": asset.id,
+                "assetRole": asset.asset_role.value,
+                "assetType": asset.asset_type.value,
+                "stageId": asset.stage_id,
+                "status": "failed" if is_audio else "succeeded",
+                "errorCode": "ELEVENLABS_API_KEY_MISSING" if is_audio else None,
+                "errorMessage": "TTS key missing" if is_audio else None,
+                "updatedAt": now,
+                "storageUrl": "path/stale",
+                "previewUrl": None,
+                "qaStatus": "failed" if is_audio else "passed",
+                "approvalStatus": "pending",
+            }
+        )
+
+    job_id = "asset_job_stale_running"
+    mission.brief_json = {
+        **mission.brief_json,
+        "assetGenerationJobs": [
+            {
+                "jobId": job_id,
+                "contentId": mission.id,
+                "teacherId": "user_teacher_demo",
+                "status": "running",
+                "queuedAt": now,
+                "startedAt": now,
+                "completedAt": None,
+                "totalCount": len(job_assets),
+                "completedCount": 5,
+                "failedCount": 5,
+                "generatedCount": 5,
+                "assets": job_assets,
+                "errorCode": None,
+                "errorMessage": None,
+            }
+        ],
+    }
+    store.save_generated_mission_content(mission)
+
+    stale_status = client.get(f"/api/contents/{content_id}/assets/generation-jobs/{job_id}")
+    assert stale_status.status_code == 200, stale_status.json()
+    refreshed_job = stale_status.json()["data"]
+    assert refreshed_job["status"] == "succeeded"
+    assert refreshed_job["completedCount"] == len(job_assets)
+    assert refreshed_job["failedCount"] == 0
+    assert all(asset["status"] == "succeeded" for asset in refreshed_job["assets"])
+
+    next_job = client.post(f"/api/contents/{content_id}/assets/generation-jobs")
+    assert next_job.status_code == 200, next_job.json()
+    assert next_job.json()["data"]["status"] == "succeeded"
+
+
 def test_registered_student_generation_review_student_completion_e2e(monkeypatch, tmp_path) -> None:
     os.environ["NEIS_API_KEY"] = "test-neis-key"
     os.environ["OPENAI_API_KEY"] = "test-openai-key"

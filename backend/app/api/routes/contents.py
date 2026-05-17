@@ -161,6 +161,7 @@ def create_content_asset_generation_job(
 
     active_job = _get_active_asset_generation_job(content)
     if active_job is not None:
+        demo_store.save_generated_mission_content(content)
         return ok(active_job)
 
     job = _create_asset_generation_job(content, teacher_id=principal.id)
@@ -182,9 +183,10 @@ def get_content_asset_generation_job(
     content = demo_store.get_mission_for_teacher(content_id, teacher_id=principal.id if principal.role == "teacher" else None)
     if content is None:
         raise HTTPException(status_code=404, detail={"code": "CONTENT_NOT_FOUND", "message": "콘텐츠를 찾을 수 없습니다."})
-    job = _get_asset_generation_job(content, job_id)
+    job = _get_asset_generation_job(content, job_id, refresh=True)
     if job is None:
         raise HTTPException(status_code=404, detail={"code": "ASSET_GENERATION_JOB_NOT_FOUND", "message": "asset 생성 job을 찾을 수 없습니다."})
+    demo_store.save_generated_mission_content(content)
     return ok(job)
 
 
@@ -482,12 +484,19 @@ def _asset_generation_jobs(content) -> list[dict[str, Any]]:
     return [job for job in jobs if isinstance(job, dict)] if isinstance(jobs, list) else []
 
 
-def _get_asset_generation_job(content, job_id: str) -> dict[str, Any] | None:
-    return next((job for job in _asset_generation_jobs(content) if job.get("jobId") == job_id), None)
+def _get_asset_generation_job(content, job_id: str, *, refresh: bool = False) -> dict[str, Any] | None:
+    job = next((job for job in _asset_generation_jobs(content) if job.get("jobId") == job_id), None)
+    if job is None:
+        return None
+    return _sync_asset_generation_job_with_content(content, job) if refresh else job
 
 
 def _get_active_asset_generation_job(content) -> dict[str, Any] | None:
-    return next((job for job in reversed(_asset_generation_jobs(content)) if job.get("status") in {"queued", "running"}), None)
+    for job in reversed(_asset_generation_jobs(content)):
+        refreshed_job = _sync_asset_generation_job_with_content(content, job)
+        if refreshed_job.get("status") in {"queued", "running"}:
+            return refreshed_job
+    return None
 
 
 def _replace_asset_generation_job(content, updated_job: dict[str, Any]) -> dict[str, Any]:
@@ -495,6 +504,75 @@ def _replace_asset_generation_job(content, updated_job: dict[str, Any]) -> dict[
     next_jobs = [updated_job if job.get("jobId") == updated_job.get("jobId") else job for job in jobs]
     content.brief_json = {**content.brief_json, ASSET_GENERATION_JOBS_KEY: next_jobs[-ASSET_GENERATION_JOB_HISTORY_LIMIT:]}
     return updated_job
+
+
+def _sync_asset_generation_job_with_content(content, job: dict[str, Any]) -> dict[str, Any]:
+    assets = job.get("assets") if isinstance(job.get("assets"), list) else []
+    refreshed_assets = []
+    for item in assets:
+        if not isinstance(item, dict):
+            refreshed_assets.append(item)
+            continue
+        asset = _find_content_asset(content, str(item.get("assetId")))
+        if asset is None:
+            refreshed_assets.append(item)
+            continue
+        status = str(item.get("status") or "queued")
+        error_code = item.get("errorCode")
+        error_message = item.get("errorMessage")
+        if _is_asset_ready(asset) and status in {"queued", "running", "failed"}:
+            status = "succeeded"
+            error_code = None
+            error_message = None
+        refreshed_assets.append(
+            {
+                **item,
+                **_asset_generation_metadata(asset),
+                "status": status,
+                "errorCode": error_code,
+                "errorMessage": error_message,
+            }
+        )
+
+    updated = _refresh_asset_generation_job_counts({**job, "assets": refreshed_assets})
+    if _is_asset_generation_job_terminal(updated):
+        updated = _complete_asset_generation_job_from_counts(updated)
+    if updated != job:
+        return _replace_asset_generation_job(content, updated)
+    return updated
+
+
+def _is_asset_generation_job_terminal(job: dict[str, Any]) -> bool:
+    assets = job.get("assets") if isinstance(job.get("assets"), list) else []
+    if not assets:
+        return job.get("status") in {"queued", "running"}
+    statuses = [asset.get("status") for asset in assets if isinstance(asset, dict)]
+    return statuses and not any(status in {"queued", "running"} for status in statuses)
+
+
+def _complete_asset_generation_job_from_counts(job: dict[str, Any]) -> dict[str, Any]:
+    completed_count = int(job.get("completedCount") or 0)
+    failed_count = int(job.get("failedCount") or 0)
+    generated_count = int(job.get("generatedCount") or 0)
+    if failed_count == 0:
+        status = "succeeded"
+        error_code = None
+        error_message = None
+    elif generated_count > 0 or completed_count > 0:
+        status = "partial_failed"
+        error_code = "ASSET_GENERATION_PARTIAL_FAILED"
+        error_message = "?쇰? ?대?吏 ?먮뒗 ?뚯꽦 asset ?앹꽦???ㅽ뙣?덉뒿?덈떎. ?ㅽ뙣??asset留??ㅼ떆 ?앹꽦?????덉뒿?덈떎."
+    else:
+        status = "failed"
+        error_code = "ASSET_GENERATION_FAILED"
+        error_message = "?대?吏? ?뚯꽦 asset ?앹꽦???ㅽ뙣?덉뒿?덈떎."
+    return {
+        **job,
+        "status": status,
+        "completedAt": job.get("completedAt") or _now_iso(),
+        "errorCode": error_code,
+        "errorMessage": error_message,
+    }
 
 
 def _set_asset_generation_job_status(
