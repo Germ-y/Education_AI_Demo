@@ -2488,7 +2488,7 @@ export function StudentStageExperience({
                 )}
 
                 {usesFullStageBoard && !isRealtimeStage && (
-                  <div className="mt-3 space-y-3">
+                  <div className="relative mt-3">
                     <StageInlineNotice
                       answer={answer}
                       isCorrect={isCorrect}
@@ -2499,6 +2499,7 @@ export function StudentStageExperience({
                       wrongMessage={activeQuestion.wrongFeedback}
                       theme={theme}
                       wrongNotice={wrongNotice}
+                      className="absolute inset-x-0 bottom-[calc(100%+0.75rem)] z-30"
                     />
                     <button
                       onClick={goToNextStage}
@@ -2673,7 +2674,7 @@ export function StudentStageExperience({
 
                 </div>
 
-                <div className="space-y-3">
+                <div className="relative">
                   <StageInlineNotice
                     answer={answer}
                     isCorrect={isCorrect}
@@ -2684,6 +2685,7 @@ export function StudentStageExperience({
                     wrongMessage={activeQuestion.wrongFeedback}
                     theme={theme}
                     wrongNotice={wrongNotice}
+                    className="absolute inset-x-0 bottom-[calc(100%+0.75rem)] z-30"
                   />
 
                   {isFinished ? null : isRealtimeStage && !isStageComplete ? (
