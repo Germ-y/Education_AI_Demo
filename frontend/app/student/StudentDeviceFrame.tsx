@@ -37,6 +37,7 @@ export function StudentDeviceFrame({
       style={{
         width: STUDENT_DEVICE_FRAME_WIDTH * activeScale,
         height: STUDENT_DEVICE_FRAME_HEIGHT * activeScale,
+        visibility: isReady ? "visible" : "hidden",
       }}
     >
       <div
