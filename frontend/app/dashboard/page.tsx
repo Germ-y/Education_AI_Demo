@@ -1330,6 +1330,7 @@ export default function DashboardPage() {
   const [generationStatuses, setGenerationStatuses] = useState<Record<string, GenerationStatus>>({});
   const [pendingGenerationJobs, setPendingGenerationJobs] = useState<Record<string, PendingGenerationJob>>(readPendingGenerationJobs);
   const generationPollLocks = useRef<Set<string>>(new Set());
+  const selectedStudentIdRef = useRef(selectedStudentId);
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({});
   const [generatedReportDrafts, setGeneratedReportDrafts] = useState<Record<string, GeneratedReportDraft>>({});
   const [savedFeedbackRecords, setSavedFeedbackRecords] = useState<SavedFeedbackRecord[]>([]);
@@ -1352,6 +1353,10 @@ export default function DashboardPage() {
   const moveTeacherTourStep = (direction: 1 | -1) => {
     setTeacherTourStepIndex((current) => Math.min(teacherTourSteps.length - 1, Math.max(0, current + direction)));
   };
+
+  useEffect(() => {
+    selectedStudentIdRef.current = selectedStudentId;
+  }, [selectedStudentId]);
 
   const updatePendingGenerationJobs = useCallback((updater: (current: Record<string, PendingGenerationJob>) => Record<string, PendingGenerationJob>) => {
     setPendingGenerationJobs((current) => {
@@ -1964,6 +1969,7 @@ export default function DashboardPage() {
     };
 
     const completeJob = (content: MissionContent) => {
+      const isCurrentStudentJob = selectedStudentIdRef.current === content.studentId;
       setSelectedCaseFile((current) =>
         current && current.profile.id === content.studentId
           ? {
@@ -1972,8 +1978,10 @@ export default function DashboardPage() {
             }
           : current,
       );
-      setReviewPreviewStep(1);
-      setOpenReviewId(content.id);
+      if (isCurrentStudentJob) {
+        setReviewPreviewStep(1);
+        setOpenReviewId(content.id);
+      }
       setGenerationStatuses((current) => ({
         ...current,
         [job.caseId]: {
@@ -2053,16 +2061,16 @@ export default function DashboardPage() {
       );
 
       const refreshedCaseFile = await getTeacherStudent(assetJob.studentId).catch(() => null);
-      if (refreshedCaseFile) {
+      if (refreshedCaseFile && selectedStudentIdRef.current === assetJob.studentId) {
         setSelectedCaseFile(refreshedCaseFile);
       }
       const refreshedReport = await getTeacherStudentReport(assetJob.studentId).catch(() => null);
-      if (refreshedReport) {
+      if (refreshedReport && selectedStudentIdRef.current === assetJob.studentId) {
         setSelectedReport(refreshedReport);
       }
 
       const isGeneratedContentComplete = isPendingGenerationContentComplete(generatedContent);
-      if (isGeneratedContentComplete) {
+      if (isGeneratedContentComplete && selectedStudentIdRef.current === generatedContent.studentId) {
         setReviewPreviewStep(1);
         setOpenReviewId(generatedContent.id);
       }
@@ -2237,16 +2245,16 @@ export default function DashboardPage() {
       );
 
       const refreshedCaseFile = await getTeacherStudent(job.studentId).catch(() => null);
-      if (refreshedCaseFile) {
+      if (refreshedCaseFile && selectedStudentIdRef.current === job.studentId) {
         setSelectedCaseFile(refreshedCaseFile);
       }
       const refreshedReport = await getTeacherStudentReport(job.studentId).catch(() => null);
-      if (refreshedReport) {
+      if (refreshedReport && selectedStudentIdRef.current === job.studentId) {
         setSelectedReport(refreshedReport);
       }
 
       const isGeneratedContentComplete = isPendingGenerationContentComplete(generatedContent);
-      if (isGeneratedContentComplete) {
+      if (isGeneratedContentComplete && selectedStudentIdRef.current === generatedContent.studentId) {
         setReviewPreviewStep(1);
         setOpenReviewId(generatedContent.id);
       }
