@@ -34,7 +34,6 @@ FLOW_RULES: dict[str, dict[int, tuple[str, set[str]]]] = {
                 TemplateType.SEQUENCE_ORDERING.value,
                 TemplateType.BLANK_FILL.value,
                 TemplateType.IMAGE_QUIZ.value,
-                TemplateType.MINI_SIMULATION.value,
                 TemplateType.EXPLANATION_CHOICE.value,
                 TemplateType.WRONG_EXPLANATION_FIX.value,
             },

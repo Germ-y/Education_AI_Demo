@@ -61,7 +61,6 @@ export type StageQuestion = {
     | "blank_fill"
     | "partition_picker"
     | "applied_question"
-    | "mini_simulation"
     | "explanation_choice"
     | "wrong_explanation_fix"
     | "card_match"

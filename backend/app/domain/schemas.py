@@ -49,7 +49,6 @@ STATIC_STAGE_TEMPLATE_TYPES = {
     },
     StageRole.APPLIED_PROBLEM: {
         TemplateType.APPLIED_QUESTION,
-        TemplateType.MINI_SIMULATION,
         TemplateType.CARD_MATCH,
         TemplateType.SEQUENCE_ORDERING,
         TemplateType.BLANK_FILL,

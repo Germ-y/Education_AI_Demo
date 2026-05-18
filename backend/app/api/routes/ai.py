@@ -53,7 +53,6 @@ ORCHESTRATOR_STAGE_CONTRACTS: dict[str, dict[int, dict[str, Any]]] = {
                 "sequence_ordering",
                 "blank_fill",
                 "image_quiz",
-                "mini_simulation",
                 "explanation_choice",
                 "wrong_explanation_fix",
             },

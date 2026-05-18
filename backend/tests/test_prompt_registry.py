@@ -42,6 +42,7 @@ def test_generation_prompts_lock_stage_labels_and_randomized_templates() -> None
 
     assert "templateRandomization.forcedStageTemplates" in orchestrator_prompt
     assert "2~3단계 `templateType`은 그 값을 그대로 사용합니다." in orchestrator_prompt
+    assert "mini_simulation" not in orchestrator_prompt
     assert "오케스트레이터의 `scenarioSpine`이 시나리오 source of truth입니다." in content_prompt
     assert "각 stage의 `stageRole`, `templateType`, `studentTitle`은 `orchestratorPlan.stagePlan`과 정확히 같아야 합니다." in content_prompt
 

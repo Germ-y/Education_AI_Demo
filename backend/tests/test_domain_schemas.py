@@ -110,6 +110,27 @@ def test_rejects_invalid_stage_template_pair() -> None:
         ContentStage.model_validate(stage)
 
 
+def test_rejects_answerless_mini_simulation_template() -> None:
+    stage = next(stage for stage in create_demo_database().mission_contents[0].stages if stage.step == 3).model_dump(by_alias=True)
+    stage["stageRole"] = "applied_problem"
+    stage["templateType"] = "mini_simulation"
+    stage["templateJson"] = {
+        "imageAssetId": "asset_content_fraction_001_stage_3",
+        "audioAssetId": "asset_content_fraction_001_stage_3_audio",
+        "assetBundle": {
+            "imageAssetId": "asset_content_fraction_001_stage_3",
+            "audioAssetId": "asset_content_fraction_001_stage_3_audio",
+        },
+        "situationText": "학생이 조작해 보는 활동 설명입니다.",
+        "practicePrompt": "시뮬레이션을 해 보세요.",
+        "sourceTextLines": [],
+        "sceneTextLines": [],
+    }
+
+    with pytest.raises(ValueError, match="stageRole과 templateType"):
+        ContentStage.model_validate(stage)
+
+
 def test_validates_image_quiz_template_shape() -> None:
     stage = create_demo_database().mission_contents[0].stages[1].model_dump(by_alias=True)
     stage["templateType"] = "image_quiz"

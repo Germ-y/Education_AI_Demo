@@ -55,7 +55,6 @@ export type TemplateType =
   | "blank_fill"
   | "partition_picker"
   | "applied_question"
-  | "mini_simulation"
   | "explanation_choice"
   | "wrong_explanation_fix"
   | "realtime_roleplay"
