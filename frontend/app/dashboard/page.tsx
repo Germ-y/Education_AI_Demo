@@ -245,10 +245,80 @@ type GeneratedReportDraft = {
   memoryCandidates: string[];
 };
 
+type TeacherTourStep = {
+  target: string;
+  tab: DashboardTab;
+  eyebrow: string;
+  title: string;
+  description: string;
+  panelPlacement?: "left" | "right";
+};
+
 const tabs: Array<{ id: DashboardTab; label: string; description: string }> = [
   { id: "info", label: "학생 정보", description: "기본 정보와 현재 학습 상태" },
   { id: "materials", label: "자료 제안·검토", description: "수업 자료 제안을 확인" },
   { id: "records", label: "학습 기록", description: "피드백과 관찰 기록" },
+];
+
+const teacherTourSteps: TeacherTourStep[] = [
+  {
+    target: "student-list",
+    tab: "info",
+    eyebrow: "1 · 학생 선택",
+    title: "왼쪽에서 학생을 고릅니다",
+    description: "검색으로 학생을 좁히고, 목록에서 학생을 선택하면 오른쪽 화면 전체가 그 학생 기준으로 바뀝니다.",
+  },
+  {
+    target: "student-summary",
+    tab: "info",
+    eyebrow: "2 · 오늘 상태",
+    title: "상단 요약에서 현재 흐름을 봅니다",
+    description: "학생의 현재 단계, 출석, 오늘 먼저 확인할 핵심 상태를 빠르게 확인하는 영역입니다.",
+  },
+  {
+    target: "dashboard-tabs",
+    tab: "info",
+    eyebrow: "3 · 화면 이동",
+    title: "세 탭으로 업무를 나눕니다",
+    description: "학생 정보, 자료 제안·검토, 학습 기록을 오가며 수업 준비부터 피드백까지 이어갑니다.",
+  },
+  {
+    target: "key-summary",
+    tab: "info",
+    eyebrow: "4 · 핵심 요약",
+    title: "수업 전 먼저 볼 항목입니다",
+    description: "잘 되는 시작점, 부담을 줄일 지점, 제시 방식을 한 번에 모아 수업 시작 전에 확인합니다.",
+  },
+  {
+    target: "teacher-memo",
+    tab: "info",
+    eyebrow: "5 · 선생님 메모",
+    title: "관찰한 내용을 기억장치로 남깁니다",
+    description: "학생 전체에 계속 참고할 관찰과 조정점을 적고 저장하면 다음 자료 생성에도 반영됩니다.",
+  },
+  {
+    target: "material-generator",
+    tab: "materials",
+    eyebrow: "6 · 자료 생성",
+    title: "오늘 만들 자료 방향을 적습니다",
+    description: "원하는 수업 방향을 직접 쓰거나 AI 추천 생성으로 학생 기록 기반 제안을 만들 수 있습니다.",
+  },
+  {
+    target: "review-queue",
+    tab: "materials",
+    eyebrow: "7 · 제안 검토",
+    title: "생성된 자료를 검토하고 적용합니다",
+    description: "제안 검토하기로 학생 화면을 미리 보고, 승인된 자료만 수업에 적용합니다.",
+    panelPlacement: "left",
+  },
+  {
+    target: "feedback-records",
+    tab: "records",
+    eyebrow: "8 · 학습 기록",
+    title: "완료된 미션을 리포트로 정리합니다",
+    description: "학생 수행 결과와 회고를 보고 선생님 관찰 기록을 더해 최근 기록으로 저장합니다.",
+    panelPlacement: "left",
+  },
 ];
 
 const realtimeSpeakingTargetTurns = 3;
@@ -1034,6 +1104,87 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
+function TeacherTourOverlay({
+  step,
+  stepIndex,
+  totalSteps,
+  onClose,
+  onPrevious,
+  onNext,
+}: {
+  step: TeacherTourStep;
+  stepIndex: number;
+  totalSteps: number;
+  onClose: () => void;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  const isFirst = stepIndex === 0;
+  const isLast = stepIndex === totalSteps - 1;
+  const panelPositionClass = step.panelPlacement === "left" ? "left-5" : "right-5";
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[60] bg-[#0f172a]/55 backdrop-blur-[1px]" aria-hidden="true" />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="teacher-tour-title"
+        className={`fixed bottom-5 z-[80] w-[min(420px,calc(100vw-32px))] rounded-xl border border-[#d8dee8] bg-white p-5 shadow-[0_28px_80px_rgba(15,23,42,0.32)] ${panelPositionClass}`}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black text-[#1f3a5f]">{step.eyebrow}</p>
+            <h2 id="teacher-tour-title" className="mt-2 text-xl font-black leading-7 text-[#172033]">
+              {step.title}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="화면 안내 닫기"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-[#cbd5e1] bg-white text-xl font-black leading-none text-[#475569]"
+          >
+            ×
+          </button>
+        </div>
+        <p className="mt-3 text-sm font-semibold leading-6 text-[#475569]">{step.description}</p>
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5" aria-label={`전체 ${totalSteps}단계 중 ${stepIndex + 1}단계`}>
+            {teacherTourSteps.map((item, index) => (
+              <span
+                key={item.target}
+                className={`h-2 rounded-full transition-all ${
+                  index === stepIndex ? "w-6 bg-[#1f3a5f]" : "w-2 bg-[#cbd5e1]"
+                }`}
+              />
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onPrevious}
+              disabled={isFirst}
+              aria-label="이전 안내"
+              className="grid h-10 w-10 place-items-center rounded-md border border-[#cbd5e1] bg-white text-lg font-black text-[#1f3a5f] disabled:cursor-not-allowed disabled:text-[#cbd5e1]"
+            >
+              &lt;
+            </button>
+            <button
+              type="button"
+              onClick={isLast ? onClose : onNext}
+              aria-label={isLast ? "화면 안내 완료" : "다음 안내"}
+              className="grid h-10 w-10 place-items-center rounded-md bg-[#1f3a5f] text-lg font-black text-white"
+            >
+              {isLast ? "✓" : ">"}
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
+  );
+}
+
 function SignalCard({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
     <div className="rounded-md border border-[#e2e8f0] bg-[#fbfcfe] p-4">
@@ -1184,6 +1335,20 @@ export default function DashboardPage() {
   const [supportProfileDraft, setSupportProfileDraft] = useState<SupportProfileDraftResponse | null>(null);
   const [supportProfileAction, setSupportProfileAction] = useState<"draft" | "confirm" | "refresh" | null>(null);
   const [reportReuseError, setReportReuseError] = useState("");
+  const [isTeacherTourOpen, setIsTeacherTourOpen] = useState(false);
+  const [teacherTourStepIndex, setTeacherTourStepIndex] = useState(0);
+  const activeTeacherTourStep = teacherTourSteps[teacherTourStepIndex] ?? teacherTourSteps[0];
+  const teacherTourHighlightClass =
+    "relative z-[70] rounded-xl bg-white ring-2 ring-white shadow-[0_18px_48px_rgba(15,23,42,0.28)]";
+  const getTeacherTourHighlightClass = (target: string) =>
+    isTeacherTourOpen && activeTeacherTourStep.target === target ? teacherTourHighlightClass : "";
+  const openTeacherTour = () => {
+    setTeacherTourStepIndex(0);
+    setIsTeacherTourOpen(true);
+  };
+  const moveTeacherTourStep = (direction: 1 | -1) => {
+    setTeacherTourStepIndex((current) => Math.min(teacherTourSteps.length - 1, Math.max(0, current + direction)));
+  };
 
   const updatePendingGenerationJobs = useCallback((updater: (current: Record<string, PendingGenerationJob>) => Record<string, PendingGenerationJob>) => {
     setPendingGenerationJobs((current) => {
@@ -1212,6 +1377,45 @@ export default function DashboardPage() {
   useEffect(() => {
     writePendingGenerationJobs(pendingGenerationJobs);
   }, [pendingGenerationJobs]);
+
+  useEffect(() => {
+    if (!isTeacherTourOpen) return;
+    setActiveTab(activeTeacherTourStep.tab);
+
+    const scrollTimer = window.setTimeout(() => {
+      const target = document.querySelector(`[data-tour-target="${activeTeacherTourStep.target}"]`);
+      target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    }, 160);
+
+    return () => window.clearTimeout(scrollTimer);
+  }, [activeTeacherTourStep.tab, activeTeacherTourStep.target, isTeacherTourOpen]);
+
+  useEffect(() => {
+    if (!isTeacherTourOpen) return;
+
+    const handleTourKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsTeacherTourOpen(false);
+        return;
+      }
+      if (event.key === "ArrowLeft") {
+        setTeacherTourStepIndex((current) => Math.max(0, current - 1));
+        return;
+      }
+      if (event.key === "ArrowRight") {
+        setTeacherTourStepIndex((current) => {
+          if (current >= teacherTourSteps.length - 1) {
+            setIsTeacherTourOpen(false);
+            return current;
+          }
+          return current + 1;
+        });
+      }
+    };
+
+    window.addEventListener("keydown", handleTourKeyDown);
+    return () => window.removeEventListener("keydown", handleTourKeyDown);
+  }, [isTeacherTourOpen]);
 
   useEffect(() => {
     if (!selectedStudentId) return;
@@ -2602,10 +2806,26 @@ export default function DashboardPage() {
         홈으로
       </Link>
       <div className="grid min-h-screen xl:grid-cols-[380px_minmax(0,1fr)]">
-        <aside className="flex flex-col border-r border-[#d8dee8] bg-white xl:sticky xl:top-0 xl:h-screen">
+        <aside
+          data-tour-target="student-list"
+          className={`flex flex-col border-r border-[#d8dee8] bg-white xl:sticky xl:top-0 xl:h-screen ${getTeacherTourHighlightClass("student-list")}`}
+        >
           <div className="border-b border-[#e5e9f0] p-6">
-            <p className="text-sm font-bold text-[#1f3a5f]">배움동행 교사용</p>
-            <h1 className="mt-2 text-2xl font-black">학생 관리</h1>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-[#1f3a5f]">배움동행 교사용</p>
+                <h1 className="mt-2 text-2xl font-black">학생 관리</h1>
+              </div>
+              <button
+                type="button"
+                onClick={openTeacherTour}
+                aria-label="화면 안내 열기"
+                title="화면 안내"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#cbd5e1] bg-[#f8fafc] text-sm font-black text-[#1f3a5f] transition hover:border-[#1f3a5f] hover:bg-[#eef4fb]"
+              >
+                ?
+              </button>
+            </div>
             <p className="mt-2 text-sm font-semibold leading-6 text-[#64748b]">
               학생을 검색하고, 오늘 수업에 필요한 상태와 자료를 확인합니다.
             </p>
@@ -2684,7 +2904,10 @@ export default function DashboardPage() {
 
         <section className="min-w-0 px-5 py-5 lg:px-8">
           <article className="overflow-hidden rounded-xl border border-[#d8dee8] bg-white">
-            <section className="border-b border-[#e5e9f0] bg-[#fbfcfe] p-6">
+            <section
+              data-tour-target="student-summary"
+              className={`border-b border-[#e5e9f0] bg-[#fbfcfe] p-6 ${getTeacherTourHighlightClass("student-summary")}`}
+            >
               <div className="flex flex-wrap items-start justify-between gap-5">
                 <div className="flex min-w-0 items-start">
                   <div className="min-w-0">
@@ -2736,7 +2959,10 @@ export default function DashboardPage() {
               </div>
             </section>
 
-            <nav className="grid border-b border-[#e5e9f0] bg-white md:grid-cols-3">
+            <nav
+              data-tour-target="dashboard-tabs"
+              className={`grid border-b border-[#e5e9f0] bg-white md:grid-cols-3 ${getTeacherTourHighlightClass("dashboard-tabs")}`}
+            >
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
@@ -2756,7 +2982,10 @@ export default function DashboardPage() {
             <div className="min-h-[560px]">
             {activeTab === "info" && (
               <section className="space-y-6 p-6">
-                <section className="rounded-lg border border-[#d8dee8] bg-white p-5">
+                <section
+                  data-tour-target="key-summary"
+                  className={`rounded-lg border border-[#d8dee8] bg-white p-5 ${getTeacherTourHighlightClass("key-summary")}`}
+                >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-black text-[#64748b]">오늘 먼저 볼 것</p>
@@ -2808,7 +3037,10 @@ export default function DashboardPage() {
                   </div>
                 </section>
 
-                <section className="rounded-lg border border-[#e5e9f0] bg-white p-5">
+                <section
+                  data-tour-target="teacher-memo"
+                  className={`rounded-lg border border-[#e5e9f0] bg-white p-5 ${getTeacherTourHighlightClass("teacher-memo")}`}
+                >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h3 className="text-xl font-black">선생님 통합 메모</h3>
@@ -3053,7 +3285,10 @@ export default function DashboardPage() {
 
             {activeTab === "materials" && (
               <section className="grid min-h-[calc(100vh-430px)] gap-5 p-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-                <section className="rounded-lg border border-[#e5e9f0] bg-white p-5">
+                <section
+                  data-tour-target="material-generator"
+                  className={`rounded-lg border border-[#e5e9f0] bg-white p-5 ${getTeacherTourHighlightClass("material-generator")}`}
+                >
                   <div className="flex h-full flex-col">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
@@ -3122,7 +3357,10 @@ export default function DashboardPage() {
                 </section>
 
                 <div className="space-y-4">
-                  <section className="space-y-3">
+                  <section
+                    data-tour-target="review-queue"
+                    className={`space-y-3 ${getTeacherTourHighlightClass("review-queue")}`}
+                  >
                     <div>
                       <h3 className="text-xl font-black">검토할 수업 자료 제안</h3>
                       <p className="mt-1 text-sm font-semibold text-[#64748b]">
@@ -3390,7 +3628,10 @@ export default function DashboardPage() {
                     ))}
                   </div>
 
-                  <div className="rounded-lg border border-[#e5e9f0] bg-white p-5 xl:order-1">
+                  <div
+                    data-tour-target="feedback-records"
+                    className={`rounded-lg border border-[#e5e9f0] bg-white p-5 xl:order-1 ${getTeacherTourHighlightClass("feedback-records")}`}
+                  >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <h3 className="text-xl font-black">학습 기록 작성 대상</h3>
@@ -3567,6 +3808,16 @@ export default function DashboardPage() {
           </article>
         </section>
       </div>
+      {isTeacherTourOpen && (
+        <TeacherTourOverlay
+          step={activeTeacherTourStep}
+          stepIndex={teacherTourStepIndex}
+          totalSteps={teacherTourSteps.length}
+          onClose={() => setIsTeacherTourOpen(false)}
+          onPrevious={() => moveTeacherTourStep(-1)}
+          onNext={() => moveTeacherTourStep(1)}
+        />
+      )}
       {isRegistrationOpen && (
         <StudentRegistrationModal
           open={isRegistrationOpen}
