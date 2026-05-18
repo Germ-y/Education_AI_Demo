@@ -26,6 +26,15 @@ class DemoRepository:
             _insert_all(session, db)
             session.commit()
 
+    def upsert_mission_content(self, content: MissionContent) -> None:
+        with self.session_factory() as session:
+            session.execute(delete(rows.ContentAssetRow).where(rows.ContentAssetRow.mission_content_id == content.id))
+            session.execute(delete(rows.ContentStageRow).where(rows.ContentStageRow.mission_content_id == content.id))
+            session.merge(_mission_content_row(content))
+            session.add_all(_content_stage_row(stage) for stage in content.stages)
+            session.add_all(_content_asset_row(asset) for asset in content.assets)
+            session.commit()
+
     def load_database(self) -> DemoDatabase:
         with self.session_factory() as session:
             stages_by_content = _group_by_content(
@@ -287,56 +296,9 @@ def _insert_all(session: Session, db: DemoDatabase) -> None:
         for item in db.planner_items
     )
     for content in db.mission_contents:
-        session.add(
-            rows.MissionContentRow(
-                id=content.id,
-                case_id=content.case_id,
-                student_id=content.student_id,
-                content_type=content.content_type,
-                title=content.title,
-                session_goal=content.session_goal,
-                status=content.status,
-                total_steps=content.total_steps,
-                brief_json=content.brief_json,
-                teacher_review_summary=content.teacher_review_summary,
-                approved_by_user_id=content.approved_by_user_id,
-                approved_at=content.approved_at,
-                published_at=content.published_at,
-            )
-        )
-        session.add_all(
-            rows.ContentStageRow(
-                id=stage.id,
-                mission_content_id=stage.mission_content_id,
-                step=stage.step,
-                stage_role=stage.stage_role,
-                template_type=stage.template_type,
-                student_title=stage.student_title,
-                student_instruction=stage.student_instruction,
-                template_json=stage.template_json,
-                realtime_spec_json=stage.realtime_spec.model_dump(by_alias=True) if stage.realtime_spec else None,
-                sort_order=stage.sort_order,
-            )
-            for stage in content.stages
-        )
-        session.add_all(
-            rows.ContentAssetRow(
-                id=asset.id,
-                mission_content_id=asset.mission_content_id,
-                stage_id=asset.stage_id,
-                asset_role=asset.asset_role,
-                asset_type=asset.asset_type,
-                provider=asset.provider,
-                model=asset.model,
-                prompt_json=asset.prompt_json,
-                source_text=asset.source_text,
-                storage_url=asset.storage_url,
-                preview_url=asset.preview_url,
-                qa_status=asset.qa_status,
-                approval_status=asset.approval_status,
-            )
-            for asset in content.assets
-        )
+        session.add(_mission_content_row(content))
+        session.add_all(_content_stage_row(stage) for stage in content.stages)
+        session.add_all(_content_asset_row(asset) for asset in content.assets)
     session.add_all(
         rows.ContentAttemptRow(
             id=item.id,
@@ -638,6 +600,57 @@ def _planner_item(row: rows.PlannerItemRow) -> dict:
         "checklistJson": row.checklist_json,
         "status": row.status,
     }
+
+
+def _mission_content_row(content: MissionContent) -> rows.MissionContentRow:
+    return rows.MissionContentRow(
+        id=content.id,
+        case_id=content.case_id,
+        student_id=content.student_id,
+        content_type=content.content_type,
+        title=content.title,
+        session_goal=content.session_goal,
+        status=content.status,
+        total_steps=content.total_steps,
+        brief_json=content.brief_json,
+        teacher_review_summary=content.teacher_review_summary,
+        approved_by_user_id=content.approved_by_user_id,
+        approved_at=content.approved_at,
+        published_at=content.published_at,
+    )
+
+
+def _content_stage_row(stage) -> rows.ContentStageRow:
+    return rows.ContentStageRow(
+        id=stage.id,
+        mission_content_id=stage.mission_content_id,
+        step=stage.step,
+        stage_role=stage.stage_role,
+        template_type=stage.template_type,
+        student_title=stage.student_title,
+        student_instruction=stage.student_instruction,
+        template_json=stage.template_json,
+        realtime_spec_json=stage.realtime_spec.model_dump(by_alias=True) if stage.realtime_spec else None,
+        sort_order=stage.sort_order,
+    )
+
+
+def _content_asset_row(asset) -> rows.ContentAssetRow:
+    return rows.ContentAssetRow(
+        id=asset.id,
+        mission_content_id=asset.mission_content_id,
+        stage_id=asset.stage_id,
+        asset_role=asset.asset_role,
+        asset_type=asset.asset_type,
+        provider=asset.provider,
+        model=asset.model,
+        prompt_json=asset.prompt_json,
+        source_text=asset.source_text,
+        storage_url=asset.storage_url,
+        preview_url=asset.preview_url,
+        qa_status=asset.qa_status,
+        approval_status=asset.approval_status,
+    )
 
 
 def _mission_from_row(content: rows.MissionContentRow, stages: list[rows.ContentStageRow], assets: list[rows.ContentAssetRow]) -> MissionContent:

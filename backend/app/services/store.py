@@ -1426,6 +1426,10 @@ class DemoStore:
         self.db.mission_contents.append(mission)
         if existing is None:
             self.mark_context_brief_dirty(mission.student_id, source={"trigger": "new_content_saved", "contentId": mission.id, "status": str(mission.status)})
+        if self.repository is not None:
+            self.repository.upsert_mission_content(mission)
+            self.refresh()
+            return mission
         self.persist()
         return mission
 

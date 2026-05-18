@@ -54,6 +54,30 @@ def test_repository_skips_invalid_mission_content_rows() -> None:
     assert len(loaded.mission_contents) == 2
 
 
+def test_repository_upserts_single_mission_without_dropping_others() -> None:
+    engine = create_database_engine("sqlite+pysqlite:///:memory:")
+    create_schema(engine)
+    repository = DemoRepository(sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True))
+    seed = create_demo_database()
+    first = seed.mission_contents[0]
+    second = seed.mission_contents[1]
+
+    repository.replace_database(seed)
+    first_update = first.model_copy(update={"title": "Updated first content"})
+    second_update = second.model_copy(update={"title": "Updated second content"})
+
+    repository.upsert_mission_content(first_update)
+    repository.upsert_mission_content(second_update)
+    loaded = repository.load_database()
+    by_id = {content.id: content for content in loaded.mission_contents}
+
+    assert by_id[first.id].title == "Updated first content"
+    assert by_id[second.id].title == "Updated second content"
+    assert len(loaded.mission_contents) == len(seed.mission_contents)
+    assert len(by_id[first.id].stages) == 4
+    assert len(by_id[first.id].assets) == 10
+
+
 def test_review_summary_prefers_latest_completed_attempt() -> None:
     db = create_demo_database()
     content = next(item for item in db.mission_contents if item.id == "content_fraction_001")
