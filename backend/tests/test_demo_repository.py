@@ -3,6 +3,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import BACKEND_DIR
 from app.data.demo_data import create_demo_database
 from app.db.session import create_database_engine, create_schema, normalize_database_url
+from app.domain import db_models as rows
 from app.domain.enums import MissionStatus
 from app.domain.models import ActivityEvent, ContentAttempt, ReviewSummary
 from app.domain.schemas import MissionContent
@@ -33,6 +34,24 @@ def test_repository_round_trips_seed_database() -> None:
     assert "Completed" not in loaded.review_summaries[0].short_summary
     assert loaded.mission_contents[0].total_steps == 4
     assert {stage.step for stage in loaded.mission_contents[0].stages} == {1, 2, 3, 4}
+
+
+def test_repository_skips_invalid_mission_content_rows() -> None:
+    engine = create_database_engine("sqlite+pysqlite:///:memory:")
+    create_schema(engine)
+    session_factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
+    repository = DemoRepository(session_factory)
+
+    repository.replace_database(create_demo_database())
+    with session_factory() as session:
+        session.query(rows.ContentStageRow).filter_by(mission_content_id="content_fraction_001").delete()
+        session.query(rows.ContentAssetRow).filter_by(mission_content_id="content_fraction_001").delete()
+        session.commit()
+
+    loaded = repository.load_database()
+
+    assert "content_fraction_001" not in {content.id for content in loaded.mission_contents}
+    assert len(loaded.mission_contents) == 2
 
 
 def test_review_summary_prefers_latest_completed_attempt() -> None:

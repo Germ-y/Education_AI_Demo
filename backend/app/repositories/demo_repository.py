@@ -1,11 +1,15 @@
+import logging
 from collections.abc import Iterable
 
+from pydantic import ValidationError
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.domain import db_models as rows
 from app.domain.models import DemoDatabase
 from app.domain.schemas import MissionContent
+
+logger = logging.getLogger(__name__)
 
 
 class DemoRepository:
@@ -29,10 +33,16 @@ class DemoRepository:
             )
             assets_by_content = _group_by_content(session.scalars(select(rows.ContentAssetRow).order_by(rows.ContentAssetRow.id)).all())
 
-            mission_contents = [
-                _mission_from_row(content, stages_by_content.get(content.id, []), assets_by_content.get(content.id, []))
-                for content in session.scalars(select(rows.MissionContentRow).order_by(rows.MissionContentRow.id)).all()
-            ]
+            mission_contents: list[MissionContent] = []
+            for content in session.scalars(select(rows.MissionContentRow).order_by(rows.MissionContentRow.id)).all():
+                try:
+                    mission_contents.append(_mission_from_row(content, stages_by_content.get(content.id, []), assets_by_content.get(content.id, [])))
+                except ValidationError as exc:
+                    logger.warning(
+                        "demo_repository.skipped_invalid_mission_content content_id=%s error=%s",
+                        content.id,
+                        exc,
+                    )
 
             return DemoDatabase.model_validate(
                 {
