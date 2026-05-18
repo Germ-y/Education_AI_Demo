@@ -226,7 +226,12 @@ def create_content_generation(
 
     existing_content_run = agent_runs.find_content_generation_for_orchestrator(payload.orchestrator_run_id)
     if existing_content_run is not None:
-        return ok({"agentRun": existing_content_run.model_dump(by_alias=True), "content": _content_from_agent_run(existing_content_run, demo_store, principal.id)})
+        return ok(
+            {
+                "agentRun": existing_content_run.model_dump(by_alias=True),
+                "content": _content_from_agent_run(existing_content_run, demo_store, principal.id),
+            }
+        )
 
     active_content = demo_store.get_active_material_for_case(payload.student_id, payload.case_id)
     if active_content is not None:

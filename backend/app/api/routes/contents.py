@@ -1134,7 +1134,8 @@ def _build_image_brief_for_asset(content, asset, stages: list, stage_visual_spec
         ]
     )
     prompt_parts.append(
-        "Keep the scene natural and do not add readable labels, tables, worksheets, notebook writing, document pages, posters, notices, speech bubbles, captions, badges, "
+        "Keep the scene natural and do not add readable labels, tables, worksheets, notebook writing, document pages, "
+        "posters, notices, speech bubbles, captions, badges, "
         "arrows, check marks, X marks, answer cues, copied lesson sentences, or invented numbers."
     )
     prompt_parts.append(
