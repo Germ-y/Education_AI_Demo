@@ -406,7 +406,7 @@ def test_mission_quality_leaves_choice_limit_nuance_to_teacher_review() -> None:
     )
 
 
-def test_mission_quality_rejects_duplicate_card_match_answer_candidates() -> None:
+def test_mission_quality_leaves_duplicate_card_match_answer_candidates_to_prompt_review() -> None:
     content = _generated_fraction_content()
     content["stages"][1]["templateType"] = "card_match"
     content["stages"][1]["templateJson"] = {
@@ -428,15 +428,14 @@ def test_mission_quality_rejects_duplicate_card_match_answer_candidates() -> Non
     }
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="rightCards"):
-        validate_mission_content_quality(
-            mission,
-            case_file=_fraction_case_file(),
-            orchestrator_plan=_valid_learning_plan(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=_fraction_case_file(),
+        orchestrator_plan=_valid_learning_plan(),
+    )
 
 
-def test_mission_quality_rejects_overlong_student_problem_text() -> None:
+def test_mission_quality_leaves_overlong_student_problem_text_to_prompt_review() -> None:
     content = _generated_fraction_content()
     content["stages"][1]["templateJson"]["question"] = (
         "첫 번째 문단 사람들이 가까운 거리를 이동할 때도 자동차를 많이 이용하면서 공기가 점점 더 더러워지고 있습니다. "
@@ -444,40 +443,37 @@ def test_mission_quality_rejects_overlong_student_problem_text() -> None:
     )
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="question"):
-        validate_mission_content_quality(
-            mission,
-            case_file=_fraction_case_file(),
-            orchestrator_plan=_valid_learning_plan(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=_fraction_case_file(),
+        orchestrator_plan=_valid_learning_plan(),
+    )
 
 
-def test_mission_quality_rejects_overlong_choice_text() -> None:
+def test_mission_quality_leaves_overlong_choice_text_to_prompt_review() -> None:
     content = _generated_fraction_content()
     content["stages"][1]["templateJson"]["choices"][0]["text"] = "자동차 대신 걸어 다니거나 자전거를 타면 공기를 더럽히는 배기가스를 줄일 수 있습니다."
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="choices"):
-        validate_mission_content_quality(
-            mission,
-            case_file=_fraction_case_file(),
-            orchestrator_plan=_valid_learning_plan(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=_fraction_case_file(),
+        orchestrator_plan=_valid_learning_plan(),
+    )
 
 
-def test_mission_quality_rejects_overlong_source_text_lines() -> None:
+def test_mission_quality_leaves_overlong_source_text_lines_to_prompt_review() -> None:
     content = _generated_fraction_content()
     content["stages"][1]["templateJson"]["sourceTextLines"] = [
         "사람들이 가까운 거리를 이동할 때 자동차를 많이 이용하면서 공기가 점점 더 더러워지고 있습니다.",
     ]
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="sourceTextLines"):
-        validate_mission_content_quality(
-            mission,
-            case_file=_fraction_case_file(),
-            orchestrator_plan=_valid_learning_plan(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=_fraction_case_file(),
+        orchestrator_plan=_valid_learning_plan(),
+    )
 
 
 def test_mission_quality_allows_three_sequence_cards_with_two_choice_limit() -> None:
@@ -711,7 +707,7 @@ def test_mission_quality_accepts_three_card_life_support_action_sequence() -> No
     )
 
 
-def test_mission_quality_rejects_four_card_life_support_action_sequence() -> None:
+def test_mission_quality_leaves_four_card_life_support_action_sequence_to_prompt_review() -> None:
     content = _generated_life_support_content()
     stage = content["stages"][2]
     stage["templateType"] = "sequence_ordering"
@@ -734,11 +730,10 @@ def test_mission_quality_rejects_four_card_life_support_action_sequence() -> Non
     }
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="3개"):
-        validate_mission_content_quality(
-            mission,
-            case_file=_life_support_case_file(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=_life_support_case_file(),
+    )
 
 
 def _valid_learning_plan() -> dict:

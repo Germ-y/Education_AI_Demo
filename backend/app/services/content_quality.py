@@ -102,24 +102,6 @@ STIGMATIZING_TERMS = (
     "실패한 학생",
 )
 
-STRUCTURED_INTERACTION_TEMPLATES = {
-    TemplateType.CARD_MATCH.value,
-    TemplateType.SEQUENCE_ORDERING.value,
-    TemplateType.BLANK_FILL.value,
-}
-
-STUDENT_INSTRUCTION_MAX_LENGTH = 45
-QUESTION_MAX_LENGTH = 80
-INTRO_STORY_MAX_LENGTH = 90
-INTRO_MISSION_MAX_LENGTH = 60
-SOURCE_TEXT_MAX_LINES = 2
-SOURCE_TEXT_LINE_MAX_LENGTH = 45
-SCENE_TEXT_LINE_MAX_LENGTH = 70
-OPTION_TEXT_MAX_LENGTH = 26
-SENTENCE_TEXT_MAX_LENGTH = 80
-FEEDBACK_TEXT_MAX_LENGTH = 70
-
-
 class ContentQualityError(ValueError):
     def __init__(self, issues: list[str]) -> None:
         self.issues = issues
@@ -161,10 +143,7 @@ def validate_mission_content_quality(
 ) -> None:
     issues: list[str] = []
     profile = case_file.get("profile") if isinstance(case_file.get("profile"), dict) else {}
-    profile_json = profile.get("profileJson") if isinstance(profile.get("profileJson"), dict) else {}
     expected_content_type = _as_value(profile.get("studentType") or mission.content_type)
-    reading_load = str(profile_json.get("readingLoad") or "default")
-    choice_limit = _positive_int(profile_json.get("choiceCountLimit"))
 
     _expect_equal(mission.student_id, profile.get("id"), "mission.studentId", issues)
     _expect_equal(_as_value(mission.content_type), expected_content_type, "mission.contentType", issues)
@@ -179,13 +158,10 @@ def validate_mission_content_quality(
         issues.append("생성 직후 콘텐츠에는 승인/배포 필드가 없어야 합니다.")
 
     _validate_mission_stage_flow(mission, expected_content_type, issues)
-    _validate_mission_template_variety(mission, issues, reading_load=reading_load, choice_limit=choice_limit)
-    _validate_mission_template_interactions(mission, expected_content_type, issues)
-    _validate_mission_template_text_lengths(mission, issues)
     _validate_asset_package(mission, issues)
     _validate_stage_asset_links(mission, issues)
     # 생성 실패를 막는 품질검수는 렌더링/저장 계약 위주로 제한한다.
-    # 문장 길이, 문제 뉘앙스, 이미지 프롬프트 표현 같은 내용 품질은
+    # 문장 길이, 카드 중복, 카드 개수, 문제 뉘앙스 같은 내용 품질은
     # 프롬프트와 교사 검토에서 다루고, 여기서 콘텐츠 생성을 차단하지 않는다.
     _validate_mission_visual_brief_contract(mission, orchestrator_plan, issues)
 
@@ -223,24 +199,6 @@ def _validate_stage_plan(stage_plan: Any, content_type: str, issues: list[str]) 
             issues.append(f"orchestrator.stagePlan[{step}].studentTitle은 '{expected_title}'이어야 합니다.")
 
 
-def _validate_stage_plan_template_variety(stage_plan: Any, issues: list[str], *, reading_load: str = "default", choice_limit: int | None = None) -> None:
-    if not isinstance(stage_plan, list):
-        return
-    if _allows_choice_first_flow(reading_load, choice_limit):
-        return
-
-    stage_2_3_templates = [
-        item.get("templateType")
-        for item in stage_plan
-        if isinstance(item, dict) and item.get("step") in {2, 3}
-    ]
-    if len(stage_2_3_templates) != 2:
-        return
-
-    if not any(template in STRUCTURED_INTERACTION_TEMPLATES for template in stage_2_3_templates):
-        issues.append("orchestrator.stagePlan 2~3단계 중 최소 1개는 card_match, sequence_ordering, blank_fill 중 하나여야 합니다.")
-
-
 def _validate_mission_stage_flow(mission: MissionContent, content_type: str, issues: list[str]) -> None:
     rules = FLOW_RULES.get(content_type)
     if rules is None:
@@ -273,153 +231,6 @@ def _validate_mission_stage_flow(mission: MissionContent, content_type: str, iss
                 issues.append(f"{stage.id}.realtimeSpec.maxTurns는 데모 품질 기준상 8 이하로 제한합니다.")
             if stage.realtime_spec.max_duration_sec > 180:
                 issues.append(f"{stage.id}.realtimeSpec.maxDurationSec는 데모 품질 기준상 180초 이하로 제한합니다.")
-
-
-def _validate_mission_template_variety(mission: MissionContent, issues: list[str], *, reading_load: str = "default", choice_limit: int | None = None) -> None:
-    if _allows_choice_first_flow(reading_load, choice_limit):
-        return
-
-    stage_2_3_templates = [
-        _as_value(stage.template_type)
-        for stage in mission.stages
-        if stage.step in {2, 3}
-    ]
-    if len(stage_2_3_templates) != 2:
-        return
-
-    if not any(template in STRUCTURED_INTERACTION_TEMPLATES for template in stage_2_3_templates):
-        issues.append("mission.stages 2~3단계 중 최소 1개는 card_match, sequence_ordering, blank_fill 중 하나여야 합니다.")
-
-
-def _validate_mission_template_interactions(mission: MissionContent, content_type: str, issues: list[str]) -> None:
-    for stage in mission.stages:
-        template_type = _as_value(stage.template_type)
-        template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
-        if template_type == TemplateType.CARD_MATCH.value:
-            _validate_card_match_unique_answer_candidates(template_json, f"{stage.id}.templateJson", issues)
-        if content_type == StudentType.LIFE_SUPPORT.value and stage.step == 3 and template_type == TemplateType.SEQUENCE_ORDERING.value:
-            cards = template_json.get("cards")
-            answer_order = template_json.get("answerOrder")
-            card_count = len(cards) if isinstance(cards, list) else 0
-            answer_count = len(answer_order) if isinstance(answer_order, list) else 0
-            if card_count != 3 or answer_count != 3:
-                issues.append(f"{stage.id}.templateJson은 life_support 3단계 sequence_ordering에서 cards와 answerOrder를 각각 3개로 구성해야 합니다.")
-
-
-def _validate_card_match_unique_answer_candidates(template_json: dict[str, Any], path: str, issues: list[str]) -> None:
-    left_texts = _card_texts(template_json.get("leftCards"))
-    right_texts = _card_texts(template_json.get("rightCards"))
-    if _has_duplicate_meaning(left_texts):
-        issues.append(f"{path}.leftCards는 같은 의미의 카드를 반복할 수 없습니다.")
-    if _has_duplicate_meaning(right_texts):
-        issues.append(f"{path}.rightCards는 정답 후보이므로 같은 정답/분류/결론을 반복할 수 없습니다.")
-
-
-def _card_texts(value: Any) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    texts: list[str] = []
-    for item in value:
-        if isinstance(item, str):
-            texts.append(item)
-        elif isinstance(item, dict):
-            text = item.get("text")
-            if isinstance(text, str):
-                texts.append(text)
-    return texts
-
-
-def _has_duplicate_meaning(texts: list[str]) -> bool:
-    normalized = [_normalize_card_text(text) for text in texts if _normalize_card_text(text)]
-    return len(normalized) != len(set(normalized))
-
-
-def _normalize_card_text(value: str) -> str:
-    return "".join(value.strip().split()).lower()
-
-
-def _validate_mission_template_text_lengths(mission: MissionContent, issues: list[str]) -> None:
-    for stage in mission.stages:
-        template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
-        _validate_short_text(stage.student_instruction, f"{stage.id}.studentInstruction", STUDENT_INSTRUCTION_MAX_LENGTH, issues)
-        _validate_short_text(template_json.get("storyText"), f"{stage.id}.templateJson.storyText", INTRO_STORY_MAX_LENGTH, issues)
-        _validate_short_text(template_json.get("missionText"), f"{stage.id}.templateJson.missionText", INTRO_MISSION_MAX_LENGTH, issues)
-        _validate_short_text(template_json.get("question"), f"{stage.id}.templateJson.question", QUESTION_MAX_LENGTH, issues)
-        _validate_short_text(template_json.get("sentence"), f"{stage.id}.templateJson.sentence", SENTENCE_TEXT_MAX_LENGTH, issues)
-        _validate_short_text(template_json.get("wrongLine"), f"{stage.id}.templateJson.wrongLine", SENTENCE_TEXT_MAX_LENGTH, issues)
-        _validate_short_text(template_json.get("fixedLine"), f"{stage.id}.templateJson.fixedLine", SENTENCE_TEXT_MAX_LENGTH, issues)
-        _validate_short_text(template_json.get("correctFeedback"), f"{stage.id}.templateJson.correctFeedback", FEEDBACK_TEXT_MAX_LENGTH, issues)
-        _validate_short_text(template_json.get("wrongFeedback"), f"{stage.id}.templateJson.wrongFeedback", FEEDBACK_TEXT_MAX_LENGTH, issues)
-        _validate_limited_text_list(
-            template_json.get("sourceTextLines"),
-            f"{stage.id}.templateJson.sourceTextLines",
-            max_items=SOURCE_TEXT_MAX_LINES,
-            max_length=SOURCE_TEXT_LINE_MAX_LENGTH,
-            issues=issues,
-        )
-        _validate_limited_text_list(
-            template_json.get("sceneTextLines"),
-            f"{stage.id}.templateJson.sceneTextLines",
-            max_items=SOURCE_TEXT_MAX_LINES,
-            max_length=SCENE_TEXT_LINE_MAX_LENGTH,
-            issues=issues,
-        )
-        _validate_choice_like_texts(template_json.get("choices"), f"{stage.id}.templateJson.choices", issues)
-        _validate_choice_like_texts(template_json.get("leftCards"), f"{stage.id}.templateJson.leftCards", issues)
-        _validate_choice_like_texts(template_json.get("rightCards"), f"{stage.id}.templateJson.rightCards", issues)
-        _validate_choice_like_texts(template_json.get("cards"), f"{stage.id}.templateJson.cards", issues)
-        _validate_tile_texts(template_json.get("tiles"), f"{stage.id}.templateJson.tiles", issues)
-
-
-def _validate_short_text(value: Any, path: str, max_length: int, issues: list[str]) -> None:
-    if value is None:
-        return
-    if not isinstance(value, str):
-        return
-    if _compact_length(value) > max_length:
-        issues.append(f"{path}는 {max_length}자 이하로 짧게 작성해야 합니다.")
-
-
-def _validate_limited_text_list(
-    value: Any,
-    path: str,
-    *,
-    max_items: int,
-    max_length: int,
-    issues: list[str],
-) -> None:
-    if value is None:
-        return
-    if not isinstance(value, list):
-        return
-    if len(value) > max_items:
-        issues.append(f"{path}는 최대 {max_items}줄까지만 사용할 수 있습니다.")
-    for index, item in enumerate(value):
-        _validate_short_text(item, f"{path}[{index}]", max_length, issues)
-
-
-def _validate_choice_like_texts(value: Any, path: str, issues: list[str]) -> None:
-    if not isinstance(value, list):
-        return
-    for index, item in enumerate(value):
-        if isinstance(item, str):
-            _validate_short_text(item, f"{path}[{index}]", OPTION_TEXT_MAX_LENGTH, issues)
-            continue
-        if not isinstance(item, dict):
-            continue
-        for key in ("text", "label", "title", "caption"):
-            _validate_short_text(item.get(key), f"{path}[{index}].{key}", OPTION_TEXT_MAX_LENGTH, issues)
-
-
-def _validate_tile_texts(value: Any, path: str, issues: list[str]) -> None:
-    if not isinstance(value, list):
-        return
-    for index, item in enumerate(value):
-        _validate_short_text(item, f"{path}[{index}]", OPTION_TEXT_MAX_LENGTH, issues)
-
-
-def _compact_length(value: str) -> int:
-    return len(" ".join(value.strip().split()))
 
 
 def _validate_asset_package(mission: MissionContent, issues: list[str]) -> None:
@@ -637,25 +448,3 @@ def _as_value(value: Any) -> str | None:
     if hasattr(value, "value"):
         return str(value.value)
     return str(value)
-
-
-def _positive_int(value: Any) -> int | None:
-    try:
-        number = int(value)
-    except (TypeError, ValueError):
-        return None
-    return number if number > 0 else None
-
-
-def _profile_json_from_case_file(case_file: dict[str, Any] | None) -> dict[str, Any]:
-    if not isinstance(case_file, dict):
-        return {}
-    profile = case_file.get("profile")
-    if not isinstance(profile, dict):
-        return {}
-    profile_json = profile.get("profileJson")
-    return profile_json if isinstance(profile_json, dict) else {}
-
-
-def _allows_choice_first_flow(reading_load: str, choice_limit: int | None) -> bool:
-    return reading_load == "very_low" or (choice_limit is not None and choice_limit <= 2)
