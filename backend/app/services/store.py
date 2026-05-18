@@ -454,7 +454,10 @@ class DemoStore:
                 "growth": "seed 데모 기준 최근 수행 안정화",
                 "stillBlocking": memory_card.next_session_cautions if memory_card else [],
             },
-            "recentContents": [content.model_dump(by_alias=True) for content in self.db.mission_contents if content.student_id == student_id],
+            "recentContents": [
+                content.model_dump(by_alias=True)
+                for content in _recent_contents_for_student(self.db.mission_contents, student_id)
+            ],
             "plannerItems": [item.model_dump(by_alias=True) for item in self.db.planner_items if item.student_id == student_id],
             "publicContextSummary": {
                 "schoolCode": student.school_code,
@@ -2935,6 +2938,26 @@ def _mission_updated_at(content: MissionContent) -> str | None:
 
 def _mission_mapping_sort_key(content: MissionContent) -> tuple[str, str]:
     return (_mission_updated_at(content) or "", content.id)
+
+
+def _recent_contents_for_student(contents: list[MissionContent], student_id: str) -> list[MissionContent]:
+    visible: dict[str, MissionContent] = {}
+    for content in contents:
+        if content.student_id != student_id:
+            continue
+        generated_at = content.brief_json.get("generatedAt") if isinstance(content.brief_json, dict) else ""
+        key = "|".join(
+            [
+                content.case_id,
+                content.title.strip(),
+                str(content.status),
+                generated_at if isinstance(generated_at, str) else "",
+            ]
+        )
+        current = visible.get(key)
+        if current is None or _mission_mapping_sort_key(content) >= _mission_mapping_sort_key(current):
+            visible[key] = content
+    return sorted(visible.values(), key=_mission_mapping_sort_key, reverse=True)
 
 
 def _is_deployed_for_student(content: MissionContent) -> bool:

@@ -733,7 +733,10 @@ function findCompletedReviewContentForGenerationJob(job: PendingGenerationJob, c
 function isPendingGenerationContentUsable(content: MissionContent | null): content is MissionContent {
   return (
     content !== null &&
-    (content.status === "teacher_review" || content.status === "approved" || content.status === "published")
+    (content.status === "generating" ||
+      content.status === "teacher_review" ||
+      content.status === "approved" ||
+      content.status === "published")
   );
 }
 

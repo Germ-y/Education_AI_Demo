@@ -134,6 +134,7 @@ def generate_content_asset(
         _refresh_image_prompts_or_raise(content)
     _generate_asset_or_raise(content, asset, force=True)
 
+    _promote_content_to_teacher_review_if_assets_ready(content)
     demo_store.save_generated_mission_content(content)
     demo_store.record_audit(
         actor_user_id=principal.id,
@@ -161,10 +162,12 @@ def create_content_asset_generation_job(
 
     active_job = _get_active_asset_generation_job(content)
     if active_job is not None:
+        _promote_content_to_teacher_review_if_assets_ready(content)
         demo_store.save_generated_mission_content(content)
         return ok(active_job)
 
     job = _create_asset_generation_job(content, teacher_id=principal.id)
+    _promote_content_to_teacher_review_if_assets_ready(content)
     demo_store.save_generated_mission_content(content)
 
     if job["status"] == "queued":
@@ -186,6 +189,7 @@ def get_content_asset_generation_job(
     job = _get_asset_generation_job(content, job_id, refresh=True)
     if job is None:
         raise HTTPException(status_code=404, detail={"code": "ASSET_GENERATION_JOB_NOT_FOUND", "message": "asset 생성 job을 찾을 수 없습니다."})
+    _promote_content_to_teacher_review_if_assets_ready(content)
     demo_store.save_generated_mission_content(content)
     return ok(job)
 
@@ -211,6 +215,8 @@ def generate_content_asset_package(
         _validate_required_asset_package(content)
         _preflight_provider_keys(content)
         if _is_required_asset_package_ready(content):
+            _promote_content_to_teacher_review_if_assets_ready(content)
+            demo_store.save_generated_mission_content(content)
             assets = [asset.model_dump(by_alias=True) for asset in _get_package_assets(content)]
             logger.info(
                 "contents.assets.package_skipped_existing content_id=%s generated_count=0 asset_count=%s",
@@ -269,6 +275,7 @@ def _generate_content_asset_package_locked(
         generated.append(asset.model_dump(by_alias=True))
         demo_store.save_generated_mission_content(content)
 
+    _promote_content_to_teacher_review_if_assets_ready(content)
     demo_store.save_generated_mission_content(content)
     demo_store.record_audit(
         actor_user_id=principal.id,
@@ -309,6 +316,11 @@ def _is_required_asset_package_ready(content) -> bool:
     audio_roles = {asset.asset_role for asset in assets if asset.asset_type == AssetType.AUDIO and _is_asset_ready(asset)}
     required_roles = {role.value for role in AssetRole}
     return required_roles.issubset(image_roles) and required_roles.issubset(audio_roles)
+
+
+def _promote_content_to_teacher_review_if_assets_ready(content) -> None:
+    if content.status == MissionStatus.GENERATING and _is_required_asset_package_ready(content):
+        content.status = MissionStatus.TEACHER_REVIEW
 
 
 def _is_asset_ready(asset) -> bool:
@@ -363,6 +375,7 @@ def _run_asset_generation_job(content_id: str, job_id: str, teacher_id: str, dem
         target_assets = _get_job_target_assets(content, job_id)
         if not target_assets:
             _set_asset_generation_job_status(content, job_id, "succeeded", completed_at=_now_iso())
+            _promote_content_to_teacher_review_if_assets_ready(content)
             demo_store.save_generated_mission_content(content)
             return
 
@@ -384,6 +397,7 @@ def _run_asset_generation_job(content_id: str, job_id: str, teacher_id: str, dem
             _run_single_asset_generation_job(content, job_id, asset, demo_store)
 
         final_job = _finalize_asset_generation_job(content, job_id)
+        _promote_content_to_teacher_review_if_assets_ready(content)
         demo_store.save_generated_mission_content(content)
         demo_store.record_audit(
             actor_user_id=teacher_id,

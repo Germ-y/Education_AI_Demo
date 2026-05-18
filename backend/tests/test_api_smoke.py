@@ -1281,7 +1281,7 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
     reviewable = client.get(f"/api/contents/{content_id}", headers=teacher_headers)
     assert reviewable.status_code == 200
     reviewable_content = reviewable.json()["data"]
-    assert reviewable_content["status"] == "teacher_review"
+    assert reviewable_content["status"] == "generating"
     assert reviewable_content["briefJson"]["generationUnits"]["unitVersion"] == "content_generation_units_v1"
 
     student_login = client.post("/api/auth/student-access", json={"accessCode": access_code})
@@ -1303,6 +1303,7 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
     assert all(asset.get("storageUrl", "").startswith(expected_asset_prefix) for asset in asset_job_payload["assets"])
 
     content_after_assets = client.get(f"/api/contents/{content_id}", headers=teacher_headers).json()["data"]
+    assert content_after_assets["status"] == "teacher_review"
     stage4 = next(stage for stage in content_after_assets["stages"] if stage["step"] == 4)
     preview_realtime = client.post(
         f"/api/contents/{content_id}/stages/{stage4['id']}/preview-realtime-session",
@@ -1804,7 +1805,7 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
     content = content_output.get("missionContent", content_output)
     content_id = content["id"]
     assert content_id.startswith(f"content_{student_id}_")
-    assert content["status"] == "teacher_review"
+    assert content["status"] == "generating"
     assert content["totalSteps"] == 4
     assert content_generation_calls["count"] == 1
     assert [stage["step"] for stage in content["stages"]] == [1, 2, 3, 4]
@@ -1853,5 +1854,6 @@ def test_ai_generation_workflow_returns_mission_content_and_assets(monkeypatch, 
 
     reviewable = client.get(f"/api/contents/{content_id}")
     assert reviewable.status_code == 200
+    assert reviewable.json()["data"]["status"] == "teacher_review"
     assert reviewable.json()["data"]["assets"][0]["previewUrl"].startswith(expected_asset_prefix)
     assert reviewable.json()["data"]["assets"][0]["qaStatus"] == "passed"

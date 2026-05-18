@@ -14,6 +14,7 @@ from app.ai.provider_errors import AiProviderError
 from app.api.deps import get_agent_run_repository, get_store, require_teacher
 from app.api.response import ok
 from app.core.config import get_settings
+from app.domain.enums import MissionStatus
 from app.domain.schemas import ContentGenerationRequest, MissionContent, OrchestratorRunRequest
 from app.repositories.agent_run_repository import AgentRunRepository
 from app.services.content_quality import ContentQualityError, validate_mission_content_quality, validate_orchestrator_plan_quality
@@ -712,6 +713,8 @@ def _run_content_agent(
         agent_runs.mark_failed(agent_run_id, error_code="MISSION_CONTENT_SCHEMA_INVALID", error_message=str(exc), review_required=True)
         return
 
+    mission.status = MissionStatus.GENERATING
+    output_json = _replace_output_mission_content(output_json, mission)
     demo_store.save_generated_mission_content(mission)
     agent_runs.mark_succeeded(agent_run_id, output_json=output_json, token_usage=token_usage)
     logger.info(
