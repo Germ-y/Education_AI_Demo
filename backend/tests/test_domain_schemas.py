@@ -411,6 +411,35 @@ def test_mission_quality_leaves_choice_limit_nuance_to_teacher_review() -> None:
     )
 
 
+def test_mission_quality_leaves_duplicate_card_match_answer_candidates_to_prompt_review() -> None:
+    content = _generated_fraction_content()
+    content["stages"][1]["templateType"] = "card_match"
+    content["stages"][1]["templateJson"] = {
+        "imageAssetId": content["stages"][1]["templateJson"]["imageAssetId"],
+        "audioAssetId": content["stages"][1]["templateJson"]["audioAssetId"],
+        "assetBundle": content["stages"][1]["templateJson"]["assetBundle"],
+        "question": "각 일정이 가능한지 이어 보세요.",
+        "leftCards": [
+            {"id": "left_1", "text": "친구 제안"},
+            {"id": "left_2", "text": "내 일정"},
+        ],
+        "rightCards": [
+            {"id": "right_1", "text": "겹치는 시간이라 바로 만나기 힘듦"},
+            {"id": "right_2", "text": "겹치는 시간이라 바로 만나기 힘듦"},
+        ],
+        "matches": {"left_1": "right_1", "left_2": "right_2"},
+        "correctFeedback": "좋아요. 시간을 비교했어요.",
+        "wrongFeedback": "두 시간을 다시 비교해 볼까요?",
+    }
+    mission = MissionContent.model_validate(content)
+
+    validate_mission_content_quality(
+        mission,
+        case_file=_fraction_case_file(),
+        orchestrator_plan=_valid_learning_plan(),
+    )
+
+
 def test_mission_quality_reports_overlong_student_problem_text_without_blocking() -> None:
     content = _generated_fraction_content()
     content["stages"][1]["templateJson"]["question"] = (
@@ -686,7 +715,7 @@ def test_mission_quality_accepts_three_card_life_support_action_sequence() -> No
     )
 
 
-def test_mission_quality_rejects_four_card_life_support_action_sequence() -> None:
+def test_mission_quality_leaves_four_card_life_support_action_sequence_to_prompt_review() -> None:
     content = _generated_life_support_content()
     stage = content["stages"][2]
     stage["templateType"] = "sequence_ordering"
@@ -709,11 +738,10 @@ def test_mission_quality_rejects_four_card_life_support_action_sequence() -> Non
     }
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="3개"):
-        validate_mission_content_quality(
-            mission,
-            case_file=_life_support_case_file(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=_life_support_case_file(),
+    )
 
 
 def _valid_learning_plan() -> dict:
