@@ -7,6 +7,8 @@ from app.domain import db_models as rows
 from app.domain.models import DemoDatabase
 from app.domain.schemas import MissionContent
 
+UNSUPPORTED_TEMPLATE_TYPES = {"mini_simulation"}
+
 
 class DemoRepository:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
@@ -24,6 +26,7 @@ class DemoRepository:
 
     def load_database(self) -> DemoDatabase:
         with self.session_factory() as session:
+            _delete_unsupported_mission_contents(session)
             stages_by_content = _group_by_content(
                 session.scalars(select(rows.ContentStageRow).order_by(rows.ContentStageRow.sort_order)).all()
             )
@@ -97,6 +100,41 @@ class DemoRepository:
                     ],
                 }
             )
+
+
+def _delete_unsupported_mission_contents(session: Session) -> None:
+    content_ids = set(
+        session.scalars(
+            select(rows.ContentStageRow.mission_content_id).where(rows.ContentStageRow.template_type.in_(UNSUPPORTED_TEMPLATE_TYPES))
+        ).all()
+    )
+    if not content_ids:
+        return
+
+    attempt_ids = set(
+        session.scalars(select(rows.ContentAttemptRow.id).where(rows.ContentAttemptRow.mission_content_id.in_(content_ids))).all()
+    )
+    review_summary_ids = set()
+    if attempt_ids:
+        review_summary_ids = set(
+            session.scalars(select(rows.ReviewSummaryRow.id).where(rows.ReviewSummaryRow.attempt_id.in_(attempt_ids))).all()
+        )
+
+    session.execute(delete(rows.TeacherReportDraftRow).where(rows.TeacherReportDraftRow.content_id.in_(content_ids)))
+    session.execute(delete(rows.TeacherReportRow).where(rows.TeacherReportRow.content_id.in_(content_ids)))
+    if review_summary_ids:
+        session.execute(delete(rows.TeacherReportDraftRow).where(rows.TeacherReportDraftRow.review_summary_id.in_(review_summary_ids)))
+        session.execute(delete(rows.TeacherReportRow).where(rows.TeacherReportRow.review_summary_id.in_(review_summary_ids)))
+        session.execute(delete(rows.ReviewSummaryRow).where(rows.ReviewSummaryRow.id.in_(review_summary_ids)))
+    if attempt_ids:
+        session.execute(delete(rows.ActivityEventRow).where(rows.ActivityEventRow.attempt_id.in_(attempt_ids)))
+        session.execute(delete(rows.RealtimePracticeSessionRow).where(rows.RealtimePracticeSessionRow.attempt_id.in_(attempt_ids)))
+        session.execute(delete(rows.ContentAttemptRow).where(rows.ContentAttemptRow.id.in_(attempt_ids)))
+    session.execute(delete(rows.RealtimePracticeSessionRow).where(rows.RealtimePracticeSessionRow.mission_content_id.in_(content_ids)))
+    session.execute(delete(rows.ContentAssetRow).where(rows.ContentAssetRow.mission_content_id.in_(content_ids)))
+    session.execute(delete(rows.ContentStageRow).where(rows.ContentStageRow.mission_content_id.in_(content_ids)))
+    session.execute(delete(rows.MissionContentRow).where(rows.MissionContentRow.id.in_(content_ids)))
+    session.commit()
 
 
 def _delete_all(session: Session, *, preserve_agent_runs: bool = False) -> None:
