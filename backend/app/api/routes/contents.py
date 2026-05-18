@@ -1,6 +1,7 @@
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
@@ -186,11 +187,14 @@ def get_content_asset_generation_job(
     content = demo_store.get_mission_for_teacher(content_id, teacher_id=principal.id if principal.role == "teacher" else None)
     if content is None:
         raise HTTPException(status_code=404, detail={"code": "CONTENT_NOT_FOUND", "message": "콘텐츠를 찾을 수 없습니다."})
+    previous_status = content.status
+    previous_brief_json = deepcopy(content.brief_json)
     job = _get_asset_generation_job(content, job_id, refresh=True)
     if job is None:
         raise HTTPException(status_code=404, detail={"code": "ASSET_GENERATION_JOB_NOT_FOUND", "message": "asset 생성 job을 찾을 수 없습니다."})
     _promote_content_to_teacher_review_if_assets_ready(content)
-    demo_store.save_generated_mission_content(content)
+    if content.status != previous_status or content.brief_json != previous_brief_json:
+        demo_store.save_generated_mission_content(content)
     return ok(job)
 
 
@@ -1111,7 +1115,8 @@ def _build_image_brief_for_asset(content, asset, stages: list, stage_visual_spec
         ]
     )
     prompt_parts.append(
-        "Keep the scene natural and do not add readable labels, tables, worksheets, notebook writing, document pages, posters, notices, speech bubbles, captions, badges, "
+        "Keep the scene natural and do not add readable labels, tables, worksheets, notebook writing, "
+        "document pages, posters, notices, speech bubbles, captions, badges, "
         "arrows, check marks, X marks, answer cues, copied lesson sentences, or invented numbers."
     )
     prompt_parts.append(

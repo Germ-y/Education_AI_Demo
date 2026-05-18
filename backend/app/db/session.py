@@ -2,7 +2,7 @@ from collections.abc import Iterator
 from functools import lru_cache
 from pathlib import Path
 
-from sqlalchemy import Engine, create_engine, inspect, text
+from sqlalchemy import Engine, create_engine, event, inspect, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -28,11 +28,24 @@ def create_database_engine(database_url: str) -> Engine:
     database_url = normalize_database_url(database_url)
     connect_args = {}
     engine_kwargs = {}
-    if database_url.startswith("sqlite"):
+    is_sqlite = database_url.startswith("sqlite")
+    if is_sqlite:
         connect_args["check_same_thread"] = False
+        connect_args["timeout"] = 30
         if database_url.endswith(":memory:"):
             engine_kwargs["poolclass"] = StaticPool
-    return create_engine(database_url, connect_args=connect_args, future=True, **engine_kwargs)
+    engine = create_engine(database_url, connect_args=connect_args, future=True, **engine_kwargs)
+    if is_sqlite and not database_url.endswith(":memory:"):
+        event.listen(engine, "connect", _configure_sqlite_connection)
+    return engine
+
+
+def _configure_sqlite_connection(dbapi_connection, connection_record) -> None:
+    del connection_record
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA busy_timeout=30000")
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.close()
 
 
 @lru_cache
