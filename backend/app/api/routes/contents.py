@@ -1104,21 +1104,21 @@ def _build_image_brief_for_asset(content, asset, stages: list, stage_visual_spec
         [
             f"Composition: {composition}",
             f"Camera: {camera}; subject priority is context_first; human presence: {human_presence}.",
-            "Show the situation, manipulatives, materials, and activity mood that support the lesson. "
+            "Show the situation, manipulatives, objects, and activity mood that support the lesson. "
             "The image is not the problem, worksheet, answer key, or UI screen. "
             "All exact lesson data, equations, questions, choices, answers, and feedback are rendered by the app UI outside the image. "
             "People, if present, stay secondary unless the stage is a life-support role practice.",
         ]
     )
     prompt_parts.append(
-        "Keep the scene natural and do not add readable labels, tables, worksheets, speech bubbles, captions, badges, "
+        "Keep the scene natural and do not add readable labels, tables, worksheets, notebook writing, document pages, posters, notices, speech bubbles, captions, badges, "
         "arrows, check marks, X marks, answer cues, copied lesson sentences, or invented numbers."
     )
     prompt_parts.append(
         "Avoid app UI, worksheet layout, answer panels, scoring marks, feedback bubbles, "
         "watermarks, logos, decorative generic scenes, split-screen comparison diagrams, "
-        "and any visual overlay that tells the answer. The image must look like a natural scene or classroom material setup, "
-        "not an instructional diagram or source document."
+        "and any visual overlay that tells the answer. The image must look like a natural scene or hands-on object setup, "
+        "not an instructional diagram, notebook page, poster, notice, or source document."
     )
 
     return {
@@ -1184,19 +1184,19 @@ def _generic_learning_scene_object(content, asset, stage) -> str:
     title = content.title
     template_type = _as_asset_role_value(stage.template_type) if stage else ""
     if any(word in title for word in ("텃밭", "식물", "나무", "키 변화")):
-        return "학교 텃밭의 식물, 자, 관찰 공책"
+        return "학교 텃밭의 식물과 측정 도구"
     if any(word in title for word in ("날씨", "온도")):
-        return "날씨 관찰 도구와 기록 공책"
+        return "날씨 관찰 도구와 창밖 풍경"
     if any(word in title for word in ("간식", "나누기", "묶음")):
         return "간식을 나누어 놓은 책상 장면"
     if any(word in title for word in ("안내", "표지", "장소")):
-        return "학교 공간과 안내판이 보이는 장면"
+        return "학교 공간과 이동 상황"
     if template_type == "card_match":
         return "책상 위 학습 카드와 조작물"
     if template_type == "sequence_ordering":
         return "순서를 떠올릴 수 있는 활동 준비 장면"
     if template_type == "blank_fill":
-        return "빈칸 문제를 풀기 전 사용할 조작물과 공책"
+        return "빈칸 문제를 풀기 전 사용할 조작물"
     return "학생이 문제를 풀기 전 살펴보는 학습 조작물과 교실 장면"
 
 

@@ -39,8 +39,8 @@
 - 이미지 안에 문제 문장, 선택지, 정답, 피드백, 풀이 힌트, 채점 표시를 넣지 않습니다.
 - 학습지원형에서 수학식이나 문장제가 필요하면 `question`, `sentence`, `choices`, `cards`, `leftCards`, `rightCards` 같은 UI 필드에 넣습니다.
 - 일상생활 지원형에서 상황 이해가 필요하면 이미지는 장소, 사람, 물체, 행동 흐름을 보여주고, 선택해야 할 행동이나 말은 `templateJson`에 넣습니다.
-- `sourceTextLines`는 schema 호환 필드입니다. 선생님 요청에 그대로 사용할 원문이 없으면 빈 배열 `[]`로 둡니다.
-- 새 원문이나 별도 자료를 임의로 만들어 `sourceTextLines`에 넣지 않습니다.
+- `sourceTextLines`는 학생 화면의 자료 영역에만 보이는 짧은 조건입니다. 긴 글 독해 자료를 만들지 않습니다.
+- 긴 글을 `question`에 붙이지 않습니다. `question`은 “무엇을 고를지”만 묻는 짧은 지시문입니다.
 - `sceneTextLines`는 이미지 안에 들어갈 글자가 아닙니다. 장면 배경 설명입니다. 필요 없으면 빈 배열을 넣습니다.
 - `sceneTextLines`에 정답 단서, 선택지 문구, 핵심 숫자, 문제 문장을 넣지 않습니다.
 - 모든 문제 텍스트, 선택지, 정답, 피드백은 `templateJson`에만 넣습니다.
@@ -92,12 +92,28 @@
 - 오답은 터무니없는 보기가 아니라 실제 학생이 헷갈릴 만한 보기여야 합니다.
 - 피드백은 “맞아요”에서 끝나지 않고 왜 그런지 한 문장으로 설명합니다.
 
+## 학생 화면 문장 길이 계약
+
+학생 화면은 태블릿 프레임 안에서 바로 읽혀야 합니다. 긴 문단을 한 필드에 몰아넣으면 실패입니다.
+
+- `studentInstruction`: 45자 이하.
+- `storyText`: 90자 이하. 필요한 경우 두 문장까지만 씁니다.
+- `missionText`: 60자 이하.
+- `question`: 80자 이하. 문제 지시만 씁니다.
+- `sourceTextLines`: 최대 2줄, 각 줄 45자 이하. 긴 글은 만들지 말고 핵심 조건만 둡니다.
+- `choices[].text`, `leftCards[].text`, `rightCards[].text`, `cards[].text`, `tiles[]`: 26자 이하.
+- `sentence`, `wrongLine`, `fixedLine`: 80자 이하.
+- `correctFeedback`, `wrongFeedback`: 70자 이하.
+- 보기에는 한 번에 읽을 수 있는 말만 씁니다. 예: `자전거를 타면 배기가스를 줄일 수 있음`처럼 짧게 압축합니다.
+- 본문 전체를 따옴표로 감싸 `question`에 넣지 않습니다.
+- 긴 글 독해가 필요한 문제는 만들지 않습니다. 같은 목표는 짧은 조건, 카드, 식, 빈칸, 보기 비교 문제로 바꿉니다.
+
 ## 템플릿 작성 규칙
 
 공통:
 
 - 모든 `templateJson`에는 `imageAssetId`, `audioAssetId`, `assetBundle`, `sourceTextLines`, `sceneTextLines`를 넣습니다.
-- `sourceTextLines`: schema 호환 필드입니다. 선생님 요청에 그대로 사용할 원문이 없으면 `[]`입니다.
+- `sourceTextLines`: 학생 화면 자료 영역의 짧은 조건입니다. 긴 글 원문을 넣지 말고, 필요 없으면 `[]`입니다.
 - `sceneTextLines`: 이미지 제작자가 이해할 장면 메모입니다. 없으면 `[]`입니다.
 - 선택지는 학생이 실제로 헷갈릴 만해야 합니다.
 - 피드백은 정답 여부만 말하지 말고, 왜 그런지 한 문장으로 설명합니다.

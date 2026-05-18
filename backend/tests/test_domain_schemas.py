@@ -77,8 +77,8 @@ def test_image_brief_keeps_image_prompt_situational_and_filters_ui_question() ->
     assert "체육 행사 안내" not in prompt
     assert "장소: 운동장" not in prompt
     assert "worksheet" in prompt
-    assert "natural scene or classroom material setup" in prompt
-    assert "not an instructional diagram or source document" in prompt
+    assert "natural scene or hands-on object setup" in prompt
+    assert "not an instructional diagram, notebook page, poster, notice, or source document" in prompt
     assert "sceneTextLines" not in output["imageBriefs"][0]
     assert "learningEvidence" not in output["imageBriefs"][0]
     assert "visualContext" in output["imageBriefs"][0]
@@ -404,6 +404,50 @@ def test_mission_quality_leaves_choice_limit_nuance_to_teacher_review() -> None:
         case_file=case_file,
         orchestrator_plan=_valid_learning_plan(),
     )
+
+
+def test_mission_quality_rejects_overlong_student_problem_text() -> None:
+    content = _generated_fraction_content()
+    content["stages"][1]["templateJson"]["question"] = (
+        "첫 번째 문단 사람들이 가까운 거리를 이동할 때도 자동차를 많이 이용하면서 공기가 점점 더 더러워지고 있습니다. "
+        "윗글을 읽고 빈칸에 들어갈 알맞은 근거 문장을 고르세요."
+    )
+    mission = MissionContent.model_validate(content)
+
+    with pytest.raises(ContentQualityError, match="question"):
+        validate_mission_content_quality(
+            mission,
+            case_file=_fraction_case_file(),
+            orchestrator_plan=_valid_learning_plan(),
+        )
+
+
+def test_mission_quality_rejects_overlong_choice_text() -> None:
+    content = _generated_fraction_content()
+    content["stages"][1]["templateJson"]["choices"][0]["text"] = "자동차 대신 걸어 다니거나 자전거를 타면 공기를 더럽히는 배기가스를 줄일 수 있습니다."
+    mission = MissionContent.model_validate(content)
+
+    with pytest.raises(ContentQualityError, match="choices"):
+        validate_mission_content_quality(
+            mission,
+            case_file=_fraction_case_file(),
+            orchestrator_plan=_valid_learning_plan(),
+        )
+
+
+def test_mission_quality_rejects_overlong_source_text_lines() -> None:
+    content = _generated_fraction_content()
+    content["stages"][1]["templateJson"]["sourceTextLines"] = [
+        "사람들이 가까운 거리를 이동할 때 자동차를 많이 이용하면서 공기가 점점 더 더러워지고 있습니다.",
+    ]
+    mission = MissionContent.model_validate(content)
+
+    with pytest.raises(ContentQualityError, match="sourceTextLines"):
+        validate_mission_content_quality(
+            mission,
+            case_file=_fraction_case_file(),
+            orchestrator_plan=_valid_learning_plan(),
+        )
 
 
 def test_mission_quality_allows_three_sequence_cards_with_two_choice_limit() -> None:
