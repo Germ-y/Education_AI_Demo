@@ -7,7 +7,12 @@ from app.api.routes.contents import (
 )
 from app.data.demo_data import create_demo_database
 from app.domain.schemas import ContentAsset, ContentStage, MissionContent
-from app.services.content_quality import ContentQualityError, validate_mission_content_quality, validate_orchestrator_plan_quality
+from app.services.content_quality import (
+    ContentQualityError,
+    collect_mission_template_text_quality_issues,
+    validate_mission_content_quality,
+    validate_orchestrator_plan_quality,
+)
 
 
 def test_accepts_demo_4_stage_missions() -> None:
@@ -406,7 +411,7 @@ def test_mission_quality_leaves_choice_limit_nuance_to_teacher_review() -> None:
     )
 
 
-def test_mission_quality_rejects_overlong_student_problem_text() -> None:
+def test_mission_quality_reports_overlong_student_problem_text_without_blocking() -> None:
     content = _generated_fraction_content()
     content["stages"][1]["templateJson"]["question"] = (
         "첫 번째 문단 사람들이 가까운 거리를 이동할 때도 자동차를 많이 이용하면서 공기가 점점 더 더러워지고 있습니다. "
@@ -414,40 +419,40 @@ def test_mission_quality_rejects_overlong_student_problem_text() -> None:
     )
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="question"):
-        validate_mission_content_quality(
-            mission,
-            case_file=_fraction_case_file(),
-            orchestrator_plan=_valid_learning_plan(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=_fraction_case_file(),
+        orchestrator_plan=_valid_learning_plan(),
+    )
+    assert any("question" in issue for issue in collect_mission_template_text_quality_issues(mission))
 
 
-def test_mission_quality_rejects_overlong_choice_text() -> None:
+def test_mission_quality_reports_overlong_choice_text_without_blocking() -> None:
     content = _generated_fraction_content()
     content["stages"][1]["templateJson"]["choices"][0]["text"] = "자동차 대신 걸어 다니거나 자전거를 타면 공기를 더럽히는 배기가스를 줄일 수 있습니다."
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="choices"):
-        validate_mission_content_quality(
-            mission,
-            case_file=_fraction_case_file(),
-            orchestrator_plan=_valid_learning_plan(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=_fraction_case_file(),
+        orchestrator_plan=_valid_learning_plan(),
+    )
+    assert any("choices" in issue for issue in collect_mission_template_text_quality_issues(mission))
 
 
-def test_mission_quality_rejects_overlong_source_text_lines() -> None:
+def test_mission_quality_reports_overlong_source_text_lines_without_blocking() -> None:
     content = _generated_fraction_content()
     content["stages"][1]["templateJson"]["sourceTextLines"] = [
         "사람들이 가까운 거리를 이동할 때 자동차를 많이 이용하면서 공기가 점점 더 더러워지고 있습니다.",
     ]
     mission = MissionContent.model_validate(content)
 
-    with pytest.raises(ContentQualityError, match="sourceTextLines"):
-        validate_mission_content_quality(
-            mission,
-            case_file=_fraction_case_file(),
-            orchestrator_plan=_valid_learning_plan(),
-        )
+    validate_mission_content_quality(
+        mission,
+        case_file=_fraction_case_file(),
+        orchestrator_plan=_valid_learning_plan(),
+    )
+    assert any("sourceTextLines" in issue for issue in collect_mission_template_text_quality_issues(mission))
 
 
 def test_mission_quality_allows_three_sequence_cards_with_two_choice_limit() -> None:

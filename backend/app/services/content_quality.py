@@ -181,7 +181,6 @@ def validate_mission_content_quality(
     _validate_mission_stage_flow(mission, expected_content_type, issues)
     _validate_mission_template_variety(mission, issues, reading_load=reading_load, choice_limit=choice_limit)
     _validate_mission_template_interactions(mission, expected_content_type, issues)
-    _validate_mission_template_text_lengths(mission, issues)
     _validate_asset_package(mission, issues)
     _validate_stage_asset_links(mission, issues)
     # 생성 실패를 막는 품질검수는 렌더링/저장 계약 위주로 제한한다.
@@ -191,6 +190,12 @@ def validate_mission_content_quality(
 
     if issues:
         raise ContentQualityError(issues)
+
+
+def collect_mission_template_text_quality_issues(mission: MissionContent) -> list[str]:
+    issues: list[str] = []
+    _validate_mission_template_text_lengths(mission, issues)
+    return issues
 
 
 def _validate_stage_plan(stage_plan: Any, content_type: str, issues: list[str]) -> None:

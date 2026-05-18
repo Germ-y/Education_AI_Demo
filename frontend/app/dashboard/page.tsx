@@ -830,6 +830,16 @@ function mapContentToReviewItem(content: MissionContent): MaterialReviewItem {
   };
 }
 
+function getContentQualityWarnings(content: MissionContent) {
+  const warnings = content.briefJson.qualityWarnings;
+  if (!Array.isArray(warnings)) return [];
+  return warnings.filter((warning): warning is string => typeof warning === "string" && warning.trim().length > 0);
+}
+
+function hasContentQualityWarnings(content: MissionContent) {
+  return getContentQualityWarnings(content).length > 0 || content.briefJson.requiresTeacherAttention === true;
+}
+
 function getContentActivityTime(content: MissionContent) {
   const generatedAt = content.briefJson.generatedAt;
   const timestamp = content.publishedAt ?? content.approvedAt ?? (typeof generatedAt === "string" ? generatedAt : "");
@@ -1794,6 +1804,8 @@ export default function DashboardPage() {
   const isOpenReportReusing = openReport ? reviewActionId === openReport.contentId : false;
   const isOpenReportReused = openReport ? reusedReportContentIds.includes(openReport.contentId) : false;
   const openReview = selectedReviewItems.find((item) => item.id === openReviewId);
+  const openReviewQualityWarnings = openReview ? getContentQualityWarnings(openReview.content) : [];
+  const openReviewHasQualityWarnings = openReview ? hasContentQualityWarnings(openReview.content) : false;
   const openReviewStages = openReview ? (reviewStageDrafts[openReview.id] ?? mapContentToReviewStages(openReview.content)) : reviewStagePreviews;
   const openReviewSelectedStages = openReviewStages.filter((stage) => stage.step === reviewPreviewStep);
   const openReviewNeedsMediaGeneration = openReview ? hasMissingGeneratedMedia(openReview.content) : false;
@@ -3436,6 +3448,8 @@ export default function DashboardPage() {
                       const materialRejected = isMaterialRejected(item);
                       const isActionRunning = reviewActionId === item.id;
                       const needsMediaGeneration = hasMissingGeneratedMedia(item.content);
+                      const hasQualityWarnings = hasContentQualityWarnings(item.content);
+                      const qualityWarnings = getContentQualityWarnings(item.content);
 
                       return (
                         <div key={item.id} className="rounded-md border border-[#e5e9f0] bg-white p-4">
@@ -3471,6 +3485,12 @@ export default function DashboardPage() {
                                       : item.state}
                             </span>
                           </div>
+                          {hasQualityWarnings && (
+                            <div className="mt-3 rounded-md border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm font-bold leading-6 text-[#9a3412]">
+                              <p>품질 확인 필요: 저장은 되었지만 문구 길이 등 검토가 필요합니다.</p>
+                              {qualityWarnings[0] && <p className="mt-1 text-xs font-semibold text-[#b45309]">{qualityWarnings[0]}</p>}
+                            </div>
+                          )}
                           <div className="mt-3 flex flex-wrap items-center gap-2">
                             <button
                               onClick={() => {
@@ -3963,6 +3983,16 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm font-bold text-[#64748b]">자료 제안 검토</p>
                 <h3 className="mt-1 text-2xl font-black">{openReview.title}</h3>
+                {openReviewHasQualityWarnings && (
+                  <div className="mt-3 max-w-3xl rounded-md border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm font-bold leading-6 text-[#9a3412]">
+                    <p>품질 확인 필요: 저장은 되었지만 문구 길이 등 검토가 필요합니다.</p>
+                    {openReviewQualityWarnings.slice(0, 3).map((warning) => (
+                      <p key={warning} className="mt-1 text-xs font-semibold text-[#b45309]">
+                        {warning}
+                      </p>
+                    ))}
+                  </div>
+                )}
                 {openReview.generatedAtLabel && (
                   <p className="mt-1 text-xs font-black text-[#94a3b8]">생성 {openReview.generatedAtLabel}</p>
                 )}

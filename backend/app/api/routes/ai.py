@@ -17,7 +17,12 @@ from app.core.config import get_settings
 from app.domain.enums import MissionStatus
 from app.domain.schemas import ContentGenerationRequest, MissionContent, OrchestratorRunRequest
 from app.repositories.agent_run_repository import AgentRunRepository
-from app.services.content_quality import ContentQualityError, validate_mission_content_quality, validate_orchestrator_plan_quality
+from app.services.content_quality import (
+    ContentQualityError,
+    collect_mission_template_text_quality_issues,
+    validate_mission_content_quality,
+    validate_orchestrator_plan_quality,
+)
 from app.services.store import DemoStore, SessionPrincipal
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -996,6 +1001,7 @@ def _generate_valid_mission_content(
         mission = _mission_from_generation(output_json, student_id=student_id, case_id=case_id)
         mission = _attach_generation_units(mission, orchestrator_plan=orchestrator_plan)
         validate_mission_content_quality(mission, case_file=case_file, orchestrator_plan=orchestrator_plan)
+        mission = _attach_nonblocking_quality_warnings(mission)
     except ContentQualityError as exc:
         logger.warning(
             "ai.content.quality_invalid student_id=%s case_id=%s issues=%s",
@@ -1021,6 +1027,23 @@ def _generate_valid_mission_content(
         mission.id,
     )
     return mission, output_json, token_usage
+
+
+def _attach_nonblocking_quality_warnings(mission: MissionContent) -> MissionContent:
+    issues = collect_mission_template_text_quality_issues(mission)
+    if not issues:
+        return mission
+    brief_json = mission.brief_json if isinstance(mission.brief_json, dict) else {}
+    return mission.model_copy(
+        update={
+            "brief_json": {
+                **brief_json,
+                "qualityWarnings": issues,
+                "qualityWarningType": "template_text_length",
+                "requiresTeacherAttention": True,
+            }
+        }
+    )
 
 
 def _critique_mission_content_quality(
