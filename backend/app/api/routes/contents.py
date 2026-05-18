@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 IMAGE_PACKAGE_PARALLELISM = 5
 ASSET_GENERATION_JOBS_KEY = "assetGenerationJobs"
 ASSET_GENERATION_JOB_HISTORY_LIMIT = 8
+ASSET_GENERATION_JOB_STALE_SECONDS = 15 * 60
 IMAGE_BRIEF_PROMPT_VERSION = "image_brief_v2"
 _asset_package_locks: dict[str, Lock] = {}
 _asset_package_locks_guard = Lock()
@@ -38,6 +39,11 @@ def get_content(
     content = demo_store.get_mission_for_teacher(content_id, teacher_id=principal.id if principal.role == "teacher" else None)
     if content is None:
         raise HTTPException(status_code=404, detail={"code": "CONTENT_NOT_FOUND", "message": "콘텐츠를 찾을 수 없습니다."})
+    previous_status = content.status
+    previous_brief_json = deepcopy(content.brief_json)
+    _promote_content_to_teacher_review_if_assets_ready(content)
+    if content.status != previous_status or content.brief_json != previous_brief_json:
+        demo_store.save_generated_mission_content(content)
     return ok(content.model_dump(by_alias=True))
 
 
@@ -323,7 +329,13 @@ def _is_required_asset_package_ready(content) -> bool:
 
 
 def _promote_content_to_teacher_review_if_assets_ready(content) -> None:
-    if content.status == MissionStatus.GENERATING and _is_required_asset_package_ready(content):
+    if content.status != MissionStatus.GENERATING:
+        return
+    if (
+        _is_required_asset_package_ready(content)
+        or _has_settled_asset_generation_attempt(content)
+        or _has_stale_untracked_asset_generation(content)
+    ):
         content.status = MissionStatus.TEACHER_REVIEW
 
 
@@ -506,12 +518,14 @@ def _get_asset_generation_job(content, job_id: str, *, refresh: bool = False) ->
     job = next((job for job in _asset_generation_jobs(content) if job.get("jobId") == job_id), None)
     if job is None:
         return None
-    return _sync_asset_generation_job_with_content(content, job) if refresh else job
+    if not refresh:
+        return job
+    return _expire_stale_asset_generation_job(content, _sync_asset_generation_job_with_content(content, job))
 
 
 def _get_active_asset_generation_job(content) -> dict[str, Any] | None:
     for job in reversed(_asset_generation_jobs(content)):
-        refreshed_job = _sync_asset_generation_job_with_content(content, job)
+        refreshed_job = _expire_stale_asset_generation_job(content, _sync_asset_generation_job_with_content(content, job))
         if refreshed_job.get("status") in {"queued", "running"}:
             return refreshed_job
     return None
@@ -558,6 +572,64 @@ def _sync_asset_generation_job_with_content(content, job: dict[str, Any]) -> dic
     if updated != job:
         return _replace_asset_generation_job(content, updated)
     return updated
+
+
+def _has_settled_asset_generation_attempt(content) -> bool:
+    latest_job = _latest_asset_generation_job(content)
+    return latest_job is not None and latest_job.get("status") in {"succeeded", "partial_failed", "failed"}
+
+
+def _has_stale_untracked_asset_generation(content) -> bool:
+    if _latest_asset_generation_job(content) is not None:
+        return False
+    generated_at = _parse_datetime(content.brief_json.get("generatedAt"))
+    if generated_at is None:
+        return False
+    return (datetime.now(UTC) - generated_at).total_seconds() >= ASSET_GENERATION_JOB_STALE_SECONDS
+
+
+def _latest_asset_generation_job(content) -> dict[str, Any] | None:
+    jobs = _asset_generation_jobs(content)
+    if not jobs:
+        return None
+    return _expire_stale_asset_generation_job(content, _sync_asset_generation_job_with_content(content, jobs[-1]))
+
+
+def _expire_stale_asset_generation_job(content, job: dict[str, Any]) -> dict[str, Any]:
+    if job.get("status") not in {"queued", "running"}:
+        return job
+    started_at = _parse_datetime(job.get("startedAt")) or _parse_datetime(job.get("queuedAt"))
+    if started_at is None:
+        return job
+    now = datetime.now(UTC)
+    if (now - started_at).total_seconds() < ASSET_GENERATION_JOB_STALE_SECONDS:
+        return job
+
+    error_code = "ASSET_GENERATION_INTERRUPTED"
+    error_message = "asset 생성 작업이 중단되었습니다. 성공한 asset은 유지했고 실패한 asset만 다시 생성할 수 있습니다."
+    assets = []
+    for item in job.get("assets", []):
+        if isinstance(item, dict) and item.get("status") in {"queued", "running"}:
+            assets.append({**item, "status": "failed", "errorCode": error_code, "errorMessage": error_message, "updatedAt": now.isoformat()})
+        else:
+            assets.append(item)
+
+    return _replace_asset_generation_job(
+        content,
+        _complete_asset_generation_job_from_counts(_refresh_asset_generation_job_counts({**job, "assets": assets})),
+    )
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _is_asset_generation_job_terminal(job: dict[str, Any]) -> bool:

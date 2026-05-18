@@ -741,7 +741,7 @@ function isPendingGenerationContentUsable(content: MissionContent | null): conte
 }
 
 function isPendingGenerationContentComplete(content: MissionContent | null): content is MissionContent {
-  return isPendingGenerationContentUsable(content) && !hasMissingGeneratedMedia(content);
+  return isPendingGenerationContentUsable(content) && content.status !== "generating";
 }
 
 function wait(ms: number) {
@@ -856,7 +856,7 @@ function isReviewQueueContent(content: MissionContent) {
 }
 
 function isReviewCardReadyContent(content: MissionContent) {
-  return isReviewQueueContent(content) && !hasMissingGeneratedMedia(content);
+  return isReviewQueueContent(content);
 }
 
 function formatContentGeneratedAt(content: MissionContent) {
@@ -1734,7 +1734,7 @@ export default function DashboardPage() {
   const completedContentIds = new Set((activeReport?.reports ?? []).map((record) => record.contentId));
   const selectedPreparingContents = (activeCaseFile?.recentContents ?? [])
     .filter((content) => !completedContentIds.has(content.id))
-    .filter(isReviewQueueContent)
+    .filter((content) => hasGeneratedAt(content) && content.status === "generating")
     .filter(hasMissingGeneratedMedia)
     .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left));
   const selectedReviewItems = (activeCaseFile?.recentContents ?? [])

@@ -15,6 +15,7 @@ from app.core.config import get_settings
 from app.data.demo_data import create_demo_database
 from app.data.neis_client import NeisClient
 from app.db.session import get_engine, get_session_maker
+from app.domain.enums import MissionStatus
 from app.main import create_app
 
 
@@ -757,6 +758,7 @@ def test_asset_generation_job_persists_partial_failure_and_retries(monkeypatch, 
     store = get_store_instance()
     mission = store.get_mission_for_teacher(content_id)
     assert mission is not None
+    mission.status = MissionStatus.GENERATING
     mission.brief_json = {**mission.brief_json, "stageVisualSpecs": _pizza_stage_visual_specs()}
     for asset in mission.assets:
         asset.storage_url = ""
@@ -802,6 +804,7 @@ def test_asset_generation_job_persists_partial_failure_and_retries(monkeypatch, 
     assert partial_job["generatedCount"] == 9
 
     reviewable_after_partial = client.get(f"/api/contents/{content_id}")
+    assert reviewable_after_partial.json()["data"]["status"] == "teacher_review"
     assets_after_partial = reviewable_after_partial.json()["data"]["assets"]
     assert next(asset for asset in assets_after_partial if asset["id"] == failing_asset_id)["qaStatus"] == "failed"
     assert sum(1 for asset in assets_after_partial if asset["qaStatus"] == "passed") == 9
@@ -889,6 +892,94 @@ def test_asset_generation_job_refreshes_stale_running_job_from_ready_assets() ->
     next_job = client.post(f"/api/contents/{content_id}/assets/generation-jobs")
     assert next_job.status_code == 200, next_job.json()
     assert next_job.json()["data"]["status"] == "succeeded"
+
+
+def test_asset_generation_job_expires_interrupted_running_job_and_promotes_review() -> None:
+    client = TestClient(create_app())
+    content_id = "content_fraction_001"
+    store = get_store_instance()
+    mission = store.get_mission_for_teacher(content_id)
+    assert mission is not None
+
+    stale_time = "2026-05-17T00:00:00+00:00"
+    job_assets = []
+    for asset in mission.assets:
+        asset.storage_url = ""
+        asset.preview_url = None
+        asset.qa_status = "pending"
+        asset.approval_status = "pending"
+        job_assets.append(
+            {
+                "assetId": asset.id,
+                "assetRole": asset.asset_role.value,
+                "assetType": asset.asset_type.value,
+                "stageId": asset.stage_id,
+                "status": "running",
+                "errorCode": None,
+                "errorMessage": None,
+                "updatedAt": stale_time,
+                "storageUrl": None,
+                "previewUrl": None,
+                "qaStatus": "pending",
+                "approvalStatus": "pending",
+            }
+        )
+
+    job_id = "asset_job_interrupted"
+    mission.status = MissionStatus.GENERATING
+    mission.brief_json = {
+        **mission.brief_json,
+        "assetGenerationJobs": [
+            {
+                "jobId": job_id,
+                "contentId": mission.id,
+                "teacherId": "user_teacher_demo",
+                "status": "running",
+                "queuedAt": stale_time,
+                "startedAt": stale_time,
+                "completedAt": None,
+                "totalCount": len(job_assets),
+                "completedCount": 0,
+                "failedCount": 0,
+                "generatedCount": 0,
+                "assets": job_assets,
+                "errorCode": None,
+                "errorMessage": None,
+            }
+        ],
+    }
+    store.save_generated_mission_content(mission)
+
+    expired = client.get(f"/api/contents/{content_id}/assets/generation-jobs/{job_id}")
+    assert expired.status_code == 200, expired.json()
+    expired_job = expired.json()["data"]
+    assert expired_job["status"] == "failed"
+    assert expired_job["failedCount"] == len(job_assets)
+    assert all(asset["status"] == "failed" for asset in expired_job["assets"])
+
+    reviewable = client.get(f"/api/contents/{content_id}")
+    assert reviewable.status_code == 200
+    assert reviewable.json()["data"]["status"] == "teacher_review"
+
+
+def test_stale_generating_content_without_asset_job_promotes_to_review() -> None:
+    client = TestClient(create_app())
+    content_id = "content_fraction_001"
+    store = get_store_instance()
+    mission = store.get_mission_for_teacher(content_id)
+    assert mission is not None
+
+    mission.status = MissionStatus.GENERATING
+    mission.brief_json = {
+        **mission.brief_json,
+        "generatedAt": "2026-05-17T00:00:00+00:00",
+        "assetGenerationJobs": [],
+    }
+    store.save_generated_mission_content(mission)
+
+    reviewable = client.get(f"/api/contents/{content_id}")
+    assert reviewable.status_code == 200
+    assert reviewable.json()["data"]["status"] == "teacher_review"
 
 
 def test_registered_student_generation_review_student_completion_e2e(monkeypatch, tmp_path) -> None:
