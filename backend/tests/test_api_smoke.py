@@ -1278,6 +1278,28 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
     content_id = content_payload["id"]
     assert content_id.startswith(f"content_{student_id}_")
 
+    duplicate_content_generation = client.post(
+        "/api/ai/content-generations",
+        headers=teacher_headers,
+        json={"orchestratorRunId": orchestrator_run["id"], "studentId": student_id, "caseId": case_id},
+    )
+    assert duplicate_content_generation.status_code == 200, duplicate_content_generation.json()
+    assert duplicate_content_generation.json()["data"]["agentRun"]["id"] == content_run["id"]
+    assert content_generation_calls["count"] == 1
+
+    blocked_orchestrator = client.post(
+        "/api/ai/orchestrator-runs",
+        headers=teacher_headers,
+        json={
+            "studentId": student_id,
+            "caseId": case_id,
+            "requestedGoal": "같은 학생에게 동시에 새 자료를 만들지 않는다.",
+            "contentType": "learning_focus",
+        },
+    )
+    assert blocked_orchestrator.status_code == 409
+    assert blocked_orchestrator.json()["error"]["code"] == "CONTENT_GENERATION_ALREADY_ACTIVE"
+
     reviewable = client.get(f"/api/contents/{content_id}", headers=teacher_headers)
     assert reviewable.status_code == 200
     reviewable_content = reviewable.json()["data"]

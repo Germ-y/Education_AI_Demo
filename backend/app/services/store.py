@@ -1429,6 +1429,16 @@ class DemoStore:
         self.persist()
         return mission
 
+    def get_active_material_for_case(self, student_id: str, case_id: str) -> MissionContent | None:
+        self.refresh()
+        active_statuses = {MissionStatus.GENERATING, MissionStatus.TEACHER_REVIEW, MissionStatus.APPROVED}
+        candidates = [
+            content
+            for content in self.db.mission_contents
+            if content.student_id == student_id and content.case_id == case_id and content.status in active_statuses
+        ]
+        return max(candidates, key=_mission_mapping_sort_key, default=None)
+
     def get_published_mission_for_student(self, student_id: str, content_id: str) -> MissionContent | None:
         self.refresh()
         return next(

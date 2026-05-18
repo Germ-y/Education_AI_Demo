@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -43,6 +43,46 @@ class AgentRunRepository:
             session.commit()
             session.refresh(row)
             return _agent_run(row)
+
+    def find_running_generation_for_case(
+        self,
+        *,
+        student_id: str,
+        case_id: str,
+        agent_type: str,
+        max_age_seconds: int = 60 * 60,
+    ) -> AgentRun | None:
+        cutoff = datetime.now(UTC) - timedelta(seconds=max_age_seconds)
+        with self.session_factory() as session:
+            result = session.scalars(
+                select(rows.AgentRunRow)
+                .where(rows.AgentRunRow.agent_type == agent_type, rows.AgentRunRow.status == "running")
+                .order_by(rows.AgentRunRow.created_at.desc())
+                .limit(100)
+            )
+            for row in result:
+                snapshot = row.input_snapshot_json or {}
+                if snapshot.get("studentId") != student_id or snapshot.get("caseId") != case_id:
+                    continue
+                created_at = _parse_timestamp(row.created_at)
+                if created_at is not None and created_at < cutoff:
+                    continue
+                return _agent_run(row)
+        return None
+
+    def find_content_generation_for_orchestrator(self, orchestrator_run_id: str) -> AgentRun | None:
+        with self.session_factory() as session:
+            result = session.scalars(
+                select(rows.AgentRunRow)
+                .where(rows.AgentRunRow.agent_type == "content", rows.AgentRunRow.status.in_(["running", "succeeded"]))
+                .order_by(rows.AgentRunRow.created_at.desc())
+                .limit(100)
+            )
+            for row in result:
+                snapshot = row.input_snapshot_json or {}
+                if snapshot.get("orchestratorRunId") == orchestrator_run_id:
+                    return _agent_run(row)
+        return None
 
     def mark_succeeded(self, agent_run_id: str, *, output_json: dict[str, Any], token_usage: dict[str, Any] | None) -> AgentRun | None:
         with self.session_factory() as session:
@@ -109,3 +149,15 @@ def _agent_run(row: rows.AgentRunRow) -> AgentRun:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _parse_timestamp(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)

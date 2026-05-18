@@ -1,7 +1,7 @@
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 IMAGE_PACKAGE_PARALLELISM = 5
 ASSET_GENERATION_JOBS_KEY = "assetGenerationJobs"
 ASSET_GENERATION_JOB_HISTORY_LIMIT = 8
+ASSET_GENERATION_STALE_AFTER = timedelta(minutes=30)
 IMAGE_BRIEF_PROMPT_VERSION = "image_brief_v2"
 _asset_package_locks: dict[str, Lock] = {}
 _asset_package_locks_guard = Lock()
@@ -523,6 +524,7 @@ def _replace_asset_generation_job(content, updated_job: dict[str, Any]) -> dict[
 def _sync_asset_generation_job_with_content(content, job: dict[str, Any]) -> dict[str, Any]:
     assets = job.get("assets") if isinstance(job.get("assets"), list) else []
     refreshed_assets = []
+    now = datetime.now(UTC)
     for item in assets:
         if not isinstance(item, dict):
             refreshed_assets.append(item)
@@ -538,6 +540,10 @@ def _sync_asset_generation_job_with_content(content, job: dict[str, Any]) -> dic
             status = "succeeded"
             error_code = None
             error_message = None
+        elif status in {"queued", "running"} and _is_stale_asset_generation_item(item, now=now):
+            status = "failed"
+            error_code = "ASSET_GENERATION_STALE_RUNNING"
+            error_message = "asset 생성 작업이 제한 시간 안에 완료되지 않아 다시 생성이 필요합니다."
         refreshed_assets.append(
             {
                 **item,
@@ -575,11 +581,11 @@ def _complete_asset_generation_job_from_counts(job: dict[str, Any]) -> dict[str,
     elif generated_count > 0 or completed_count > 0:
         status = "partial_failed"
         error_code = "ASSET_GENERATION_PARTIAL_FAILED"
-        error_message = "?쇰? ?대?吏 ?먮뒗 ?뚯꽦 asset ?앹꽦???ㅽ뙣?덉뒿?덈떎. ?ㅽ뙣??asset留??ㅼ떆 ?앹꽦?????덉뒿?덈떎."
+        error_message = "일부 이미지 또는 음성 asset 생성에 실패했습니다. 실패한 asset만 다시 생성할 수 있습니다."
     else:
         status = "failed"
         error_code = "ASSET_GENERATION_FAILED"
-        error_message = "?대?吏? ?뚯꽦 asset ?앹꽦???ㅽ뙣?덉뒿?덈떎."
+        error_message = "이미지와 음성 asset 생성에 실패했습니다."
     return {
         **job,
         "status": status,
@@ -782,6 +788,23 @@ def _error_from_http_exception(exc: HTTPException) -> tuple[str, str]:
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _parse_asset_generation_timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _is_stale_asset_generation_item(item: dict[str, Any], *, now: datetime) -> bool:
+    updated_at = _parse_asset_generation_timestamp(item.get("updatedAt") or item.get("startedAt"))
+    return updated_at is not None and now - updated_at > ASSET_GENERATION_STALE_AFTER
 
 
 @router.post("/{content_id}/stages/{stage_id}/preview-realtime-session")

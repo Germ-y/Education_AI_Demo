@@ -122,6 +122,33 @@ def create_orchestrator_run(
     if principal.role == "teacher" and case_file["openCase"]["ownerTeacherId"] != principal.id:
         raise HTTPException(status_code=403, detail={"code": "FORBIDDEN", "message": "담당 학생 사례만 생성할 수 있습니다."})
 
+    active_content = demo_store.get_active_material_for_case(payload.student_id, payload.case_id)
+    if active_content is not None:
+        raise _active_generation_conflict(active_content)
+
+    running_orchestrator = agent_runs.find_running_generation_for_case(
+        student_id=payload.student_id,
+        case_id=payload.case_id,
+        agent_type="orchestrator",
+    )
+    if running_orchestrator is not None:
+        return ok({"agentRun": running_orchestrator.model_dump(by_alias=True)})
+
+    running_content = agent_runs.find_running_generation_for_case(
+        student_id=payload.student_id,
+        case_id=payload.case_id,
+        agent_type="content",
+    )
+    if running_content is not None:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "CONTENT_GENERATION_ALREADY_RUNNING",
+                "message": "이미 콘텐츠 생성 작업이 진행 중입니다. 완료 후 다시 확인해 주세요.",
+                "details": {"agentRunId": running_content.id, "status": running_content.status},
+            },
+        )
+
     settings = get_settings()
     spec = PROMPT_SPECS["orchestrator_plan"]
     content_type = str(payload.content_type or case_file["profile"]["studentType"])
@@ -197,6 +224,29 @@ def create_content_generation(
             },
         )
 
+    existing_content_run = agent_runs.find_content_generation_for_orchestrator(payload.orchestrator_run_id)
+    if existing_content_run is not None:
+        return ok({"agentRun": existing_content_run.model_dump(by_alias=True), "content": _content_from_agent_run(existing_content_run, demo_store, principal.id)})
+
+    active_content = demo_store.get_active_material_for_case(payload.student_id, payload.case_id)
+    if active_content is not None:
+        raise _active_generation_conflict(active_content)
+
+    running_content = agent_runs.find_running_generation_for_case(
+        student_id=payload.student_id,
+        case_id=payload.case_id,
+        agent_type="content",
+    )
+    if running_content is not None:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "CONTENT_GENERATION_ALREADY_RUNNING",
+                "message": "이미 콘텐츠 생성 작업이 진행 중입니다. 완료 후 다시 확인해 주세요.",
+                "details": {"agentRunId": running_content.id, "status": running_content.status},
+            },
+        )
+
     settings = get_settings()
     spec = PROMPT_SPECS["mission_content_package"]
     generation_plan = _build_generation_plan(orchestrator_run.output_json)
@@ -242,6 +292,29 @@ def create_content_generation(
         agent_runs,
     )
     return ok({"agentRun": agent_run.model_dump(by_alias=True), "content": None})
+
+
+def _active_generation_conflict(content) -> HTTPException:
+    return HTTPException(
+        status_code=409,
+        detail={
+            "code": "CONTENT_GENERATION_ALREADY_ACTIVE",
+            "message": "이미 생성 중이거나 검토 중인 수업 자료가 있습니다. 기존 자료를 검토하거나 사용 안 함 처리한 뒤 다시 생성해 주세요.",
+            "details": {"contentId": content.id, "status": str(content.status), "title": content.title},
+        },
+    )
+
+
+def _content_from_agent_run(agent_run, demo_store: DemoStore, teacher_id: str) -> dict | None:
+    output = agent_run.output_json
+    if not isinstance(output, dict):
+        return None
+    candidate = output.get("missionContent") if isinstance(output.get("missionContent"), dict) else output
+    content_id = candidate.get("id") if isinstance(candidate, dict) else None
+    if not isinstance(content_id, str):
+        return None
+    content = demo_store.get_mission_for_teacher(content_id, teacher_id=teacher_id)
+    return content.model_dump(by_alias=True) if content is not None else None
 
 
 @router.get("/agent-runs")
