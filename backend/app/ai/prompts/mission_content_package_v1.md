@@ -48,7 +48,7 @@
 - 이미지만 보고 풀 수 있는 문제는 실패입니다.
 - 이미지 프롬프트와 `sceneTextLines`만 읽었을 때 정답을 추론할 수 있으면 실패입니다.
 - 문제 UI 없이 이미지로 정답을 찍을 수 있으면 실패입니다.
-- `image_quiz`는 legacy schema 이름입니다. 새 생성에서 사용하지 않습니다. 만약 기존 콘텐츠 호환으로 보이더라도 실제 의미는 “이미지를 보고 정답 찾기”가 아니라 시각 맥락이 함께 있는 선택형 문제입니다.
+- `image_quiz`는 선택형 퀴즈 템플릿입니다. 실제 의미는 “이미지를 보고 정답 찾기”가 아니라 시각 맥락이 함께 있는 선택형 문제입니다.
 
 ## 학생 유형별 콘텐츠
 
@@ -132,7 +132,7 @@
 - `storyText`: 상황이나 개념을 짧고 구체적으로 엽니다.
 - `missionText`: 오늘 무엇을 해 볼지 설명합니다.
 
-`scene_question`, `clue_question`, `applied_question`, `action_choice`, `explanation_choice`, `decision_card`, `scene_observation`, `highlight_clue`:
+`scene_question`, `clue_question`, `image_quiz`, `applied_question`, `action_choice`, `explanation_choice`, `decision_card`, `scene_observation`, `highlight_clue`:
 
 - `choices`는 `{ "id": "a", "text": "..." }` 형식입니다.
 - `answer`는 선택지 id입니다.

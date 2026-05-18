@@ -47,21 +47,22 @@ ORCHESTRATOR_STAGE_CONTRACTS: dict[str, dict[int, dict[str, Any]]] = {
         3: {
             "stageRole": "applied_problem",
             "studentTitle": "문제 2",
-            "defaultTemplate": "applied_question",
+            "defaultTemplate": "image_quiz",
             "allowedTemplates": {
                 "card_match",
                 "sequence_ordering",
                 "blank_fill",
-                "applied_question",
+                "image_quiz",
                 "mini_simulation",
                 "explanation_choice",
                 "wrong_explanation_fix",
             },
             "templateAliases": {
-                "scene_question": "applied_question",
-                "clue_question": "applied_question",
-                "action_choice": "applied_question",
-                "decision_card": "applied_question",
+                "applied_question": "image_quiz",
+                "scene_question": "image_quiz",
+                "clue_question": "image_quiz",
+                "action_choice": "image_quiz",
+                "decision_card": "image_quiz",
             },
         },
         4: {
@@ -121,10 +122,6 @@ def create_orchestrator_run(
         raise HTTPException(status_code=404, detail={"code": "CASE_NOT_FOUND", "message": "학생 사례를 찾을 수 없습니다."})
     if principal.role == "teacher" and case_file["openCase"]["ownerTeacherId"] != principal.id:
         raise HTTPException(status_code=403, detail={"code": "FORBIDDEN", "message": "담당 학생 사례만 생성할 수 있습니다."})
-
-    active_content = demo_store.get_active_material_for_case(payload.student_id, payload.case_id)
-    if active_content is not None:
-        raise _active_generation_conflict(active_content)
 
     running_orchestrator = agent_runs.find_running_generation_for_case(
         student_id=payload.student_id,
@@ -233,10 +230,6 @@ def create_content_generation(
             }
         )
 
-    active_content = demo_store.get_active_material_for_case(payload.student_id, payload.case_id)
-    if active_content is not None:
-        raise _active_generation_conflict(active_content)
-
     running_content = agent_runs.find_running_generation_for_case(
         student_id=payload.student_id,
         case_id=payload.case_id,
@@ -297,17 +290,6 @@ def create_content_generation(
         agent_runs,
     )
     return ok({"agentRun": agent_run.model_dump(by_alias=True), "content": None})
-
-
-def _active_generation_conflict(content) -> HTTPException:
-    return HTTPException(
-        status_code=409,
-        detail={
-            "code": "CONTENT_GENERATION_ALREADY_ACTIVE",
-            "message": "이미 생성 중이거나 검토 중인 수업 자료가 있습니다. 기존 자료를 검토하거나 사용 안 함 처리한 뒤 다시 생성해 주세요.",
-            "details": {"contentId": content.id, "status": str(content.status), "title": content.title},
-        },
-    )
 
 
 def _content_from_agent_run(agent_run, demo_store: DemoStore, teacher_id: str) -> dict | None:
@@ -693,6 +675,7 @@ def _template_json_contract(template_type: Any) -> dict[str, Any]:
         },
         "scene_question": choice_contract,
         "clue_question": choice_contract,
+        "image_quiz": choice_contract,
         "applied_question": choice_contract,
         "action_choice": choice_contract,
         "explanation_choice": choice_contract,

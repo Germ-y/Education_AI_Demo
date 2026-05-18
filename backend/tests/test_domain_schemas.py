@@ -344,7 +344,7 @@ def test_orchestrator_plan_quality_leaves_prompt_level_design_criteria_to_genera
 def test_orchestrator_plan_quality_allows_choice_flow_for_very_low_reading_load() -> None:
     plan = _valid_learning_plan()
     plan["stagePlan"][1]["templateType"] = "scene_question"
-    plan["stagePlan"][2]["templateType"] = "applied_question"
+    plan["stagePlan"][2]["templateType"] = "image_quiz"
     case_file = _fraction_case_file()
     case_file["profile"]["profileJson"]["readingLoad"] = "very_low"
     case_file["profile"]["profileJson"]["choiceCountLimit"] = 2

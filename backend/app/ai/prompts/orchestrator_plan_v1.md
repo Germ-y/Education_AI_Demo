@@ -140,7 +140,7 @@
 
 - 1단계: `concept_intro` + `concept_intro`
 - 2단계: `basic_problem` + `card_match`, `sequence_ordering`, `blank_fill`, `scene_question`, `clue_question`
-- 3단계: `applied_problem` + `card_match`, `sequence_ordering`, `blank_fill`, `applied_question`, `mini_simulation`, `explanation_choice`, `wrong_explanation_fix`
+- 3단계: `applied_problem` + `card_match`, `sequence_ordering`, `blank_fill`, `image_quiz`, `mini_simulation`, `explanation_choice`, `wrong_explanation_fix`
 - 4단계: `realtime_practice` + `realtime_teach_back`
 
 ## 출력 필드

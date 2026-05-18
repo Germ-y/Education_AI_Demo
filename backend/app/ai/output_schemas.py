@@ -264,6 +264,7 @@ _CONTENT_STAGE_SCHEMA = _object_schema(
                 "scene_question",
                 "clue_question",
                 "blank_fill",
+                "image_quiz",
                 "applied_question",
                 "mini_simulation",
                 "explanation_choice",

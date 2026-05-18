@@ -591,7 +591,7 @@ def test_orchestrator_plan_normalizer_maps_contract_aliases() -> None:
         "applied_problem",
         "realtime_practice",
     ]
-    assert normalized["stagePlan"][2]["templateType"] == "applied_question"
+    assert normalized["stagePlan"][2]["templateType"] == "image_quiz"
     assert normalized["stagePlan"][3]["templateType"] == "realtime_teach_back"
     assert normalized["normalizationNotes"]
 
@@ -1297,8 +1297,12 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
             "contentType": "learning_focus",
         },
     )
-    assert blocked_orchestrator.status_code == 409
-    assert blocked_orchestrator.json()["error"]["code"] == "CONTENT_GENERATION_ALREADY_ACTIVE"
+    assert blocked_orchestrator.status_code == 200, blocked_orchestrator.json()
+    blocked_orchestrator_run = client.get(
+        f"/api/ai/agent-runs/{blocked_orchestrator.json()['data']['agentRun']['id']}",
+        headers=teacher_headers,
+    ).json()["data"]
+    assert blocked_orchestrator_run["status"] == "succeeded"
 
     reviewable = client.get(f"/api/contents/{content_id}", headers=teacher_headers)
     assert reviewable.status_code == 200

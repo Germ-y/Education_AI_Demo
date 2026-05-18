@@ -33,7 +33,7 @@ FLOW_RULES: dict[str, dict[int, tuple[str, set[str]]]] = {
                 TemplateType.CARD_MATCH.value,
                 TemplateType.SEQUENCE_ORDERING.value,
                 TemplateType.BLANK_FILL.value,
-                TemplateType.APPLIED_QUESTION.value,
+                TemplateType.IMAGE_QUIZ.value,
                 TemplateType.MINI_SIMULATION.value,
                 TemplateType.EXPLANATION_CHOICE.value,
                 TemplateType.WRONG_EXPLANATION_FIX.value,
