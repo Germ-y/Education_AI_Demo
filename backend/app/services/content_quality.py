@@ -102,6 +102,18 @@ STIGMATIZING_TERMS = (
     "실패한 학생",
 )
 
+STUDENT_INSTRUCTION_MAX_LENGTH = 45
+QUESTION_MAX_LENGTH = 80
+INTRO_STORY_MAX_LENGTH = 90
+INTRO_MISSION_MAX_LENGTH = 60
+SOURCE_TEXT_MAX_LINES = 2
+SOURCE_TEXT_LINE_MAX_LENGTH = 45
+SCENE_TEXT_LINE_MAX_LENGTH = 70
+OPTION_TEXT_MAX_LENGTH = 26
+SENTENCE_TEXT_MAX_LENGTH = 80
+FEEDBACK_TEXT_MAX_LENGTH = 70
+
+
 class ContentQualityError(ValueError):
     def __init__(self, issues: list[str]) -> None:
         self.issues = issues
@@ -173,6 +185,86 @@ def collect_mission_template_text_quality_issues(mission: MissionContent) -> lis
     issues: list[str] = []
     _validate_mission_template_text_lengths(mission, issues)
     return issues
+
+
+def _validate_mission_template_text_lengths(mission: MissionContent, issues: list[str]) -> None:
+    for stage in mission.stages:
+        template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
+        _validate_short_text(stage.student_instruction, f"{stage.id}.studentInstruction", STUDENT_INSTRUCTION_MAX_LENGTH, issues)
+        _validate_short_text(template_json.get("storyText"), f"{stage.id}.templateJson.storyText", INTRO_STORY_MAX_LENGTH, issues)
+        _validate_short_text(template_json.get("missionText"), f"{stage.id}.templateJson.missionText", INTRO_MISSION_MAX_LENGTH, issues)
+        _validate_short_text(template_json.get("question"), f"{stage.id}.templateJson.question", QUESTION_MAX_LENGTH, issues)
+        _validate_short_text(template_json.get("sentence"), f"{stage.id}.templateJson.sentence", SENTENCE_TEXT_MAX_LENGTH, issues)
+        _validate_short_text(template_json.get("wrongLine"), f"{stage.id}.templateJson.wrongLine", SENTENCE_TEXT_MAX_LENGTH, issues)
+        _validate_short_text(template_json.get("fixedLine"), f"{stage.id}.templateJson.fixedLine", SENTENCE_TEXT_MAX_LENGTH, issues)
+        _validate_short_text(template_json.get("correctFeedback"), f"{stage.id}.templateJson.correctFeedback", FEEDBACK_TEXT_MAX_LENGTH, issues)
+        _validate_short_text(template_json.get("wrongFeedback"), f"{stage.id}.templateJson.wrongFeedback", FEEDBACK_TEXT_MAX_LENGTH, issues)
+        _validate_limited_text_list(
+            template_json.get("sourceTextLines"),
+            f"{stage.id}.templateJson.sourceTextLines",
+            max_items=SOURCE_TEXT_MAX_LINES,
+            max_length=SOURCE_TEXT_LINE_MAX_LENGTH,
+            issues=issues,
+        )
+        _validate_limited_text_list(
+            template_json.get("sceneTextLines"),
+            f"{stage.id}.templateJson.sceneTextLines",
+            max_items=SOURCE_TEXT_MAX_LINES,
+            max_length=SCENE_TEXT_LINE_MAX_LENGTH,
+            issues=issues,
+        )
+        _validate_choice_like_texts(template_json.get("choices"), f"{stage.id}.templateJson.choices", issues)
+        _validate_choice_like_texts(template_json.get("leftCards"), f"{stage.id}.templateJson.leftCards", issues)
+        _validate_choice_like_texts(template_json.get("rightCards"), f"{stage.id}.templateJson.rightCards", issues)
+        _validate_choice_like_texts(template_json.get("cards"), f"{stage.id}.templateJson.cards", issues)
+        _validate_tile_texts(template_json.get("tiles"), f"{stage.id}.templateJson.tiles", issues)
+
+
+def _validate_short_text(value: Any, path: str, max_length: int, issues: list[str]) -> None:
+    if value is None or not isinstance(value, str):
+        return
+    if _compact_length(value) > max_length:
+        issues.append(f"{path}??{max_length}???댄븯濡?吏㏐쾶 ?묒꽦?댁빞 ?⑸땲??")
+
+
+def _validate_limited_text_list(
+    value: Any,
+    path: str,
+    *,
+    max_items: int,
+    max_length: int,
+    issues: list[str],
+) -> None:
+    if value is None or not isinstance(value, list):
+        return
+    if len(value) > max_items:
+        issues.append(f"{path}??理쒕? {max_items}以꾧퉴吏留??ъ슜?????덉뒿?덈떎.")
+    for index, item in enumerate(value):
+        _validate_short_text(item, f"{path}[{index}]", max_length, issues)
+
+
+def _validate_choice_like_texts(value: Any, path: str, issues: list[str]) -> None:
+    if not isinstance(value, list):
+        return
+    for index, item in enumerate(value):
+        if isinstance(item, str):
+            _validate_short_text(item, f"{path}[{index}]", OPTION_TEXT_MAX_LENGTH, issues)
+            continue
+        if not isinstance(item, dict):
+            continue
+        for key in ("text", "label", "title", "caption"):
+            _validate_short_text(item.get(key), f"{path}[{index}].{key}", OPTION_TEXT_MAX_LENGTH, issues)
+
+
+def _validate_tile_texts(value: Any, path: str, issues: list[str]) -> None:
+    if not isinstance(value, list):
+        return
+    for index, item in enumerate(value):
+        _validate_short_text(item, f"{path}[{index}]", OPTION_TEXT_MAX_LENGTH, issues)
+
+
+def _compact_length(value: str) -> int:
+    return len(" ".join(value.strip().split()))
 
 
 def _validate_stage_plan(stage_plan: Any, content_type: str, issues: list[str]) -> None:
