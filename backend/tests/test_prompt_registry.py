@@ -66,7 +66,7 @@ def test_generation_prompts_require_concrete_playable_micro_scenarios() -> None:
     assert "`question`: 80자 이하" in content_prompt
     assert "긴 글 독해가 필요한 문제는 만들지 않습니다." in content_prompt
     assert "`choices[].text`, `leftCards[].text`, `rightCards[].text`, `cards[].text`, `tiles[]`: 26자 이하" in content_prompt
-    assert "답은 개념, 조건 비교, 자료 해석, 문장 이해, 수량 관계, 계산 과정, 설명 논리 중 하나" in content_prompt
+    assert "답은 해당 학년의 교과 개념, 조건 비교, 수량 관계, 계산 과정, 분류 기준, 설명 논리 중 하나" in content_prompt
     assert "답은 실제 다음 행동, 물어볼 말, 도움 요청, 순서 확인, 선택 전 확인으로 이어져야 합니다." in content_prompt
     assert "구체적으로 플레이 가능한 4단계 수업" in critique_prompt
     assert "실제 학습 판단을 요구합니다." in critique_prompt

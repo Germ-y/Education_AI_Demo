@@ -611,12 +611,12 @@ def create_demo_database(*, include_students: bool = True, include_mission_conte
                     "grade": "middle_2",
                     "schoolCode": "8811058",
                     "studentType": "learning_focus",
-                    "primaryNeed": "짧은 정보 문장에서 확인 가능한 단서와 생각이 담긴 표현 구분하기",
+                    "primaryNeed": "짧은 조건을 비교해 주장과 근거의 관계 설명하기",
                     "profileJson": {
                         "ageBand": "older",
                         "gradeNumber": "2",
                         "className": "1",
-                        "interests": ["환경 캠페인", "탐험형 읽기", "학교 게시판"],
+                        "interests": ["과학 탐구", "자료 비교", "학교 프로젝트"],
                         "readingLoad": "low",
                         "choiceCountLimit": 3,
                         "dashboard": {
@@ -626,13 +626,13 @@ def create_demo_database(*, include_students: bool = True, include_mission_conte
                             "trackLabel": "고연령 학습지원형",
                             "statusLabel": "자료 검토",
                             "attendanceLabel": "95%",
-                            "summaryLine": "짧은 정보 문장을 보고 사실·의견을 구분한 뒤 판단 근거를 말합니다.",
+                            "summaryLine": "짧은 조건을 비교하고 판단 근거를 말합니다.",
                             "primaryNeedTitle": "현재 지원 목표",
-                            "primaryNeedDetail": "포스터·안내문 원문에서 확인 가능한 단서와 생각이 담긴 표현 구분하기",
+                            "primaryNeedDetail": "짧은 조건 카드에서 확인 가능한 근거와 생각을 구분하기",
                             "supportStrategyTitle": "수업 설계 힌트",
-                            "supportStrategyDetail": "포스터 원문, 사실·의견 기준 카드, 한 문장 근거 말하기로 판단 과정을 나눕니다.",
+                            "supportStrategyDetail": "기준 카드, 조건 비교, 한 문장 근거 말하기로 판단 과정을 나눕니다.",
                             "strengths": [
-                                "포스터나 안내문처럼 실제 장면이 있으면 읽어야 할 문장을 더 잘 찾습니다.",
+                                "기준이 보이면 어떤 조건을 먼저 봐야 하는지 더 잘 찾습니다.",
                                 "판단 기준을 카드로 나누어 보여주면 끝까지 따라올 수 있습니다.",
                                 "학교생활과 연결된 소재에서는 자신의 생각을 짧게 말하려는 시도가 좋습니다.",
                             ],
@@ -644,9 +644,9 @@ def create_demo_database(*, include_students: bool = True, include_mission_conte
                             "emotionalNote": "첫 오답 뒤에도 이유를 짧게 설명하면 다시 시도합니다.",
                             "responsePattern": "절차를 카드처럼 나누어 보여주면 따라오고, 마지막에 자기 말로 설명하는 단계가 효과적입니다.",
                             "guardianCooperation": "보호자 협조는 보통 수준이며, 가정 복습은 짧은 예시 1개 정도가 적합합니다.",
-                            "schoolContextNote": "NEIS 시간표의 국어·사회·과학 등 읽기 자료가 많은 날에는 포스터·안내문 원문을 읽는 문장 판단 콘텐츠와 연결합니다.",
+                            "schoolContextNote": "NEIS 시간표의 국어·사회·과학 등 생각을 설명하는 과목 흐름과 연결합니다.",
                             "nextSessionFocus": ["확인 가능한 단서 찾기", "사실·의견 구분하기", "판단 근거 한 문장으로 말하기"],
-                            "aiContextSummary": "중2 고연령 학습지원형 학생. 포스터 원문과 기준 카드로 읽기 부담을 낮추고, 마지막에는 판단 근거를 한 문장으로 말하는 구성이 안정적입니다.",
+                            "aiContextSummary": "중2 고연령 학습지원형 학생. 기준 카드와 조건 비교로 판단 과정을 나누고, 마지막에는 판단 근거를 한 문장으로 말하는 구성이 안정적입니다.",
                         },
                     },
                 },
@@ -1030,17 +1030,17 @@ def create_demo_database(*, include_students: bool = True, include_mission_conte
                     "id": "context_brief_student_learning_fraction_seed",
                     "studentId": "student_learning_fraction",
                     "briefText": (
-                        "이민준 학생은 중2 고연령 학습지원형입니다. 포스터, 안내문, 학교 게시판처럼 실제 장면 안의 짧은 원문을 보고 확인 가능한 단서와 생각·권유 표현을 나누는 수업에서 참여가 좋습니다. "
-                        "읽기 부담은 낮게 잡되 중학생 수준의 소재를 유지하고, 선택지는 3개 안팎까지 가능합니다. 기준 카드를 먼저 제시하면 판단을 끝까지 따라오며, 답을 고른 뒤 판단 근거를 한 문장으로 말하는 단계에는 짧은 도움말이 필요합니다. "
-                        "콘텐츠 생성 시 교사 요청 주제를 우선하고 과거 분수 소재로 되돌아가지 않습니다. 이미지가 필요한 문제는 문제·정답·선택지 UI 문장을 이미지에 숨기지 않되, 포스터나 안내문처럼 장면 자체의 짧은 읽기 문구는 장면 안에 자연스럽게 포함할 수 있습니다."
+                        "이민준 학생은 중2 고연령 학습지원형입니다. 기준 카드와 짧은 조건 비교를 통해 확인 가능한 근거와 생각을 나누는 수업에서 참여가 좋습니다. "
+                        "읽기 부담은 낮게 잡되 중학생 수준의 사고 과제는 유지하고, 선택지는 3개 안팎까지 가능합니다. 기준 카드를 먼저 제시하면 판단을 끝까지 따라오며, 답을 고른 뒤 판단 근거를 한 문장으로 말하는 단계에는 짧은 도움말이 필요합니다. "
+                        "콘텐츠 생성 시 교사 요청 주제를 우선하고 과거 분수 소재로 되돌아가지 않습니다. 이미지는 문제를 대신 푸는 글 자료가 아니라 상황과 조작물을 보여주는 맥락 장면으로만 사용합니다."
                     ),
                     "studentType": "고연령 학습지원형",
                     "readingLoad": "low",
                     "choiceCount": 3,
-                    "recentSuccessPatterns": ["포스터나 안내문 원문에서 읽어야 할 문장 찾기", "기준 카드를 보고 사실과 의견 나누기", "학교생활 소재에서 짧게 자기 생각 말하기"],
+                    "recentSuccessPatterns": ["기준 카드를 보고 사실과 의견 나누기", "짧은 조건을 비교해 판단하기", "학교생활 소재에서 짧게 자기 생각 말하기"],
                     "recentDifficultyPatterns": ["확인 가능한 사실과 생각·권유가 담긴 의견을 섞어 판단함", "문제 설명이 길면 눈에 띄는 단어에 먼저 반응함", "판단 근거를 말할 때 짧은 지원이 필요함"],
-                    "recommendedScaffolds": ["실제 장면 자료", "사실·의견 기준 카드", "짧은 원문 2~3개", "근거 한 문장 말하기", "중학생에게 맞는 생활·교과 소재"],
-                    "avoidTopicRegression": ["분수 피자 소재 반복", "유아적 선택지", "문제 설명만 길고 읽기 근거가 없는 이미지"],
+                    "recommendedScaffolds": ["기준 카드", "짧은 조건 비교", "근거 한 문장 말하기", "중학생에게 맞는 생활·교과 소재"],
+                    "avoidTopicRegression": ["분수 피자 소재 반복", "유아적 선택지", "긴 글 독해형 문제"],
                     "sourceWatermark": NOW,
                     "dirty": False,
                     "status": "refreshed",

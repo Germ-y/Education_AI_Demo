@@ -1807,29 +1807,20 @@ export default function DashboardPage() {
   const canSaveMemo = isMemoDirty && memoValue.trim().length > 0 && !isSavingMemo;
   const lessonDraftValue = lessonDrafts[selectedCase.id] ?? "";
   const aiRecommendedGoal = useMemo(() => {
-    const presentationSupports = [...(activeContextBrief?.recommendedScaffolds ?? [])].slice(0, 3);
-    const observedStrengths = [...(activeContextBrief?.recentSuccessPatterns ?? [])].slice(0, 2);
-    const regressionGuards = [
-      selectedCase.primaryNeed,
-      ...(activeContextBrief?.avoidTopicRegression ?? []),
-    ].filter(Boolean);
+    const gradeLabel = selectedStudent.grade || activeCaseFile?.profile.gradeLabel || "해당 학년";
+    const isLearningFocus = (activeCaseFile?.profile.studentType ?? selectedApiStudent?.studentType) === "learning_focus";
     return [
       "[AI 추천 생성]",
-      "선생님 추가 입력 없이 학생 기억장치의 지원 방식만 참고해 오늘 사용할 새 수업 주제와 활동을 추천 생성합니다.",
-      "기억장치에 남은 과거 상황은 예시 소재일 뿐이며, 새 수업 주제를 덮어쓰지 않습니다.",
-      "수업 적용 힌트는 문제 수준을 낮추는 지시가 아니라 화면 제시 방식입니다.",
-      observedStrengths.length ? `관찰된 수행 강점: ${observedStrengths.join(" / ")}` : "",
-      presentationSupports.length ? `제시 방식 조정: ${presentationSupports.join(" / ")}` : "",
-      regressionGuards.length ? `반복하지 않을 과거 예시 소재: ${regressionGuards.join(" / ")}` : "",
+      `${selectedCase.caseType} 학생에게 맞는 새 수업 주제를 추천 생성합니다.`,
+      isLearningFocus
+        ? `${gradeLabel} 학생이 배우는 교과 개념을 기준으로 수업 주제를 새로 설계합니다.`
+        : `${gradeLabel} 학생이 실제 생활에서 마주칠 만한 상황 판단과 표현 연습을 설계합니다.`,
+      "과거 수업 소재나 교사 메모 문장을 주제로 반복하지 않습니다.",
+      "긴 글 독해형 문제, 포스터·안내문·원문 읽기 문제는 만들지 않습니다.",
+      "이미지는 글 자료가 아니라 상황과 조작물을 보여주는 맥락 장면으로 사용합니다.",
     ]
-      .filter(Boolean)
       .join("\n");
-  }, [
-    activeContextBrief?.avoidTopicRegression,
-    activeContextBrief?.recentSuccessPatterns,
-    activeContextBrief?.recommendedScaffolds,
-    selectedCase.primaryNeed,
-  ]);
+  }, [activeCaseFile?.profile.gradeLabel, activeCaseFile?.profile.studentType, selectedApiStudent?.studentType, selectedCase.caseType, selectedStudent.grade]);
   const selectedPendingGenerationJobs = Object.values(pendingGenerationJobs).filter(
     (job) => job.caseId === selectedCase.id || (selectedCase.studentId && job.studentId === selectedCase.studentId),
   );
@@ -2323,8 +2314,12 @@ export default function DashboardPage() {
   const handleGenerateContent = async (mode: "teacher_request" | "ai_recommendation" = "teacher_request") => {
     if (!selectedCase.id || !selectedCase.studentId || isGeneratingContent) return;
 
-    const requestedGoal = mode === "ai_recommendation" ? aiRecommendedGoal : lessonDraftValue.trim() || selectedCase.primaryNeed;
     const contentType = activeCaseFile?.profile.studentType ?? selectedApiStudent?.studentType ?? "learning_focus";
+    const fallbackRequestedGoal =
+      contentType === "life_support"
+        ? "학년 수준에 맞는 일상 상황 판단과 의사표현 수업"
+        : "해당 학년이 배우는 교과 개념 이해와 문제 해결 수업";
+    const requestedGoal = mode === "ai_recommendation" ? aiRecommendedGoal : lessonDraftValue.trim() || fallbackRequestedGoal;
     setActiveTab("materials");
 
     setGenerationStatuses((current) => ({
@@ -2333,7 +2328,7 @@ export default function DashboardPage() {
             state: "running",
             message:
               mode === "ai_recommendation"
-                ? "기억장치를 바탕으로 AI 추천 수업 방향을 정리하는 중입니다."
+                ? "학생 유형과 학년을 바탕으로 AI 추천 수업 방향을 정리하는 중입니다."
                 : "학생 기록을 바탕으로 수업 방향을 정리하는 중입니다.",
           },
         }));

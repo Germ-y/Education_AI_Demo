@@ -317,7 +317,7 @@ def test_teacher_and_student_demo_flows() -> None:
     assert "좋겠어요" not in fraction_case.json()["data"]["dashboardProfile"]["primaryNeedDetail"]
     assert "근거" in fraction_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
     assert "좋겠어요" not in fraction_case.json()["data"]["dashboardProfile"]["supportStrategyDetail"]
-    assert fraction_case.json()["data"]["dashboardProfile"]["strengths"][0] == "포스터나 안내문처럼 실제 장면이 있으면 읽어야 할 문장을 더 잘 찾습니다."
+    assert fraction_case.json()["data"]["dashboardProfile"]["strengths"][0] == "기준이 보이면 어떤 조건을 먼저 봐야 하는지 더 잘 찾습니다."
     assert fraction_case.json()["data"]["dashboardProfile"]["weaknesses"][0] == "확인할 수 있는 사실과 생각·권유가 담긴 의견을 가끔 섞어 판단합니다."
     assert_no_teacher_raw_terms(fraction_case.json()["data"]["dashboardProfile"])
     life_case = client.get("/api/teacher/students/student_life_bus", headers={"authorization": f"Bearer {teacher_token}"})
@@ -336,7 +336,7 @@ def test_teacher_and_student_demo_flows() -> None:
     assert bundle["student"]["gradeLabel"] == "중2"
     assert bundle["student"]["name"] == "이민준"
     assert bundle["student"]["displayName"] == "이민준"
-    assert "정보 문장" in bundle["caseSummary"]["primaryNeed"]
+    assert "조건" in bundle["caseSummary"]["primaryNeed"]
     assert bundle["schoolContext"]["timetableSummary"]["todaySubjects"] == ["역사", "동아리활동", "진로와 직업", "국어", "과학", "도덕"]
     assert [item["label"] for item in bundle["autoContext"]] == ["학생 기록", "이전 수업", "학교 시간표", "다음 목표"]
     assert bundle["aiReadyContext"]["evidenceSources"]
