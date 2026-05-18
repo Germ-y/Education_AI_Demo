@@ -295,6 +295,8 @@ def _validate_mission_template_interactions(mission: MissionContent, content_typ
     for stage in mission.stages:
         template_type = _as_value(stage.template_type)
         template_json = stage.template_json if isinstance(stage.template_json, dict) else {}
+        if template_type == TemplateType.CARD_MATCH.value:
+            _validate_card_match_unique_answer_candidates(template_json, f"{stage.id}.templateJson", issues)
         if content_type == StudentType.LIFE_SUPPORT.value and stage.step == 3 and template_type == TemplateType.SEQUENCE_ORDERING.value:
             cards = template_json.get("cards")
             answer_order = template_json.get("answerOrder")
@@ -302,6 +304,38 @@ def _validate_mission_template_interactions(mission: MissionContent, content_typ
             answer_count = len(answer_order) if isinstance(answer_order, list) else 0
             if card_count != 3 or answer_count != 3:
                 issues.append(f"{stage.id}.templateJson은 life_support 3단계 sequence_ordering에서 cards와 answerOrder를 각각 3개로 구성해야 합니다.")
+
+
+def _validate_card_match_unique_answer_candidates(template_json: dict[str, Any], path: str, issues: list[str]) -> None:
+    left_texts = _card_texts(template_json.get("leftCards"))
+    right_texts = _card_texts(template_json.get("rightCards"))
+    if _has_duplicate_meaning(left_texts):
+        issues.append(f"{path}.leftCards는 같은 의미의 카드를 반복할 수 없습니다.")
+    if _has_duplicate_meaning(right_texts):
+        issues.append(f"{path}.rightCards는 정답 후보이므로 같은 정답/분류/결론을 반복할 수 없습니다.")
+
+
+def _card_texts(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    texts: list[str] = []
+    for item in value:
+        if isinstance(item, str):
+            texts.append(item)
+        elif isinstance(item, dict):
+            text = item.get("text")
+            if isinstance(text, str):
+                texts.append(text)
+    return texts
+
+
+def _has_duplicate_meaning(texts: list[str]) -> bool:
+    normalized = [_normalize_card_text(text) for text in texts if _normalize_card_text(text)]
+    return len(normalized) != len(set(normalized))
+
+
+def _normalize_card_text(value: str) -> str:
+    return "".join(value.strip().split()).lower()
 
 
 def _validate_mission_template_text_lengths(mission: MissionContent, issues: list[str]) -> None:
