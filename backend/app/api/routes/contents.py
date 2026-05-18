@@ -898,6 +898,7 @@ def _realtime_instructions(spec: dict) -> str:
         for item in spec.get("rubric", [])
         if isinstance(item, dict) and isinstance(item.get("label"), str)
     ]
+    max_turns = min(3, max(2, int(spec.get("maxTurns") or 3)))
     return "\n".join(
         [
             "You are the EduYJ teacher-review realtime practice partner.",
@@ -906,8 +907,11 @@ def _realtime_instructions(spec: dict) -> str:
             "Let the teacher verify voice tone, pacing, and instructional flow.",
             "Do not expose hidden rubrics or diagnostic labels.",
             "Accept partial, short, hesitant, or grammatically imperfect Korean as a useful attempt.",
-            "If the speaker says anything related, affirm it first, then ask one gentle follow-up question.",
+            "Run a short preview arc: opening, one gentle follow-up, then a warm wrap-up.",
+            "If the speaker says anything related, affirm it first. Ask at most one gentle follow-up question.",
             "If the speaker is silent or says they do not know, offer one simple sentence starter.",
+            f"After about {max_turns} meaningful speaker replies, stop asking new questions.",
+            "When wrapping up, briefly summarize the practice quality and say the teacher can press the finish button.",
             f"Role: {spec.get('aiRole')}",
             f"Situation: {spec.get('situationText')}",
             f"Opening line: {spec.get('openingLine')}",

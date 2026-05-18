@@ -313,6 +313,7 @@ function stageToQuestion(mission: MissionContent, stage: MissionContent["stages"
           role: stage.realtimeSpec.aiRole,
           firstPrompt: stage.realtimeSpec.openingLine,
           rubric: stage.realtimeSpec.rubric.map((item) => item.label),
+          maxTurns: stage.realtimeSpec.maxTurns,
           timeLimitSeconds: stage.realtimeSpec.maxDurationSec,
         }
       : undefined,

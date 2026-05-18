@@ -119,6 +119,7 @@ export type StageQuestion = {
     role: string;
     firstPrompt: string;
     rubric: string[];
+    maxTurns: number;
     timeLimitSeconds: number;
   };
   visualActiveIndex?: number;

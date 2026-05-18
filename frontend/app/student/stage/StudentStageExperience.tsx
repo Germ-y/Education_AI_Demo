@@ -1092,10 +1092,12 @@ function RealtimePracticeRoom({
   const practice = getRealtimePracticeCopy(scene, question);
   const timeLimitMinutes = Math.round((question.realtimePracticeSpec?.timeLimitSeconds ?? 180) / 60);
   const minimumStudentTurns = 1;
+  const recommendedStudentTurns = Math.min(3, Math.max(2, question.realtimePracticeSpec?.maxTurns ?? 3));
   const [draft, setDraft] = useState("");
   const [connectionState, setConnectionState] = useState<RealtimeConnectionState>("idle");
   const [statusMessage, setStatusMessage] = useState("시작을 누르면 별이와 실시간으로 대화할 수 있어요.");
   const [studentTurns, setStudentTurns] = useState(0);
+  const [practiceReadyToFinish, setPracticeReadyToFinish] = useState(false);
   const [messages, setMessages] = useState<Array<{ id: number; role: "partner" | "student" | "system"; text: string }>>([
     { id: 1, role: "partner", text: practice.sceneLine },
   ]);
@@ -1111,6 +1113,7 @@ function RealtimePracticeRoom({
   const realtimeTokenRef = useRef<string | null>(null);
   const startedAtRef = useRef<number | null>(null);
   const transcriptRef = useRef<string[]>([practice.sceneLine]);
+  const studentTurnsRef = useRef(0);
   const partnerDraftRef = useRef("");
   const studentDraftRef = useRef("");
   const speechStartedAtRef = useRef<number | null>(null);
@@ -1122,7 +1125,7 @@ function RealtimePracticeRoom({
     { label: "실시간 연결", state: realtimeConnectionStatusLabel[connectionState] },
   ];
   const showRealtimeCompleteToast =
-    isComplete && connectionState !== "connecting" && connectionState !== "connected" && connectionState !== "ending";
+    (isComplete || practiceReadyToFinish) && connectionState !== "connecting" && connectionState !== "ending";
 
   useEffect(() => {
     messageListRef.current?.scrollTo({
@@ -1173,8 +1176,10 @@ function RealtimePracticeRoom({
     speechStartedAtRef.current = null;
     hasUserSubmittedRef.current = false;
     responseInProgressRef.current = false;
+    studentTurnsRef.current = 0;
     setDraft("");
     setStudentTurns(0);
+    setPracticeReadyToFinish(false);
     setMessages([{ id: 1, role: "partner", text: practice.sceneLine }]);
     setLivePartnerText("");
     setLiveStudentText("");
@@ -1233,7 +1238,13 @@ function RealtimePracticeRoom({
       if (text) {
         appendMessage("student", text);
         if (isMeaningfulStudentSpeech(text)) {
-          setStudentTurns((current) => current + 1);
+          const nextTurns = studentTurnsRef.current + 1;
+          studentTurnsRef.current = nextTurns;
+          setStudentTurns(nextTurns);
+          if (nextTurns >= recommendedStudentTurns) {
+            setPracticeReadyToFinish(true);
+            setStatusMessage("충분히 연습했어요. 별이의 마무리 말을 듣고 마치기를 눌러도 돼요.");
+          }
         }
         setDraft("");
       }
@@ -1450,9 +1461,14 @@ function RealtimePracticeRoom({
     if (!trimmed) return;
 
     const nextTurn = studentTurns + 1;
+    studentTurnsRef.current = nextTurn;
     hasUserSubmittedRef.current = true;
     appendMessage("student", trimmed);
     setStudentTurns(nextTurn);
+    if (nextTurn >= recommendedStudentTurns) {
+      setPracticeReadyToFinish(true);
+      setStatusMessage("충분히 연습했어요. 마무리 답변을 들은 뒤 마치기를 눌러도 돼요.");
+    }
     setDraft("");
     sendSessionEvent("realtime_text_message", { text: trimmed });
 
@@ -1481,9 +1497,9 @@ function RealtimePracticeRoom({
       }
     } else if (realtimeSessionIdRef.current) {
       const fallbackReply =
-        nextTurn >= minimumStudentTurns
-          ? "좋아요. 지금처럼 짧게 물어보면 안전하게 확인할 수 있어요. 이제 마치기를 눌러도 돼요."
-          : "좋아요. 한 문장으로 더 말해볼까요?";
+        nextTurn >= recommendedStudentTurns
+          ? "좋아요. 지금처럼 짧게 말하면 충분해요. 이제 마치기를 눌러도 돼요."
+          : "좋아요. 한 문장으로 한 번만 더 말해볼까요?";
       appendMessage("partner", fallbackReply);
       sendSessionEvent("realtime_text_fallback_reply", { text: fallbackReply });
       setStatusMessage("채팅으로 연습 중이에요. 끝났으면 마치기를 눌러 주세요.");
@@ -1508,11 +1524,11 @@ function RealtimePracticeRoom({
       await completeRealtimeSession(
         sessionId,
         {
-          turnCount: studentTurns,
+          turnCount: studentTurnsRef.current,
           durationSec: startedAtRef.current ? Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000)) : 0,
           rubricResult: {
-            practiced: studentTurns >= minimumStudentTurns,
-            supportNeeded: studentTurns < minimumStudentTurns ? "학생 발화가 충분히 기록되지 않았습니다." : null,
+            practiced: studentTurnsRef.current >= minimumStudentTurns,
+            supportNeeded: studentTurnsRef.current < minimumStudentTurns ? "학생 발화가 충분히 기록되지 않았습니다." : null,
           },
           transcriptSummary: transcriptRef.current.slice(-8).join(" / "),
         },
@@ -1583,7 +1599,7 @@ function RealtimePracticeRoom({
         <div className="border-b border-[#e2e8f0] bg-white px-5 py-4">
           <p className="text-sm font-black text-[#172033]">실시간 채팅</p>
           <p className="mt-1 text-xs font-bold text-[#64748b]">
-            마이크가 안 되면 채팅으로 연습할 수 있어요 · 목표 시간 {timeLimitMinutes}분 · 내 말 {studentTurns}/{minimumStudentTurns}
+            마이크가 안 되면 채팅으로 연습할 수 있어요 · 목표 시간 {timeLimitMinutes}분 · 권장 {recommendedStudentTurns}번 · 내 말 {studentTurns}번
           </p>
         </div>
 
@@ -1592,12 +1608,14 @@ function RealtimePracticeRoom({
           <div className="pointer-events-none absolute inset-x-5 bottom-5 z-20">
             <div className="pointer-events-auto mx-auto flex max-w-[460px] items-center justify-between gap-3 rounded-[20px] border border-[#f0dfb4] bg-[#fff9e8] px-4 py-3 shadow-[0_18px_42px_rgba(31,41,55,0.18)] animate-[stageToastIn_220ms_ease-out_both]">
               <div className="min-w-0">
-                <p className="text-sm font-black text-[#8a5a00]">대화가 마무리됐어요</p>
-                <p className="mt-0.5 text-xs font-bold text-[#6b5a24]">오늘 연습을 완료할 수 있어요.</p>
+                <p className="text-sm font-black text-[#8a5a00]">{isComplete ? "대화가 마무리됐어요" : "마무리해도 좋아요"}</p>
+                <p className="mt-0.5 text-xs font-bold text-[#6b5a24]">
+                  {isComplete ? "오늘 연습을 완료할 수 있어요." : "충분히 연습했어요. 기록을 저장할 수 있어요."}
+                </p>
               </div>
               <button
                 type="button"
-                onClick={onFinish}
+                onClick={isComplete ? onFinish : finishRealtimeConversation}
                 className="shrink-0 rounded-[14px] px-4 py-2 text-sm font-black text-white shadow-[0_10px_20px_rgba(39,174,96,0.22)] transition duration-200 hover:-translate-y-0.5"
                 style={{ backgroundColor: theme.accentStrong }}
               >
