@@ -1501,10 +1501,24 @@ export default function DashboardPage() {
         if (ignore) return;
 
         setTeacherStudentItems(items);
-        if (items.length > 0) setSelectedStudentId(items[0].studentId);
+        if (items.length > 0) {
+          setSelectedStudentId(items[0].studentId);
+          return;
+        }
+        setSelectedStudentId("");
+        setSelectedCaseFile(null);
+        setSelectedReport(null);
+        setSelectedFeedbackId(null);
+        setOpenReportId(null);
+        setOpenReviewId(null);
+        setGenerationStatuses({});
+        updatePendingGenerationJobs(() => ({}));
       } catch {
         if (ignore) return;
         setTeacherStudentItems([]);
+        setSelectedStudentId("");
+        setSelectedCaseFile(null);
+        setSelectedReport(null);
       }
     }
 
@@ -1513,7 +1527,7 @@ export default function DashboardPage() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [updatePendingGenerationJobs]);
 
   useEffect(() => {
     if (teacherStudentItems.length === 0 || !selectedStudentId) return;
