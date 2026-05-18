@@ -2826,10 +2826,11 @@ export default function DashboardPage() {
                 type="button"
                 onClick={openTeacherTour}
                 aria-label="화면 안내 열기"
-                title="화면 안내"
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#cbd5e1] bg-[#f8fafc] text-sm font-black text-[#1f3a5f] transition hover:border-[#1f3a5f] hover:bg-[#eef4fb]"
+                title="사용법"
+                className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-[#cbd5e1] bg-[#f8fafc] px-3 text-sm font-black text-[#1f3a5f] transition hover:border-[#1f3a5f] hover:bg-[#eef4fb]"
               >
-                ?
+                <span className="grid h-5 w-5 place-items-center rounded-full bg-white text-xs shadow-sm">?</span>
+                <span>사용법</span>
               </button>
             </div>
             <p className="mt-2 text-sm font-semibold leading-6 text-[#64748b]">
