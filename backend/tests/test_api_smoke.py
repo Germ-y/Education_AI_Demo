@@ -3,6 +3,7 @@ import json
 import os
 import threading
 import time
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -927,6 +928,81 @@ def test_asset_generation_job_refreshes_stale_running_job_from_ready_assets() ->
     next_job = client.post(f"/api/contents/{content_id}/assets/generation-jobs")
     assert next_job.status_code == 200, next_job.json()
     assert next_job.json()["data"]["status"] == "succeeded"
+
+
+def test_asset_generation_job_reconciles_ready_file_missing_db_metadata(tmp_path) -> None:
+    os.environ["GENERATED_ASSETS_DIR"] = str(tmp_path / "generated")
+    get_settings.cache_clear()
+
+    client = TestClient(create_app())
+    content_id = "content_fraction_001"
+    store = get_store_instance()
+    mission = store.get_mission_for_teacher(content_id)
+    assert mission is not None
+
+    target_asset = next(asset for asset in mission.assets if asset.asset_type.value == "audio" and asset.asset_role.value == "stage_4_realtime")
+    target_asset.storage_url = ""
+    target_asset.preview_url = None
+    target_asset.qa_status = "pending"
+    target_asset.provider = "generated"
+    target_asset.model = "tts-ko-v1"
+
+    relative_path = f"assets/students/{mission.student_id}/{mission.id}/{target_asset.id}.mp3"
+    output_path = Path(os.environ["GENERATED_ASSETS_DIR"]) / relative_path
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(b"mp3")
+
+    job_id = "asset_job_reconcile_ready_file"
+    mission.brief_json = {
+        **mission.brief_json,
+        "assetGenerationJobs": [
+            {
+                "jobId": job_id,
+                "contentId": mission.id,
+                "teacherId": "user_teacher_demo",
+                "status": "running",
+                "queuedAt": "2026-05-17T00:00:00+00:00",
+                "startedAt": "2026-05-17T00:00:00+00:00",
+                "completedAt": None,
+                "totalCount": 1,
+                "completedCount": 0,
+                "failedCount": 0,
+                "generatedCount": 0,
+                "assets": [
+                    {
+                        "assetId": target_asset.id,
+                        "assetRole": target_asset.asset_role.value,
+                        "assetType": target_asset.asset_type.value,
+                        "stageId": target_asset.stage_id,
+                        "status": "running",
+                        "errorCode": None,
+                        "errorMessage": None,
+                        "updatedAt": "2026-05-17T00:00:00+00:00",
+                        "storageUrl": "",
+                        "previewUrl": None,
+                        "qaStatus": "pending",
+                        "approvalStatus": "pending",
+                    }
+                ],
+                "errorCode": None,
+                "errorMessage": None,
+            }
+        ],
+    }
+    store.save_generated_mission_content(mission)
+
+    status = client.get(f"/api/contents/{content_id}/assets/generation-jobs/{job_id}")
+    assert status.status_code == 200, status.json()
+    job = status.json()["data"]
+    assert job["status"] == "succeeded"
+    assert job["assets"][0]["status"] == "succeeded"
+    assert job["assets"][0]["qaStatus"] == "passed"
+    assert job["assets"][0]["storageUrl"] == f"/generated/{relative_path}"
+
+    refreshed = client.get(f"/api/contents/{content_id}")
+    asset = next(asset for asset in refreshed.json()["data"]["assets"] if asset["id"] == target_asset.id)
+    assert asset["qaStatus"] == "passed"
+    assert asset["storageUrl"] == f"/generated/{relative_path}"
 
 
 def test_registered_student_generation_review_student_completion_e2e(monkeypatch, tmp_path) -> None:

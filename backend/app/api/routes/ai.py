@@ -1134,6 +1134,7 @@ def _template_json_contract(template_type: Any) -> dict[str, Any]:
             "requiredFields": [*common_fields, "question", "cards", "answerOrder", "correctFeedback", "wrongFeedback"],
             "hardRules": [
                 "answerOrder contains the card ids in the correct order.",
+                "answerOrder must follow the semantic order requested by question, not the display order of cards; for example, 더 단단한 것부터 means the hardest card id comes first.",
                 "Generated student missions should use exactly 3 cards unless the teacher explicitly requested a longer procedure.",
                 "For life_support step 3 action_selection, cards and answerOrder must contain exactly 3 items.",
             ],

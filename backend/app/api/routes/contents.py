@@ -350,6 +350,8 @@ def _get_package_assets(content) -> list:
 
 def _is_required_asset_package_ready(content) -> bool:
     assets = _get_package_assets(content)
+    for asset in assets:
+        _reconcile_generated_asset_file_metadata(content, asset)
     image_roles = {asset.asset_role for asset in assets if asset.asset_type == AssetType.IMAGE and _is_asset_ready(asset)}
     audio_roles = {asset.asset_role for asset in assets if asset.asset_type == AssetType.AUDIO and _is_asset_ready(asset)}
     required_roles = {role.value for role in AssetRole}
@@ -365,6 +367,21 @@ def _is_asset_ready(asset) -> bool:
     if asset.qa_status != "passed":
         return False
     return _asset_url_ready(asset.storage_url) or _asset_url_ready(asset.preview_url)
+
+
+def _reconcile_generated_asset_file_metadata(content, asset) -> None:
+    if _is_asset_ready(asset):
+        return
+
+    relative_path = _generated_asset_relative_path(content.student_id, content.id, asset)
+    if not _is_generated_file_ready(_generated_file_path(relative_path)):
+        return
+
+    settings = get_settings()
+    if asset.asset_type == AssetType.IMAGE:
+        _apply_generated_asset_metadata(asset, relative_path, provider="openai", model=settings.openai_image_model)
+    elif asset.asset_type == AssetType.AUDIO:
+        _apply_generated_asset_metadata(asset, relative_path, provider="elevenlabs", model=settings.elevenlabs_model_id)
 
 
 def _asset_url_ready(url: str | None) -> bool:
@@ -570,6 +587,7 @@ def _sync_asset_generation_job_with_content(content, job: dict[str, Any]) -> dic
         if asset is None:
             refreshed_assets.append(item)
             continue
+        _reconcile_generated_asset_file_metadata(content, asset)
         status = str(item.get("status") or "queued")
         error_code = item.get("errorCode")
         error_message = item.get("errorMessage")
