@@ -8,6 +8,7 @@ from app.data.demo_data import create_demo_database
 from app.db.session import create_schema, get_session_maker
 from app.repositories.agent_run_repository import AgentRunRepository
 from app.repositories.demo_repository import DemoRepository
+from app.repositories.generation_job_repository import GenerationJobRepository
 from app.services.store import DemoStore, SessionPrincipal
 
 _store_init_lock = Lock()
@@ -52,6 +53,11 @@ def get_store() -> DemoStore:
 def get_agent_run_repository() -> AgentRunRepository:
     create_schema()
     return AgentRunRepository(get_session_maker())
+
+
+def get_generation_job_repository() -> GenerationJobRepository:
+    create_schema()
+    return GenerationJobRepository(get_session_maker())
 
 
 def _extract_token(authorization: str | None) -> str | None:

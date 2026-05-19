@@ -98,19 +98,21 @@ npm run start -- -H 0.0.0.0 -p 3000
 ## 콘텐츠 생성 구조
 
 ```text
-POST /api/ai/orchestrator-runs
-  -> studentContextBrief, caseFile, requestedGoal, contentType, templateRandomization 입력
-  -> scenarioSpine, stagePlan, stageVisualSpecs, imagePackageIntent 생성
+POST /api/ai/generation-jobs
+  -> generation_jobs row 생성 또는 같은 학생/사례의 active job 반환
+  -> 백그라운드에서 orchestrator/content/asset 순서로 실행
 
-POST /api/ai/content-generations
-  -> orchestrator output과 generationPlan 입력
-  -> MissionContent, 4 stages, 10 assets record 생성
-  -> schema/quality 검증 후 DB 저장
+GET /api/ai/generation-jobs?student_id=...
+GET /api/ai/generation-jobs/{jobId}
+  -> queued/orchestrating/content_generating/asset_generating/ready_for_review/failed 상태 조회
+  -> asset 생성 진행률 completedCount/failedCount/totalCount 확인
+  -> 오래된 running 계열 job은 failed로 닫힘
 
-POST /api/contents/{contentId}/assets/generation-jobs
-  -> 이미지 5장 병렬 생성
-  -> 음성 5개 생성
-  -> asset별 상태를 briefJson.assetGenerationJobs에 저장
+내부 실행 순서
+  -> orchestrator: 수업 시나리오와 4단계 계획 생성
+  -> content: MissionContent, 4 stages, 10 assets record 생성
+  -> asset: 이미지 5장과 음성 5개 생성
+  -> 모두 성공하면 teacher_review 검토 카드로 노출
 ```
 
 관련 주요 파일:
@@ -144,6 +146,8 @@ POST /api/contents/{contentId}/assets/generation-jobs
 ## 현재 중요한 계약
 
 - 학생에게 노출되는 AI 콘텐츠는 교사 승인 전에는 published로 열리지 않습니다.
+- 생성 작업의 화면 상태는 프론트 localStorage가 아니라 백엔드 `generation_jobs` 상태를 기준으로 합니다.
+- 새로고침/학생 탭 이동 시 프론트가 예전 `agent_runs`를 찾아 생성 작업을 되살리지 않습니다.
 - 교사 검토는 `제안 검토하기` 모달에서 합니다. 별도 `교사용 미리보기` 버튼은 제거했습니다.
 - `학생 화면 열기`는 published 콘텐츠에서만 사용합니다.
 - 이미지에는 문제 UI, 선택지, 정답, 피드백을 넣지 않습니다.
@@ -160,10 +164,10 @@ POST /api/contents/{contentId}/assets/generation-jobs
    - 목표: `GET /api/teacher/support-checklists?studentType=...`
    - 저장 시 `itemId`, `groupId`, `label`, `version` 보존
 
-2. PostgreSQL migration 준비
-   - 현재: SQLite 공유 DB
-   - 목표: PostgreSQL role/database 생성 스크립트와 SQLite to PostgreSQL migration script
-   - 현재 dry-run에서 FK insert 순서 보정이 필요함
+2. PostgreSQL 운영 이관
+   - 코드: `DATABASE_URL=postgresql+psycopg://...` 기준으로 SQLAlchemy schema 생성 가능
+   - 의존성: `psycopg[binary]`
+   - 남은 운영 작업: role/database 생성, SQLite 데이터를 앱 모델로 읽어 PostgreSQL에 넣는 migration script, asset 파일 배포 방식 결정
 
 3. 학생정보 탭 UX 정리
    - 텍스트 과밀 축소
@@ -176,7 +180,7 @@ POST /api/contents/{contentId}/assets/generation-jobs
    - 템플릿 다양성 확인
 
 5. 운영 job queue
-   - 현재: FastAPI background task
+   - 현재: FastAPI background task + DB job 상태
    - 목표: durable worker/queue
 
 ## 팀 작업 방식

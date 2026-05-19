@@ -725,6 +725,52 @@ class DemoStore:
         self.persist()
         return mission
 
+    def close_generation_failed_mission_content(
+        self,
+        content_id: str,
+        teacher_id: str,
+        *,
+        reason: str,
+        requested_changes: list[str],
+    ) -> MissionContent | None:
+        self.refresh()
+        mission = self.get_mission_for_teacher(content_id, teacher_id)
+        if mission is None:
+            return None
+        mission.status = MissionStatus.REVISION_REQUESTED
+        mission.teacher_review_summary = reason
+        mission.brief_json = {
+            **mission.brief_json,
+            "generationFailedAt": _now(),
+            "generationFailureReason": reason,
+            "requestedChanges": requested_changes,
+        }
+        self.persist()
+        return mission
+
+    def mark_stale_generating_mission_contents_failed(self, *, max_age_seconds: int) -> list[MissionContent]:
+        self.refresh()
+        cutoff = datetime.now(UTC) - timedelta(seconds=max_age_seconds)
+        stale_contents: list[MissionContent] = []
+        for mission in self.db.mission_contents:
+            if mission.status != MissionStatus.GENERATING:
+                continue
+            generated_at = _parse_iso_datetime(_mission_updated_at(mission))
+            if generated_at is None or generated_at >= cutoff:
+                continue
+            mission.status = MissionStatus.REVISION_REQUESTED
+            mission.teacher_review_summary = "생성 작업이 제한 시간 안에 완료되지 않아 다시 생성이 필요합니다."
+            mission.brief_json = {
+                **mission.brief_json,
+                "generationFailedAt": _now(),
+                "generationFailureReason": "서버 재시작 또는 provider 지연으로 콘텐츠가 오래 생성 중 상태에 머물렀습니다.",
+                "requestedChanges": ["다시 제안받기를 눌러 새 자료를 생성해 주세요."],
+            }
+            stale_contents.append(mission)
+        if stale_contents:
+            self.persist()
+        return stale_contents
+
     def update_mission_content_review(self, content_id: str, teacher_id: str, stage_patches: list[ContentStagePatch]) -> MissionContent | None:
         self.refresh()
         mission = self.get_mission_for_teacher(content_id, teacher_id)

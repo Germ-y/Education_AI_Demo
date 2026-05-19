@@ -771,6 +771,49 @@ export type ContentGenerationResponse = {
   content: MissionContent | null;
 };
 
+export type GenerationJobStatus =
+  | "queued"
+  | "orchestrating"
+  | "content_generating"
+  | "asset_generating"
+  | "ready_for_review"
+  | "failed"
+  | "cancelled";
+
+export type GenerationJobRequest = {
+  studentId: string;
+  caseId: string;
+  requestedGoal?: string | null;
+  contentType?: ContentType | null;
+};
+
+export type GenerationJob = {
+  id: string;
+  teacherId: string;
+  studentId: string;
+  caseId: string;
+  contentType: ContentType;
+  requestedGoal?: string | null;
+  status: GenerationJobStatus;
+  phase: GenerationJobStatus;
+  message: string;
+  orchestratorRunId?: string | null;
+  contentRunId?: string | null;
+  contentId?: string | null;
+  assetJobId?: string | null;
+  progressJson: Record<string, unknown>;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string | null;
+};
+
+export type GenerationJobResponse = {
+  job: GenerationJob;
+  created: boolean;
+};
+
 export type AssetPackageGenerationResponse = {
   contentId: string;
   generatedCount: number;

@@ -350,6 +350,30 @@ class TeacherReportRow(Base):
     created_at: Mapped[str] = mapped_column(String)
 
 
+class GenerationJobRow(Base):
+    __tablename__ = "generation_jobs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    teacher_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    student_id: Mapped[str] = mapped_column(ForeignKey("students.id"), index=True)
+    case_id: Mapped[str] = mapped_column(ForeignKey("support_cases.id"), index=True)
+    content_type: Mapped[str] = mapped_column(String, index=True)
+    requested_goal: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String, index=True)
+    phase: Mapped[str] = mapped_column(String, index=True)
+    message: Mapped[str] = mapped_column(Text)
+    orchestrator_run_id: Mapped[str | None] = mapped_column(String, index=True)
+    content_run_id: Mapped[str | None] = mapped_column(String, index=True)
+    content_id: Mapped[str | None] = mapped_column(String, index=True)
+    asset_job_id: Mapped[str | None] = mapped_column(String, index=True)
+    progress_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    error_code: Mapped[str | None] = mapped_column(String, index=True)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[str] = mapped_column(String)
+    updated_at: Mapped[str] = mapped_column(String)
+    completed_at: Mapped[str | None] = mapped_column(String)
+
+
 class AgentRunRow(Base):
     __tablename__ = "agent_runs"
 

@@ -10,6 +10,9 @@ import type {
   DemoLoginResponse,
   MissionContent,
   OrchestratorRunResponse,
+  GenerationJob,
+  GenerationJobRequest,
+  GenerationJobResponse,
   PublicContextBundle,
   RealtimeSessionRequest,
   RealtimeSessionResponse,
@@ -55,6 +58,9 @@ export type ApiAdapter = {
   listAgentRuns(params: { studentId?: string; caseId?: string; status?: AgentRun["status"] }, options?: ApiAdapterOptions): Promise<AgentRun[]>;
   createAgentRun(payload: AgentRunRequest, options?: ApiAdapterOptions): Promise<OrchestratorRunResponse>;
   createContentGeneration(payload: ContentGenerationRequest, options?: ApiAdapterOptions): Promise<ContentGenerationResponse>;
+  createGenerationJob(payload: GenerationJobRequest, options?: ApiAdapterOptions): Promise<GenerationJobResponse>;
+  listGenerationJobs(params: { studentId?: string; caseId?: string; status?: GenerationJob["status"] }, options?: ApiAdapterOptions): Promise<GenerationJob[]>;
+  getGenerationJob(jobId: string, options?: ApiAdapterOptions): Promise<GenerationJob>;
   generateContentAssetPackage(contentId: string, options?: ApiAdapterOptions): Promise<AssetPackageGenerationResponse>;
   createContentAssetGenerationJob(contentId: string, options?: ApiAdapterOptions): Promise<AssetGenerationJob>;
   getContentAssetGenerationJob(contentId: string, jobId: string, options?: ApiAdapterOptions): Promise<AssetGenerationJob>;

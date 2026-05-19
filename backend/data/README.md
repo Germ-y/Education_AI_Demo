@@ -85,11 +85,10 @@ DB가 참조하는 `/generated/...` 파일 누락은 허용하지 않습니다.
 
 ## PostgreSQL 이관 상태
 
-PostgreSQL은 목표 운영 DB입니다. 현재 main 기준으로는 SQLAlchemy 모델이 PostgreSQL URL을 받을 수 있지만, SQLite dump를 PostgreSQL에 바로 넣는 방식은 지원하지 않습니다.
+PostgreSQL은 목표 운영 DB입니다. 현재 main 기준으로는 `DATABASE_URL=postgresql+psycopg://...` 설정 시 SQLAlchemy 모델 기반 schema 생성이 가능하고, `generation_jobs`를 포함한 신규 테이블도 `create_schema()`에서 생성됩니다. SQLite dump를 PostgreSQL에 바로 넣는 방식은 지원하지 않습니다.
 
 남은 작업:
 
 1. PostgreSQL role/database 생성 스크립트
 2. SQLite DB를 앱 모델로 읽어 PostgreSQL에 삽입하는 migration script
-3. FK insert 순서 또는 flush 처리 보정
-4. generated asset 배포/동기화 방식 결정
+3. generated asset 배포/동기화 방식 결정

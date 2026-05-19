@@ -1,3 +1,6 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,12 +11,29 @@ from app.api.response import ok
 from app.api.routes import ai, audit, auth, contents, context, public_data, review, student, teacher
 from app.core.config import get_settings
 from app.core.logging import configure_generation_logging
+from app.db.session import create_schema, get_session_maker
+from app.repositories.demo_repository import DemoRepository
+from app.repositories.generation_job_repository import GenerationJobRepository
+from app.services.store import DemoStore
+
+
+def cleanup_stale_generation_jobs() -> None:
+    create_schema()
+    session_maker = get_session_maker()
+    GenerationJobRepository(session_maker).mark_stale_running_failed(max_age_seconds=45 * 60)
+    DemoStore(repository=DemoRepository(session_maker)).mark_stale_generating_mission_contents_failed(max_age_seconds=45 * 60)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    cleanup_stale_generation_jobs()
+    yield
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_generation_logging(settings)
-    app = FastAPI(title="EduYJ Backend", version="0.1.0")
+    app = FastAPI(title="EduYJ Backend", version="0.1.0", lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,

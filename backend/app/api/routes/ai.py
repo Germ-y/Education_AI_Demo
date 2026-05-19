@@ -11,18 +11,21 @@ from app.ai.openai_provider import OpenAiProvider
 from app.ai.output_schemas import output_json_schema
 from app.ai.prompt_registry import PROMPT_SPECS, load_prompt
 from app.ai.provider_errors import AiProviderError
-from app.api.deps import get_agent_run_repository, get_store, require_teacher
+from app.api.deps import get_agent_run_repository, get_generation_job_repository, get_store, require_teacher
 from app.api.response import ok
 from app.core.config import get_settings
 from app.domain.enums import MissionStatus
-from app.domain.schemas import ContentGenerationRequest, MissionContent, OrchestratorRunRequest
+from app.domain.models import GenerationJob
+from app.domain.schemas import ContentGenerationRequest, GenerationJobRequest, MissionContent, OrchestratorRunRequest
 from app.repositories.agent_run_repository import AgentRunRepository
+from app.repositories.generation_job_repository import GenerationJobRepository
 from app.services.content_quality import ContentQualityError, validate_mission_content_quality, validate_orchestrator_plan_quality
 from app.services.store import DemoStore, SessionPrincipal
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 logger = logging.getLogger(__name__)
 _template_random = SystemRandom()
+GENERATION_JOB_STALE_AFTER_SECONDS = 45 * 60
 
 ORCHESTRATOR_STAGE_CONTRACTS: dict[str, dict[int, dict[str, Any]]] = {
     "learning_focus": {
@@ -106,6 +109,77 @@ ORCHESTRATOR_STAGE_CONTRACTS: dict[str, dict[int, dict[str, Any]]] = {
         },
     },
 }
+
+
+@router.post("/generation-jobs")
+def create_generation_job(
+    payload: GenerationJobRequest,
+    background_tasks: BackgroundTasks,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+    agent_runs: AgentRunRepository = Depends(get_agent_run_repository),
+    generation_jobs: GenerationJobRepository = Depends(get_generation_job_repository),
+) -> dict:
+    generation_jobs.mark_stale_running_failed(max_age_seconds=GENERATION_JOB_STALE_AFTER_SECONDS)
+    case_file = demo_store.get_student_case_file(payload.student_id)
+    if case_file is None or case_file["openCase"]["id"] != payload.case_id:
+        raise HTTPException(status_code=404, detail={"code": "CASE_NOT_FOUND", "message": "학생 사례를 찾을 수 없습니다."})
+    if principal.role == "teacher" and case_file["openCase"]["ownerTeacherId"] != principal.id:
+        raise HTTPException(status_code=403, detail={"code": "FORBIDDEN", "message": "담당 학생 사례만 생성할 수 있습니다."})
+
+    content_type = str(payload.content_type or case_file["profile"]["studentType"])
+    job, created = generation_jobs.create_or_get_active(
+        teacher_id=principal.id,
+        student_id=payload.student_id,
+        case_id=payload.case_id,
+        content_type=content_type,
+        requested_goal=payload.requested_goal,
+    )
+    if created:
+        background_tasks.add_task(_run_generation_job, job.id, demo_store, agent_runs, generation_jobs)
+        logger.info(
+            "ai.generation_job.queued job_id=%s student_id=%s case_id=%s content_type=%s",
+            job.id,
+            payload.student_id,
+            payload.case_id,
+            content_type,
+        )
+    return ok({"job": job.model_dump(by_alias=True), "created": created})
+
+
+@router.get("/generation-jobs")
+def list_generation_jobs(
+    student_id: str | None = None,
+    case_id: str | None = None,
+    status: str | None = None,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+    generation_jobs: GenerationJobRepository = Depends(get_generation_job_repository),
+) -> dict:
+    generation_jobs.mark_stale_running_failed(max_age_seconds=GENERATION_JOB_STALE_AFTER_SECONDS)
+    statuses = {item.strip() for item in status.split(",") if item.strip()} if status else None
+    jobs = generation_jobs.list_recent(student_id=student_id, case_id=case_id, statuses=statuses, limit=50)
+    refreshed = [_refresh_generation_job_state(job, demo_store=demo_store, generation_jobs=generation_jobs) for job in jobs]
+    if principal.role == "teacher":
+        refreshed = [job for job in refreshed if _teacher_can_read_generation_job(job, principal.id, demo_store)]
+    return ok([job.model_dump(by_alias=True) for job in refreshed])
+
+
+@router.get("/generation-jobs/{job_id}")
+def get_generation_job(
+    job_id: str,
+    principal: SessionPrincipal = Depends(require_teacher),
+    demo_store: DemoStore = Depends(get_store),
+    generation_jobs: GenerationJobRepository = Depends(get_generation_job_repository),
+) -> dict:
+    generation_jobs.mark_stale_running_failed(max_age_seconds=GENERATION_JOB_STALE_AFTER_SECONDS)
+    job = generation_jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail={"code": "GENERATION_JOB_NOT_FOUND", "message": "생성 작업을 찾을 수 없습니다."})
+    if principal.role == "teacher" and not _teacher_can_read_generation_job(job, principal.id, demo_store):
+        raise HTTPException(status_code=403, detail={"code": "FORBIDDEN", "message": "담당 학생 생성 작업만 확인할 수 있습니다."})
+    job = _refresh_generation_job_state(job, demo_store=demo_store, generation_jobs=generation_jobs)
+    return ok(job.model_dump(by_alias=True))
 
 
 @router.post("/orchestrator-runs")
@@ -357,6 +431,334 @@ def get_agent_run(
     if agent_run is None:
         raise HTTPException(status_code=404, detail={"code": "AGENT_RUN_NOT_FOUND", "message": "AI 실행 기록을 찾을 수 없습니다."})
     return ok(agent_run.model_dump(by_alias=True))
+
+
+def _run_generation_job(
+    job_id: str,
+    demo_store: DemoStore,
+    agent_runs: AgentRunRepository,
+    generation_jobs: GenerationJobRepository,
+) -> None:
+    job = generation_jobs.get(job_id)
+    if job is None:
+        return
+
+    settings = get_settings()
+    case_file = demo_store.get_student_case_file(job.student_id)
+    if case_file is None or case_file["openCase"]["id"] != job.case_id:
+        generation_jobs.mark_failed(
+            job_id,
+            error_code="CASE_NOT_FOUND",
+            error_message="학생 사례를 찾을 수 없습니다.",
+            message="학생 사례를 찾지 못해 생성 작업을 중단했습니다.",
+        )
+        return
+
+    content_type = str(job.content_type)
+    try:
+        template_randomization = _build_template_randomization(content_type)
+        orchestrator_snapshot = {
+            "teacherId": job.teacher_id,
+            "studentId": job.student_id,
+            "caseId": job.case_id,
+            "requestedGoal": job.requested_goal,
+            "contentType": content_type,
+            "studentProfile": _minimal_student_profile(case_file),
+            "templateRandomization": template_randomization,
+            "generationMode": {
+                "contextPolicy": "minimal_student_profile_only",
+                "memoryUsed": False,
+                "caseFileUsedForAi": False,
+                "teacherRequestedGoalIsTopicSource": True,
+            },
+        }
+        generation_jobs.mark_phase(
+            job_id,
+            status="orchestrating",
+            message="수업 방향을 정리하는 중입니다.",
+            progress={"step": "orchestrating"},
+        )
+        orchestrator_spec = PROMPT_SPECS["orchestrator_plan"]
+        orchestrator_run = agent_runs.create_running(
+            agent_type="orchestrator",
+            prompt_version=orchestrator_spec.version,
+            output_schema_name=orchestrator_spec.output_schema_name,
+            input_snapshot=orchestrator_snapshot,
+            model=settings.openai_orchestrator_model,
+        )
+        generation_jobs.mark_phase(
+            job_id,
+            status="orchestrating",
+            message="수업 방향을 정리하는 중입니다.",
+            progress={"step": "orchestrating", "orchestratorRunId": orchestrator_run.id},
+            orchestrator_run_id=orchestrator_run.id,
+        )
+        _run_orchestrator_agent(
+            orchestrator_run.id,
+            settings,
+            orchestrator_snapshot,
+            job.student_id,
+            job.case_id,
+            content_type,
+            agent_runs,
+        )
+        orchestrator_run = agent_runs.get(orchestrator_run.id)
+        if orchestrator_run is None or orchestrator_run.status != "succeeded" or orchestrator_run.output_json is None:
+            _fail_generation_job_from_agent_run(
+                generation_jobs,
+                job_id,
+                orchestrator_run,
+                fallback_code="ORCHESTRATOR_RUN_FAILED",
+                fallback_message="수업 방향 생성에 실패했습니다.",
+            )
+            return
+
+        generation_plan = _build_generation_plan(orchestrator_run.output_json)
+        content_snapshot = {
+            "teacherId": job.teacher_id,
+            "studentId": job.student_id,
+            "caseId": job.case_id,
+            "orchestratorRunId": orchestrator_run.id,
+            "studentProfile": _minimal_student_profile(case_file),
+            "orchestratorPlan": orchestrator_run.output_json,
+            "generationPlan": generation_plan,
+            "generationMode": {
+                "contextPolicy": "minimal_student_profile_only",
+                "memoryUsed": False,
+                "caseFileUsedForAi": False,
+            },
+        }
+        generation_jobs.mark_phase(
+            job_id,
+            status="content_generating",
+            message="검토할 수업 콘텐츠 구조를 만드는 중입니다.",
+            progress={"step": "content_generating", "orchestratorRunId": orchestrator_run.id},
+        )
+        content_spec = PROMPT_SPECS["mission_content_package"]
+        content_run = agent_runs.create_running(
+            agent_type="content",
+            prompt_version=content_spec.version,
+            output_schema_name=content_spec.output_schema_name,
+            input_snapshot=content_snapshot,
+            model=settings.openai_content_model,
+        )
+        generation_jobs.mark_phase(
+            job_id,
+            status="content_generating",
+            message="검토할 수업 콘텐츠 구조를 만드는 중입니다.",
+            progress={"step": "content_generating", "contentRunId": content_run.id},
+            content_run_id=content_run.id,
+        )
+        _run_content_agent(
+            content_run.id,
+            settings,
+            content_snapshot,
+            job.student_id,
+            job.case_id,
+            case_file,
+            orchestrator_run.output_json,
+            demo_store,
+            agent_runs,
+        )
+        content_run = agent_runs.get(content_run.id)
+        if content_run is None or content_run.status != "succeeded":
+            _fail_generation_job_from_agent_run(
+                generation_jobs,
+                job_id,
+                content_run,
+                fallback_code="CONTENT_RUN_FAILED",
+                fallback_message="콘텐츠 생성에 실패했습니다.",
+            )
+            return
+
+        content_id = _content_id_from_agent_run(content_run)
+        if content_id is None:
+            generation_jobs.mark_failed(
+                job_id,
+                error_code="CONTENT_ID_NOT_FOUND",
+                error_message="생성된 콘텐츠 ID를 확인하지 못했습니다.",
+                message="수업 구조는 만들어졌지만 콘텐츠 ID를 확인하지 못했습니다.",
+            )
+            return
+
+        generation_jobs.mark_phase(
+            job_id,
+            status="asset_generating",
+            message="이미지와 음성 asset을 생성하는 중입니다.",
+            progress={"step": "asset_generating", "contentId": content_id},
+            content_id=content_id,
+        )
+        asset_job = _run_generation_job_assets(content_id, teacher_id=job.teacher_id, demo_store=demo_store)
+        asset_progress = _asset_job_progress(asset_job)
+        if asset_job.get("status") == "succeeded":
+            generation_jobs.mark_ready(job_id, content_id=content_id, asset_job_id=asset_job.get("jobId"), progress=asset_progress)
+            return
+
+        failure_message = str(asset_job.get("errorMessage") or "수업 구조는 만들어졌지만 이미지/음성 생성에 실패했습니다.")
+        _close_failed_generation_content(
+            demo_store,
+            content_id,
+            teacher_id=job.teacher_id,
+            message=failure_message,
+            requested_changes=["이미지와 음성 asset을 다시 생성해 주세요."],
+        )
+        generation_jobs.mark_failed(
+            job_id,
+            error_code=str(asset_job.get("errorCode") or "ASSET_GENERATION_FAILED"),
+            error_message=str(asset_job.get("errorMessage") or "이미지와 음성 asset 생성에 실패했습니다."),
+            message=failure_message,
+            content_id=content_id,
+            asset_job_id=asset_job.get("jobId") if isinstance(asset_job.get("jobId"), str) else None,
+            progress=asset_progress,
+        )
+    except HTTPException as exc:
+        code, message = _error_from_http_exception(exc)
+        generation_jobs.mark_failed(job_id, error_code=code, error_message=message, message=message)
+    except Exception as exc:  # noqa: BLE001 - background job must finish in DB with a visible failure.
+        logger.exception("ai.generation_job.unhandled_failed job_id=%s", job_id)
+        generation_jobs.mark_failed(
+            job_id,
+            error_code="GENERATION_JOB_FAILED",
+            error_message=str(exc) or "생성 작업이 실패했습니다.",
+            message="자료 생성 중 오류가 발생했습니다. 다시 시도해 주세요.",
+        )
+
+
+def _run_generation_job_assets(content_id: str, *, teacher_id: str, demo_store: DemoStore) -> dict[str, Any]:
+    from app.api.routes.contents import run_asset_generation_package_job
+
+    return run_asset_generation_package_job(content_id, teacher_id=teacher_id, demo_store=demo_store)
+
+
+def _refresh_generation_job_state(
+    job: GenerationJob,
+    *,
+    demo_store: DemoStore,
+    generation_jobs: GenerationJobRepository,
+) -> GenerationJob:
+    if job.status not in {"asset_generating", "failed"} or not job.content_id or not job.asset_job_id:
+        return job
+
+    from app.api.routes.contents import get_asset_generation_package_job_snapshot
+
+    asset_job = get_asset_generation_package_job_snapshot(job.content_id, job.asset_job_id, teacher_id=job.teacher_id, demo_store=demo_store)
+    if asset_job is None:
+        return job
+
+    progress = _asset_job_progress(asset_job)
+    if asset_job.get("status") == "succeeded":
+        return generation_jobs.mark_ready(job.id, content_id=job.content_id, asset_job_id=job.asset_job_id, progress=progress) or job
+    if asset_job.get("status") in {"failed", "partial_failed"}:
+        failure_message = str(asset_job.get("errorMessage") or "수업 구조는 만들어졌지만 이미지/음성 생성에 실패했습니다.")
+        _close_failed_generation_content(
+            demo_store,
+            job.content_id,
+            teacher_id=job.teacher_id,
+            message=failure_message,
+            requested_changes=["이미지와 음성 asset을 다시 생성해 주세요."],
+        )
+        return generation_jobs.mark_failed(
+            job.id,
+            error_code=str(asset_job.get("errorCode") or "ASSET_GENERATION_FAILED"),
+            error_message=str(asset_job.get("errorMessage") or "이미지와 음성 asset 생성에 실패했습니다."),
+            message=failure_message,
+            content_id=job.content_id,
+            asset_job_id=job.asset_job_id,
+            progress=progress,
+        ) or job
+
+    return (
+        generation_jobs.mark_phase(
+            job.id,
+            status="asset_generating",
+            message="이미지와 음성 asset을 생성하는 중입니다.",
+            progress=progress,
+            content_id=job.content_id,
+            asset_job_id=job.asset_job_id,
+        )
+        or job
+    )
+
+
+def _asset_job_progress(asset_job: dict[str, Any]) -> dict[str, Any]:
+    assets = asset_job.get("assets") if isinstance(asset_job.get("assets"), list) else []
+    return {
+        "step": "asset_generating",
+        "assetJobId": asset_job.get("jobId"),
+        "assetStatus": asset_job.get("status"),
+        "totalCount": asset_job.get("totalCount"),
+        "completedCount": asset_job.get("completedCount"),
+        "failedCount": asset_job.get("failedCount"),
+        "generatedCount": asset_job.get("generatedCount"),
+        "assets": [
+            {
+                "assetId": item.get("assetId"),
+                "assetRole": item.get("assetRole"),
+                "assetType": item.get("assetType"),
+                "status": item.get("status"),
+                "errorCode": item.get("errorCode"),
+                "errorMessage": item.get("errorMessage"),
+            }
+            for item in assets
+            if isinstance(item, dict)
+        ],
+    }
+
+
+def _close_failed_generation_content(
+    demo_store: DemoStore,
+    content_id: str,
+    *,
+    teacher_id: str,
+    message: str,
+    requested_changes: list[str],
+) -> None:
+    demo_store.close_generation_failed_mission_content(
+        content_id,
+        teacher_id,
+        reason=message,
+        requested_changes=requested_changes,
+    )
+
+
+def _content_id_from_agent_run(agent_run) -> str | None:
+    output = agent_run.output_json
+    if not isinstance(output, dict):
+        return None
+    candidate = output.get("missionContent") if isinstance(output.get("missionContent"), dict) else output
+    content_id = candidate.get("id") if isinstance(candidate, dict) else None
+    return content_id if isinstance(content_id, str) else None
+
+
+def _fail_generation_job_from_agent_run(
+    generation_jobs: GenerationJobRepository,
+    job_id: str,
+    agent_run,
+    *,
+    fallback_code: str,
+    fallback_message: str,
+) -> None:
+    code = agent_run.error_code if agent_run is not None and agent_run.error_code else fallback_code
+    message = agent_run.error_message if agent_run is not None and agent_run.error_message else fallback_message
+    generation_jobs.mark_failed(job_id, error_code=code, error_message=message, message=fallback_message)
+
+
+def _teacher_can_read_generation_job(job: GenerationJob, teacher_id: str, demo_store: DemoStore) -> bool:
+    if job.teacher_id == teacher_id:
+        return True
+    case_file = demo_store.get_student_case_file(job.student_id)
+    return bool(case_file and case_file["openCase"]["id"] == job.case_id and case_file["openCase"]["ownerTeacherId"] == teacher_id)
+
+
+def _error_from_http_exception(exc: HTTPException) -> tuple[str, str]:
+    detail = exc.detail
+    if isinstance(detail, dict):
+        code = detail.get("code") if isinstance(detail.get("code"), str) else "HTTP_ERROR"
+        message = detail.get("message") if isinstance(detail.get("message"), str) else str(detail)
+        return code, message
+    if isinstance(detail, str):
+        return "HTTP_ERROR", detail
+    return "HTTP_ERROR", str(exc)
 
 
 def _run_orchestrator_agent(

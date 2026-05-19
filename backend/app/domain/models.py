@@ -320,6 +320,41 @@ class TeacherReport(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+GenerationJobStatus = Literal[
+    "queued",
+    "orchestrating",
+    "content_generating",
+    "asset_generating",
+    "ready_for_review",
+    "failed",
+    "cancelled",
+]
+
+
+class GenerationJob(BaseModel):
+    id: str
+    teacher_id: str = Field(alias="teacherId")
+    student_id: str = Field(alias="studentId")
+    case_id: str = Field(alias="caseId")
+    content_type: StudentType = Field(alias="contentType")
+    requested_goal: str | None = Field(default=None, alias="requestedGoal")
+    status: GenerationJobStatus
+    phase: GenerationJobStatus
+    message: str
+    orchestrator_run_id: str | None = Field(default=None, alias="orchestratorRunId")
+    content_run_id: str | None = Field(default=None, alias="contentRunId")
+    content_id: str | None = Field(default=None, alias="contentId")
+    asset_job_id: str | None = Field(default=None, alias="assetJobId")
+    progress_json: dict[str, Any] = Field(default_factory=dict, alias="progressJson")
+    error_code: str | None = Field(default=None, alias="errorCode")
+    error_message: str | None = Field(default=None, alias="errorMessage")
+    created_at: str = Field(alias="createdAt")
+    updated_at: str = Field(alias="updatedAt")
+    completed_at: str | None = Field(default=None, alias="completedAt")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class AuditLog(BaseModel):
     id: str
     actor_user_id: str | None = Field(default=None, alias="actorUserId")

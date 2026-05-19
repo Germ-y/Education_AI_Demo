@@ -195,6 +195,43 @@ def get_content_asset_generation_job(
     return ok(job)
 
 
+def run_asset_generation_package_job(content_id: str, *, teacher_id: str, demo_store: DemoStore) -> dict[str, Any]:
+    content = demo_store.get_mission_for_teacher(content_id, teacher_id=teacher_id)
+    if content is None:
+        raise HTTPException(status_code=404, detail={"code": "CONTENT_NOT_FOUND", "message": "콘텐츠를 찾을 수 없습니다."})
+
+    _ensure_asset_generation_allowed(content)
+    _validate_required_asset_package(content)
+
+    job = _get_active_asset_generation_job(content)
+    if job is None:
+        job = _create_asset_generation_job(content, teacher_id=teacher_id)
+        _promote_content_to_teacher_review_if_assets_ready(content)
+        demo_store.save_generated_mission_content(content)
+
+    if job["status"] == "queued":
+        _run_asset_generation_job(content.id, job["jobId"], teacher_id, demo_store)
+
+    refreshed_content = demo_store.get_mission_for_teacher(content_id, teacher_id=teacher_id)
+    if refreshed_content is None:
+        return job
+    refreshed_job = _get_asset_generation_job(refreshed_content, job["jobId"], refresh=True) or job
+    _promote_content_to_teacher_review_if_assets_ready(refreshed_content)
+    demo_store.save_generated_mission_content(refreshed_content)
+    return refreshed_job
+
+
+def get_asset_generation_package_job_snapshot(content_id: str, job_id: str, *, teacher_id: str, demo_store: DemoStore) -> dict[str, Any] | None:
+    content = demo_store.get_mission_for_teacher(content_id, teacher_id=teacher_id)
+    if content is None:
+        return None
+    job = _get_asset_generation_job(content, job_id, refresh=True)
+    if job is not None:
+        _promote_content_to_teacher_review_if_assets_ready(content)
+        demo_store.save_generated_mission_content(content)
+    return job
+
+
 @router.post("/{content_id}/assets/generate-package")
 def generate_content_asset_package(
     content_id: str,

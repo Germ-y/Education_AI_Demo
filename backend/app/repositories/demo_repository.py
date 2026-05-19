@@ -166,6 +166,7 @@ def _delete_all(session: Session, *, preserve_agent_runs: bool = False) -> None:
         rows.PublicDataSourceRow,
     ]
     if not preserve_agent_runs:
+        models.insert(0, rows.GenerationJobRow)
         models.insert(0, rows.AgentRunRow)
     for model in models:
         session.execute(delete(model))

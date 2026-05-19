@@ -1,6 +1,6 @@
 import type { ApiAdapterOptions } from "../adapter";
 import { getApiAdapter, type ApiDataSource } from "../client";
-import type { AgentRunRequest, ContentGenerationRequest } from "../contracts";
+import type { AgentRunRequest, ContentGenerationRequest, GenerationJob, GenerationJobRequest } from "../contracts";
 
 export function getAgentRun(agentRunId: string, options?: ApiAdapterOptions & { source?: ApiDataSource }) {
   return getApiAdapter(options?.source).getAgentRun(agentRunId, options);
@@ -19,6 +19,21 @@ export function createAgentRun(payload: AgentRunRequest, options?: ApiAdapterOpt
 
 export function createContentGeneration(payload: ContentGenerationRequest, options?: ApiAdapterOptions & { source?: ApiDataSource }) {
   return getApiAdapter(options?.source).createContentGeneration(payload, options);
+}
+
+export function createGenerationJob(payload: GenerationJobRequest, options?: ApiAdapterOptions & { source?: ApiDataSource }) {
+  return getApiAdapter(options?.source).createGenerationJob(payload, options);
+}
+
+export function listGenerationJobs(
+  params: { studentId?: string; caseId?: string; status?: GenerationJob["status"] },
+  options?: ApiAdapterOptions & { source?: ApiDataSource },
+) {
+  return getApiAdapter(options?.source).listGenerationJobs(params, options);
+}
+
+export function getGenerationJob(jobId: string, options?: ApiAdapterOptions & { source?: ApiDataSource }) {
+  return getApiAdapter(options?.source).getGenerationJob(jobId, options);
 }
 
 export function generateContentAssetPackage(contentId: string, options?: ApiAdapterOptions & { source?: ApiDataSource }) {

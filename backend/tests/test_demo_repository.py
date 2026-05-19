@@ -1,4 +1,6 @@
-from sqlalchemy import text
+from datetime import UTC, datetime, timedelta
+
+from sqlalchemy import create_mock_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import BACKEND_DIR
@@ -9,6 +11,7 @@ from app.domain.enums import MissionStatus
 from app.domain.models import ActivityEvent, ContentAttempt, ReviewSummary
 from app.domain.schemas import MissionContent
 from app.repositories.demo_repository import DemoRepository
+from app.repositories.generation_job_repository import GenerationJobRepository
 from app.services.store import DemoStore
 
 
@@ -24,6 +27,88 @@ def test_file_sqlite_engine_uses_wal_and_busy_timeout(tmp_path) -> None:
     with engine.connect() as connection:
         assert connection.execute(text("PRAGMA journal_mode")).scalar_one() == "wal"
         assert connection.execute(text("PRAGMA busy_timeout")).scalar_one() == 30000
+
+
+def test_schema_compiles_for_postgresql_dialect() -> None:
+    statements: list[str] = []
+    engine = create_mock_engine("postgresql+psycopg://", lambda sql, *_args, **_kwargs: statements.append(str(sql.compile(dialect=engine.dialect))))
+
+    create_schema(engine)
+
+    assert any("CREATE TABLE generation_jobs" in statement for statement in statements)
+    assert any("CREATE TABLE mission_contents" in statement for statement in statements)
+
+
+def test_generation_job_repository_reuses_active_job_and_closes_stale_jobs() -> None:
+    engine = create_database_engine("sqlite+pysqlite:///:memory:")
+    create_schema(engine)
+    session_factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
+    repository = DemoRepository(session_factory)
+    repository.replace_database(create_demo_database())
+    generation_jobs = GenerationJobRepository(session_factory)
+
+    first_job, first_created = generation_jobs.create_or_get_active(
+        teacher_id="teacher_001",
+        student_id="student_learning_clock",
+        case_id="case_learning_clock",
+        content_type="learning_focus",
+        requested_goal="첫 번째 생성",
+    )
+    second_job, second_created = generation_jobs.create_or_get_active(
+        teacher_id="teacher_001",
+        student_id="student_learning_clock",
+        case_id="case_learning_clock",
+        content_type="learning_focus",
+        requested_goal="중복 생성",
+    )
+
+    assert first_created is True
+    assert second_created is False
+    assert second_job.id == first_job.id
+
+    closed_jobs = generation_jobs.mark_stale_running_failed(max_age_seconds=0)
+    assert [job.id for job in closed_jobs] == [first_job.id]
+    closed_job = generation_jobs.get(first_job.id)
+    assert closed_job is not None
+    assert closed_job.status == "failed"
+    assert closed_job.error_code == "GENERATION_JOB_STALE_RUNNING"
+
+
+def test_store_closes_stale_generating_mission_contents() -> None:
+    db = create_demo_database()
+    mission = db.mission_contents[0]
+    mission.status = MissionStatus.GENERATING
+    mission.brief_json = {
+        **mission.brief_json,
+        "generatedAt": (datetime.now(UTC) - timedelta(hours=2)).isoformat(),
+    }
+    store = DemoStore(seed=db)
+
+    closed_contents = store.mark_stale_generating_mission_contents_failed(max_age_seconds=60 * 60)
+
+    assert [content.id for content in closed_contents] == [mission.id]
+    assert mission.status == MissionStatus.REVISION_REQUESTED
+    assert mission.teacher_review_summary == "생성 작업이 제한 시간 안에 완료되지 않아 다시 생성이 필요합니다."
+    assert mission.brief_json["requestedChanges"] == ["다시 제안받기를 눌러 새 자료를 생성해 주세요."]
+
+
+def test_store_closes_asset_failed_generated_mission_content() -> None:
+    db = create_demo_database()
+    mission = db.mission_contents[0]
+    mission.status = MissionStatus.GENERATING
+    store = DemoStore(seed=db)
+
+    closed_content = store.close_generation_failed_mission_content(
+        mission.id,
+        "user_teacher_demo",
+        reason="이미지와 음성 asset 생성에 실패했습니다.",
+        requested_changes=["이미지와 음성 asset을 다시 생성해 주세요."],
+    )
+
+    assert closed_content is not None
+    assert closed_content.status == MissionStatus.REVISION_REQUESTED
+    assert closed_content.teacher_review_summary == "이미지와 음성 asset 생성에 실패했습니다."
+    assert closed_content.brief_json["requestedChanges"] == ["이미지와 음성 asset을 다시 생성해 주세요."]
 
 
 def test_repository_round_trips_seed_database() -> None:

@@ -4,28 +4,27 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   approveContent,
-  createAgentRun,
   createContentAssetGenerationJob,
-  createContentGeneration,
+  createGenerationJob,
   createSupportProfileDraft,
   createTeacherStudentNote,
   createTeacherReportDraft,
   confirmSupportProfile,
-  getAgentRun,
   getContentAssetGenerationJob,
+  getGenerationJob,
   getReviewableContent,
   getTeacherStudent,
   getTeacherStudentReport,
   getTeacherStudents,
-  listAgentRuns,
+  listGenerationJobs,
   publishContent,
   refreshStudentContextBrief,
   rejectContent,
   saveTeacherReport,
   updateContentReview,
-  type AgentRun,
   type AssetGenerationJob,
   type CaseNote,
+  type GenerationJob,
   type MissionContent,
   type StudentCaseFile,
   type StudentListItem,
@@ -76,108 +75,7 @@ type GenerationFeedbackCard = GenerationStatus & {
   caseId: string;
 };
 
-type PendingGenerationJob = {
-  caseId: string;
-  studentId: string;
-  requestedGoal: string;
-  contentType: string;
-  phase: "orchestrator" | "content" | "assets";
-  orchestratorRunId?: string;
-  contentRunId?: string;
-  contentId?: string;
-  assetJobId?: string;
-  startedAt: string;
-};
-
-const PENDING_GENERATION_STORAGE_KEY = "eduyj:pending-generation-jobs";
-const GENERATION_RUNNING_TIMEOUT_MS = 30 * 60 * 1000;
-const ASSET_GENERATION_RUNNING_TIMEOUT_MS = 60 * 60 * 1000;
 const ASSET_GENERATION_POLL_INTERVAL_MS = 3000;
-
-function readPendingGenerationJobs(): Record<string, PendingGenerationJob> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(PENDING_GENERATION_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<string, PendingGenerationJob>;
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function writePendingGenerationJobs(jobs: Record<string, PendingGenerationJob>) {
-  if (typeof window === "undefined") return;
-  if (Object.keys(jobs).length === 0) {
-    window.localStorage.removeItem(PENDING_GENERATION_STORAGE_KEY);
-    return;
-  }
-  window.localStorage.setItem(PENDING_GENERATION_STORAGE_KEY, JSON.stringify(jobs));
-}
-
-function getGeneratedContentId(agentRun: AgentRun) {
-  const output = agentRun.outputJson;
-  if (!output) return null;
-  const candidate = typeof output.missionContent === "object" && output.missionContent !== null ? output.missionContent : output;
-  const id = (candidate as { id?: unknown }).id;
-  return typeof id === "string" ? id : null;
-}
-
-function getSnapshotText(agentRun: AgentRun, key: string) {
-  const value = agentRun.inputSnapshotJson[key];
-  return typeof value === "string" ? value : "";
-}
-
-function isTimedOutIsoDate(value: string, timeoutMs = GENERATION_RUNNING_TIMEOUT_MS) {
-  const timestamp = new Date(value).getTime();
-  return Number.isFinite(timestamp) && Date.now() - timestamp > timeoutMs;
-}
-
-function isAgentRunTimedOut(agentRun: AgentRun) {
-  return agentRun.status === "running" && isTimedOutIsoDate(agentRun.createdAt);
-}
-
-function isPendingGenerationJobTimedOut(job: PendingGenerationJob) {
-  return isTimedOutIsoDate(
-    job.startedAt,
-    job.phase === "assets" ? ASSET_GENERATION_RUNNING_TIMEOUT_MS : GENERATION_RUNNING_TIMEOUT_MS,
-  );
-}
-
-function getPendingJobFromAgentRun(agentRun: AgentRun): PendingGenerationJob | null {
-  const studentId = getSnapshotText(agentRun, "studentId");
-  const caseId = getSnapshotText(agentRun, "caseId");
-  if (!studentId || !caseId) return null;
-
-  if (agentRun.agentType === "orchestrator") {
-    return {
-      caseId,
-      studentId,
-      requestedGoal: getSnapshotText(agentRun, "requestedGoal"),
-      contentType: getSnapshotText(agentRun, "contentType") || "learning_focus",
-      phase: "orchestrator",
-      orchestratorRunId: agentRun.id,
-      startedAt: agentRun.createdAt,
-    };
-  }
-
-  if (agentRun.agentType === "content") {
-    const contentId = agentRun.status === "succeeded" ? getGeneratedContentId(agentRun) : null;
-    return {
-      caseId,
-      studentId,
-      requestedGoal: "",
-      contentType: "learning_focus",
-      phase: contentId ? "assets" : "content",
-      orchestratorRunId: getSnapshotText(agentRun, "orchestratorRunId") || undefined,
-      contentRunId: agentRun.id,
-      contentId: contentId ?? undefined,
-      startedAt: contentId ? new Date().toISOString() : agentRun.createdAt,
-    };
-  }
-
-  return null;
-}
 
 type ReviewStageDraft = {
   step: 1 | 2 | 3 | 4;
@@ -657,18 +555,6 @@ function getReviewStageReason(stage: ReviewStageDraft) {
   return "앞 단계에서 고른 단서를 문장이나 기호와 연결해 수업 목표로 정리합니다.";
 }
 
-function getAiGenerationFailureMessage(agentRun?: AgentRun | null) {
-  if (agentRun?.errorCode === "OPENAI_API_KEY_MISSING") {
-    return "서버에 자료 생성 설정이 없어 실제 자료 생성은 아직 실행되지 않았습니다. 설정을 연결하면 같은 버튼으로 생성됩니다.";
-  }
-
-  if (agentRun?.errorMessage) {
-    return agentRun.errorMessage;
-  }
-
-  return "자료 제안을 만들지 못했습니다. 잠시 뒤 다시 시도해 주세요.";
-}
-
 function getClientGenerationErrorMessage(error: unknown) {
   const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
   if (code === "OPENAI_API_KEY_MISSING") {
@@ -718,18 +604,6 @@ function hasMissingGeneratedMedia(content: MissionContent) {
   });
 }
 
-function findPendingGenerationContent(job: PendingGenerationJob, caseFile?: StudentCaseFile | null) {
-  if (!caseFile || !job.contentId) return null;
-  return caseFile.recentContents.find((content) => content.id === job.contentId) ?? null;
-}
-
-function findCompletedReviewContentForGenerationJob(job: PendingGenerationJob, caseFile?: StudentCaseFile | null) {
-  if (!caseFile) return null;
-  const exactContent = findPendingGenerationContent(job, caseFile);
-  if (isPendingGenerationContentComplete(exactContent)) return exactContent;
-  return null;
-}
-
 function isPendingGenerationContentUsable(content: MissionContent | null): content is MissionContent {
   return (
     content !== null &&
@@ -742,6 +616,40 @@ function isPendingGenerationContentUsable(content: MissionContent | null): conte
 
 function isPendingGenerationContentComplete(content: MissionContent | null): content is MissionContent {
   return isPendingGenerationContentUsable(content) && !hasMissingGeneratedMedia(content);
+}
+
+function isGenerationJobActive(job: GenerationJob) {
+  return job.status === "queued" || job.status === "orchestrating" || job.status === "content_generating" || job.status === "asset_generating";
+}
+
+function generationJobProgressText(job: GenerationJob) {
+  const total = typeof job.progressJson.totalCount === "number" ? job.progressJson.totalCount : null;
+  const completed = typeof job.progressJson.completedCount === "number" ? job.progressJson.completedCount : null;
+  const failed = typeof job.progressJson.failedCount === "number" ? job.progressJson.failedCount : 0;
+  if (total && completed !== null) return ` (${Math.min(completed + failed, total)}/${total})`;
+  return "";
+}
+
+function generationStatusFromJob(job: GenerationJob): GenerationStatus {
+  if (job.status === "ready_for_review") {
+    return {
+      state: "succeeded",
+      message: job.message || "이미지와 음성까지 준비된 검토 자료가 만들어졌습니다.",
+    };
+  }
+
+  if (job.status === "failed" || job.status === "cancelled") {
+    return {
+      state: "failed",
+      message: job.message || job.errorMessage || "생성 작업이 실패했습니다. 다시 시도해 주세요.",
+      persistent: true,
+    };
+  }
+
+  return {
+    state: "running",
+    message: `${job.message || "검토할 수업 자료를 만들고 있습니다."}${job.status === "asset_generating" ? generationJobProgressText(job) : ""}`,
+  };
 }
 
 function wait(ms: number) {
@@ -1348,7 +1256,8 @@ export default function DashboardPage() {
   const [savingMemoCaseId, setSavingMemoCaseId] = useState<string | null>(null);
   const [lessonDrafts, setLessonDrafts] = useState<Record<string, string>>({});
   const [generationStatuses, setGenerationStatuses] = useState<Record<string, GenerationStatus>>({});
-  const [pendingGenerationJobs, setPendingGenerationJobs] = useState<Record<string, PendingGenerationJob>>(readPendingGenerationJobs);
+  const [serverGenerationJobs, setServerGenerationJobs] = useState<Record<string, GenerationJob>>({});
+  const [hiddenGenerationJobIds, setHiddenGenerationJobIds] = useState<string[]>([]);
   const generationPollLocks = useRef<Set<string>>(new Set());
   const selectedStudentIdRef = useRef(selectedStudentId);
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({});
@@ -1378,14 +1287,6 @@ export default function DashboardPage() {
     selectedStudentIdRef.current = selectedStudentId;
   }, [selectedStudentId]);
 
-  const updatePendingGenerationJobs = useCallback((updater: (current: Record<string, PendingGenerationJob>) => Record<string, PendingGenerationJob>) => {
-    setPendingGenerationJobs((current) => {
-      const next = updater(current);
-      writePendingGenerationJobs(next);
-      return next;
-    });
-  }, []);
-
   const clearGenerationFeedback = useCallback(
     (caseId: string) => {
       setGenerationStatuses((current) => {
@@ -1393,18 +1294,15 @@ export default function DashboardPage() {
         delete next[caseId];
         return next;
       });
-      updatePendingGenerationJobs((current) => {
-        const next = { ...current };
-        delete next[caseId];
-        return next;
+      setHiddenGenerationJobIds((current) => {
+        const matchingIds = Object.values(serverGenerationJobs)
+          .filter((job) => job.caseId === caseId)
+          .map((job) => job.id);
+        return Array.from(new Set([...current, ...matchingIds]));
       });
     },
-    [updatePendingGenerationJobs],
+    [serverGenerationJobs],
   );
-
-  useEffect(() => {
-    writePendingGenerationJobs(pendingGenerationJobs);
-  }, [pendingGenerationJobs]);
 
   useEffect(() => {
     if (!isTeacherTourOpen) return;
@@ -1446,63 +1344,6 @@ export default function DashboardPage() {
   }, [isTeacherTourOpen]);
 
   useEffect(() => {
-    if (!selectedStudentId) return;
-
-    let ignore = false;
-    async function restoreServerGenerationJob() {
-      try {
-        const runs = await listAgentRuns({ studentId: selectedStudentId });
-        if (ignore) return;
-        let restorableRun =
-          runs.find(
-            (run) =>
-              run.status === "running" &&
-              !isAgentRunTimedOut(run) &&
-              (run.agentType === "orchestrator" || run.agentType === "content"),
-          ) ?? null;
-        if (!restorableRun) {
-          restorableRun =
-            runs.find((run) => {
-              if (run.status !== "succeeded" || run.agentType !== "orchestrator") return false;
-              return !runs.some(
-                (candidate) =>
-                  candidate.agentType === "content" &&
-                  getSnapshotText(candidate, "orchestratorRunId") === run.id,
-              );
-            }) ?? null;
-        }
-        if (!restorableRun) {
-          for (const run of runs) {
-            if (run.status !== "succeeded" || run.agentType !== "content") continue;
-            const contentId = getGeneratedContentId(run);
-            if (!contentId) continue;
-            const content = await getReviewableContent(contentId).catch(() => null);
-            if (isPendingGenerationContentUsable(content) && hasMissingGeneratedMedia(content)) {
-              restorableRun = run;
-              break;
-            }
-          }
-        }
-        if (!restorableRun) return;
-
-        const job = getPendingJobFromAgentRun(restorableRun);
-        if (!job) return;
-        updatePendingGenerationJobs((current) => {
-          if (current[job.caseId]) return current;
-          return { ...current, [job.caseId]: job };
-        });
-      } catch {
-        // Local storage restoration still covers the normal path.
-      }
-    }
-
-    void restoreServerGenerationJob();
-    return () => {
-      ignore = true;
-    };
-  }, [selectedStudentId, updatePendingGenerationJobs]);
-
-  useEffect(() => {
     let ignore = false;
 
     async function loadStudents() {
@@ -1511,10 +1352,19 @@ export default function DashboardPage() {
         if (ignore) return;
 
         setTeacherStudentItems(items);
-        if (items.length > 0) setSelectedStudentId(items[0].studentId);
+        if (items.length > 0) {
+          setSelectedStudentId((current) => (items.some((item) => item.studentId === current) ? current : items[0].studentId));
+        } else {
+          setSelectedStudentId("");
+          setSelectedCaseFile(null);
+          setSelectedReport(null);
+        }
       } catch {
         if (ignore) return;
         setTeacherStudentItems([]);
+        setSelectedStudentId("");
+        setSelectedCaseFile(null);
+        setSelectedReport(null);
       }
     }
 
@@ -1526,7 +1376,15 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (teacherStudentItems.length === 0 || !selectedStudentId) return;
+    if (teacherStudentItems.length === 0 || !selectedStudentId) {
+      setSelectedCaseFile(null);
+      setSelectedReport(null);
+      setSelectedFeedbackId(null);
+      setOpenReportId(null);
+      setOpenReviewId(null);
+      setSupportProfileDraft(null);
+      return;
+    }
 
     let ignore = false;
     setSelectedCaseFile(null);
@@ -1554,6 +1412,101 @@ export default function DashboardPage() {
       ignore = true;
     };
   }, [selectedStudentId, teacherStudentItems.length]);
+
+  const storeServerGenerationJob = useCallback((job: GenerationJob) => {
+    setServerGenerationJobs((current) => ({ ...current, [job.id]: job }));
+    setGenerationStatuses((current) => ({ ...current, [job.caseId]: generationStatusFromJob(job) }));
+  }, []);
+
+  const syncServerGenerationJob = useCallback(
+    async (jobId: string) => {
+      if (generationPollLocks.current.has(jobId)) return;
+      generationPollLocks.current.add(jobId);
+
+      try {
+        const job = await getGenerationJob(jobId);
+        storeServerGenerationJob(job);
+
+        if (job.status === "ready_for_review" && job.contentId) {
+          const [caseFile, report] = await Promise.all([
+            getTeacherStudent(job.studentId).catch(() => null),
+            getTeacherStudentReport(job.studentId).catch(() => null),
+          ]);
+          if (caseFile && selectedStudentIdRef.current === job.studentId) {
+            setSelectedCaseFile(caseFile);
+            setReviewPreviewStep(1);
+            setOpenReviewId(job.contentId);
+          }
+          if (report && selectedStudentIdRef.current === job.studentId) {
+            setSelectedReport(report);
+          }
+        }
+      } catch (error) {
+        const message = getClientGenerationErrorMessage(error);
+        setGenerationStatuses((current) => ({
+          ...current,
+          [jobId]: {
+            state: "failed",
+            message,
+            persistent: true,
+          },
+        }));
+      } finally {
+        generationPollLocks.current.delete(jobId);
+      }
+    },
+    [storeServerGenerationJob],
+  );
+
+  useEffect(() => {
+    if (!selectedStudentId) {
+      setServerGenerationJobs({});
+      return;
+    }
+
+    let ignore = false;
+    async function loadGenerationJobs() {
+      try {
+        const jobs = await listGenerationJobs({ studentId: selectedStudentId });
+        if (ignore) return;
+        setServerGenerationJobs(Object.fromEntries(jobs.map((job) => [job.id, job])));
+        setGenerationStatuses((current) => {
+          const next = { ...current };
+          jobs.forEach((job) => {
+            next[job.caseId] = generationStatusFromJob(job);
+          });
+          return next;
+        });
+      } catch {
+        if (ignore) return;
+        setServerGenerationJobs({});
+      }
+    }
+
+    void loadGenerationJobs();
+    const timer = window.setInterval(loadGenerationJobs, 5000);
+    return () => {
+      ignore = true;
+      window.clearInterval(timer);
+    };
+  }, [selectedStudentId]);
+
+  useEffect(() => {
+    const activeJobs = Object.values(serverGenerationJobs).filter(isGenerationJobActive);
+    if (activeJobs.length === 0) return;
+
+    activeJobs.forEach((job) => {
+      void syncServerGenerationJob(job.id);
+    });
+
+    const timer = window.setInterval(() => {
+      activeJobs.forEach((job) => {
+        void syncServerGenerationJob(job.id);
+      });
+    }, 3000);
+
+    return () => window.clearInterval(timer);
+  }, [serverGenerationJobs, syncServerGenerationJob]);
 
   const dashboardStudents = useMemo<DashboardStudentView[]>(() => {
     return teacherStudentItems.map((item) => ({
@@ -1635,33 +1588,6 @@ export default function DashboardPage() {
     setSavedMemos((current) => (current[caseId] === memo ? current : { ...current, [caseId]: memo }));
     setMemoDrafts((current) => (current[caseId] === undefined ? { ...current, [caseId]: memo } : current));
   }, [activeCaseFile]);
-
-  useEffect(() => {
-    if (!activeCaseFile) return;
-
-    const completedJobIds = Object.values(pendingGenerationJobs)
-      .filter((job) => Boolean(findCompletedReviewContentForGenerationJob(job, activeCaseFile)))
-      .map((job) => job.caseId);
-    if (completedJobIds.length === 0) return;
-
-    updatePendingGenerationJobs((current) => {
-      const next = { ...current };
-      completedJobIds.forEach((caseId) => {
-        delete next[caseId];
-      });
-      return next;
-    });
-    setGenerationStatuses((currentStatuses) => {
-      const nextStatuses = { ...currentStatuses };
-      completedJobIds.forEach((caseId) => {
-        nextStatuses[caseId] = {
-          state: "succeeded",
-          message: "이미지와 음성까지 준비된 검토 자료가 만들어졌습니다.",
-        };
-      });
-      return nextStatuses;
-    });
-  }, [activeCaseFile, pendingGenerationJobs, updatePendingGenerationJobs]);
 
   const selectedCase: SupportCase = activeCaseFile
     ? toSupportCaseFromCaseFile(activeCaseFile, selectedApiStudent)
@@ -1847,89 +1773,35 @@ export default function DashboardPage() {
     ]
       .join("\n");
   }, [activeCaseFile?.profile.gradeLabel, activeCaseFile?.profile.studentType, selectedApiStudent?.studentType, selectedCase.caseType, selectedStudent.grade]);
-  const selectedPendingGenerationJobs = Object.values(pendingGenerationJobs).filter(
+  const selectedGenerationJobs = Object.values(serverGenerationJobs).filter(
     (job) => job.caseId === selectedCase.id || (selectedCase.studentId && job.studentId === selectedCase.studentId),
   );
-  const selectedPendingGenerationJob = selectedPendingGenerationJobs[0];
-  const selectedPendingGenerationContent = selectedPendingGenerationJob
-    ? findPendingGenerationContent(selectedPendingGenerationJob, activeCaseFile)
-    : null;
-  const selectedCompletedReviewContent = selectedPendingGenerationJob
-    ? findCompletedReviewContentForGenerationJob(selectedPendingGenerationJob, activeCaseFile)
-    : null;
-  const isSelectedPendingGenerationComplete =
-    isPendingGenerationContentComplete(selectedPendingGenerationContent) ||
-    isPendingGenerationContentComplete(selectedCompletedReviewContent);
-  const selectedPendingGenerationStatus: GenerationStatus | undefined = selectedPendingGenerationJob
-    ? {
-        state: isSelectedPendingGenerationComplete
-          ? "succeeded"
-          : isPendingGenerationJobTimedOut(selectedPendingGenerationJob)
-            ? "failed"
-            : "running",
-        message: isSelectedPendingGenerationComplete
-          ? "이미지와 음성까지 준비된 검토 자료가 만들어졌습니다."
-          : isPendingGenerationJobTimedOut(selectedPendingGenerationJob)
-          ? "생성 작업이 오래 응답하지 않아 멈춘 것으로 표시했습니다. 다시 제안받기를 눌러 주세요."
-          : selectedPendingGenerationJob.phase === "orchestrator"
-            ? "학생 기록을 바탕으로 수업 방향을 정리하는 중입니다."
-            : selectedPendingGenerationJob.phase === "content"
-              ? "검토할 수업 콘텐츠 구조를 만드는 중입니다."
-              : "이미지와 음성 asset을 연결하는 중입니다.",
-      }
-    : undefined;
+  const selectedVisibleGenerationJobs = selectedGenerationJobs.filter((job) => !hiddenGenerationJobIds.includes(job.id));
+  const selectedActiveGenerationJobs = selectedVisibleGenerationJobs.filter(isGenerationJobActive);
+  const selectedActiveGenerationJob = selectedActiveGenerationJobs[0] ?? null;
+  const selectedFailedGenerationJobs = selectedVisibleGenerationJobs.filter((job) => job.status === "failed" || job.status === "cancelled");
   const generationStatus =
-    isSelectedPendingGenerationComplete && selectedPendingGenerationStatus
-      ? selectedPendingGenerationStatus
-      : generationStatuses[selectedCase.id] ??
-        (selectedPendingGenerationJob ? generationStatuses[selectedPendingGenerationJob.caseId] : undefined) ??
-        selectedPendingGenerationStatus;
-  const isGeneratingContent =
-    generationStatus?.state === "running" ||
-    Boolean(
-      selectedPendingGenerationJob &&
-        !isSelectedPendingGenerationComplete &&
-        !isPendingGenerationJobTimedOut(selectedPendingGenerationJob),
-    );
+    (selectedActiveGenerationJob ? generationStatusFromJob(selectedActiveGenerationJob) : undefined) ??
+    generationStatuses[selectedCase.id] ??
+    (selectedFailedGenerationJobs[0] ? generationStatusFromJob(selectedFailedGenerationJobs[0]) : undefined);
+  const isGeneratingContent = generationStatus?.state === "running" || selectedActiveGenerationJobs.length > 0;
   const generationFeedbackState = isGeneratingContent ? "running" : generationStatus?.state;
   const generationStatusMessage =
     generationStatus?.message ?? "검토할 수업 자료를 만들고 있습니다. 잠시만 기다려 주세요.";
-  const visiblePendingGenerationJobs = selectedPendingGenerationJobs.filter(
-    (job) => !isPendingGenerationJobTimedOut(job) || findPendingGenerationContent(job, activeCaseFile) === null,
-  );
-  const pendingGenerationFeedbackCards: GenerationFeedbackCard[] =
-    visiblePendingGenerationJobs.length > 0
-      ? visiblePendingGenerationJobs.map((job, index) => {
-          const pendingContent = findPendingGenerationContent(job, activeCaseFile);
-          const completedContent = findCompletedReviewContentForGenerationJob(job, activeCaseFile);
-          const isComplete = isPendingGenerationContentComplete(pendingContent) || isPendingGenerationContentComplete(completedContent);
-          const jobStatus = generationStatuses[job.caseId];
-          const state: GenerationStatus["state"] = isComplete
-            ? "succeeded"
-            : isPendingGenerationJobTimedOut(job)
-              ? "failed"
-              : jobStatus?.state ?? "running";
-          const message =
-            jobStatus?.message ??
-            (state === "succeeded"
-              ? "이미지와 음성까지 준비된 검토 자료가 만들어졌습니다."
-              : state === "failed"
-                ? "생성 작업이 오래 응답하지 않아 멈춘 것으로 표시했습니다. 다시 제안받기를 눌러 주세요."
-                : job.phase === "orchestrator"
-                  ? "학생 기록을 바탕으로 수업 방향을 정리하는 중입니다."
-                  : job.phase === "content"
-                    ? "검토할 수업 콘텐츠 구조를 만드는 중입니다."
-                    : "이미지와 음성 asset을 연결하는 중입니다.");
-
-          return {
-            id: `${job.caseId}-${job.contentId ?? job.contentRunId ?? job.orchestratorRunId ?? index}`,
-            caseId: job.caseId,
-            state,
-            message,
-          };
-        })
-      : [];
-  const shouldShowPreparingContents = visiblePendingGenerationJobs.length === 0 && generationFeedbackState === "running";
+  const serverGenerationFeedbackCards: GenerationFeedbackCard[] = selectedVisibleGenerationJobs
+    .filter((job) => isGenerationJobActive(job) || job.status === "failed" || job.status === "cancelled")
+    .map((job) => ({
+      id: job.id,
+      caseId: job.caseId,
+      title:
+        job.status === "asset_generating"
+          ? "이미지/음성 생성 중"
+          : job.status === "failed" || job.status === "cancelled"
+            ? "생성 확인 필요"
+            : "검토 자료 생성 중",
+      ...generationStatusFromJob(job),
+    }));
+  const shouldShowPreparingContents = serverGenerationFeedbackCards.length === 0 && generationFeedbackState === "running";
   const preparingContentFeedbackCards: GenerationFeedbackCard[] = shouldShowPreparingContents
     ? selectedPreparingContents.map((content) => ({
         id: `preparing-${content.id}`,
@@ -1940,14 +1812,14 @@ export default function DashboardPage() {
       }))
     : [];
   const transientGenerationFeedbackCards: GenerationFeedbackCard[] =
-    visiblePendingGenerationJobs.length === 0 &&
+    serverGenerationFeedbackCards.length === 0 &&
     preparingContentFeedbackCards.length === 0 &&
     generationFeedbackState &&
     (generationFeedbackState === "running" || generationStatus?.persistent)
       ? [{ id: selectedCase.id || "generation-feedback", caseId: selectedCase.id, state: generationFeedbackState, message: generationStatusMessage }]
         : [];
   const generationFeedbackCards = [
-    ...pendingGenerationFeedbackCards,
+    ...serverGenerationFeedbackCards,
     ...preparingContentFeedbackCards,
     ...transientGenerationFeedbackCards,
   ];
@@ -1966,380 +1838,6 @@ export default function DashboardPage() {
     });
   };
 
-  const continueGenerationJob = useCallback(async (job: PendingGenerationJob) => {
-    if (generationPollLocks.current.has(job.caseId)) return;
-    generationPollLocks.current.add(job.caseId);
-
-    const setRunningMessage = (message: string) => {
-      setGenerationStatuses((current) => ({
-        ...current,
-        [job.caseId]: { state: "running", message },
-      }));
-    };
-
-    const failJob = (message: string) => {
-      setGenerationStatuses((current) => ({
-        ...current,
-        [job.caseId]: { state: "failed", message },
-      }));
-      updatePendingGenerationJobs((current) => {
-        const next = { ...current };
-        delete next[job.caseId];
-        return next;
-      });
-    };
-
-    const completeJob = (content: MissionContent) => {
-      const isCurrentStudentJob = selectedStudentIdRef.current === content.studentId;
-      setSelectedCaseFile((current) =>
-        current && current.profile.id === content.studentId
-          ? {
-              ...current,
-              recentContents: [content, ...current.recentContents.filter((item) => item.id !== content.id)],
-            }
-          : current,
-      );
-      if (isCurrentStudentJob) {
-        setReviewPreviewStep(1);
-        setOpenReviewId(content.id);
-      }
-      setGenerationStatuses((current) => ({
-        ...current,
-        [job.caseId]: {
-          state: "succeeded",
-          message: "이미지와 음성까지 준비된 검토 자료가 만들어졌습니다.",
-        },
-      }));
-      updatePendingGenerationJobs((current) => {
-        const next = { ...current };
-        delete next[job.caseId];
-        return next;
-      });
-    };
-
-    const completeAssetGeneration = async (assetJob: PendingGenerationJob) => {
-      if (!assetJob.contentId) {
-        failJob("생성된 콘텐츠를 찾지 못했습니다. 다시 시도해 주세요.");
-        return;
-      }
-
-      const localContent = findPendingGenerationContent(assetJob, activeCaseFile);
-      if (localContent && !isPendingGenerationContentUsable(localContent)) {
-        failJob("이 자료는 이미 사용 안 함 상태라 생성 이어가기를 중단했습니다. 새 자료 제안을 다시 실행해 주세요.");
-        return;
-      }
-      if (isPendingGenerationContentComplete(localContent)) {
-        completeJob(localContent);
-        return;
-      }
-
-      setRunningMessage("이미지와 음성 asset을 연결하는 중입니다.");
-      let generatedContent = await getReviewableContent(assetJob.contentId);
-      if (!isPendingGenerationContentUsable(generatedContent)) {
-        failJob("이 자료는 이미 사용 안 함 상태라 생성 이어가기를 중단했습니다. 새 자료 제안을 다시 실행해 주세요.");
-        return;
-      }
-      if (!hasMissingGeneratedMedia(generatedContent)) {
-        completeJob(generatedContent);
-        return;
-      }
-
-      const assetGenerationResult = await generateAssetPackageWithRecovery(generatedContent, {
-        assetJobId: assetJob.assetJobId,
-        onJobUpdate: (jobStatus) => {
-          updatePendingGenerationJobs((current) => ({
-            ...current,
-            [assetJob.caseId]: {
-              ...(current[assetJob.caseId] ?? assetJob),
-              phase: "assets",
-              contentId: generatedContent.id,
-              assetJobId: jobStatus.jobId,
-              startedAt: jobStatus.startedAt ?? jobStatus.queuedAt,
-            },
-          }));
-          setGenerationStatuses((current) => ({
-            ...current,
-            [assetJob.caseId]: {
-              state: isAssetGenerationJobRunning(jobStatus) ? "running" : jobStatus.status === "succeeded" ? "succeeded" : "failed",
-              message: getAssetGenerationJobMessage(jobStatus),
-            },
-          }));
-        },
-      });
-      generatedContent = assetGenerationResult.content;
-      const assetGenerationErrorMessage = assetGenerationResult.errorMessage;
-
-      setSelectedCaseFile((current) =>
-        current && current.profile.id === generatedContent.studentId
-          ? {
-              ...current,
-              recentContents: [
-                generatedContent,
-                ...current.recentContents.filter((content) => content.id !== generatedContent.id),
-              ],
-            }
-          : current,
-      );
-
-      const refreshedCaseFile = await getTeacherStudent(assetJob.studentId).catch(() => null);
-      if (refreshedCaseFile && selectedStudentIdRef.current === assetJob.studentId) {
-        setSelectedCaseFile(refreshedCaseFile);
-      }
-      const refreshedReport = await getTeacherStudentReport(assetJob.studentId).catch(() => null);
-      if (refreshedReport && selectedStudentIdRef.current === assetJob.studentId) {
-        setSelectedReport(refreshedReport);
-      }
-
-      const isGeneratedContentComplete = isPendingGenerationContentComplete(generatedContent);
-      if (isGeneratedContentComplete && selectedStudentIdRef.current === generatedContent.studentId) {
-        setReviewPreviewStep(1);
-        setOpenReviewId(generatedContent.id);
-      }
-      setGenerationStatuses((current) => ({
-        ...current,
-        [assetJob.caseId]: {
-          state: isGeneratedContentComplete ? "succeeded" : assetGenerationErrorMessage ? "failed" : "running",
-          message: assetGenerationErrorMessage
-            ? `수업 구조는 만들어졌지만 이미지/음성 생성에 실패했습니다. ${assetGenerationErrorMessage}`
-            : isGeneratedContentComplete
-              ? "이미지와 음성까지 포함한 검토용 수업 자료가 만들어졌습니다."
-              : "이미지와 음성이 준비되는 중입니다. 모두 준비되면 검토 목록에 표시됩니다.",
-          persistent: Boolean(assetGenerationErrorMessage),
-        },
-      }));
-      updatePendingGenerationJobs((current) => {
-        const next = { ...current };
-        delete next[assetJob.caseId];
-        return next;
-      });
-    };
-
-    try {
-      if (job.phase === "assets" && job.contentId) {
-        const localContent = findPendingGenerationContent(job, activeCaseFile);
-        if (isPendingGenerationContentComplete(localContent)) {
-          completeJob(localContent);
-          return;
-        }
-
-        const existingContent = await getReviewableContent(job.contentId).catch(() => null);
-        if (isPendingGenerationContentComplete(existingContent)) {
-          completeJob(existingContent);
-          return;
-        }
-      }
-
-      if (isPendingGenerationJobTimedOut(job)) {
-        failJob("생성 작업이 오래 응답하지 않아 멈춘 것으로 표시했습니다. 다시 제안받기를 눌러 주세요.");
-        return;
-      }
-
-      if (job.phase === "orchestrator") {
-        if (!job.orchestratorRunId) {
-          failJob("자료 방향 생성 기록을 찾지 못했습니다. 다시 시도해 주세요.");
-          return;
-        }
-
-        setRunningMessage("학생 기록을 바탕으로 수업 방향을 정리하는 중입니다.");
-        const orchestratorRun = await getAgentRun(job.orchestratorRunId);
-        if (isAgentRunTimedOut(orchestratorRun)) {
-          failJob("자료 방향 생성이 오래 응답하지 않아 중단된 것으로 표시했습니다. 다시 시도해 주세요.");
-          return;
-        }
-        if (orchestratorRun.status === "running") return;
-        if (orchestratorRun.status === "failed") {
-          failJob(getAiGenerationFailureMessage(orchestratorRun));
-          return;
-        }
-
-        const generationResult = await createContentGeneration({
-          orchestratorRunId: orchestratorRun.id,
-          studentId: job.studentId,
-          caseId: job.caseId,
-        });
-        if (!generationResult.agentRun) {
-          failJob("콘텐츠 생성 기록을 만들지 못했습니다. 다시 시도해 주세요.");
-          return;
-        }
-
-        updatePendingGenerationJobs((current) => ({
-          ...current,
-          [job.caseId]: {
-            ...job,
-            phase: "content",
-            contentRunId: generationResult.agentRun?.id,
-            startedAt: new Date().toISOString(),
-          },
-        }));
-        setRunningMessage("검토할 수업 콘텐츠 구조를 만드는 중입니다.");
-        return;
-      }
-
-      if (job.phase === "content") {
-        if (!job.contentRunId) {
-          failJob("콘텐츠 생성 기록을 찾지 못했습니다. 다시 시도해 주세요.");
-          return;
-        }
-
-        setRunningMessage("검토할 수업 콘텐츠 구조를 만드는 중입니다.");
-        const contentRun = await getAgentRun(job.contentRunId);
-        if (isAgentRunTimedOut(contentRun)) {
-          failJob("콘텐츠 생성이 오래 응답하지 않아 중단된 것으로 표시했습니다. 다시 시도해 주세요.");
-          return;
-        }
-        if (contentRun.status === "running") return;
-        if (contentRun.status === "failed") {
-          failJob(getAiGenerationFailureMessage(contentRun));
-          return;
-        }
-
-        const contentId = getGeneratedContentId(contentRun);
-        if (!contentId) {
-          failJob("생성된 콘텐츠 ID를 확인하지 못했습니다. 다시 시도해 주세요.");
-          return;
-        }
-
-        updatePendingGenerationJobs((current) => ({
-          ...current,
-          [job.caseId]: {
-            ...job,
-            phase: "assets",
-            contentId,
-            startedAt: new Date().toISOString(),
-          },
-        }));
-        await completeAssetGeneration({
-          ...job,
-          phase: "assets",
-          contentId,
-          startedAt: new Date().toISOString(),
-        });
-        return;
-      }
-
-      if (!job.contentId) {
-        failJob("생성된 콘텐츠를 찾지 못했습니다. 다시 시도해 주세요.");
-        return;
-      }
-
-      setRunningMessage("이미지와 음성 asset을 연결하는 중입니다.");
-      let generatedContent = await getReviewableContent(job.contentId);
-      if (!isPendingGenerationContentUsable(generatedContent)) {
-        failJob("이 자료는 이미 사용 안 함 상태라 생성 이어가기를 중단했습니다. 새 자료 제안을 다시 실행해 주세요.");
-        return;
-      }
-      const assetGenerationResult = await generateAssetPackageWithRecovery(generatedContent, {
-        assetJobId: job.assetJobId,
-        onJobUpdate: (jobStatus) => {
-          updatePendingGenerationJobs((current) => ({
-            ...current,
-            [job.caseId]: {
-              ...(current[job.caseId] ?? job),
-              phase: "assets",
-              contentId: generatedContent.id,
-              assetJobId: jobStatus.jobId,
-              startedAt: jobStatus.startedAt ?? jobStatus.queuedAt,
-            },
-          }));
-          setGenerationStatuses((current) => ({
-            ...current,
-            [job.caseId]: {
-              state: isAssetGenerationJobRunning(jobStatus) ? "running" : jobStatus.status === "succeeded" ? "succeeded" : "failed",
-              message: getAssetGenerationJobMessage(jobStatus),
-            },
-          }));
-        },
-      });
-      generatedContent = assetGenerationResult.content;
-      const assetGenerationErrorMessage = assetGenerationResult.errorMessage;
-
-      setSelectedCaseFile((current) =>
-        current && current.profile.id === generatedContent.studentId
-          ? {
-              ...current,
-              recentContents: [
-                generatedContent,
-                ...current.recentContents.filter((content) => content.id !== generatedContent.id),
-              ],
-            }
-          : current,
-      );
-
-      const refreshedCaseFile = await getTeacherStudent(job.studentId).catch(() => null);
-      if (refreshedCaseFile && selectedStudentIdRef.current === job.studentId) {
-        setSelectedCaseFile(refreshedCaseFile);
-      }
-      const refreshedReport = await getTeacherStudentReport(job.studentId).catch(() => null);
-      if (refreshedReport && selectedStudentIdRef.current === job.studentId) {
-        setSelectedReport(refreshedReport);
-      }
-
-      const isGeneratedContentComplete = isPendingGenerationContentComplete(generatedContent);
-      if (isGeneratedContentComplete && selectedStudentIdRef.current === generatedContent.studentId) {
-        setReviewPreviewStep(1);
-        setOpenReviewId(generatedContent.id);
-      }
-      setGenerationStatuses((current) => ({
-        ...current,
-        [job.caseId]: {
-          state: isGeneratedContentComplete ? "succeeded" : assetGenerationErrorMessage ? "failed" : "running",
-          message: assetGenerationErrorMessage
-            ? `수업 구조는 만들어졌지만 이미지/음성 생성에 실패했습니다. ${assetGenerationErrorMessage}`
-            : isGeneratedContentComplete
-              ? "이미지와 음성까지 포함한 검토용 수업 자료가 만들어졌습니다."
-              : "이미지와 음성이 준비되는 중입니다. 모두 준비되면 검토 목록에 표시됩니다.",
-          persistent: Boolean(assetGenerationErrorMessage),
-        },
-      }));
-      updatePendingGenerationJobs((current) => {
-        const next = { ...current };
-        delete next[job.caseId];
-        return next;
-      });
-    } catch (error) {
-      failJob(getClientGenerationErrorMessage(error));
-    } finally {
-      generationPollLocks.current.delete(job.caseId);
-    }
-  }, [activeCaseFile, updatePendingGenerationJobs]);
-
-  useEffect(() => {
-    Object.values(pendingGenerationJobs).forEach((job) => {
-      if (findCompletedReviewContentForGenerationJob(job, activeCaseFile)) {
-        setGenerationStatuses((current) => ({
-          ...current,
-          [job.caseId]: {
-            state: "succeeded",
-            message: "이미지와 음성까지 준비된 검토 자료가 만들어졌습니다.",
-          },
-        }));
-        return;
-      }
-
-      setGenerationStatuses((current) => ({
-        ...current,
-        [job.caseId]: {
-          state: "running",
-          message:
-            job.phase === "orchestrator"
-              ? "학생 기록을 바탕으로 수업 방향을 정리하는 중입니다."
-              : job.phase === "content"
-                ? "검토할 수업 콘텐츠 구조를 만드는 중입니다."
-                : "이미지와 음성 asset을 연결하는 중입니다.",
-        },
-      }));
-      void continueGenerationJob(job);
-    });
-
-    if (Object.keys(pendingGenerationJobs).length === 0) return;
-    const timer = window.setInterval(() => {
-      Object.values(readPendingGenerationJobs()).forEach((job) => {
-        void continueGenerationJob(job);
-      });
-    }, 3000);
-    return () => window.clearInterval(timer);
-  }, [activeCaseFile, continueGenerationJob, pendingGenerationJobs]);
-
   const handleGenerateContent = async (mode: "teacher_request" | "ai_recommendation" = "teacher_request") => {
     if (!selectedCase.id || !selectedCase.studentId || isGeneratingContent) return;
 
@@ -2352,50 +1850,26 @@ export default function DashboardPage() {
     setActiveTab("materials");
 
     setGenerationStatuses((current) => ({
-          ...current,
-          [selectedCase.id]: {
-            state: "running",
-            message:
-              mode === "ai_recommendation"
-                ? "학생 유형과 학년을 바탕으로 AI 추천 수업 방향을 정리하는 중입니다."
-                : "학생 기록을 바탕으로 수업 방향을 정리하는 중입니다.",
-          },
-        }));
+      ...current,
+      [selectedCase.id]: {
+        state: "running",
+        message:
+          mode === "ai_recommendation"
+            ? "학생 유형과 학년을 바탕으로 AI 추천 수업 방향을 정리하는 중입니다."
+            : "학생 기록을 바탕으로 수업 방향을 정리하는 중입니다.",
+      },
+    }));
 
     try {
-      const orchestratorResult = await createAgentRun({
+      const result = await createGenerationJob({
         studentId: selectedCase.studentId,
         caseId: selectedCase.id,
         requestedGoal,
         contentType,
       });
-
-      if (!orchestratorResult.agentRun) {
-        setGenerationStatuses((current) => ({
-          ...current,
-          [selectedCase.id]: {
-            state: "failed",
-            message: "자료 방향 생성 기록을 만들지 못했습니다. 다시 시도해 주세요.",
-          },
-        }));
-        return;
-      }
-
-      const job: PendingGenerationJob = {
-        caseId: selectedCase.id,
-        studentId: selectedCase.studentId,
-        requestedGoal,
-        contentType,
-        phase: "orchestrator",
-        orchestratorRunId: orchestratorResult.agentRun.id,
-        startedAt: new Date().toISOString(),
-      };
-
-      updatePendingGenerationJobs((current) => ({
-        ...current,
-        [selectedCase.id]: job,
-      }));
-      void continueGenerationJob(job);
+      setHiddenGenerationJobIds((current) => current.filter((id) => id !== result.job.id));
+      storeServerGenerationJob(result.job);
+      void syncServerGenerationJob(result.job.id);
     } catch (error) {
       setGenerationStatuses((current) => ({
         ...current,
@@ -2407,31 +1881,73 @@ export default function DashboardPage() {
     }
   };
 
-  const handleRetryMaterialAssets = (item: MaterialReviewItem) => {
+  const handleRetryMaterialAssets = async (item: MaterialReviewItem) => {
     if (isGeneratingContent || !hasMissingGeneratedMedia(item.content)) return;
 
-    const job: PendingGenerationJob = {
-      caseId: item.caseId,
-      studentId: item.content.studentId,
-      requestedGoal: item.content.sessionGoal,
-      contentType: item.content.contentType,
-      phase: "assets",
-      contentId: item.contentId,
-      startedAt: new Date().toISOString(),
-    };
     setActiveTab("materials");
     setGenerationStatuses((current) => ({
       ...current,
-      [job.caseId]: {
+      [item.caseId]: {
         state: "running",
         message: "실패했거나 비어 있는 이미지와 음성 asset만 다시 생성합니다.",
       },
     }));
-    updatePendingGenerationJobs((current) => ({
-      ...current,
-      [job.caseId]: job,
-    }));
-    void continueGenerationJob(job);
+
+    try {
+      const result = await generateAssetPackageWithRecovery(item.content, {
+        onJobUpdate: (jobStatus) => {
+          setGenerationStatuses((current) => ({
+            ...current,
+            [item.caseId]: {
+              state: isAssetGenerationJobRunning(jobStatus) ? "running" : jobStatus.status === "succeeded" ? "succeeded" : "failed",
+              message: getAssetGenerationJobMessage(jobStatus),
+              persistent: jobStatus.status === "failed" || jobStatus.status === "partial_failed",
+            },
+          }));
+        },
+      });
+
+      setSelectedCaseFile((current) =>
+        current && current.profile.id === result.content.studentId
+          ? {
+              ...current,
+              recentContents: [
+                result.content,
+                ...current.recentContents.filter((content) => content.id !== result.content.id),
+              ],
+            }
+          : current,
+      );
+      const [caseFile, report] = await Promise.all([
+        getTeacherStudent(item.content.studentId).catch(() => null),
+        getTeacherStudentReport(item.content.studentId).catch(() => null),
+      ]);
+      if (caseFile && selectedStudentIdRef.current === item.content.studentId) setSelectedCaseFile(caseFile);
+      if (report && selectedStudentIdRef.current === item.content.studentId) setSelectedReport(report);
+
+      const isComplete = isPendingGenerationContentComplete(result.content);
+      setGenerationStatuses((current) => ({
+        ...current,
+        [item.caseId]: {
+          state: isComplete ? "succeeded" : "failed",
+          message: result.errorMessage
+            ? `수업 구조는 만들어졌지만 이미지/음성 생성에 실패했습니다. ${result.errorMessage}`
+            : isComplete
+              ? "이미지와 음성까지 포함한 검토용 수업 자료가 만들어졌습니다."
+              : "이미지와 음성 asset 상태를 다시 확인해 주세요.",
+          persistent: !isComplete,
+        },
+      }));
+    } catch (error) {
+      setGenerationStatuses((current) => ({
+        ...current,
+        [item.caseId]: {
+          state: "failed",
+          message: getClientGenerationErrorMessage(error),
+          persistent: true,
+        },
+      }));
+    }
   };
 
   const refreshStudentData = async (studentId: string) => {
@@ -2931,6 +2447,24 @@ export default function DashboardPage() {
         </aside>
 
         <section className="min-w-0 px-5 py-5 lg:px-8">
+          {dashboardStudents.length === 0 ? (
+            <article className="flex min-h-[520px] items-center justify-center rounded-xl border border-[#d8dee8] bg-white p-8 text-center">
+              <div className="max-w-md">
+                <p className="text-sm font-black text-[#1f3a5f]">학생 관리</p>
+                <h2 className="mt-3 text-3xl font-black text-[#172033]">등록된 학생이 없습니다.</h2>
+                <p className="mt-4 text-sm font-semibold leading-6 text-[#64748b]">
+                  학생 등록을 먼저 진행하면 자료 생성, 검토, 학습 기록을 한 화면에서 이어서 확인할 수 있습니다.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsRegistrationOpen(true)}
+                  className="mt-6 rounded-md bg-[#1f3a5f] px-5 py-3 text-sm font-black text-white"
+                >
+                  학생 등록하기
+                </button>
+              </div>
+            </article>
+          ) : (
           <article className="overflow-hidden rounded-xl border border-[#d8dee8] bg-white">
             <section
               data-tour-target="student-summary"
@@ -3834,6 +3368,7 @@ export default function DashboardPage() {
             )}
             </div>
           </article>
+          )}
         </section>
       </div>
       {isTeacherTourOpen && (

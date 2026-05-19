@@ -7,6 +7,8 @@ import type {
   ContentGenerationResponse,
   ContextMe,
   DemoLoginResponse,
+  GenerationJob,
+  GenerationJobResponse,
   MissionContent,
   OrchestratorRunResponse,
   PublicContextBundle,
@@ -115,6 +117,21 @@ export const backendAdapter: ApiAdapter = {
 
   createContentGeneration: (payload, options) =>
     apiFetch<ContentGenerationResponse>("/api/ai/content-generations", { method: "POST", body: payload, token: options?.token }),
+
+  createGenerationJob: (payload, options) =>
+    apiFetch<GenerationJobResponse>("/api/ai/generation-jobs", { method: "POST", body: payload, token: options?.token }),
+
+  listGenerationJobs: (params, options) => {
+    const searchParams = new URLSearchParams();
+    if (params.studentId) searchParams.set("student_id", params.studentId);
+    if (params.caseId) searchParams.set("case_id", params.caseId);
+    if (params.status) searchParams.set("status", params.status);
+    const query = searchParams.toString();
+    return apiFetch<GenerationJob[]>(`/api/ai/generation-jobs${query ? `?${query}` : ""}`, { token: options?.token });
+  },
+
+  getGenerationJob: (jobId, options) =>
+    apiFetch<GenerationJob>(`/api/ai/generation-jobs/${encodeURIComponent(jobId)}`, { token: options?.token }),
 
   generateContentAssetPackage: (contentId, options) =>
     apiFetch<AssetPackageGenerationResponse>(`/api/contents/${encodeURIComponent(contentId)}/assets/generate-package`, {

@@ -393,6 +393,15 @@ class ContentGenerationRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class GenerationJobRequest(BaseModel):
+    student_id: str = Field(alias="studentId")
+    case_id: str = Field(alias="caseId")
+    requested_goal: str | None = Field(default=None, alias="requestedGoal")
+    content_type: Literal[StudentType.LIFE_SUPPORT, StudentType.LEARNING_FOCUS] | None = Field(default=None, alias="contentType")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
 class ContentApprovalRequest(BaseModel):
     approved_stage_ids: list[str] = Field(alias="approvedStageIds")
     approved_asset_ids: list[str] = Field(alias="approvedAssetIds")
