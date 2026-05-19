@@ -1035,6 +1035,21 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
+function TourChevronIcon({ direction }: { direction: "left" | "right" }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`block h-3 w-3 border-b-[3px] border-r-[3px] border-current ${
+        direction === "left" ? "rotate-[135deg]" : "-rotate-45"
+      }`}
+    />
+  );
+}
+
+function TourCheckIcon() {
+  return <span aria-hidden="true" className="block h-4 w-2.5 rotate-45 border-b-[3px] border-r-[3px] border-current" />;
+}
+
 function TeacherTourOverlay({
   step,
   stepIndex,
@@ -1097,17 +1112,17 @@ function TeacherTourOverlay({
               onClick={onPrevious}
               disabled={isFirst}
               aria-label="이전 안내"
-              className="grid h-10 w-10 place-items-center rounded-md border border-[#cbd5e1] bg-white text-lg font-black text-[#1f3a5f] disabled:cursor-not-allowed disabled:text-[#cbd5e1]"
+              className="grid h-11 w-11 place-items-center rounded-[14px] border border-[#cbd5e1] bg-white text-[#1f3a5f] shadow-[0_10px_24px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:border-[#94a3b8] hover:bg-[#f8fafc] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#bfdbfe] disabled:translate-y-0 disabled:cursor-not-allowed disabled:border-[#dbe3ee] disabled:bg-[#f8fafc] disabled:text-[#cbd5e1] disabled:shadow-none"
             >
-              &lt;
+              <TourChevronIcon direction="left" />
             </button>
             <button
               type="button"
               onClick={isLast ? onClose : onNext}
               aria-label={isLast ? "화면 안내 완료" : "다음 안내"}
-              className="grid h-10 w-10 place-items-center rounded-md bg-[#1f3a5f] text-lg font-black text-white"
+              className="grid h-11 w-11 place-items-center rounded-[14px] bg-[#1f3a5f] text-white shadow-[0_12px_26px_rgba(31,58,95,0.26)] transition hover:-translate-y-0.5 hover:bg-[#172b47] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#bfdbfe]"
             >
-              {isLast ? "✓" : ">"}
+              {isLast ? <TourCheckIcon /> : <TourChevronIcon direction="right" />}
             </button>
           </div>
         </div>
