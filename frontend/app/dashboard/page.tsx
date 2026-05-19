@@ -2572,7 +2572,7 @@ export default function DashboardPage() {
                         type="button"
                         onClick={() => void handleRefreshContextBrief()}
                         disabled={!selectedCase.studentId || Boolean(supportProfileAction)}
-                        className="rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-xs font-black text-[#334155] disabled:cursor-not-allowed disabled:text-[#94a3b8]"
+                        className="min-w-[8.5rem] rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-center text-xs font-black text-[#334155] disabled:cursor-not-allowed disabled:text-[#94a3b8]"
                       >
                         {supportProfileAction === "refresh" ? "갱신 중" : "기억장치 갱신"}
                       </button>
