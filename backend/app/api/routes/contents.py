@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime, timedelta
@@ -1036,6 +1037,7 @@ def _generate_asset_or_raise(content, asset, *, force: bool = False) -> None:
             prompt = _extract_image_prompt(asset.prompt_json)
             relative_path = _generated_asset_relative_path(content.student_id, content.id, asset)
             output_path = _generated_file_path(relative_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             if force and output_path.exists():
                 output_path.unlink()
             if not _is_generated_file_ready(output_path):
@@ -1068,6 +1070,7 @@ def _generate_asset_or_raise(content, asset, *, force: bool = False) -> None:
                 raise HTTPException(status_code=400, detail={"code": "ASSET_SOURCE_TEXT_MISSING", "message": "TTS asset sourceText가 필요합니다."})
             relative_path = _generated_asset_relative_path(content.student_id, content.id, asset)
             output_path = _generated_file_path(relative_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             if not _is_generated_file_ready(output_path):
                 logger.info(
                     "contents.asset.audio_started content_id=%s asset_id=%s role=%s stage_id=%s path=%s",
@@ -1788,5 +1791,10 @@ def _extract_image_prompt(prompt_json: dict | None) -> str:
     return prompt
 
 
-def _generated_file_path(relative_path: str):
-    return Path(get_settings().generated_assets_dir) / relative_path
+def _generated_file_path(relative_path: str) -> Path:
+    path = Path(get_settings().generated_assets_dir) / relative_path
+    if os.name == "nt":
+        resolved_path = str(path.resolve(strict=False))
+        if not resolved_path.startswith("\\\\?\\"):
+            return Path(f"\\\\?\\{resolved_path}")
+    return path

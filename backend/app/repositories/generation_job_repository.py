@@ -187,6 +187,7 @@ class GenerationJobRepository:
 
     def mark_stale_running_failed(self, *, max_age_seconds: int) -> list[GenerationJob]:
         cutoff = datetime.now(UTC) - timedelta(seconds=max_age_seconds)
+        force_stale = max_age_seconds <= 0
         stale_jobs: list[GenerationJob] = []
         with self.session_factory() as session:
             result = session.scalars(
@@ -197,7 +198,7 @@ class GenerationJobRepository:
             )
             for row in result:
                 updated_at = _parse_timestamp(row.updated_at or row.created_at)
-                if updated_at is None or updated_at >= cutoff:
+                if not force_stale and (updated_at is None or updated_at >= cutoff):
                     continue
                 now = _now()
                 row.status = "failed"

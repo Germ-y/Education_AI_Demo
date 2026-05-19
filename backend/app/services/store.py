@@ -1,3 +1,4 @@
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -3161,8 +3162,17 @@ def _asset_url_ready_for_review(url: str | None) -> bool:
         return False
     if url.startswith("/generated/"):
         relative_path = url.removeprefix("/generated/").lstrip("/")
-        return relative_path.startswith("assets/") and (Path(get_settings().generated_assets_dir) / relative_path).is_file()
+        return relative_path.startswith("assets/") and _generated_asset_file_path(relative_path).is_file()
     return True
+
+
+def _generated_asset_file_path(relative_path: str) -> Path:
+    path = Path(get_settings().generated_assets_dir) / relative_path
+    if os.name == "nt":
+        resolved_path = str(path.resolve(strict=False))
+        if not resolved_path.startswith("\\\\?\\"):
+            return Path(f"\\\\?\\{resolved_path}")
+    return path
 
 
 def _is_asset_ready_for_student_publish(asset: ContentAsset) -> bool:

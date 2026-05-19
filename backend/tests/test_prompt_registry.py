@@ -32,8 +32,8 @@ def test_prompts_keep_image_text_and_ui_text_separate() -> None:
     assert '"contentId"' not in content_prompt
     assert "문제 문장·보기·정답·피드백·풀이 힌트는 앱 UI가 보여줍니다." in image_prompt
     assert "정확한 문장, 숫자, 조건은 UI 필드에 둡니다." in image_prompt
-    assert "`learning_focus`: 교과 개념" in image_prompt
-    assert "`life_support`: 실제 장소" in image_prompt
+    assert "`learning_focus`: 이미 확정된 question, templateJson, sourceTextLines" in image_prompt
+    assert "`life_support`: 실제 장소, 사람 관계, 물건 배치" in image_prompt
 
 
 def test_generation_prompts_lock_stage_labels_and_randomized_templates() -> None:
