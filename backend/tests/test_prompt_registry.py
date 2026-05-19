@@ -32,7 +32,7 @@ def test_prompts_keep_image_text_and_ui_text_separate() -> None:
     assert '"contentId"' not in content_prompt
     assert "문제 문장, 보기, 정답, 피드백은 앱 UI가 보여줍니다." in image_prompt
     assert "학생이 판단할 정확한 조건과 문항은 앱 UI가 보여줍니다." in image_prompt
-    assert "이미지는 목적 있는 수업 장면을 보여줍니다." in image_prompt
+    assert "이미지는 문제와 같은 수업 상황을 보여줍니다." in image_prompt
     assert "사람은 필요할 때만 보조 맥락으로 둡니다." in image_prompt
 
 
@@ -62,7 +62,7 @@ def test_generation_prompts_require_concrete_playable_micro_scenarios() -> None:
     assert "정답은 이미지 안에 있지 않습니다." in orchestrator_prompt
     assert "목표는 학년 수준의 학습 콘텐츠입니다." in orchestrator_prompt
     assert "목표는 느린학습자가 일상에서 마주치는 상황을 이해하고 다음 행동이나 말을 고르는 시나리오입니다." in orchestrator_prompt
-    assert "문제는 UI가 풀고, 이미지는 맥락만 보여준다" in content_prompt
+    assert "이미지는 문제와 같은 상황을 보여주되 정답을 대신하지 않는다" in content_prompt
     assert "학생 화면 문장 길이 계약" in content_prompt
     assert "`question`: 80자 이하" in content_prompt
     assert "긴 글 독해가 필요한 문제는 만들지 않습니다." in content_prompt
@@ -73,13 +73,13 @@ def test_generation_prompts_require_concrete_playable_micro_scenarios() -> None:
     assert "실제 학습 판단을 요구합니다." in critique_prompt
     assert "실제 다음 행동이나 말을 고르게 합니다." in critique_prompt
     assert "source of truth" in critique_prompt
-    assert "이미지는 문제를 대신 풀어 주지 않고" in critique_prompt
+    assert "이미지는 문제와 같은 상황, 장소, 활동, 조작물을 보여주되 정답을 대신 풀어 주지 않습니다." in critique_prompt
     assert "학년에 맞는 자료 길이, 어휘, 추론 수준, 보기 수" in orchestrator_prompt
-    assert "초등 고학년과 중학생은 문장을 짧게 하더라도 소재와 표현을 유치하게 낮추지 않습니다." in content_prompt
+    assert "학년 수준은 학생이 배워야 할 개념, 상황 판단, 설명 요구의 깊이로 정합니다." in content_prompt
     assert "학년 존중감을 지킵니다." in critique_prompt
     assert "2단계는 기본 문제입니다." in content_prompt
     assert "3단계는 응용 예제입니다." in content_prompt
-    assert "초등 저학년은 문장과 선택지를 줄이되 사고 자체를 지나치게 낮추지 않습니다." in content_prompt
+    assert "읽기 부담 조정은 과제 수준을 낮추는 것이 아니라 정보 제시 방식을 정돈하는 것입니다." in content_prompt
     assert "이미지에는 학생이 읽어야 할 글, 문서, 공책 문장, 표, 안내문, 포스터 문구를 넣지 않습니다." in orchestrator_prompt
     assert "글 자료, 일기장, 공책, 안내문, 포스터, 표가 핵심 피사체가 되지 않게 합니다." in image_prompt
     assert "색/물건 이름만 묻는 단순 회상" in critique_prompt

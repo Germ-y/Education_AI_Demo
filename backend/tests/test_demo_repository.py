@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import BACKEND_DIR
@@ -15,6 +16,14 @@ def test_relative_sqlite_database_url_resolves_from_backend_dir() -> None:
     expected_path = (BACKEND_DIR / "data" / "eduyj_demo.db").resolve().as_posix()
 
     assert normalize_database_url("sqlite:///./data/eduyj_demo.db") == f"sqlite:///{expected_path}"
+
+
+def test_file_sqlite_engine_uses_wal_and_busy_timeout(tmp_path) -> None:
+    engine = create_database_engine(f"sqlite+pysqlite:///{tmp_path / 'eduyj-test.db'}")
+
+    with engine.connect() as connection:
+        assert connection.execute(text("PRAGMA journal_mode")).scalar_one() == "wal"
+        assert connection.execute(text("PRAGMA busy_timeout")).scalar_one() == 30000
 
 
 def test_repository_round_trips_seed_database() -> None:

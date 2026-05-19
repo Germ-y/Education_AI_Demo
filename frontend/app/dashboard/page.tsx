@@ -837,6 +837,26 @@ function getContentActivityTime(content: MissionContent) {
   return Number.isFinite(value) ? value : 0;
 }
 
+function getReviewContentDedupeKey(content: MissionContent) {
+  const generatedAt = typeof content.briefJson.generatedAt === "string" ? content.briefJson.generatedAt : "";
+  return [content.caseId, content.title.trim(), content.sessionGoal.trim(), content.status, generatedAt].join("::");
+}
+
+function dedupeReviewContents(contents: MissionContent[]) {
+  const byId = new Map<string, MissionContent>();
+  contents.forEach((content) => byId.set(content.id, content));
+
+  const byKey = new Map<string, MissionContent>();
+  Array.from(byId.values()).forEach((content) => {
+    const key = getReviewContentDedupeKey(content);
+    const current = byKey.get(key);
+    if (!current || getContentActivityTime(content) >= getContentActivityTime(current)) {
+      byKey.set(key, content);
+    }
+  });
+  return Array.from(byKey.values());
+}
+
 function hasGeneratedAt(content: MissionContent) {
   return typeof content.briefJson.generatedAt === "string" && content.briefJson.generatedAt.trim().length > 0;
 }
@@ -1722,20 +1742,21 @@ export default function DashboardPage() {
     return Array.from(byRecordId.values());
   }, [savedFeedbackRecords, serverSavedFeedbackRecords]);
   const completedContentIds = new Set((activeReport?.reports ?? []).map((record) => record.contentId));
-  const selectedPreparingContents = (activeCaseFile?.recentContents ?? [])
+  const visibleRecentContents = dedupeReviewContents(activeCaseFile?.recentContents ?? []);
+  const selectedPreparingContents = visibleRecentContents
     .filter((content) => !completedContentIds.has(content.id))
     .filter(isReviewQueueContent)
     .filter(hasMissingGeneratedMedia)
     .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left));
-  const selectedReviewItems = (activeCaseFile?.recentContents ?? [])
+  const selectedReviewItems = visibleRecentContents
     .filter((content) => !completedContentIds.has(content.id))
     .filter(isReviewCardReadyContent)
     .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left))
     .map((content) => mapContentToReviewItem(content));
-  const selectedPublishedContents = (activeCaseFile?.recentContents ?? [])
+  const selectedPublishedContents = visibleRecentContents
     .filter((content) => content.status === "published")
     .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left));
-  const selectedArchivedDeploymentContents = (activeCaseFile?.recentContents ?? [])
+  const selectedArchivedDeploymentContents = visibleRecentContents
     .filter((content) => content.status === "archived" && Boolean(content.publishedAt))
     .sort((left, right) => getContentActivityTime(right) - getContentActivityTime(left));
   const selectedRecords: SessionLog[] = (activeReport?.reports ?? []).map((record) => {

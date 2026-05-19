@@ -1297,12 +1297,8 @@ def test_registered_student_generation_review_student_completion_e2e(monkeypatch
             "contentType": "learning_focus",
         },
     )
-    assert blocked_orchestrator.status_code == 200, blocked_orchestrator.json()
-    blocked_orchestrator_run = client.get(
-        f"/api/ai/agent-runs/{blocked_orchestrator.json()['data']['agentRun']['id']}",
-        headers=teacher_headers,
-    ).json()["data"]
-    assert blocked_orchestrator_run["status"] == "succeeded"
+    assert blocked_orchestrator.status_code == 409, blocked_orchestrator.json()
+    assert blocked_orchestrator.json()["error"]["code"] == "CONTENT_ASSET_GENERATION_ALREADY_RUNNING"
 
     reviewable = client.get(f"/api/contents/{content_id}", headers=teacher_headers)
     assert reviewable.status_code == 200

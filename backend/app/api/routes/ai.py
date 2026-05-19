@@ -122,6 +122,17 @@ def create_orchestrator_run(
     if principal.role == "teacher" and case_file["openCase"]["ownerTeacherId"] != principal.id:
         raise HTTPException(status_code=403, detail={"code": "FORBIDDEN", "message": "담당 학생 사례만 생성할 수 있습니다."})
 
+    generating_content = demo_store.get_generating_material_for_case(payload.student_id, payload.case_id)
+    if generating_content is not None:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "CONTENT_ASSET_GENERATION_ALREADY_RUNNING",
+                "message": "이미 이미지와 음성 생성이 진행 중인 자료가 있습니다. 완료 후 다시 확인해 주세요.",
+                "details": {"contentId": generating_content.id, "status": generating_content.status},
+            },
+        )
+
     running_orchestrator = agent_runs.find_running_generation_for_case(
         student_id=payload.student_id,
         case_id=payload.case_id,
@@ -227,6 +238,17 @@ def create_content_generation(
                 "agentRun": existing_content_run.model_dump(by_alias=True),
                 "content": _content_from_agent_run(existing_content_run, demo_store, principal.id),
             }
+        )
+
+    generating_content = demo_store.get_generating_material_for_case(payload.student_id, payload.case_id)
+    if generating_content is not None:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "CONTENT_ASSET_GENERATION_ALREADY_RUNNING",
+                "message": "이미 이미지와 음성 생성이 진행 중인 자료가 있습니다. 완료 후 다시 확인해 주세요.",
+                "details": {"contentId": generating_content.id, "status": generating_content.status},
+            },
         )
 
     running_content = agent_runs.find_running_generation_for_case(

@@ -1439,6 +1439,24 @@ class DemoStore:
         ]
         return max(candidates, key=_mission_mapping_sort_key, default=None)
 
+    def get_generating_material_for_case(
+        self,
+        student_id: str,
+        case_id: str,
+        *,
+        max_age_seconds: int = 60 * 60,
+    ) -> MissionContent | None:
+        self.refresh()
+        cutoff = datetime.now(UTC) - timedelta(seconds=max_age_seconds)
+        candidates = [
+            content
+            for content in self.db.mission_contents
+            if content.student_id == student_id and content.case_id == case_id and content.status == MissionStatus.GENERATING
+            and (created_at := _parse_iso_datetime(_mission_updated_at(content))) is not None
+            and created_at >= cutoff
+        ]
+        return max(candidates, key=_mission_mapping_sort_key, default=None)
+
     def get_published_mission_for_student(self, student_id: str, content_id: str) -> MissionContent | None:
         self.refresh()
         return next(
