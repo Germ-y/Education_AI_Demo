@@ -1175,15 +1175,14 @@ def _build_image_brief_for_asset(content, asset, stages: list, stage_visual_spec
         ]
     )
     prompt_parts.append(
-        "Keep the scene natural and do not add readable labels, tables, worksheets, notebook writing, document pages, "
-        "posters, notices, speech bubbles, captions, badges, "
-        "arrows, check marks, X marks, answer cues, copied lesson sentences, or invented numbers."
+        "Do not render the exact problem sentence, answer choices, correct answer, feedback, copied lesson text, "
+        "or any visual hint that tells the answer. Incidental classroom or daily-life text may exist only as background texture "
+        "and must not be needed to solve the problem."
     )
     prompt_parts.append(
-        "Avoid app UI, worksheet layout, answer panels, scoring marks, feedback bubbles, "
-        "watermarks, logos, decorative generic scenes, split-screen comparison diagrams, "
-        "and any visual overlay that tells the answer. The image must look like a natural scene or hands-on object setup, "
-        "not an instructional diagram, notebook page, poster, notice, or source document."
+        "Use rich contextual detail: place, objects, tools, manipulatives, body positions, relationships, and activity flow. "
+        "A notebook, simple chart, measuring tool, sign, or document may appear as a natural prop, but not as a readable answer source. "
+        "Avoid app UI, answer panels, scoring marks, feedback bubbles, watermarks, logos, and decorative generic scenes."
     )
 
     return {
@@ -1235,11 +1234,9 @@ def _safe_image_anchor(value: str) -> str:
     cleaned = value.strip() if isinstance(value, str) else ""
     if not cleaned:
         return ""
-    if any(character.isdigit() for character in cleaned):
-        return ""
     if len(cleaned) > 42:
         return ""
-    blocked_words = ("문제", "정답", "보기", "선택지", "피드백", "힌트", "cm", "월", "일")
+    blocked_words = ("문제", "정답", "보기", "선택지", "피드백", "힌트")
     if any(word in cleaned for word in blocked_words):
         return ""
     return cleaned

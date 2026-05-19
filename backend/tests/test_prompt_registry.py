@@ -31,7 +31,7 @@ def test_prompts_keep_image_text_and_ui_text_separate() -> None:
     assert "assetPlaceholders" not in content_prompt
     assert '"contentId"' not in content_prompt
     assert "문제 문장, 보기, 정답, 피드백은 앱 UI가 보여줍니다." in image_prompt
-    assert "학생이 판단할 정확한 조건과 문항은 앱 UI가 보여줍니다." in image_prompt
+    assert "문제 풀이에 필요한 날짜, 숫자, 문장, 라벨은 UI가 제공합니다." in image_prompt
     assert "이미지는 문제와 같은 수업 상황을 보여줍니다." in image_prompt
     assert "사람은 필요할 때만 보조 맥락으로 둡니다." in image_prompt
 
@@ -80,8 +80,8 @@ def test_generation_prompts_require_concrete_playable_micro_scenarios() -> None:
     assert "2단계는 기본 문제입니다." in content_prompt
     assert "3단계는 응용 예제입니다." in content_prompt
     assert "읽기 부담 조정은 과제 수준을 낮추는 것이 아니라 정보 제시 방식을 정돈하는 것입니다." in content_prompt
-    assert "이미지에는 학생이 읽어야 할 글, 문서, 공책 문장, 표, 안내문, 포스터 문구를 넣지 않습니다." in orchestrator_prompt
-    assert "글 자료, 일기장, 공책, 안내문, 포스터, 표가 핵심 피사체가 되지 않게 합니다." in image_prompt
+    assert "이미지는 장소, 사람 관계, 조작물, 활동 흐름을 충분히 보여줍니다." in orchestrator_prompt
+    assert "글 자료, 일기장, 공책, 안내문, 포스터, 표가 등장할 수는 있지만" in image_prompt
     assert "색/물건 이름만 묻는 단순 회상" in critique_prompt
 
 

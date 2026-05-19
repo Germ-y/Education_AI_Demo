@@ -233,7 +233,7 @@ def create_orchestrator_run(
     settings = get_settings()
     spec = PROMPT_SPECS["orchestrator_plan"]
     content_type = str(payload.content_type or case_file["profile"]["studentType"])
-    template_randomization = _build_template_randomization(content_type)
+    template_randomization = _build_template_randomization(content_type, requested_goal=payload.requested_goal)
     input_snapshot = {
         "teacherId": principal.id,
         "studentId": payload.student_id,
@@ -456,7 +456,7 @@ def _run_generation_job(
 
     content_type = str(job.content_type)
     try:
-        template_randomization = _build_template_randomization(content_type)
+        template_randomization = _build_template_randomization(content_type, requested_goal=job.requested_goal)
         orchestrator_snapshot = {
             "teacherId": job.teacher_id,
             "studentId": job.student_id,
@@ -914,43 +914,82 @@ def _minimal_student_profile(case_file: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _build_template_randomization(content_type: str) -> dict[str, Any]:
+def _build_template_randomization(content_type: str, *, requested_goal: str | None = None) -> dict[str, Any]:
     contracts = ORCHESTRATOR_STAGE_CONTRACTS.get(content_type, {})
     forced_stage_templates: list[dict[str, Any]] = []
     candidate_templates: dict[str, list[str]] = {}
+    goal_text = str(requested_goal or "")
     for step in (2, 3):
         contract = contracts.get(step)
         if not contract:
             continue
         all_candidates = sorted(str(template) for template in contract["allowedTemplates"])
-        candidates = list(all_candidates)
-        candidate_templates[str(step)] = candidates
-        if candidates:
-            forced_stage_templates.append({"step": step, "templateType": _template_random.choice(candidates)})
+        candidate_templates[str(step)] = list(all_candidates)
+        preferred = _preferred_templates_for_goal(content_type, step, goal_text)
+        chosen_template = _choose_goal_aligned_template(preferred, all_candidates)
+        if chosen_template:
+            forced_stage_templates.append({"step": step, "templateType": chosen_template})
 
-    _ensure_randomized_template_quality(content_type, forced_stage_templates)
     return {
-        "mode": "random_per_generation",
+        "mode": "intent_weighted_per_generation",
         "randomId": uuid4().hex,
-        "policy": "2~3단계 템플릿은 매 생성마다 후보 중 랜덤으로 정하고 오케스트레이터가 그대로 사용합니다.",
+        "policy": "2~3단계 템플릿은 선생님 요청의 사고 유형을 먼저 보고, 같은 유형 안에서만 변주합니다.",
         "candidateTemplates": candidate_templates,
         "forcedStageTemplates": forced_stage_templates,
     }
 
 
-def _ensure_randomized_template_quality(content_type: str, forced_stage_templates: list[dict[str, Any]]) -> None:
-    structured_templates = {"card_match", "sequence_ordering", "blank_fill"}
-    if any(item.get("templateType") in structured_templates for item in forced_stage_templates):
-        return
+def _choose_goal_aligned_template(preferred_templates: list[str], allowed_templates: list[str]) -> str | None:
+    allowed = [template for template in preferred_templates if template in allowed_templates]
+    if allowed:
+        return _template_random.choice(allowed)
+    if allowed_templates:
+        return _template_random.choice(allowed_templates)
+    return None
 
-    replaceable = [item for item in forced_stage_templates if item.get("step") in {2, 3}]
-    if not replaceable:
-        return
-    target = _template_random.choice(replaceable)
-    allowed = ORCHESTRATOR_STAGE_CONTRACTS.get(content_type, {}).get(target["step"], {}).get("allowedTemplates", set())
-    structured_allowed = sorted(template for template in allowed if template in structured_templates)
-    if structured_allowed:
-        target["templateType"] = _template_random.choice(structured_allowed)
+
+def _preferred_templates_for_goal(content_type: str, step: int, goal_text: str) -> list[str]:
+    text = goal_text.replace(" ", "")
+    if content_type == "learning_focus":
+        return _preferred_learning_templates(step, text)
+    if content_type == "life_support":
+        return _preferred_life_templates(step, text)
+    return []
+
+
+def _has_any(text: str, keywords: tuple[str, ...]) -> bool:
+    return any(keyword in text for keyword in keywords)
+
+
+def _preferred_learning_templates(step: int, text: str) -> list[str]:
+    reason_keywords = ("이유", "근거", "주장", "설명", "판단", "왜", "오류", "틀린", "고치")
+    compare_keywords = ("비교", "차이", "가장", "크다", "작다", "많다", "적다", "순서", "절차", "차례")
+    connect_keywords = ("짝", "연결", "분류", "기준", "예시", "개념", "뜻", "단위")
+    fill_keywords = ("빈칸", "식", "계산", "문장", "조건", "비율", "비례", "분수", "소수")
+
+    if _has_any(text, reason_keywords):
+        return ["clue_question", "card_match", "scene_question"] if step == 2 else ["explanation_choice", "wrong_explanation_fix"]
+    if _has_any(text, compare_keywords):
+        return ["sequence_ordering", "card_match", "scene_question"] if step == 2 else ["sequence_ordering", "explanation_choice"]
+    if _has_any(text, connect_keywords):
+        return ["card_match", "blank_fill", "scene_question"] if step == 2 else ["explanation_choice", "card_match", "blank_fill"]
+    if _has_any(text, fill_keywords):
+        return ["blank_fill", "scene_question"] if step == 2 else ["blank_fill", "explanation_choice"]
+    return ["scene_question", "card_match", "blank_fill"] if step == 2 else ["explanation_choice", "blank_fill", "wrong_explanation_fix"]
+
+
+def _preferred_life_templates(step: int, text: str) -> list[str]:
+    sequence_keywords = ("순서", "절차", "차례", "먼저", "다음", "이후", "정리")
+    expression_keywords = ("도움", "요청", "말", "표현", "묻", "물어", "거절", "인사", "대화")
+    clue_keywords = ("단서", "확인", "찾", "살펴", "기다", "멈추")
+
+    if _has_any(text, sequence_keywords):
+        return ["scene_observation", "card_match"] if step == 2 else ["sequence_ordering", "decision_card"]
+    if _has_any(text, expression_keywords):
+        return ["scene_observation", "highlight_clue"] if step == 2 else ["decision_card", "action_choice"]
+    if _has_any(text, clue_keywords):
+        return ["highlight_clue", "scene_observation"] if step == 2 else ["action_choice", "decision_card"]
+    return ["scene_observation", "highlight_clue", "card_match"] if step == 2 else ["decision_card", "action_choice", "sequence_ordering"]
 
 
 def _forced_templates_from_randomization(template_randomization: Any) -> dict[int, str]:

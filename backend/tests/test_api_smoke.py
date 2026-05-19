@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from app.ai.elevenlabs_provider import ElevenLabsProvider
 from app.ai.openai_provider import OpenAiProvider
 from app.api.deps import get_store_instance
-from app.api.routes.ai import _normalize_orchestrator_plan_candidate, _template_json_contract
+from app.api.routes.ai import _build_template_randomization, _normalize_orchestrator_plan_candidate, _template_json_contract
 from app.core.config import get_settings
 from app.data.demo_data import create_demo_database
 from app.data.neis_client import NeisClient
@@ -619,6 +619,23 @@ def test_orchestrator_plan_normalizer_uses_randomized_template_contract() -> Non
 
     assert normalized["stagePlan"][1]["templateType"] == "card_match"
     assert normalized["stagePlan"][2]["templateType"] == "sequence_ordering"
+
+
+def test_template_randomization_uses_goal_intent_for_learning_focus() -> None:
+    randomization = _build_template_randomization("learning_focus", requested_goal="환경 보호 글에서 주장과 근거 찾기")
+    forced = {item["step"]: item["templateType"] for item in randomization["forcedStageTemplates"]}
+
+    assert randomization["mode"] == "intent_weighted_per_generation"
+    assert forced[2] in {"clue_question", "card_match", "scene_question"}
+    assert forced[3] in {"explanation_choice", "wrong_explanation_fix"}
+
+
+def test_template_randomization_uses_goal_intent_for_life_support() -> None:
+    randomization = _build_template_randomization("life_support", requested_goal="친구에게 도움을 요청하는 말을 연습하기")
+    forced = {item["step"]: item["templateType"] for item in randomization["forcedStageTemplates"]}
+
+    assert forced[2] in {"scene_observation", "highlight_clue"}
+    assert forced[3] in {"decision_card", "action_choice"}
 
 
 def test_realtime_template_json_contract_is_explicit() -> None:

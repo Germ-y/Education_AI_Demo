@@ -77,8 +77,8 @@ def test_image_brief_keeps_image_prompt_situational_and_filters_ui_question() ->
     assert "체육 행사 안내" not in prompt
     assert "장소: 운동장" not in prompt
     assert "worksheet" in prompt
-    assert "natural scene or hands-on object setup" in prompt
-    assert "not an instructional diagram, notebook page, poster, notice, or source document" in prompt
+    assert "Use rich contextual detail" in prompt
+    assert "not as a readable answer source" in prompt
     assert "sceneTextLines" not in output["imageBriefs"][0]
     assert "learningEvidence" not in output["imageBriefs"][0]
     assert "visualContext" in output["imageBriefs"][0]
