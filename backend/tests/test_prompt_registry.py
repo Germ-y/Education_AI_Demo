@@ -30,10 +30,10 @@ def test_prompts_keep_image_text_and_ui_text_separate() -> None:
     assert '"assets"' in content_prompt
     assert "assetPlaceholders" not in content_prompt
     assert '"contentId"' not in content_prompt
-    assert "문제 문장, 보기, 정답, 피드백은 앱 UI가 보여줍니다." in image_prompt
-    assert "문제 풀이에 필요한 날짜, 숫자, 문장, 라벨은 UI가 제공합니다." in image_prompt
-    assert "이미지는 문제와 같은 수업 상황을 보여줍니다." in image_prompt
-    assert "사람은 필요할 때만 보조 맥락으로 둡니다." in image_prompt
+    assert "문제 문장·보기·정답·피드백·풀이 힌트는 앱 UI가 보여줍니다." in image_prompt
+    assert "정확한 문장, 숫자, 조건은 UI 필드에 둡니다." in image_prompt
+    assert "`learning_focus`: 교과 개념" in image_prompt
+    assert "`life_support`: 실제 장소" in image_prompt
 
 
 def test_generation_prompts_lock_stage_labels_and_randomized_templates() -> None:
@@ -81,7 +81,7 @@ def test_generation_prompts_require_concrete_playable_micro_scenarios() -> None:
     assert "3단계는 응용 예제입니다." in content_prompt
     assert "읽기 부담 조정은 과제 수준을 낮추는 것이 아니라 정보 제시 방식을 정돈하는 것입니다." in content_prompt
     assert "이미지는 장소, 사람 관계, 조작물, 활동 흐름을 충분히 보여줍니다." in orchestrator_prompt
-    assert "글 자료, 일기장, 공책, 안내문, 포스터, 표가 등장할 수는 있지만" in image_prompt
+    assert "문서·공책·표·안내문은 자연스러운 소품으로 등장할 수 있지만" in image_prompt
     assert "색/물건 이름만 묻는 단순 회상" in critique_prompt
 
 
