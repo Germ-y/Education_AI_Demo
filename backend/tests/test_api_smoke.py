@@ -649,6 +649,27 @@ def test_realtime_template_json_contract_is_explicit() -> None:
     assert "stage.realtimeSpec.templateType must be exactly realtime_roleplay." in roleplay_contract["hardRules"]
 
 
+def test_template_json_contract_requires_answer_consistency() -> None:
+    choice_contract = _template_json_contract("applied_question")
+    fix_contract = _template_json_contract("wrong_explanation_fix")
+    math_rule = (
+        "For quantity, math, ratio, time, length, or condition-comparison questions, silently solve the problem "
+        "before writing JSON and ensure the selected answer is mathematically consistent."
+    )
+    division_rule = (
+        "If the task uses division with quotient and remainder, check divisor × quotient + remainder = dividend "
+        "and remainder < divisor before choosing answer."
+    )
+
+    assert "answer, the selected choice text, correctFeedback, and wrongFeedback must all describe the same correct solution." in choice_contract["hardRules"]
+    assert math_rule in choice_contract["hardRules"]
+    assert (
+        "fixedLine must be the actually correct explanation, and answer must point to the choice that means the same corrected idea."
+        in fix_contract["hardRules"]
+    )
+    assert division_rule in fix_contract["hardRules"]
+
+
 def test_teacher_can_persist_content_review_edits() -> None:
     client = TestClient(create_app())
     teacher_login = client.post(

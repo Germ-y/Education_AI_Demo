@@ -80,6 +80,10 @@ def test_generation_prompts_require_concrete_playable_micro_scenarios() -> None:
     assert "2단계는 기본 문제입니다." in content_prompt
     assert "3단계는 응용 예제입니다." in content_prompt
     assert "읽기 부담 조정은 과제 수준을 낮추는 것이 아니라 정보 제시 방식을 정돈하는 것입니다." in content_prompt
+    assert "정답 일관성 계약" in content_prompt
+    assert "`answer`, 정답 선택지 문구, `correctFeedback`, `wrongFeedback`, `fixedLine`, `acceptedAnswers`, `matches`, `answerOrder`" in content_prompt
+    assert "나누는 수 × 몫 + 나머지 = 전체 수" in content_prompt
+    assert "`fixedLine`은 실제 정답 설명이고, `answer`가 가리키는 선택지와 같은 뜻" in content_prompt
     assert "이미지는 장소, 사람 관계, 조작물, 활동 흐름을 충분히 보여줍니다." in orchestrator_prompt
     assert "문서·공책·표·안내문은 자연스러운 소품으로 등장할 수 있지만" in image_prompt
     assert "색/물건 이름만 묻는 단순 회상" in critique_prompt

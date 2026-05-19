@@ -1087,6 +1087,9 @@ def _template_json_contract(template_type: Any) -> dict[str, Any]:
             "choices is an array of objects shaped {\"id\":\"a\",\"text\":\"...\"}.",
             "answer is exactly one choice id from choices.",
             "the correct answer must be determined from question and choices, not from the image.",
+            "answer, the selected choice text, correctFeedback, and wrongFeedback must all describe the same correct solution.",
+            "For quantity, math, ratio, time, length, or condition-comparison questions, silently solve the problem "
+            "before writing JSON and ensure the selected answer is mathematically consistent.",
         ],
     }
     contracts: dict[str, dict[str, Any]] = {
@@ -1159,6 +1162,10 @@ def _template_json_contract(template_type: Any) -> dict[str, Any]:
                 "choices is an array of objects shaped {\"id\":\"a\",\"text\":\"...\"}.",
                 "answer is exactly one choice id from choices.",
                 "wrongLine is a plausible misconception and fixedLine explains the corrected idea.",
+                "fixedLine must be the actually correct explanation, and answer must point to the choice that means the same corrected idea.",
+                "If the task uses division with quotient and remainder, check divisor × quotient + remainder = dividend "
+                "and remainder < divisor before choosing answer.",
+                "wrongLine must stay wrong; fixedLine, selected choice, and correctFeedback must not contradict each other.",
             ],
         },
     }
